@@ -1,0 +1,19 @@
+```json
+{
+  "instruction_paths": [
+    "./AGENTS.md",
+    "./.codex/SKILL.md"
+  ],
+  "preferred_technologies": [
+    "Modern CSS (Grid, Flexbox)",
+    "Semantic HTML5",
+    "Native Web APIs (Popover, Dialog)",
+    "Vanilla JS (ESNext)"
+  ],
+  "crimes_to_avoid": [
+    "Using float or inline-blocks for structural layouts",
+    "Replacing buttons with div tags containing onClick listeners",
+    "Using innerHTML without explicit sanitization",
+    "Writing custom JavaScript focus traps when <dialog> can be used"
+  ]
+}

@@ -1,0 +1,20 @@
+<svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">NTE Meta logo</title>
+  <desc id="desc">Neon diamond mark for NTE Meta</desc>
+  <rect width="160" height="160" rx="24" fill="#080A12"/>
+  <path d="M80 16L132 48V112L80 144L28 112V48L80 16Z" fill="url(#paint0_linear)" fill-opacity="0.16" stroke="url(#paint1_linear)" stroke-width="6"/>
+  <path d="M49 104V56H61L91 84V56H111V104H99L69 76V104H49Z" fill="#F8FBFF"/>
+  <path d="M48 122H112" stroke="#26D9FF" stroke-width="8" stroke-linecap="round"/>
+  <path d="M36 47L51 31M126 113L142 129" stroke="#FF4EAD" stroke-width="8" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="paint0_linear" x1="25" y1="20" x2="136" y2="137" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#26D9FF"/>
+      <stop offset="0.5" stop-color="#A78BFA"/>
+      <stop offset="1" stop-color="#FF4EAD"/>
+    </linearGradient>
+    <linearGradient id="paint1_linear" x1="31" y1="28" x2="132" y2="130" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#26D9FF"/>
+      <stop offset="1" stop-color="#FF4EAD"/>
+    </linearGradient>
+  </defs>
+</svg>

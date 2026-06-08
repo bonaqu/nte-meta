@@ -9,7 +9,7 @@
 - Админка с ролями, markdown preview, YouTube, кастомными секциями и drag/drop сортировкой.
 - Worker REST API с D1, валидацией, CORS, rate limit, audit log и проверкой ролей.
 - Регистрация, вход, выход, смена пароля и `HttpOnly` session cookie.
-- PBKDF2-SHA-256, индивидуальная соль, 180000 итераций; открытые пароли не хранятся.
+- PBKDF2-SHA-256, индивидуальная соль, 20000 итераций и отдельный Worker pepper; открытые пароли и pepper не хранятся в D1.
 - Профиль поддерживает изменение отображаемого имени и безопасную смену пароля с завершением всех сессий.
 - Owner/admin видят список пользователей из D1 и могут назначать роли в пределах своих полномочий.
 - Owner может мягко удалить чужой аккаунт; Worker немедленно отзывает его активные сессии.
@@ -67,7 +67,7 @@
 Установить зависимости и применить локальные миграции:
 
 ```powershell
-Set-Location "D:\Projects\nte-hub"
+Set-Location "D:\Projects\nte-meta"
 npm install
 npm run db:migrate:local
 ```
@@ -100,7 +100,7 @@ npm run test:ui
 
 Текущие production-ресурсы:
 
-- Frontend: `https://bonaqu.github.io/nte-hub/`
+- Frontend: `https://bonaqu.github.io/nte-meta/`
 - API: `https://nte-meta-api.bonaqu.workers.dev`
 - D1: `nte-meta-db`, регион `WEUR`
 
@@ -109,7 +109,7 @@ Cloudflare D1 создан, миграции применены, Worker разв
 ### Обновить production
 
 ```powershell
-Set-Location "D:\Projects\nte-hub"
+Set-Location "D:\Projects\nte-meta"
 npm run db:migrate:remote
 npm run worker:deploy -- --env=""
 ```

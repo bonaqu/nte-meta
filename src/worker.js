@@ -19,7 +19,7 @@ const PUBLIC_GET = new Set([
 const CONTENT_ROLE = 'editor';
 const ADMIN_ROLE = 'admin';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
-const PASSWORD_ITERATIONS = 180000;
+const PASSWORD_ITERATIONS = 20000;
 const SESSION_COOKIE = 'nte_meta_session';
 const MAX_JSON_BYTES = 128 * 1024;
 
@@ -355,7 +355,7 @@ async function handleAuth(request, env, parts, ctx) {
       );
     }
     const id = crypto.randomUUID();
-    const passwordRecord = await hashPassword(password);
+    const passwordRecord = await hashPassword(password, env);
 
     let inserted;
     try {
@@ -413,6 +413,7 @@ async function handleAuth(request, env, parts, ctx) {
         user.password_salt,
         user.password_hash,
         user.password_iterations,
+        env,
       ))
     ) {
       return json({ error: 'Неверный логин или пароль' }, 401);
@@ -472,6 +473,7 @@ async function handleAuth(request, env, parts, ctx) {
         dbUser.password_salt,
         dbUser.password_hash,
         dbUser.password_iterations,
+        env,
       ))
     ) {
       return json({ error: 'Текущий пароль неверный' }, 401);
@@ -491,7 +493,7 @@ async function handleAuth(request, env, parts, ctx) {
       );
     }
 
-    const passwordRecord = await hashPassword(nextPassword);
+    const passwordRecord = await hashPassword(nextPassword, env);
     await env.DB.prepare(
       'UPDATE users SET password_hash = ?, password_salt = ?, password_iterations = ?, updated_at = current_timestamp WHERE id = ?',
     )
@@ -1929,11 +1931,12 @@ async function getSessionTokenHash(request) {
   return token ? sha256Base64(token) : null;
 }
 
-async function hashPassword(password) {
+async function hashPassword(password, env) {
   const salt = randomToken(16);
+  const passwordMaterial = await pepperPassword(password, env);
   const key = await crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(password),
+    passwordMaterial,
     'PBKDF2',
     false,
     ['deriveBits'],
@@ -1956,10 +1959,12 @@ async function verifyPassword(
   salt,
   expectedHash,
   iterations = PASSWORD_ITERATIONS,
+  env,
 ) {
+  const passwordMaterial = await pepperPassword(password, env);
   const key = await crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(password),
+    passwordMaterial,
     'PBKDF2',
     false,
     ['deriveBits'],
@@ -1978,6 +1983,26 @@ async function verifyPassword(
     bytesToBase64Url(new Uint8Array(bits)),
     expectedHash,
   );
+}
+
+async function pepperPassword(password, env) {
+  const pepper = String(env.PASSWORD_PEPPER || '');
+  if (!pepper) {
+    throwHttp('Секрет хеширования паролей не настроен', 503);
+  }
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(pepper),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    new TextEncoder().encode(password),
+  );
+  return new Uint8Array(signature);
 }
 
 async function rateLimit(request, env, action, limit, windowSeconds) {

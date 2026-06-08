@@ -11,7 +11,7 @@
     "head_sampling_rate": 1,
   },
   "secrets": {
-    "required": ["OWNER_BOOTSTRAP_TOKEN"],
+    "required": ["OWNER_BOOTSTRAP_TOKEN", "PASSWORD_PEPPER"],
   },
   "vars": {
     "FRONTEND_ORIGIN": "https://bonaqu.github.io",

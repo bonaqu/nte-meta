@@ -13,6 +13,9 @@ export default defineConfig({
       url: 'http://127.0.0.1:8788/api/characters',
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
+      env: {
+        PASSWORD_PEPPER: 'playwright-only-password-pepper',
+      },
     },
     {
       command: 'npm run dev -- --port 4174',

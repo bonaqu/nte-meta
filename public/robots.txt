@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://bonaqu.github.io/nte-hub/sitemap.xml
+Sitemap: https://bonaqu.github.io/nte-meta/sitemap.xml

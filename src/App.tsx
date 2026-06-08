@@ -2770,7 +2770,7 @@ const defaultSettings: AppSettings = {
     leaksRequireApproval: true,
   },
   seo: {
-    canonical: 'https://bonaqu.github.io/nte-hub/',
+    canonical: 'https://bonaqu.github.io/nte-meta/',
     description:
       'Русскоязычный meta-hub по Neverness to Everness с глубокими гайдами и тир-листами.',
   },

@@ -1,3 +1,4 @@
 # Скопируйте в .dev.vars только для локальной проверки защищенного bootstrap.
 # В production задавайте через: npx wrangler secret put OWNER_BOOTSTRAP_TOKEN
 OWNER_BOOTSTRAP_TOKEN=REPLACE_WITH_A_RANDOM_32_BYTE_TOKEN
+PASSWORD_PEPPER=REPLACE_WITH_ANOTHER_RANDOM_32_BYTE_TOKEN

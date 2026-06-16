@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   BookOpen,
   CheckCircle2,
@@ -21,7 +27,6 @@ import {
   Search,
   Settings,
   ShieldCheck,
-  Sparkles,
   Star,
   ThumbsDown,
   ThumbsUp,
@@ -31,6 +36,12 @@ import {
   Video,
   X,
 } from 'lucide-react';
+import {
+  EmptyState,
+  SectionHeader,
+  SkeletonGrid,
+  StatusBanner,
+} from './components/ui-state';
 import { seedData } from './data/seed';
 import {
   changePassword,
@@ -56,6 +67,15 @@ import {
   updateUserRole,
 } from './lib/api';
 import { applyMarkdownAction, MarkdownPreview } from './lib/markdown';
+import {
+  formatDate,
+  getCharacter,
+  getCharacterSearchText,
+  getGuideCharacter,
+  groupTierItems,
+  normalizeSearchText,
+  tierOrder,
+} from './lib/site-data';
 import { getYoutubeEmbedUrl } from './lib/youtube';
 import type {
   AdminUser,
@@ -83,7 +103,6 @@ const navItems = [
   { label: 'Админка / Профиль', href: '#/admin', icon: ShieldCheck },
 ];
 
-const tierOrder: Tier[] = ['S+', 'S', 'A', 'B', 'C'];
 const roleWeight: Record<User['role'], number> = {
   user: 1,
   moderator: 2,
@@ -138,41 +157,6 @@ function navigate(path: string) {
   window.location.hash = path === '/' ? '#/' : `#/${path.replace(/^\//, '')}`;
 }
 
-function formatDate(date: string) {
-  return new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(date));
-}
-
-function getCharacter(data: SiteData, id: string) {
-  return data.characters.find(
-    (character) => character.id === id || character.slug === id,
-  );
-}
-
-function getGuideCharacter(data: SiteData, guide: Guide) {
-  return getCharacter(data, guide.characterId);
-}
-
-function groupTierItems(data: SiteData, kind: 'base' | 'premium') {
-  const tierlist =
-    data.tierlists.find((item) => item.kind === kind) || data.tierlists[0];
-  const grouped = Object.fromEntries(
-    tierOrder.map((tier) => [tier, [] as Character[]]),
-  ) as Record<Tier, Character[]>;
-
-  tierlist?.items.forEach((item) => {
-    const character = getCharacter(data, item.characterId);
-    if (character) {
-      grouped[item.tier].push(character);
-    }
-  });
-
-  return { tierlist, grouped };
-}
-
 function App() {
   const route = useHashRoute();
   const [data, setData] = useState<SiteData>(seedData);
@@ -214,6 +198,25 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [route]);
+
+  useEffect(() => {
+    if (!mobileOpen) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileOpen]);
+
   const [section, slug] = route.split('/');
   let page = <HomePage data={data} loading={loading} />;
 
@@ -250,11 +253,30 @@ function App() {
       </a>
       <Header
         user={user}
+        route={route}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
       />
+      {mobileOpen ? (
+        <button
+          className="menu-backdrop mobile-only"
+          type="button"
+          aria-label="Закрыть меню вне панели"
+          onClick={() => setMobileOpen(false)}
+        />
+      ) : null}
       <main id="main-content" className="site-main">
         {error ? <StatusBanner tone="danger" text={error} /> : null}
+        {loading ? (
+          <StatusBanner
+            tone="info"
+            text={
+              hasApiBase()
+                ? 'Синхронизируем свежие данные с NTE Meta API...'
+                : 'Готовим локальные демо-данные...'
+            }
+          />
+        ) : null}
         {!hasApiBase() ? (
           <StatusBanner
             tone="info"
@@ -270,10 +292,12 @@ function App() {
 
 function Header({
   user,
+  route,
   mobileOpen,
   setMobileOpen,
 }: {
   user: User | null;
+  route: string;
   mobileOpen: boolean;
   setMobileOpen: (value: boolean) => void;
 }) {
@@ -305,11 +329,17 @@ function Header({
       >
         {navItems.map((item) => {
           const Icon = item.icon;
+          const itemRoute = item.href.replace(/^#\/?/, '');
+          const isActive =
+            itemRoute === ''
+              ? route === ''
+              : route === itemRoute || route.startsWith(`${itemRoute}/`);
           return (
             <a
               key={item.href}
-              className="nav-pill"
+              className={`nav-pill ${isActive ? 'active' : ''}`}
               href={item.href}
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => setMobileOpen(false)}
             >
               <Icon aria-hidden="true" />
@@ -327,53 +357,6 @@ function Header({
         </span>
       </a>
     </header>
-  );
-}
-
-function StatusBanner({
-  tone,
-  text,
-}: {
-  tone: 'info' | 'danger' | 'success';
-  text: string;
-}) {
-  const Icon =
-    tone === 'danger'
-      ? CircleAlert
-      : tone === 'success'
-        ? CheckCircle2
-        : Sparkles;
-  return (
-    <div
-      className={`status-banner ${tone}`}
-      role={tone === 'danger' ? 'alert' : 'status'}
-    >
-      <Icon aria-hidden="true" />
-      <span>{text}</span>
-    </div>
-  );
-}
-
-function SectionHeader({
-  eyebrow,
-  title,
-  text,
-  action,
-}: {
-  eyebrow?: string;
-  title: string;
-  text?: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="section-heading">
-      <div>
-        {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-        <h2>{title}</h2>
-        {text ? <p>{text}</p> : null}
-      </div>
-      {action}
-    </div>
   );
 }
 
@@ -447,7 +430,7 @@ function HomePage({ data, loading }: { data: SiteData; loading: boolean }) {
 
       <MetricsStrip data={data} />
 
-      {loading ? <SkeletonGrid /> : null}
+      {loading && latestGuides.length === 0 ? <SkeletonGrid /> : null}
 
       <section className="content-band">
         <SectionHeader
@@ -555,18 +538,6 @@ function MetricsStrip({ data }: { data: SiteData }) {
           </div>
         );
       })}
-    </section>
-  );
-}
-
-function SkeletonGrid() {
-  return (
-    <section className="content-band" aria-label="Загрузка данных">
-      <div className="skeleton-row">
-        <span />
-        <span />
-        <span />
-      </div>
     </section>
   );
 }
@@ -716,11 +687,20 @@ function Tags({ tags }: { tags: string[] }) {
 
 function CharactersPage({ data }: { data: SiteData }) {
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   const [role, setRole] = useState('Все роли');
   const [type, setType] = useState('Все типы');
   const [rarity, setRarity] = useState('Любая редкость');
   const [tier, setTier] = useState('Любой тир');
   const [attribute, setAttribute] = useState('Любой атрибут');
+  const indexedCharacters = useMemo(
+    () =>
+      data.characters.map((character) => ({
+        character,
+        searchText: getCharacterSearchText(character),
+      })),
+    [data.characters],
+  );
 
   const attributes = useMemo(
     () => [
@@ -732,21 +712,24 @@ function CharactersPage({ data }: { data: SiteData }) {
     [data.characters],
   );
 
-  const filtered = data.characters.filter((character) => {
-    const queryMatch =
-      !query ||
-      `${character.name} ${character.originalName} ${character.role} ${character.attribute} ${character.tags.join(' ')}`
-        .toLowerCase()
-        .includes(query.toLowerCase());
-    return (
-      queryMatch &&
-      (role === 'Все роли' || character.role === role) &&
-      (type === 'Все типы' || character.type === type) &&
-      (rarity === 'Любая редкость' || character.rarity === rarity) &&
-      (tier === 'Любой тир' || character.tier === tier) &&
-      (attribute === 'Любой атрибут' || character.attribute === attribute)
-    );
-  });
+  const filtered = useMemo(() => {
+    const normalizedQuery = normalizeSearchText(deferredQuery);
+
+    return indexedCharacters
+      .filter(({ character, searchText }) => {
+        const queryMatch =
+          !normalizedQuery || searchText.includes(normalizedQuery);
+        return (
+          queryMatch &&
+          (role === 'Все роли' || character.role === role) &&
+          (type === 'Все типы' || character.type === type) &&
+          (rarity === 'Любая редкость' || character.rarity === rarity) &&
+          (tier === 'Любой тир' || character.tier === tier) &&
+          (attribute === 'Любой атрибут' || character.attribute === attribute)
+        );
+      })
+      .map(({ character }) => character);
+  }, [attribute, deferredQuery, indexedCharacters, rarity, role, tier, type]);
 
   return (
     <div className="page-stack">
@@ -766,6 +749,7 @@ function CharactersPage({ data }: { data: SiteData }) {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Имя, роль, тег..."
+            aria-describedby="character-results-count"
           />
         </label>
         <SelectFilter
@@ -799,6 +783,13 @@ function CharactersPage({ data }: { data: SiteData }) {
           options={rarityOptions}
         />
       </section>
+      <p
+        id="character-results-count"
+        className="filter-summary"
+        aria-live="polite"
+      >
+        Найдено: {filtered.length} из {data.characters.length}
+      </p>
       {filtered.length ? (
         <section className="character-grid">
           {filtered.map((character) => (
@@ -843,16 +834,6 @@ function SelectFilter({
         ))}
       </select>
     </label>
-  );
-}
-
-function EmptyState({ title, text }: { title: string; text: string }) {
-  return (
-    <section className="empty-state">
-      <Sparkles aria-hidden="true" />
-      <h2>{title}</h2>
-      <p>{text}</p>
-    </section>
   );
 }
 
@@ -2259,11 +2240,48 @@ function AdminGuides({
 }) {
   const guide = data.guides[0];
   const [sections, setSections] = useState<GuideSection[]>(() =>
-    [...guide.sections].sort((a, b) => a.position - b.position),
+    guide ? [...guide.sections].sort((a, b) => a.position - b.position) : [],
   );
   const [markdown, setMarkdown] = useState(sections[0]?.content || '');
+  const [selectedSectionId, setSelectedSectionId] = useState(
+    sections[0]?.id || '',
+  );
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const selectedSectionIdRef = useRef(selectedSectionId);
+
+  useEffect(() => {
+    selectedSectionIdRef.current = selectedSectionId;
+  }, [selectedSectionId]);
+
+  useEffect(() => {
+    if (!guide) {
+      return;
+    }
+
+    const nextSections = [...guide.sections].sort(
+      (a, b) => a.position - b.position,
+    );
+    const selectedSection =
+      nextSections.find(
+        (section) => section.id === selectedSectionIdRef.current,
+      ) || nextSections[0];
+
+    setSections(nextSections);
+    setSelectedSectionId(selectedSection?.id || '');
+    setMarkdown(selectedSection?.content || '');
+  }, [guide]);
+
+  if (!guide) {
+    return (
+      <EmptyState
+        title="Гайдов пока нет"
+        text="Создайте первый гайд, чтобы управлять секциями и markdown-разметкой."
+      />
+    );
+  }
 
   function reorder(index: number) {
     if (dragIndex === null || dragIndex === index) {
@@ -2278,6 +2296,23 @@ function AdminGuides({
     setDragIndex(null);
   }
 
+  function selectSection(section: GuideSection) {
+    setSelectedSectionId(section.id);
+    setMarkdown(section.content);
+  }
+
+  function updateSelectedMarkdown(value: string) {
+    setMarkdown(value);
+    // Один источник правды: textarea, preview и сохранение смотрят на один массив секций.
+    setSections((current) =>
+      current.map((section) =>
+        section.id === selectedSectionId
+          ? { ...section, content: value }
+          : section,
+      ),
+    );
+  }
+
   function addSection() {
     const nextSection = {
       id: `custom-${Date.now()}`,
@@ -2288,6 +2323,7 @@ function AdminGuides({
       position: sections.length + 1,
     };
     setSections((value) => [...value, nextSection]);
+    setSelectedSectionId(nextSection.id);
     setMarkdown(nextSection.content);
   }
 
@@ -2302,22 +2338,93 @@ function AdminGuides({
       textarea.selectionEnd,
       action,
     );
-    setMarkdown(next);
+    updateSelectedMarkdown(next);
   }
 
   async function saveSections() {
-    const updatedGuide = { ...guide, sections };
+    setPending(true);
+    setMessage('');
+    const persistedSections: GuideSection[] = [];
+    const idMap = new Map<string, string>();
+
+    if (hasApiBase()) {
+      for (const section of sections) {
+        if (section.id.startsWith('custom-')) {
+          const result = await saveEntity<{ id: string }>(
+            `/api/guides/${guide.id}/sections`,
+            {
+              title: section.title,
+              type: section.type,
+              content: section.content,
+            },
+            'POST',
+          );
+
+          if (!result.ok) {
+            setMessage(result.error);
+            setPending(false);
+            return;
+          }
+
+          idMap.set(section.id, result.data.id);
+          persistedSections.push({ ...section, id: result.data.id });
+        } else {
+          const result = await saveEntity<{ success: boolean }>(
+            `/api/guide-sections/${section.id}`,
+            {
+              title: section.title,
+              type: section.type,
+              content: section.content,
+            },
+            'PATCH',
+          );
+
+          if (!result.ok) {
+            setMessage(result.error);
+            setPending(false);
+            return;
+          }
+
+          persistedSections.push(section);
+        }
+      }
+
+      const reorderResult = await saveEntity<{ success: boolean }>(
+        `/api/guides/${guide.id}/sections/reorder`,
+        { sectionIds: persistedSections.map((section) => section.id) },
+        'PATCH',
+      );
+
+      if (!reorderResult.ok) {
+        setMessage(reorderResult.error);
+        setPending(false);
+        return;
+      }
+    } else {
+      persistedSections.push(...sections);
+    }
+
+    const updatedGuide = { ...guide, sections: persistedSections };
     setData((current) => ({
       ...current,
       guides: current.guides.map((item) =>
         item.id === guide.id ? updatedGuide : item,
       ),
     }));
-    await saveEntity(
-      `/api/guides/${guide.id}/sections/reorder`,
-      { sectionIds: sections.map((section) => section.id) },
-      'PATCH',
+    setSections(persistedSections);
+    const nextSelectedSectionId =
+      idMap.get(selectedSectionId) ||
+      selectedSectionId ||
+      persistedSections[0]?.id ||
+      '';
+    selectedSectionIdRef.current = nextSelectedSectionId;
+    setSelectedSectionId(nextSelectedSectionId);
+    setMessage(
+      hasApiBase()
+        ? 'Секции гайда сохранены в D1.'
+        : 'Секции обновлены в демо-режиме.',
     );
+    setPending(false);
   }
 
   return (
@@ -2342,7 +2449,9 @@ function AdminGuides({
               onDragStart={() => setDragIndex(index)}
               onDragOver={(event) => event.preventDefault()}
               onDrop={() => reorder(index)}
-              onClick={() => setMarkdown(section.content)}
+              onClick={() => selectSection(section)}
+              aria-pressed={section.id === selectedSectionId}
+              className={section.id === selectedSectionId ? 'active' : ''}
             >
               <GripVertical aria-hidden="true" />
               <span>{section.title}</span>
@@ -2350,10 +2459,18 @@ function AdminGuides({
             </button>
           ))}
         </div>
-        <button className="primary-button" type="button" onClick={saveSections}>
+        <button
+          className="primary-button"
+          type="button"
+          disabled={pending}
+          onClick={saveSections}
+        >
           <CheckCircle2 aria-hidden="true" />
-          Сохранить порядок
+          {pending ? 'Сохраняем...' : 'Сохранить секции'}
         </button>
+        <p className="form-message" aria-live="polite">
+          {message}
+        </p>
       </div>
       <div className="admin-panel editor-panel">
         <h2>Markdown editor</h2>
@@ -2384,7 +2501,7 @@ function AdminGuides({
           id="markdown-editor"
           ref={textareaRef}
           value={markdown}
-          onChange={(event) => setMarkdown(event.target.value)}
+          onChange={(event) => updateSelectedMarkdown(event.target.value)}
           rows={12}
         />
         <h3>Live preview</h3>

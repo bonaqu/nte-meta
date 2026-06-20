@@ -23,7 +23,7 @@ VALUES
 INSERT OR IGNORE INTO guides
 (id, slug, character_id, title, summary, status, patch_version, author_name, video_url)
 VALUES
-('guide-hotori', 'hotori-burst-guide', 'hotori', 'Хотори: burst-гайд, ротации и команды', 'Практический разбор Хотори: окно урона, ошибки, F2P и premium команды.', 'published', '1.0', 'NTE Meta', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'),
+('guide-hotori', 'hotori-burst-guide', 'hotori', 'Хотори: burst-гайд, ротации и команды', 'Практический разбор Хотори: окно урона, ошибки, F2P и premium команды.', 'published', '1.0', 'NTE Meta', NULL),
 ('guide-baicang', 'baicang-support-guide', 'baicang', 'Байканг: универсальный саппорт и лучшие пары', 'Когда брать Байканга, кому он дает максимум и как не потерять бафф-окно.', 'published', '1.0', 'NTE Meta', NULL),
 ('guide-sakiri', 'sakiri-sustain-guide', 'sakiri', 'Сакири: стабильный DPS без идеального окна', 'Гайд для игроков, которым нужен ровный урон и меньше наказания за ошибки.', 'published', '1.0', 'NTE Meta', NULL);
 

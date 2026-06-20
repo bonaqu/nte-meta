@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react';
-import { CheckCircle2, CircleAlert, Sparkles } from 'lucide-react';
+import {
+  CheckCircle2,
+  CircleAlert,
+  Sparkles,
+  type LucideIcon,
+} from 'lucide-react';
 
 export function StatusBanner({
   tone,
@@ -49,12 +54,23 @@ export function SectionHeader({
   );
 }
 
-export function EmptyState({ title, text }: { title: string; text: string }) {
+export function EmptyState({
+  title,
+  text,
+  icon: Icon = Sparkles,
+  action,
+}: {
+  title: string;
+  text: string;
+  icon?: LucideIcon;
+  action?: ReactNode;
+}) {
   return (
     <section className="empty-state">
-      <Sparkles aria-hidden="true" />
+      <Icon aria-hidden="true" />
       <h2>{title}</h2>
       <p>{text}</p>
+      {action}
     </section>
   );
 }

@@ -1,4 +1,6 @@
 import React, {
+  lazy,
+  Suspense,
   useDeferredValue,
   useEffect,
   useMemo,
@@ -8,7 +10,9 @@ import React, {
 import {
   BookOpen,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   CircleAlert,
   ClipboardList,
   Gamepad2,
@@ -46,11 +50,16 @@ import { seedData } from './data/seed';
 import {
   changePassword,
   createComment,
+  createUserWarning,
   deleteComment,
+  deleteEntity,
   deleteUser,
   hasApiBase,
+  loadAuthConfig,
   loadComments,
+  loadAuditLog,
   loadModerationComments,
+  loadMyWarnings,
   loadReactionSummary,
   loadSettings,
   loadSiteData,
@@ -64,6 +73,7 @@ import {
   updateComment,
   updateProfile,
   updateSettings,
+  updateUserStatus,
   updateUserRole,
 } from './lib/api';
 import { applyMarkdownAction, MarkdownPreview } from './lib/markdown';
@@ -77,8 +87,10 @@ import {
   tierOrder,
 } from './lib/site-data';
 import { getYoutubeEmbedUrl } from './lib/youtube';
+import { setPageMetadata } from './lib/seo';
 import type {
   AdminUser,
+  AuditLogEntry,
   AppSettings,
   Character,
   Comment,
@@ -90,7 +102,39 @@ import type {
   SiteData,
   Tier,
   User,
+  UserWarning,
 } from './types';
+
+const AdminCharactersManager = lazy(() =>
+  import('./features/admin/content-manager').then((module) => ({
+    default: module.AdminCharactersManager,
+  })),
+);
+const AdminNewsManager = lazy(() =>
+  import('./features/admin/content-manager').then((module) => ({
+    default: module.AdminNewsManager,
+  })),
+);
+const AdminLeaksManager = lazy(() =>
+  import('./features/admin/content-manager').then((module) => ({
+    default: module.AdminLeaksManager,
+  })),
+);
+const AdminSourcesManager = lazy(() =>
+  import('./features/admin/content-manager').then((module) => ({
+    default: module.AdminSourcesManager,
+  })),
+);
+const AdminRotationsManager = lazy(() =>
+  import('./features/admin/content-manager').then((module) => ({
+    default: module.AdminRotationsManager,
+  })),
+);
+const AdminTeamsManager = lazy(() =>
+  import('./features/admin/content-manager').then((module) => ({
+    default: module.AdminTeamsManager,
+  })),
+);
 
 const navItems = [
   { label: 'Главная', href: '#/', icon: Home },
@@ -139,22 +183,27 @@ const rarityOptions = ['Любая редкость', 'S', 'A', 'Нулевой'
 const tierOptions = ['Любой тир', ...tierOrder];
 
 function useHashRoute() {
-  const [route, setRoute] = useState(
-    () => window.location.hash.replace(/^#\/?/, '') || '',
-  );
+  function getRoute() {
+    const hashRoute = window.location.hash.replace(/^#\/?/, '');
+    if (hashRoute) return hashRoute;
+
+    const basePath = import.meta.env.BASE_URL.replace(/^\.?\//, '/');
+    const pathname = window.location.pathname;
+    if (basePath !== '/' && pathname.startsWith(basePath)) {
+      return pathname.slice(basePath.length).replace(/^\/|\/$/g, '');
+    }
+    return '';
+  }
+
+  const [route, setRoute] = useState(() => getRoute());
 
   useEffect(() => {
-    const onHashChange = () =>
-      setRoute(window.location.hash.replace(/^#\/?/, '') || '');
+    const onHashChange = () => setRoute(getRoute());
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
   return route;
-}
-
-function navigate(path: string) {
-  window.location.hash = path === '/' ? '#/' : `#/${path.replace(/^\//, '')}`;
 }
 
 function App() {
@@ -170,17 +219,20 @@ function App() {
 
     async function init() {
       setLoading(true);
-      const siteData = await loadSiteData();
       const currentUser = await me();
+      const viewer = currentUser.ok ? currentUser.data : null;
+      const siteData = await loadSiteData({
+        includePrivate: Boolean(
+          viewer && roleWeight[viewer.role] >= roleWeight.admin,
+        ),
+      });
 
       if (!mounted) {
         return;
       }
 
       setData(siteData);
-      if (currentUser.ok) {
-        setUser(currentUser.data);
-      }
+      setUser(viewer);
       setLoading(false);
     }
 
@@ -197,6 +249,11 @@ function App() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!user || roleWeight[user.role] < roleWeight.admin) return;
+    loadSiteData({ includePrivate: true }).then(setData);
+  }, [user]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -217,6 +274,156 @@ function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [mobileOpen]);
 
+  useEffect(() => {
+    const [activeSection, activeSlug] = route.split('/');
+    const character = data.characters.find(
+      (item) => item.id === activeSlug || item.slug === activeSlug,
+    );
+    const guide = data.guides.find(
+      (item) => item.id === activeSlug || item.slug === activeSlug,
+    );
+    const newsItem = data.news.find(
+      (item) => item.id === activeSlug || item.slug === activeSlug,
+    );
+    const leak = data.leaks.find(
+      (item) => item.id === activeSlug || item.slug === activeSlug,
+    );
+    const team = data.teams.find(
+      (item) => item.id === activeSlug || item.slug === activeSlug,
+    );
+
+    if (activeSection === 'news' && newsItem) {
+      setPageMetadata({
+        title: newsItem.title,
+        description: newsItem.summary,
+        path: `/news/${newsItem.slug}/`,
+        image: newsItem.imageUrl,
+        type: 'article',
+        structuredData: {
+          '@type': 'NewsArticle',
+          headline: newsItem.title,
+          description: newsItem.summary,
+          datePublished: newsItem.date,
+          dateModified: newsItem.updatedAt || newsItem.date,
+          author: { '@type': 'Organization', name: newsItem.author },
+        },
+      });
+      return;
+    }
+    if (activeSection === 'leaks' && leak) {
+      setPageMetadata({
+        title: leak.title,
+        description: leak.summary,
+        path: `/leaks/${leak.slug}/`,
+        type: 'article',
+        structuredData: {
+          '@type': 'Article',
+          headline: leak.title,
+          description: leak.summary,
+          datePublished: leak.date,
+        },
+      });
+      return;
+    }
+    if (activeSection === 'guides' && guide) {
+      setPageMetadata({
+        title: guide.title,
+        description: guide.summary,
+        path: `/guides/${guide.slug}/`,
+        type: 'article',
+        structuredData: {
+          '@type': 'TechArticle',
+          headline: guide.title,
+          description: guide.summary,
+          dateModified: guide.updatedAt,
+          author: { '@type': 'Organization', name: guide.author },
+        },
+      });
+      return;
+    }
+    if (activeSection === 'characters' && character) {
+      setPageMetadata({
+        title: `${character.name} — гайд, билд и команды`,
+        description: character.shortDescription,
+        path: `/characters/${character.slug}/`,
+        image: character.splashUrl,
+        type: 'article',
+      });
+      return;
+    }
+    if (activeSection === 'teams' && team) {
+      setPageMetadata({
+        title: `${team.title} — состав и ротация`,
+        description: team.synergy,
+        path: `/teams/${team.slug || team.id}/`,
+      });
+      return;
+    }
+
+    const sectionTitles: Record<string, [string, string, string]> = {
+      characters: [
+        'Персонажи',
+        'Персонажи Neverness to Everness: роли, атрибуты, тиры и подробные гайды.',
+        '/characters/',
+      ],
+      guides: [
+        'Гайды',
+        'Практические гайды NTE Meta: ротации, билды, команды и ошибки.',
+        '/guides/',
+      ],
+      tierlists: [
+        'Тир-листы',
+        'Base C0 и Premium C6 тир-листы NTE Meta.',
+        '/tierlists/',
+      ],
+      news: [
+        'Новости',
+        'Новости Neverness to Everness и редакционные разборы.',
+        '/news/',
+      ],
+      leaks: [
+        'Сливы',
+        'Слухи и сливы NTE с источниками, статусами и уровнем доверия.',
+        '/leaks/',
+      ],
+      teams: [
+        'Команды',
+        'F2P и Premium команды NTE с ролями и ротациями.',
+        '/teams/',
+      ],
+      rotations: [
+        'Ротации',
+        'Простые, advanced, boss и AoE-ротации персонажей NTE.',
+        '/rotations/',
+      ],
+      videos: [
+        'Видео-гайды',
+        'Видео-гайды NTE Meta с таймкодами и текстовыми материалами.',
+        '/videos/',
+      ],
+      community: [
+        'Комьюнити-хаб',
+        'Обсуждения, комментарии и оценки материалов NTE Meta.',
+        '/community/',
+      ],
+      admin: [
+        'Профиль и CMS',
+        'Профиль пользователя и редакционная CMS NTE Meta.',
+        '/admin/',
+      ],
+    };
+    const fallback = sectionTitles[activeSection] || [
+      'Русская мета Neverness to Everness',
+      'Гайды, тир-листы, команды, ротации, новости и комьюнити Neverness to Everness.',
+      '/',
+    ];
+    setPageMetadata({
+      title: fallback[0],
+      description: fallback[1],
+      path: fallback[2],
+    });
+  }, [data, route]);
+
   const [section, slug] = route.split('/');
   let page = <HomePage data={data} loading={loading} />;
 
@@ -235,7 +442,25 @@ function App() {
   } else if (section === 'tierlists') {
     page = <TierListsPage data={data} />;
   } else if (section === 'news') {
-    page = <NewsPage data={data} />;
+    page = slug ? (
+      <NewsDetailPage data={data} slug={slug} user={user} />
+    ) : (
+      <NewsPage data={data} />
+    );
+  } else if (section === 'leaks') {
+    page = slug ? (
+      <LeakDetailPage data={data} slug={slug} user={user} />
+    ) : (
+      <LeaksPage data={data} />
+    );
+  } else if (section === 'teams') {
+    page = slug ? (
+      <TeamDetailPage data={data} slug={slug} />
+    ) : (
+      <TeamsPage data={data} />
+    );
+  } else if (section === 'rotations') {
+    page = <RotationsPage data={data} />;
   } else if (section === 'videos') {
     page = <VideosPage data={data} />;
   } else if (section === 'community') {
@@ -244,6 +469,8 @@ function App() {
     page = (
       <AdminPage data={data} user={user} setUser={setUser} setData={setData} />
     );
+  } else if (section) {
+    page = <NotFoundPage />;
   }
 
   return (
@@ -381,39 +608,26 @@ function HomePage({ data, loading }: { data: SiteData; loading: boolean }) {
             комьюнити-разборы.
           </p>
           <div className="button-row">
-            <button
-              className="primary-button"
-              type="button"
-              onClick={() => navigate('tierlists')}
-            >
+            <a className="primary-button" href="#/tierlists">
               <Star aria-hidden="true" />
               Смотреть тир-лист
-            </button>
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => navigate('characters')}
-            >
+            </a>
+            <a className="ghost-button" href="#/characters">
               <Gamepad2 aria-hidden="true" />
               Персонажи
-            </button>
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => navigate('guides')}
-            >
+            </a>
+            <a className="ghost-button" href="#/guides">
               <BookOpen aria-hidden="true" />
               Последние гайды
-            </button>
+            </a>
           </div>
         </div>
         <div className="hero-media" aria-label="Избранные персонажи NTE Meta">
           {data.characters.slice(0, 3).map((character, index) => (
-            <button
+            <a
               className={`hero-character hero-character-${index + 1}`}
               key={character.id}
-              type="button"
-              onClick={() => navigate(`characters/${character.slug}`)}
+              href={`#/characters/${character.slug}`}
             >
               <img
                 src={character.imageUrl}
@@ -423,7 +637,7 @@ function HomePage({ data, loading }: { data: SiteData; loading: boolean }) {
                 loading={index === 0 ? 'eager' : 'lazy'}
               />
               <span>{character.name}</span>
-            </button>
+            </a>
           ))}
         </div>
       </section>
@@ -438,13 +652,9 @@ function HomePage({ data, loading }: { data: SiteData; loading: boolean }) {
           title="Последние гайды"
           text="Карточки показывают персонажа, патч, автора и краткий практический вывод."
           action={
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => navigate('guides')}
-            >
+            <a className="text-button" href="#/guides">
               Все гайды <ChevronRight aria-hidden="true" />
-            </button>
+            </a>
           }
         />
         <div className="guide-grid">
@@ -497,21 +707,31 @@ function HomePage({ data, loading }: { data: SiteData; loading: boolean }) {
       <section className="community-band">
         <div>
           <p className="eyebrow">Комьюнити</p>
-          <h2>Обсуждения скоро станут полноценным хабом</h2>
+          <h2>Последние обсуждения игроков</h2>
           <p>
-            Фундамент комментариев, реакций и ролей уже заложен в D1/Worker.
-            Пока база пустая, пользователь видит аккуратную заглушку и последние
-            демо-обсуждения.
+            Делитесь находками, проверяйте ротации вместе и отмечайте полезные
+            ответы. Все публикации доступны модерации.
           </p>
+          <a className="ghost-button" href="#/community">
+            <MessageCircle aria-hidden="true" />
+            Открыть комьюнити-хаб
+          </a>
         </div>
         <div className="comment-preview">
-          {data.comments.slice(0, 2).map((comment) => (
-            <article key={comment.id}>
-              <strong>{comment.author}</strong>
-              <p>{comment.body}</p>
-              <span>{comment.score} полезно</span>
-            </article>
-          ))}
+          {data.comments.length ? (
+            data.comments.slice(0, 2).map((comment) => (
+              <article key={comment.id}>
+                <strong>{comment.author}</strong>
+                <p>{comment.body}</p>
+                <span>{comment.score} полезно</span>
+              </article>
+            ))
+          ) : (
+            <EmptyState
+              title="Пока тихо"
+              text="Начните первое обсуждение в комьюнити-хабе."
+            />
+          )}
         </div>
       </section>
     </div>
@@ -523,7 +743,7 @@ function MetricsStrip({ data }: { data: SiteData }) {
     { label: 'Персонажей', value: data.characters.length, icon: Gamepad2 },
     { label: 'Гайдов', value: data.guides.length, icon: BookOpen },
     { label: 'Команд', value: data.teams.length, icon: Users },
-    { label: 'Источников', value: data.sources.length, icon: ShieldCheck },
+    { label: 'Новостей', value: data.news.length, icon: Newspaper },
   ];
 
   return (
@@ -545,9 +765,8 @@ function MetricsStrip({ data }: { data: SiteData }) {
 function CharacterCard({ character }: { character: Character }) {
   return (
     <article className="character-card">
-      <button
-        type="button"
-        onClick={() => navigate(`characters/${character.slug}`)}
+      <a
+        href={`#/characters/${character.slug}`}
         aria-label={`Открыть гайд ${character.name}`}
       >
         <img
@@ -566,7 +785,7 @@ function CharacterCard({ character }: { character: Character }) {
           <span>{character.shortDescription}</span>
           <Tags tags={character.tags} />
         </div>
-      </button>
+      </a>
     </article>
   );
 }
@@ -599,13 +818,9 @@ function GuideCard({ guide, data }: { guide: Guide; data: SiteData }) {
             <dd>{formatDate(guide.updatedAt)}</dd>
           </div>
         </dl>
-        <button
-          className="text-button"
-          type="button"
-          onClick={() => navigate(`guides/${guide.slug}`)}
-        >
+        <a className="text-button" href={`#/guides/${guide.slug}`}>
           Читать гайд <ChevronRight aria-hidden="true" />
-        </button>
+        </a>
       </div>
     </article>
   );
@@ -640,6 +855,9 @@ function LeakCompactCard({ item }: { item: LeakItem }) {
           Не подтверждено: информация может измениться. Источник:{' '}
           {item.sourceName}
         </small>
+        <a className="text-button" href={`#/leaks/${item.slug}`}>
+          Открыть материал <ChevronRight aria-hidden="true" />
+        </a>
       </div>
     </article>
   );
@@ -653,10 +871,9 @@ function TierPreview({ grouped }: { grouped: Record<Tier, Character[]> }) {
           <strong>{tier}</strong>
           <div>
             {grouped[tier].slice(0, 8).map((character) => (
-              <button
+              <a
                 key={character.id}
-                type="button"
-                onClick={() => navigate(`characters/${character.slug}`)}
+                href={`#/characters/${character.slug}`}
                 title={character.name}
               >
                 <img
@@ -666,7 +883,7 @@ function TierPreview({ grouped }: { grouped: Record<Tier, Character[]> }) {
                   height="58"
                   loading="lazy"
                 />
-              </button>
+              </a>
             ))}
           </div>
         </div>
@@ -811,11 +1028,13 @@ function SelectFilter({
   value,
   setValue,
   options,
+  optionLabels,
 }: {
   label: string;
   value: string;
   setValue: (value: string) => void;
   options: string[];
+  optionLabels?: Record<string, string>;
 }) {
   const id = `filter-${label}`;
   return (
@@ -829,7 +1048,7 @@ function SelectFilter({
       >
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {optionLabels?.[option] || option}
           </option>
         ))}
       </select>
@@ -1136,10 +1355,9 @@ function TeamCard({
         {team.members.map((member) => {
           const character = getCharacter(data, member.characterId);
           return character ? (
-            <button
+            <a
               key={`${team.id}-${member.characterId}`}
-              type="button"
-              onClick={() => navigate(`characters/${character.slug}`)}
+              href={`#/characters/${character.slug}`}
             >
               <img
                 src={character.imageUrl}
@@ -1149,7 +1367,7 @@ function TeamCard({
                 loading="lazy"
               />
               <span>{member.role}</span>
-            </button>
+            </a>
           ) : null;
         })}
       </div>
@@ -1163,6 +1381,9 @@ function TeamCard({
           <dd>{team.weakAt}</dd>
         </div>
       </dl>
+      <a className="text-button" href={`#/teams/${team.slug || team.id}`}>
+        Разобрать команду <ChevronRight aria-hidden="true" />
+      </a>
     </article>
   );
 }
@@ -1564,6 +1785,13 @@ function GuidesPage({ data }: { data: SiteData }) {
           механики.
         </p>
       </section>
+      <nav className="content-tabs" aria-label="Материалы по мете">
+        <a aria-current="page" className="active" href="#/guides">
+          Гайды
+        </a>
+        <a href="#/teams">Команды</a>
+        <a href="#/rotations">Ротации</a>
+      </nav>
       <section className="guide-grid">
         {data.guides.map((guide) => (
           <GuideCard key={guide.id} guide={guide} data={data} />
@@ -1653,6 +1881,9 @@ function NewsPage({ data }: { data: SiteData }) {
                   <h3>{item.title}</h3>
                   <p>{item.summary}</p>
                   <Tags tags={item.tags} />
+                  <a className="text-button" href={`#/news/${item.slug}`}>
+                    Читать полностью <ChevronRight aria-hidden="true" />
+                  </a>
                 </div>
               </article>
             ))}
@@ -1662,6 +1893,11 @@ function NewsPage({ data }: { data: SiteData }) {
           <SectionHeader
             title="Сливы из источников"
             text="Автоимпорт подготовлен архитектурно, публикация только после одобрения."
+            action={
+              <a className="text-button" href="#/leaks">
+                Все сливы <ChevronRight aria-hidden="true" />
+              </a>
+            }
           />
           <div className="compact-list">
             {data.leaks.map((item) => (
@@ -1674,7 +1910,405 @@ function NewsPage({ data }: { data: SiteData }) {
   );
 }
 
+function EditorialMeta({
+  date,
+  author,
+  sourceName,
+  sourceUrl,
+}: {
+  date: string;
+  author?: string;
+  sourceName?: string;
+  sourceUrl?: string;
+}) {
+  return (
+    <dl className="editorial-meta">
+      <div>
+        <dt>Опубликовано</dt>
+        <dd>{formatDate(date)}</dd>
+      </div>
+      {author ? (
+        <div>
+          <dt>Автор</dt>
+          <dd>{author}</dd>
+        </div>
+      ) : null}
+      {sourceName ? (
+        <div>
+          <dt>Источник</dt>
+          <dd>
+            {sourceUrl ? (
+              <a href={sourceUrl} target="_blank" rel="noopener noreferrer">
+                {sourceName}
+              </a>
+            ) : (
+              sourceName
+            )}
+          </dd>
+        </div>
+      ) : null}
+    </dl>
+  );
+}
+
+function NewsDetailPage({
+  data,
+  slug,
+  user,
+}: {
+  data: SiteData;
+  slug: string;
+  user: User | null;
+}) {
+  const item = data.news.find(
+    (newsItem) => newsItem.slug === slug || newsItem.id === slug,
+  );
+
+  if (!item) {
+    return (
+      <EmptyState
+        title="Новость не найдена"
+        text="Материал мог быть перемещен, снят с публикации или еще не опубликован."
+      />
+    );
+  }
+
+  return (
+    <div className="page-stack">
+      <article className="editorial-article">
+        <header className="editorial-hero">
+          <img
+            src={item.imageUrl}
+            alt=""
+            width="1280"
+            height="720"
+            fetchPriority="high"
+          />
+          <div>
+            <p className="eyebrow">{item.category}</p>
+            <h1>{item.title}</h1>
+            <p>{item.summary}</p>
+            <EditorialMeta
+              date={item.date}
+              author={item.author}
+              sourceName={item.sourceName}
+              sourceUrl={item.sourceUrl}
+            />
+            <Tags tags={item.tags} />
+          </div>
+        </header>
+        <div className="editorial-body">
+          <MarkdownPreview value={item.body} />
+        </div>
+      </article>
+      <section className="guide-toolbar">
+        <div>
+          <p>Оценка материала</p>
+          <strong>Полезна ли эта новость?</strong>
+        </div>
+        <RatingBar targetType="news" targetId={item.id} user={user} />
+      </section>
+      <CommentsBlock
+        targetType="news"
+        targetId={item.id}
+        data={data}
+        user={user}
+      />
+    </div>
+  );
+}
+
+function LeaksPage({ data }: { data: SiteData }) {
+  const approvedLeaks = data.leaks.filter((item) => item.approved);
+
+  return (
+    <div className="page-stack">
+      <section className="page-hero compact leak-hero">
+        <p className="eyebrow">Слухи не являются фактами</p>
+        <h1>Сливы и неподтвержденная информация</h1>
+        <p>
+          Каждый материал показывает статус, доверие и оригинальный источник.
+          Информация может измениться или быть опровергнута.
+        </p>
+      </section>
+      <section className="news-grid">
+        {approvedLeaks.map((item) => (
+          <article className="news-card leak-card" key={item.id}>
+            <div>
+              <p className="eyebrow">
+                {item.status} · доверие: {item.trustLevel}
+              </p>
+              <h2>{item.title}</h2>
+              <p>{item.summary}</p>
+              <Tags tags={item.tags} />
+              <a className="text-button" href={`#/leaks/${item.slug}`}>
+                Открыть слив <ChevronRight aria-hidden="true" />
+              </a>
+            </div>
+          </article>
+        ))}
+      </section>
+    </div>
+  );
+}
+
+function LeakDetailPage({
+  data,
+  slug,
+  user,
+}: {
+  data: SiteData;
+  slug: string;
+  user: User | null;
+}) {
+  const item = data.leaks.find(
+    (leakItem) => leakItem.slug === slug || leakItem.id === slug,
+  );
+
+  if (!item || !item.approved) {
+    return (
+      <EmptyState
+        title="Слив недоступен"
+        text="Материал еще не одобрен, отклонен редакцией или был удален."
+      />
+    );
+  }
+
+  return (
+    <div className="page-stack">
+      <article className="editorial-article leak-article">
+        <header className="editorial-copy-hero">
+          <div className="leak-warning" role="note">
+            <CircleAlert aria-hidden="true" />
+            <strong>Информация не подтверждена и может измениться</strong>
+          </div>
+          <p className="eyebrow">
+            {item.status} · доверие: {item.trustLevel}
+          </p>
+          <h1>{item.title}</h1>
+          <p>{item.summary}</p>
+          <EditorialMeta
+            date={item.date}
+            sourceName={item.sourceName}
+            sourceUrl={item.sourceUrl}
+          />
+          <Tags tags={item.tags} />
+        </header>
+        <div className="editorial-body">
+          <MarkdownPreview value={item.body} />
+        </div>
+      </article>
+      <section className="guide-toolbar">
+        <div>
+          <p>Оценка материала</p>
+          <strong>Полезна ли пометка источника?</strong>
+        </div>
+        <RatingBar targetType="leak" targetId={item.id} user={user} />
+      </section>
+      <CommentsBlock
+        targetType="leak"
+        targetId={item.id}
+        data={data}
+        user={user}
+      />
+    </div>
+  );
+}
+
+function TeamsPage({ data }: { data: SiteData }) {
+  const [budget, setBudget] = useState('Все');
+  const [teamType, setTeamType] = useState('Все');
+  const teamTypes = useMemo(
+    () => ['Все', ...Array.from(new Set(data.teams.map((team) => team.type)))],
+    [data.teams],
+  );
+  const filteredTeams = useMemo(
+    () =>
+      data.teams.filter(
+        (team) =>
+          (budget === 'Все' || team.budget === budget) &&
+          (teamType === 'Все' || team.type === teamType),
+      ),
+    [budget, data.teams, teamType],
+  );
+
+  return (
+    <div className="page-stack">
+      <section className="page-hero compact">
+        <h1>Команды NTE Meta</h1>
+        <p>
+          Готовые составы для старта, фарма, боссов и эндгейма с объяснением
+          синергии и рекомендуемой ротацией.
+        </p>
+      </section>
+      <nav className="content-tabs" aria-label="Материалы по мете">
+        <a href="#/guides">Гайды</a>
+        <a aria-current="page" className="active" href="#/teams">
+          Команды
+        </a>
+        <a href="#/rotations">Ротации</a>
+      </nav>
+      <section className="filter-panel compact-filters">
+        <SelectFilter
+          label="Бюджет"
+          value={budget}
+          setValue={setBudget}
+          options={['Все', 'F2P', 'Mixed', 'Premium']}
+        />
+        <SelectFilter
+          label="Тип команды"
+          value={teamType}
+          setValue={setTeamType}
+          options={teamTypes}
+        />
+      </section>
+      <section className="team-grid">
+        {filteredTeams.map((team) => (
+          <TeamCard key={team.id} team={team} data={data} />
+        ))}
+      </section>
+    </div>
+  );
+}
+
+function TeamDetailPage({ data, slug }: { data: SiteData; slug: string }) {
+  const team = data.teams.find(
+    (item) => item.id === slug || item.slug === slug,
+  );
+
+  if (!team) {
+    return (
+      <EmptyState
+        title="Команда не найдена"
+        text="Состав мог быть снят с публикации или перенесен в другой патч."
+      />
+    );
+  }
+
+  return (
+    <div className="page-stack">
+      <section className="page-hero compact team-detail-hero">
+        <p className="eyebrow">
+          {team.type} · {team.budget} · сложность: {team.difficulty}
+        </p>
+        <h1>{team.title}</h1>
+        <p>{team.synergy}</p>
+        <div className="power-meter">
+          <progress
+            aria-label={`Сила команды ${team.power} из 100`}
+            max="100"
+            value={team.power}
+          />
+          <strong>{team.power}/100</strong>
+        </div>
+      </section>
+      <section className="content-band">
+        <SectionHeader title="Состав и роли" />
+        <div className="team-member-detail-grid">
+          {team.members.map((member) => {
+            const character = getCharacter(data, member.characterId);
+            return character ? (
+              <a
+                key={member.characterId}
+                href={`#/characters/${character.slug}`}
+              >
+                <img
+                  src={character.imageUrl}
+                  alt={character.name}
+                  width="220"
+                  height="280"
+                  loading="lazy"
+                />
+                <strong>{character.name}</strong>
+                <span>{member.role}</span>
+              </a>
+            ) : null;
+          })}
+        </div>
+      </section>
+      <section className="split-band">
+        <div>
+          <SectionHeader title="Где команда сильна" />
+          <p>{team.goodAt}</p>
+        </div>
+        <div>
+          <SectionHeader title="Ограничения" />
+          <p>{team.weakAt}</p>
+        </div>
+      </section>
+      <section className="content-band">
+        <SectionHeader title="Рекомендуемая ротация" />
+        <p className="team-rotation-copy">{team.rotation}</p>
+      </section>
+    </div>
+  );
+}
+
+function RotationsPage({ data }: { data: SiteData }) {
+  const [characterId, setCharacterId] = useState('Все');
+  const filteredRotations = useMemo(
+    () =>
+      data.rotations.filter(
+        (rotation) =>
+          characterId === 'Все' || rotation.characterId === characterId,
+      ),
+    [characterId, data.rotations],
+  );
+
+  return (
+    <div className="page-stack">
+      <section className="page-hero compact">
+        <h1>Ротации</h1>
+        <p>
+          Пошаговые последовательности с назначением и объяснением логики:
+          простые, boss, AoE, F2P-friendly и min-max варианты.
+        </p>
+      </section>
+      <nav className="content-tabs" aria-label="Материалы по мете">
+        <a href="#/guides">Гайды</a>
+        <a href="#/teams">Команды</a>
+        <a aria-current="page" className="active" href="#/rotations">
+          Ротации
+        </a>
+      </nav>
+      <section className="filter-panel compact-filters">
+        <SelectFilter
+          label="Персонаж"
+          value={characterId}
+          setValue={setCharacterId}
+          options={['Все', ...data.characters.map((character) => character.id)]}
+          optionLabels={Object.fromEntries(
+            data.characters.map((character) => [character.id, character.name]),
+          )}
+        />
+      </section>
+      <section className="rotation-grid">
+        {filteredRotations.map((rotation) => {
+          const character = getCharacter(data, rotation.characterId);
+          return (
+            <article className="rotation-card detailed" key={rotation.id}>
+              <p className="eyebrow">
+                {rotation.type} · {character?.name || 'Персонаж'}
+              </p>
+              <h2>{rotation.title}</h2>
+              <p>{rotation.purpose}</p>
+              <ol>
+                {rotation.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+              <strong>{rotation.logic}</strong>
+            </article>
+          );
+        })}
+      </section>
+    </div>
+  );
+}
+
 function VideosPage({ data }: { data: SiteData }) {
+  const videoGuides = data.guides.filter((guide) => guide.videoUrl);
+
   return (
     <div className="page-stack">
       <section className="page-hero compact">
@@ -1686,35 +2320,46 @@ function VideosPage({ data }: { data: SiteData }) {
         </p>
       </section>
       <section className="video-grid">
-        {data.videos.map((video) => {
-          const embedUrl = getYoutubeEmbedUrl(video.youtubeUrl);
+        {videoGuides.map((guide) => {
+          const embedUrl = getYoutubeEmbedUrl(guide.videoUrl || '');
+          const character = getGuideCharacter(data, guide);
           return (
-            <article className="video-card" key={video.id}>
+            <article className="video-card" key={guide.id}>
               {embedUrl ? (
                 <iframe
                   className="video-frame"
                   src={embedUrl}
-                  title={video.title}
+                  title={guide.title}
                   loading="lazy"
                   allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
                 />
               ) : null}
               <div>
-                <p className="eyebrow">{formatDate(video.publishedAt)}</p>
-                <h3>{video.title}</h3>
-                <p>{video.description}</p>
-                <div className="timestamp-list">
-                  {video.timestamps.map((time) => (
-                    <span key={time.time}>
-                      {time.time} · {time.label}
-                    </span>
-                  ))}
-                </div>
+                <p className="eyebrow">
+                  {character?.name || 'NTE Meta'} · патч {guide.patch}
+                </p>
+                <h3>{guide.title}</h3>
+                <p>{guide.summary}</p>
+                <a className="text-button" href={`#/guides/${guide.slug}`}>
+                  Текстовая версия <ChevronRight aria-hidden="true" />
+                </a>
               </div>
             </article>
           );
         })}
+        {videoGuides.length === 0 ? (
+          <EmptyState
+            icon={Video}
+            title="Видео-гайды готовятся"
+            text="Здесь появятся проверенные ролики редакции. Пока используйте текстовые гайды: в них уже есть ротации, команды и ошибки."
+            action={
+              <a className="primary-button" href="#/guides">
+                <BookOpen aria-hidden="true" /> Открыть текстовые гайды
+              </a>
+            }
+          />
+        ) : null}
       </section>
     </div>
   );
@@ -1727,8 +2372,9 @@ function CommunityPage({ data, user }: { data: SiteData; user: User | null }) {
         <p className="eyebrow">Комментарии, реакции, роли</p>
         <h1>Комьюнити-хаб</h1>
         <p>
-          Фундамент уже готов: регистрация, роли, комментарии, лайки/дизлайки и
-          модерация на backend.
+          Место для разборов ротаций, вопросов по сборкам и практических находок
+          игроков. Ответы можно оценивать, а нарушения отправляются на
+          модерацию.
         </p>
       </section>
       <section className="split-band">
@@ -1742,28 +2388,26 @@ function CommunityPage({ data, user }: { data: SiteData; user: User | null }) {
             Гости читают гайды, новости, тир-листы и сливы. Комментирование,
             оценки и профиль требуют регистрации.
           </p>
-          <button
-            className="primary-button"
-            type="button"
-            onClick={() => navigate('admin')}
-          >
+          <a className="primary-button" href="#/admin">
             <LockKeyhole aria-hidden="true" />
-            Войти или зарегистрироваться
-          </button>
+            {user ? 'Открыть профиль' : 'Войти или зарегистрироваться'}
+          </a>
         </div>
         <div className="content-band flat">
-          <h2>Последние обсуждения</h2>
-          <div className="comment-list">
-            {data.comments.map((comment) => (
-              <article className="comment-card" key={comment.id}>
-                <strong>{comment.author}</strong>
-                <p>{comment.body}</p>
-                <span>{comment.score} полезно</span>
-              </article>
-            ))}
-          </div>
+          <h2>Правила коротко</h2>
+          <ul className="check-list">
+            <li>Проверяйте факты и отделяйте тесты от предположений.</li>
+            <li>Не публикуйте сюжетные спойлеры без предупреждения.</li>
+            <li>Критикуйте сборку или аргумент, а не автора.</li>
+          </ul>
         </div>
       </section>
+      <CommentsBlock
+        targetType="site"
+        targetId="community"
+        data={data}
+        user={user}
+      />
     </div>
   );
 }
@@ -1773,6 +2417,8 @@ const adminTabs = [
   'dashboard',
   'characters',
   'guides',
+  'rotations',
+  'teams',
   'tierlists',
   'news',
   'leaks',
@@ -1780,6 +2426,7 @@ const adminTabs = [
   'users',
   'settings',
   'sources',
+  'audit',
 ] as const;
 
 const adminLabels: Record<(typeof adminTabs)[number], string> = {
@@ -1787,6 +2434,8 @@ const adminLabels: Record<(typeof adminTabs)[number], string> = {
   dashboard: 'Dashboard',
   characters: 'Персонажи',
   guides: 'Гайды',
+  rotations: 'Ротации',
+  teams: 'Команды',
   tierlists: 'Тир-листы',
   news: 'Новости',
   leaks: 'Сливы',
@@ -1794,6 +2443,7 @@ const adminLabels: Record<(typeof adminTabs)[number], string> = {
   users: 'Пользователи',
   settings: 'Настройки',
   sources: 'Источники',
+  audit: 'Audit log',
 };
 
 const adminTabRole: Record<(typeof adminTabs)[number], User['role']> = {
@@ -1801,6 +2451,8 @@ const adminTabRole: Record<(typeof adminTabs)[number], User['role']> = {
   dashboard: 'moderator',
   characters: 'editor',
   guides: 'editor',
+  rotations: 'editor',
+  teams: 'editor',
   tierlists: 'editor',
   news: 'admin',
   leaks: 'admin',
@@ -1808,6 +2460,7 @@ const adminTabRole: Record<(typeof adminTabs)[number], User['role']> = {
   users: 'admin',
   settings: 'admin',
   sources: 'admin',
+  audit: 'admin',
 };
 
 function AdminPage({
@@ -1837,6 +2490,10 @@ function AdminPage({
       setTab('profile');
     }
   }, [tab, user, visibleTabs]);
+
+  async function refreshContent() {
+    setData(await loadSiteData({ includePrivate: true }));
+  }
 
   return (
     <div className="admin-shell">
@@ -1876,23 +2533,63 @@ function AdminPage({
                 Выйти
               </button>
             </div>
-            {tab === 'profile' ? (
-              <ProfilePanel user={user} setUser={setUser} />
-            ) : null}
-            {tab === 'dashboard' ? <AdminDashboard data={data} /> : null}
-            {tab === 'characters' ? <AdminCharacters data={data} /> : null}
-            {tab === 'guides' ? (
-              <AdminGuides data={data} setData={setData} />
-            ) : null}
-            {tab === 'tierlists' ? <AdminTierlists data={data} /> : null}
-            {tab === 'news' ? <AdminNews data={data} /> : null}
-            {tab === 'leaks' ? <AdminLeaks data={data} /> : null}
-            {tab === 'comments' ? (
-              <AdminComments data={data} user={user} />
-            ) : null}
-            {tab === 'users' ? <AdminUsers actor={user} /> : null}
-            {tab === 'settings' ? <AdminSettings /> : null}
-            {tab === 'sources' ? <AdminSources data={data} /> : null}
+            <Suspense fallback={<SkeletonGrid label="Загрузка редактора" />}>
+              {tab === 'profile' ? (
+                <ProfilePanel user={user} setUser={setUser} />
+              ) : null}
+              {tab === 'dashboard' ? <AdminDashboard data={data} /> : null}
+              {tab === 'characters' ? (
+                <AdminCharactersManager
+                  items={data.characters}
+                  onRefresh={refreshContent}
+                />
+              ) : null}
+              {tab === 'guides' ? (
+                <AdminGuides data={data} setData={setData} />
+              ) : null}
+              {tab === 'rotations' ? (
+                <AdminRotationsManager
+                  items={data.rotations}
+                  characters={data.characters}
+                  guides={data.guides}
+                  onRefresh={refreshContent}
+                />
+              ) : null}
+              {tab === 'teams' ? (
+                <AdminTeamsManager
+                  items={data.teams}
+                  characters={data.characters}
+                  onRefresh={refreshContent}
+                />
+              ) : null}
+              {tab === 'tierlists' ? (
+                <AdminTierlists data={data} setData={setData} />
+              ) : null}
+              {tab === 'news' ? (
+                <AdminNewsManager
+                  items={data.news}
+                  onRefresh={refreshContent}
+                />
+              ) : null}
+              {tab === 'leaks' ? (
+                <AdminLeaksManager
+                  items={data.leaks}
+                  onRefresh={refreshContent}
+                />
+              ) : null}
+              {tab === 'comments' ? (
+                <AdminComments data={data} user={user} />
+              ) : null}
+              {tab === 'users' ? <AdminUsers actor={user} /> : null}
+              {tab === 'settings' ? <AdminSettings /> : null}
+              {tab === 'sources' ? (
+                <AdminSourcesManager
+                  items={data.sources}
+                  onRefresh={refreshContent}
+                />
+              ) : null}
+              {tab === 'audit' ? <AdminAuditLog /> : null}
+            </Suspense>
           </>
         )}
       </section>
@@ -1910,6 +2607,14 @@ function ProfilePanel({
   const [profileMessage, setProfileMessage] = useState('');
   const [passwordMessage, setPasswordMessage] = useState('');
   const [pending, setPending] = useState('');
+  const [warnings, setWarnings] = useState<UserWarning[]>([]);
+
+  useEffect(() => {
+    if (!hasApiBase()) return;
+    loadMyWarnings().then((result) => {
+      if (result.ok) setWarnings(result.data);
+    });
+  }, []);
 
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2002,7 +2707,7 @@ function ProfilePanel({
           name="nextPassword"
           type="password"
           autoComplete="new-password"
-          minLength={8}
+          minLength={10}
           maxLength={128}
           required
         />
@@ -2012,7 +2717,7 @@ function ProfilePanel({
           name="nextConfirm"
           type="password"
           autoComplete="new-password"
-          minLength={8}
+          minLength={10}
           maxLength={128}
           required
         />
@@ -2028,6 +2733,23 @@ function ProfilePanel({
           {passwordMessage}
         </p>
       </form>
+      {warnings.length ? (
+        <section
+          className="admin-panel profile-warnings"
+          aria-label="Предупреждения модерации"
+        >
+          <p className="eyebrow">Модерация</p>
+          <h2>Активные предупреждения</h2>
+          {warnings.map((warning) => (
+            <article key={warning.id}>
+              <strong>{warning.reason}</strong>
+              <span>
+                {warning.moderatorName} · {formatDate(warning.createdAt)}
+              </span>
+            </article>
+          ))}
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -2035,7 +2757,21 @@ function ProfilePanel({
 function AuthPanel({ setUser }: { setUser: (user: User | null) => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [message, setMessage] = useState('');
+  const [messageTone, setMessageTone] = useState<'info' | 'danger' | 'success'>(
+    'info',
+  );
   const [pending, setPending] = useState(false);
+  const [authConfig, setAuthConfig] = useState({
+    registrationEnabled: true,
+    needsBootstrap: false,
+  });
+
+  useEffect(() => {
+    if (!hasApiBase()) return;
+    loadAuthConfig().then((result) => {
+      if (result.ok) setAuthConfig(result.data);
+    });
+  }, []);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2053,6 +2789,7 @@ function AuthPanel({ setUser }: { setUser: (user: User | null) => void }) {
       setMessage(
         'Демо-вход включен. Для настоящей авторизации подключите Worker API.',
       );
+      setMessageTone('info');
       return;
     }
 
@@ -2069,12 +2806,17 @@ function AuthPanel({ setUser }: { setUser: (user: User | null) => void }) {
 
     if (result.ok) {
       setUser(result.data.user);
+      setMessageTone('success');
       setMessage(
         mode === 'login'
           ? 'Вы вошли.'
-          : 'Аккаунт создан. Первый пользователь станет owner.',
+          : 'Аккаунт создан. Добро пожаловать в NTE Meta.',
       );
+      if (mode === 'register') {
+        setAuthConfig((current) => ({ ...current, needsBootstrap: false }));
+      }
     } else {
+      setMessageTone('danger');
       setMessage(result.error);
     }
     setPending(false);
@@ -2084,10 +2826,11 @@ function AuthPanel({ setUser }: { setUser: (user: User | null) => void }) {
     <section className="auth-panel">
       <div>
         <p className="eyebrow">Авторизация</p>
-        <h1>{mode === 'login' ? 'Вход в админку' : 'Регистрация'}</h1>
+        <h1>{mode === 'login' ? 'Вход в NTE Meta' : 'Регистрация'}</h1>
         <p>
-          Первый зарегистрированный пользователь в D1 автоматически получает
-          роль owner. Пароли хешируются на Worker, права проверяются на backend.
+          {authConfig.needsBootstrap
+            ? 'Создайте первый owner-аккаунт с одноразовым кодом Cloudflare.'
+            : 'Аккаунт открывает комментарии, оценки и профиль. Права всегда проверяет Worker API.'}
         </p>
       </div>
       <form onSubmit={onSubmit}>
@@ -2106,7 +2849,7 @@ function AuthPanel({ setUser }: { setUser: (user: User | null) => void }) {
           type="password"
           autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
           required
-          minLength={8}
+          minLength={10}
         />
         {mode === 'register' ? (
           <>
@@ -2117,21 +2860,24 @@ function AuthPanel({ setUser }: { setUser: (user: User | null) => void }) {
               type="password"
               autoComplete="new-password"
               required
-              minLength={8}
+              minLength={10}
             />
-            <label htmlFor="auth-bootstrap">
-              Код первого owner <span>(если настроен)</span>
-            </label>
-            <input
-              id="auth-bootstrap"
-              name="bootstrapToken"
-              type="password"
-              autoComplete="off"
-              aria-describedby="bootstrap-help"
-            />
-            <small id="bootstrap-help">
-              Нужен только при создании самого первого owner-аккаунта.
-            </small>
+            {authConfig.needsBootstrap ? (
+              <>
+                <label htmlFor="auth-bootstrap">Код первого owner</label>
+                <input
+                  id="auth-bootstrap"
+                  name="bootstrapToken"
+                  type="password"
+                  autoComplete="off"
+                  aria-describedby="bootstrap-help"
+                  required
+                />
+                <small id="bootstrap-help">
+                  Одноразовый код хранится только в Cloudflare Worker secrets.
+                </small>
+              </>
+            ) : null}
           </>
         ) : null}
         <button className="primary-button" type="submit" disabled={pending}>
@@ -2145,21 +2891,20 @@ function AuthPanel({ setUser }: { setUser: (user: User | null) => void }) {
         <button
           className="text-button"
           type="button"
-          onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+          disabled={mode === 'login' && !authConfig.registrationEnabled}
+          onClick={() => {
+            setMessage('');
+            setMode(mode === 'login' ? 'register' : 'login');
+          }}
         >
-          {mode === 'login' ? 'Нужна регистрация' : 'Уже есть аккаунт'}
+          {mode === 'login'
+            ? authConfig.registrationEnabled
+              ? 'Нужна регистрация'
+              : 'Регистрация временно закрыта'
+            : 'Уже есть аккаунт'}
         </button>
       </form>
-      {message ? (
-        <StatusBanner
-          tone={
-            message.includes('ошиб') || message.includes('API')
-              ? 'info'
-              : 'success'
-          }
-          text={message}
-        />
-      ) : null}
+      {message ? <StatusBanner tone={messageTone} text={message} /> : null}
     </section>
   );
 }
@@ -2191,43 +2936,36 @@ function AdminDashboard({ data }: { data: SiteData }) {
   );
 }
 
-function AdminCharacters({ data }: { data: SiteData }) {
+function GuideCreateFields({ characters }: { characters: Character[] }) {
   return (
-    <div className="admin-grid">
-      <div className="admin-panel">
-        <div className="panel-title-row">
-          <h2>Персонажи</h2>
-          <button className="primary-button" type="button">
-            <Plus aria-hidden="true" />
-            Создать
-          </button>
-        </div>
-        <div className="admin-table">
-          {data.characters.slice(0, 10).map((character) => (
-            <div key={character.id}>
-              <img
-                src={character.imageUrl}
-                alt=""
-                width="44"
-                height="44"
-                loading="lazy"
-              />
-              <span>{character.name}</span>
-              <span>{character.role}</span>
-              <span>{character.tier}</span>
-              <button className="text-button" type="button">
-                Редактировать
-              </button>
-            </div>
+    <>
+      <label>
+        Персонаж
+        <select name="characterId" required>
+          {characters.map((character) => (
+            <option key={character.id} value={character.id}>
+              {character.name}
+            </option>
           ))}
-        </div>
-      </div>
-      <EntityForm
-        endpoint="/api/characters"
-        title="Быстрое создание персонажа"
-        fields={['name', 'slug', 'role', 'attribute', 'rarity']}
-      />
-    </div>
+        </select>
+      </label>
+      <label>
+        Заголовок
+        <input name="title" required />
+      </label>
+      <label>
+        Slug
+        <input name="slug" required />
+      </label>
+      <label>
+        Краткое описание
+        <textarea name="summary" rows={4} required />
+      </label>
+      <label>
+        Патч
+        <input name="patch" defaultValue="1.0" required />
+      </label>
+    </>
   );
 }
 
@@ -2238,7 +2976,10 @@ function AdminGuides({
   data: SiteData;
   setData: React.Dispatch<React.SetStateAction<SiteData>>;
 }) {
-  const guide = data.guides[0];
+  const [selectedGuideId, setSelectedGuideId] = useState(
+    data.guides[0]?.id || '',
+  );
+  const guide = data.guides.find((item) => item.id === selectedGuideId);
   const [sections, setSections] = useState<GuideSection[]>(() =>
     guide ? [...guide.sections].sort((a, b) => a.position - b.position) : [],
   );
@@ -2249,8 +2990,28 @@ function AdminGuides({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
+  const [guideMeta, setGuideMeta] = useState({
+    title: guide?.title || '',
+    summary: guide?.summary || '',
+    patch: guide?.patch || '1.0',
+    videoUrl: guide?.videoUrl || '',
+    status: guide?.status || 'draft',
+  });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const selectedSectionIdRef = useRef(selectedSectionId);
+  const createGuideDialogRef = useRef<HTMLDialogElement>(null);
+  const deleteGuideDialogRef = useRef<HTMLDialogElement>(null);
+  const deleteSectionDialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (
+      selectedGuideId &&
+      data.guides.some((item) => item.id === selectedGuideId)
+    ) {
+      return;
+    }
+    setSelectedGuideId(data.guides[0]?.id || '');
+  }, [data.guides, selectedGuideId]);
 
   useEffect(() => {
     selectedSectionIdRef.current = selectedSectionId;
@@ -2272,16 +3033,16 @@ function AdminGuides({
     setSections(nextSections);
     setSelectedSectionId(selectedSection?.id || '');
     setMarkdown(selectedSection?.content || '');
+    setGuideMeta({
+      title: guide.title,
+      summary: guide.summary,
+      patch: guide.patch,
+      videoUrl: guide.videoUrl || '',
+      status: guide.status,
+    });
   }, [guide]);
 
-  if (!guide) {
-    return (
-      <EmptyState
-        title="Гайдов пока нет"
-        text="Создайте первый гайд, чтобы управлять секциями и markdown-разметкой."
-      />
-    );
-  }
+  const activeGuide = guide;
 
   function reorder(index: number) {
     if (dragIndex === null || dragIndex === index) {
@@ -2294,6 +3055,22 @@ function AdminGuides({
       next.map((section, position) => ({ ...section, position: position + 1 })),
     );
     setDragIndex(null);
+  }
+
+  function moveSelectedSection(offset: number) {
+    const currentIndex = sections.findIndex(
+      (section) => section.id === selectedSectionId,
+    );
+    const nextIndex = currentIndex + offset;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= sections.length) {
+      return;
+    }
+    const next = [...sections];
+    const [moved] = next.splice(currentIndex, 1);
+    next.splice(nextIndex, 0, moved);
+    setSections(
+      next.map((section, position) => ({ ...section, position: position + 1 })),
+    );
   }
 
   function selectSection(section: GuideSection) {
@@ -2309,6 +3086,14 @@ function AdminGuides({
         section.id === selectedSectionId
           ? { ...section, content: value }
           : section,
+      ),
+    );
+  }
+
+  function updateSelectedSection(patch: Partial<GuideSection>) {
+    setSections((current) =>
+      current.map((section) =>
+        section.id === selectedSectionId ? { ...section, ...patch } : section,
       ),
     );
   }
@@ -2341,7 +3126,129 @@ function AdminGuides({
     updateSelectedMarkdown(next);
   }
 
+  async function createGuide(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!hasApiBase()) {
+      setMessage('Создание гайда требует подключенного Worker API.');
+      createGuideDialogRef.current?.close();
+      return;
+    }
+    setPending(true);
+    const form = new FormData(event.currentTarget);
+    const result = await saveEntity<{ id: string }>(
+      '/api/guides',
+      {
+        characterId: String(form.get('characterId') || ''),
+        title: String(form.get('title') || ''),
+        slug: String(form.get('slug') || ''),
+        summary: String(form.get('summary') || ''),
+        patchVersion: String(form.get('patch') || '1.0'),
+        status: 'draft',
+        sections: [
+          {
+            title: 'Обзор персонажа',
+            type: 'overview',
+            content: '## Обзор\nДобавьте роль, механику и практический вывод.',
+          },
+        ],
+      },
+      'POST',
+    );
+    if (result.ok) {
+      setSelectedGuideId(result.data.id);
+      setData(await loadSiteData({ includePrivate: true }));
+      setMessage('Новый гайд создан как черновик.');
+      event.currentTarget.reset();
+      createGuideDialogRef.current?.close();
+    } else {
+      setMessage(result.error);
+    }
+    setPending(false);
+  }
+
+  async function saveGuideMeta() {
+    if (!activeGuide) return;
+    if (!hasApiBase()) {
+      setData((current) => ({
+        ...current,
+        guides: current.guides.map((item) =>
+          item.id === activeGuide.id ? { ...item, ...guideMeta } : item,
+        ),
+      }));
+      setMessage('Метаданные обновлены в демо-режиме.');
+      return;
+    }
+    setPending(true);
+    const result = await saveEntity<{ success: boolean }>(
+      `/api/guides/${activeGuide.id}`,
+      {
+        title: guideMeta.title,
+        summary: guideMeta.summary,
+        patchVersion: guideMeta.patch,
+        videoUrl: guideMeta.videoUrl,
+        status: guideMeta.status,
+      },
+      'PATCH',
+    );
+    if (result.ok) {
+      setData(await loadSiteData({ includePrivate: true }));
+      setMessage('Метаданные гайда сохранены.');
+    } else {
+      setMessage(result.error);
+    }
+    setPending(false);
+  }
+
+  async function deleteGuide() {
+    if (!activeGuide) return;
+    deleteGuideDialogRef.current?.close();
+    if (!hasApiBase()) {
+      setData((current) => ({
+        ...current,
+        guides: current.guides.filter((item) => item.id !== activeGuide.id),
+      }));
+      return;
+    }
+    setPending(true);
+    const result = await deleteEntity(`/api/guides/${activeGuide.id}`);
+    if (result.ok) {
+      const nextData = await loadSiteData({ includePrivate: true });
+      setData(nextData);
+      setSelectedGuideId(nextData.guides[0]?.id || '');
+      setMessage('Гайд удален.');
+    } else {
+      setMessage(result.error);
+    }
+    setPending(false);
+  }
+
+  async function deleteSelectedSection() {
+    const selected = sections.find(
+      (section) => section.id === selectedSectionId,
+    );
+    if (!selected) return;
+    deleteSectionDialogRef.current?.close();
+    if (hasApiBase() && !selected.id.startsWith('custom-')) {
+      setPending(true);
+      const result = await deleteEntity(`/api/guide-sections/${selected.id}`);
+      if (!result.ok) {
+        setMessage(result.error);
+        setPending(false);
+        return;
+      }
+    }
+    const next = sections
+      .filter((section) => section.id !== selected.id)
+      .map((section, position) => ({ ...section, position: position + 1 }));
+    setSections(next);
+    setSelectedSectionId(next[0]?.id || '');
+    setMarkdown(next[0]?.content || '');
+    setMessage('Секция удалена. Сохраните новый порядок.');
+    setPending(false);
+  }
+
   async function saveSections() {
+    if (!activeGuide) return;
     setPending(true);
     setMessage('');
     const persistedSections: GuideSection[] = [];
@@ -2351,7 +3258,7 @@ function AdminGuides({
       for (const section of sections) {
         if (section.id.startsWith('custom-')) {
           const result = await saveEntity<{ id: string }>(
-            `/api/guides/${guide.id}/sections`,
+            `/api/guides/${activeGuide.id}/sections`,
             {
               title: section.title,
               type: section.type,
@@ -2390,7 +3297,7 @@ function AdminGuides({
       }
 
       const reorderResult = await saveEntity<{ success: boolean }>(
-        `/api/guides/${guide.id}/sections/reorder`,
+        `/api/guides/${activeGuide.id}/sections/reorder`,
         { sectionIds: persistedSections.map((section) => section.id) },
         'PATCH',
       );
@@ -2404,11 +3311,11 @@ function AdminGuides({
       persistedSections.push(...sections);
     }
 
-    const updatedGuide = { ...guide, sections: persistedSections };
+    const updatedGuide = { ...activeGuide, sections: persistedSections };
     setData((current) => ({
       ...current,
       guides: current.guides.map((item) =>
-        item.id === guide.id ? updatedGuide : item,
+        item.id === activeGuide.id ? updatedGuide : item,
       ),
     }));
     setSections(persistedSections);
@@ -2427,139 +3334,583 @@ function AdminGuides({
     setPending(false);
   }
 
+  if (!activeGuide) {
+    return (
+      <form className="admin-panel entity-form" onSubmit={createGuide}>
+        <p className="eyebrow">Пустая база</p>
+        <h2>Создать первый гайд</h2>
+        <p>
+          После создания появится редактор секций, metadata, видео и статуса
+          публикации.
+        </p>
+        <GuideCreateFields characters={data.characters} />
+        <button className="primary-button" type="submit" disabled={pending}>
+          <Plus aria-hidden="true" /> Создать черновик
+        </button>
+        <p className="form-message" aria-live="polite">
+          {message}
+        </p>
+      </form>
+    );
+  }
+
   return (
-    <div className="admin-grid two-columns">
-      <div className="admin-panel">
+    <div className="page-stack">
+      <section className="admin-panel guide-admin-meta">
         <div className="panel-title-row">
-          <h2>Секции гайда</h2>
-          <button className="primary-button" type="button" onClick={addSection}>
-            <Plus aria-hidden="true" />
-            Добавить раздел
-          </button>
-        </div>
-        <div
-          className="section-sorter"
-          aria-label="Перетаскивание секций гайда"
-        >
-          {sections.map((section, index) => (
+          <div>
+            <p className="eyebrow">Редактор персонажного гайда</p>
+            <h2>{activeGuide.title}</h2>
+          </div>
+          <div className="button-row">
             <button
-              key={section.id}
+              className="ghost-button"
               type="button"
-              draggable
-              onDragStart={() => setDragIndex(index)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => reorder(index)}
-              onClick={() => selectSection(section)}
-              aria-pressed={section.id === selectedSectionId}
-              className={section.id === selectedSectionId ? 'active' : ''}
+              onClick={() => createGuideDialogRef.current?.showModal()}
             >
-              <GripVertical aria-hidden="true" />
-              <span>{section.title}</span>
-              <small>{section.type}</small>
+              <Plus aria-hidden="true" /> Создать гайд
             </button>
+            <button
+              className="ghost-button danger"
+              type="button"
+              onClick={() => deleteGuideDialogRef.current?.showModal()}
+            >
+              <Trash2 aria-hidden="true" /> Удалить гайд
+            </button>
+          </div>
+        </div>
+        <label htmlFor="guide-picker">Редактируемый гайд</label>
+        <select
+          id="guide-picker"
+          value={activeGuide.id}
+          onChange={(event) => setSelectedGuideId(event.target.value)}
+        >
+          {data.guides.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.title} · {item.status}
+            </option>
           ))}
+        </select>
+        <div className="guide-meta-fields">
+          <label>
+            Заголовок
+            <input
+              value={guideMeta.title}
+              onChange={(event) =>
+                setGuideMeta((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            Патч
+            <input
+              value={guideMeta.patch}
+              onChange={(event) =>
+                setGuideMeta((current) => ({
+                  ...current,
+                  patch: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            Статус
+            <select
+              value={guideMeta.status}
+              onChange={(event) =>
+                setGuideMeta((current) => ({
+                  ...current,
+                  status: event.target.value as Guide['status'],
+                }))
+              }
+            >
+              <option value="draft">Черновик</option>
+              <option value="pending_review">На проверке</option>
+              <option value="published">Опубликован</option>
+              <option value="archived">Архив</option>
+            </select>
+          </label>
+          <label>
+            YouTube URL
+            <input
+              type="url"
+              value={guideMeta.videoUrl}
+              onChange={(event) =>
+                setGuideMeta((current) => ({
+                  ...current,
+                  videoUrl: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="wide-field">
+            Краткое описание
+            <textarea
+              rows={4}
+              value={guideMeta.summary}
+              onChange={(event) =>
+                setGuideMeta((current) => ({
+                  ...current,
+                  summary: event.target.value,
+                }))
+              }
+            />
+          </label>
         </div>
         <button
           className="primary-button"
           type="button"
           disabled={pending}
-          onClick={saveSections}
+          onClick={saveGuideMeta}
+        >
+          <CheckCircle2 aria-hidden="true" /> Сохранить параметры гайда
+        </button>
+      </section>
+
+      <div className="admin-grid two-columns">
+        <div className="admin-panel">
+          <div className="panel-title-row">
+            <h2>Секции гайда</h2>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={addSection}
+            >
+              <Plus aria-hidden="true" />
+              Добавить раздел
+            </button>
+          </div>
+          <div
+            className="section-sorter"
+            aria-label="Перетаскивание секций гайда"
+          >
+            {sections.map((section, index) => (
+              <button
+                key={section.id}
+                type="button"
+                draggable
+                onDragStart={() => setDragIndex(index)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => reorder(index)}
+                onClick={() => selectSection(section)}
+                aria-pressed={section.id === selectedSectionId}
+                className={section.id === selectedSectionId ? 'active' : ''}
+              >
+                <GripVertical aria-hidden="true" />
+                <span>{section.title}</span>
+                <small>{section.type}</small>
+              </button>
+            ))}
+          </div>
+          <div className="button-row">
+            <button
+              className="icon-button"
+              type="button"
+              title="Переместить выбранную секцию выше"
+              aria-label="Переместить выбранную секцию выше"
+              onClick={() => moveSelectedSection(-1)}
+            >
+              <ChevronUp aria-hidden="true" />
+            </button>
+            <button
+              className="icon-button"
+              type="button"
+              title="Переместить выбранную секцию ниже"
+              aria-label="Переместить выбранную секцию ниже"
+              onClick={() => moveSelectedSection(1)}
+            >
+              <ChevronDown aria-hidden="true" />
+            </button>
+            <button
+              className="ghost-button danger"
+              type="button"
+              disabled={!selectedSectionId}
+              onClick={() => deleteSectionDialogRef.current?.showModal()}
+            >
+              <Trash2 aria-hidden="true" /> Удалить секцию
+            </button>
+            <button
+              className="primary-button"
+              type="button"
+              disabled={pending}
+              onClick={saveSections}
+            >
+              <CheckCircle2 aria-hidden="true" />
+              {pending ? 'Сохраняем...' : 'Сохранить секции'}
+            </button>
+          </div>
+          <p className="form-message" aria-live="polite">
+            {message}
+          </p>
+        </div>
+        <div className="admin-panel editor-panel">
+          <h2>Markdown editor</h2>
+          <div className="guide-section-fields">
+            <label>
+              Название секции
+              <input
+                value={
+                  sections.find((section) => section.id === selectedSectionId)
+                    ?.title || ''
+                }
+                onChange={(event) =>
+                  updateSelectedSection({ title: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              Тип секции
+              <input
+                value={
+                  sections.find((section) => section.id === selectedSectionId)
+                    ?.type || ''
+                }
+                onChange={(event) =>
+                  updateSelectedSection({ type: event.target.value })
+                }
+              />
+            </label>
+          </div>
+          <div className="toolbar" aria-label="Markdown toolbar">
+            {[
+              ['h2', 'H2'],
+              ['h3', 'H3'],
+              ['bold', 'B'],
+              ['italic', 'I'],
+              ['list', 'List'],
+              ['quote', 'Quote'],
+              ['spoiler', 'Spoiler'],
+              ['table', 'Table'],
+              ['link', 'Link'],
+              ['youtube', 'YouTube'],
+            ].map(([action, label]) => (
+              <button
+                key={action}
+                type="button"
+                onClick={() => applyAction(action)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <label htmlFor="markdown-editor">Текст раздела</label>
+          <textarea
+            id="markdown-editor"
+            ref={textareaRef}
+            value={markdown}
+            onChange={(event) => updateSelectedMarkdown(event.target.value)}
+            rows={12}
+          />
+          <h3>Live preview</h3>
+          <MarkdownPreview value={markdown} />
+        </div>
+      </div>
+
+      <dialog className="confirm-dialog" ref={createGuideDialogRef}>
+        <form method="dialog" onSubmit={createGuide}>
+          <h2>Создать гайд</h2>
+          <GuideCreateFields characters={data.characters} />
+          <div className="button-row">
+            <button className="ghost-button" value="cancel">
+              Отменить
+            </button>
+            <button className="primary-button" type="submit">
+              <Plus aria-hidden="true" /> Создать черновик
+            </button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog className="confirm-dialog" ref={deleteGuideDialogRef}>
+        <form method="dialog">
+          <h2>Удалить гайд?</h2>
+          <p>
+            Секции гайда будут удалены каскадно. Действие попадет в audit log.
+          </p>
+          <div className="button-row">
+            <button className="ghost-button" value="cancel">
+              Отменить
+            </button>
+            <button
+              className="primary-button danger-action"
+              type="button"
+              onClick={deleteGuide}
+            >
+              <Trash2 aria-hidden="true" /> Удалить гайд
+            </button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog className="confirm-dialog" ref={deleteSectionDialogRef}>
+        <form method="dialog">
+          <h2>Удалить выбранную секцию?</h2>
+          <p>Секция исчезнет из публичного гайда после сохранения.</p>
+          <div className="button-row">
+            <button className="ghost-button" value="cancel">
+              Отменить
+            </button>
+            <button
+              className="primary-button danger-action"
+              type="button"
+              onClick={deleteSelectedSection}
+            >
+              <Trash2 aria-hidden="true" /> Удалить секцию
+            </button>
+          </div>
+        </form>
+      </dialog>
+    </div>
+  );
+}
+
+function AdminTierlists({
+  data,
+  setData,
+}: {
+  data: SiteData;
+  setData: React.Dispatch<React.SetStateAction<SiteData>>;
+}) {
+  const [kind, setKind] = useState<'base' | 'premium'>('base');
+  const tierlist =
+    data.tierlists.find((item) => item.kind === kind) || data.tierlists[0];
+  const [items, setItems] = useState(tierlist?.items || []);
+  const [title, setTitle] = useState(tierlist?.title || '');
+  const [patch, setPatch] = useState(tierlist?.patch || '1.0');
+  const [status, setStatus] = useState(tierlist?.status || 'published');
+  const [changelog, setChangelog] = useState(
+    (tierlist?.changelog || []).join('\n'),
+  );
+  const [message, setMessage] = useState('');
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    setItems(tierlist?.items || []);
+    setTitle(tierlist?.title || '');
+    setPatch(tierlist?.patch || '1.0');
+    setStatus(tierlist?.status || 'published');
+    setChangelog((tierlist?.changelog || []).join('\n'));
+    setMessage('');
+  }, [tierlist]);
+
+  const grouped = useMemo(() => {
+    const result = Object.fromEntries(
+      tierOrder.map((tier) => [tier, [] as Character[]]),
+    ) as Record<Tier, Character[]>;
+    items.forEach((item) => {
+      const character = getCharacter(data, item.characterId);
+      if (character) result[item.tier].push(character);
+    });
+    return result;
+  }, [data, items]);
+
+  function updateItem(
+    characterId: string,
+    patchValue: Partial<(typeof items)[number]>,
+  ) {
+    setItems((current) =>
+      current.map((item) =>
+        item.characterId === characterId ? { ...item, ...patchValue } : item,
+      ),
+    );
+  }
+
+  async function saveTierlist() {
+    if (!tierlist) return;
+    setPending(true);
+    setMessage('');
+    const payload = {
+      title,
+      tierlistType: kind,
+      patchVersion: patch,
+      status,
+      changelogJson: changelog
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean),
+      items,
+    };
+
+    if (hasApiBase()) {
+      const result = await saveEntity<{ success: boolean }>(
+        `/api/tierlists/${tierlist.id}`,
+        payload,
+        'PATCH',
+      );
+      if (!result.ok) {
+        setMessage(result.error);
+        setPending(false);
+        return;
+      }
+      setData(await loadSiteData({ includePrivate: true }));
+      setMessage('Тир-лист сохранен в D1.');
+    } else {
+      setData((current) => ({
+        ...current,
+        tierlists: current.tierlists.map((item) =>
+          item.id === tierlist.id
+            ? {
+                ...item,
+                title,
+                patch,
+                status,
+                changelog: payload.changelogJson,
+                items,
+              }
+            : item,
+        ),
+      }));
+      setMessage('Тир-лист обновлен в демо-режиме.');
+    }
+    setPending(false);
+  }
+
+  if (!tierlist) {
+    return (
+      <EmptyState
+        title="Тир-листов пока нет"
+        text="Создайте base и premium записи через API, затем наполните их персонажами."
+      />
+    );
+  }
+
+  return (
+    <div className="page-stack">
+      <section className="admin-panel tierlist-editor-header">
+        <div className="panel-title-row">
+          <div>
+            <p className="eyebrow">Base C0 и Premium C6</p>
+            <h2>Редактор тир-листов</h2>
+          </div>
+          <div className="segmented-control" aria-label="Тип тир-листа">
+            <button
+              className={kind === 'base' ? 'active' : ''}
+              type="button"
+              onClick={() => setKind('base')}
+            >
+              Base C0
+            </button>
+            <button
+              className={kind === 'premium' ? 'active' : ''}
+              type="button"
+              onClick={() => setKind('premium')}
+            >
+              Premium C6
+            </button>
+          </div>
+        </div>
+        <div className="tierlist-meta-fields">
+          <label>
+            Название
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+            />
+          </label>
+          <label>
+            Патч
+            <input
+              value={patch}
+              onChange={(event) => setPatch(event.target.value)}
+            />
+          </label>
+          <label>
+            Статус
+            <select
+              value={status}
+              onChange={(event) =>
+                setStatus(
+                  event.target.value as NonNullable<typeof tierlist.status>,
+                )
+              }
+            >
+              <option value="draft">Черновик</option>
+              <option value="published">Опубликован</option>
+              <option value="archived">Архив</option>
+            </select>
+          </label>
+          <label className="wide-field">
+            История изменений — одна запись на строку
+            <textarea
+              rows={4}
+              value={changelog}
+              onChange={(event) => setChangelog(event.target.value)}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="admin-panel">
+        <SectionHeader
+          title="Предпросмотр"
+          text="Публичное распределение обновляется сразу при выборе тира."
+        />
+        <TierPreview grouped={grouped} />
+      </section>
+
+      <section className="admin-panel">
+        <div className="tierlist-item-editor">
+          {items.map((item) => {
+            const character = getCharacter(data, item.characterId);
+            if (!character) return null;
+            return (
+              <article key={item.characterId}>
+                <img
+                  src={character.imageUrl}
+                  alt=""
+                  width="56"
+                  height="56"
+                  loading="lazy"
+                />
+                <strong>{character.name}</strong>
+                <label>
+                  Тир
+                  <select
+                    value={item.tier}
+                    onChange={(event) =>
+                      updateItem(item.characterId, {
+                        tier: event.target.value as Tier,
+                      })
+                    }
+                  >
+                    {tierOrder.map((tier) => (
+                      <option key={tier} value={tier}>
+                        {tier}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Комментарий редакции
+                  <input
+                    value={item.note}
+                    onChange={(event) =>
+                      updateItem(item.characterId, {
+                        note: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+              </article>
+            );
+          })}
+        </div>
+        <button
+          className="primary-button"
+          type="button"
+          disabled={pending}
+          onClick={saveTierlist}
         >
           <CheckCircle2 aria-hidden="true" />
-          {pending ? 'Сохраняем...' : 'Сохранить секции'}
+          {pending ? 'Сохраняем...' : 'Сохранить тир-лист'}
         </button>
         <p className="form-message" aria-live="polite">
           {message}
         </p>
-      </div>
-      <div className="admin-panel editor-panel">
-        <h2>Markdown editor</h2>
-        <div className="toolbar" aria-label="Markdown toolbar">
-          {[
-            ['h2', 'H2'],
-            ['h3', 'H3'],
-            ['bold', 'B'],
-            ['italic', 'I'],
-            ['list', 'List'],
-            ['quote', 'Quote'],
-            ['spoiler', 'Spoiler'],
-            ['table', 'Table'],
-            ['link', 'Link'],
-            ['youtube', 'YouTube'],
-          ].map(([action, label]) => (
-            <button
-              key={action}
-              type="button"
-              onClick={() => applyAction(action)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <label htmlFor="markdown-editor">Текст раздела</label>
-        <textarea
-          id="markdown-editor"
-          ref={textareaRef}
-          value={markdown}
-          onChange={(event) => updateSelectedMarkdown(event.target.value)}
-          rows={12}
-        />
-        <h3>Live preview</h3>
-        <MarkdownPreview value={markdown} />
-      </div>
-    </div>
-  );
-}
-
-function AdminTierlists({ data }: { data: SiteData }) {
-  return (
-    <div className="admin-panel">
-      <h2>Редактор тир-листов</h2>
-      <p>
-        Base и premium хранятся отдельно. Персонажей можно переносить между S+,
-        S, A, B, C после подключения drag/drop API.
-      </p>
-      <TierPreview grouped={groupTierItems(data, 'base').grouped} />
-    </div>
-  );
-}
-
-function AdminNews({ data }: { data: SiteData }) {
-  return (
-    <div className="admin-grid">
-      <EntityForm
-        endpoint="/api/news"
-        title="Создать новость"
-        fields={['title', 'slug', 'category', 'summary', 'sourceUrl']}
-      />
-      <div className="admin-panel">
-        <h2>Новости</h2>
-        {data.news.map((item) => (
-          <NewsCompactCard key={item.id} item={item} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AdminLeaks({ data }: { data: SiteData }) {
-  return (
-    <div className="admin-grid">
-      <EntityForm
-        endpoint="/api/leaks"
-        title="Подготовить слив к публикации"
-        fields={['title', 'slug', 'status', 'trustLevel', 'sourceUrl']}
-      />
-      <div className="admin-panel">
-        <h2>Очередь одобрения</h2>
-        <p>
-          Автоимпорт из Telegram/сайтов запланирован: запись попадает сюда и не
-          публикуется без решения редактора.
-        </p>
-        {data.leaks.map((item) => (
-          <LeakCompactCard key={item.id} item={item} />
-        ))}
-      </div>
+      </section>
     </div>
   );
 }
@@ -2575,7 +3926,9 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
   const [message, setMessage] = useState('');
   const [actionId, setActionId] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Comment | null>(null);
+  const [warningTarget, setWarningTarget] = useState<Comment | null>(null);
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
+  const warningDialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     if (!hasApiBase()) return;
@@ -2624,6 +3977,25 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
     deleteDialogRef.current?.showModal();
   }
 
+  async function submitWarning(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!warningTarget?.userId) return;
+    const form = new FormData(event.currentTarget);
+    setActionId(warningTarget.id);
+    const result = await createUserWarning(
+      warningTarget.userId,
+      String(form.get('reason') || ''),
+    );
+    if (result.ok) {
+      setMessage(`Предупреждение для ${warningTarget.author} сохранено.`);
+      event.currentTarget.reset();
+      warningDialogRef.current?.close();
+    } else {
+      setMessage(result.error);
+    }
+    setActionId('');
+  }
+
   return (
     <div className="admin-panel">
       <div className="panel-title-row">
@@ -2650,6 +4022,18 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
             </div>
             <p>{comment.body}</p>
             <div className="button-row">
+              <button
+                className="ghost-button"
+                type="button"
+                disabled={!comment.userId || actionId === comment.id}
+                onClick={() => {
+                  setWarningTarget(comment);
+                  warningDialogRef.current?.showModal();
+                }}
+              >
+                <CircleAlert aria-hidden="true" />
+                Предупредить
+              </button>
               {comment.status === 'visible' ? (
                 <button
                   className="ghost-button"
@@ -2711,11 +4095,99 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
           </div>
         </form>
       </dialog>
+      <dialog
+        className="confirm-dialog"
+        ref={warningDialogRef}
+        onClose={() => setWarningTarget(null)}
+      >
+        <form onSubmit={submitWarning}>
+          <h2>Предупреждение пользователю</h2>
+          <p>
+            Пользователь {warningTarget?.author} увидит причину в своём профиле.
+            Действие сохранится в audit log.
+          </p>
+          <label htmlFor="moderation-warning-reason">Причина</label>
+          <textarea
+            id="moderation-warning-reason"
+            name="reason"
+            minLength={5}
+            maxLength={1000}
+            rows={5}
+            required
+          />
+          <div className="button-row">
+            <button className="ghost-button" value="cancel" formMethod="dialog">
+              Отменить
+            </button>
+            <button className="primary-button" type="submit">
+              <CircleAlert aria-hidden="true" /> Выдать предупреждение
+            </button>
+          </div>
+        </form>
+      </dialog>
     </div>
   );
 }
 
 const userRoles: Role[] = ['user', 'moderator', 'editor', 'admin', 'owner'];
+
+function AdminAuditLog() {
+  const [entries, setEntries] = useState<AuditLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    loadAuditLog().then((result) => {
+      if (!mounted) return;
+      if (result.ok) {
+        setEntries(result.data);
+      } else {
+        setMessage(result.error);
+      }
+      setLoading(false);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return (
+    <section className="admin-panel">
+      <div className="panel-title-row">
+        <div>
+          <p className="eyebrow">Последние 200 событий</p>
+          <h2>Audit log</h2>
+        </div>
+        <span>{entries.length} записей</span>
+      </div>
+      <p className="form-message" aria-live="polite">
+        {loading ? 'Загружаем журнал...' : message}
+      </p>
+      <div className="audit-list">
+        {entries.map((entry) => (
+          <article key={entry.id}>
+            <div>
+              <strong>{entry.action}</strong>
+              <span>{formatDate(entry.created_at)}</span>
+            </div>
+            <code>{entry.target_id || 'system'}</code>
+            <details>
+              <summary>Детали</summary>
+              <pre>{entry.details_json}</pre>
+            </details>
+          </article>
+        ))}
+        {!loading && entries.length === 0 ? (
+          <EmptyState
+            title="Журнал пока пуст"
+            text="Создание, редактирование и удаление контента появятся здесь."
+          />
+        ) : null}
+      </div>
+    </section>
+  );
+}
 
 function AdminUsers({ actor }: { actor: User }) {
   const [users, setUsers] = useState<AdminUser[]>(
@@ -2755,6 +4227,29 @@ function AdminUsers({ actor }: { actor: User }) {
         ),
       );
       setMessage(`Роль ${target.displayName} изменена на ${role}.`);
+    } else {
+      setMessage(result.error);
+    }
+    setActionId('');
+  }
+
+  async function changeStatus(
+    target: AdminUser,
+    status: 'active' | 'disabled',
+  ) {
+    setActionId(target.id);
+    const result = await updateUserStatus(target.id, status);
+    if (result.ok) {
+      setUsers((current) =>
+        current.map((user) =>
+          user.id === target.id ? { ...user, status } : user,
+        ),
+      );
+      setMessage(
+        status === 'active'
+          ? `Аккаунт ${target.displayName} восстановлен.`
+          : `Аккаунт ${target.displayName} отключен, сессии завершены.`,
+      );
     } else {
       setMessage(result.error);
     }
@@ -2832,11 +4327,31 @@ function AdminUsers({ actor }: { actor: User }) {
                 ))}
               </select>
             </label>
+            {target.id !== actor.id && target.status !== 'deleted' ? (
+              <button
+                className="ghost-button"
+                type="button"
+                disabled={actionId === target.id}
+                onClick={() =>
+                  changeStatus(
+                    target,
+                    target.status === 'active' ? 'disabled' : 'active',
+                  )
+                }
+              >
+                {target.status === 'active' ? (
+                  <CircleAlert aria-hidden="true" />
+                ) : (
+                  <CheckCircle2 aria-hidden="true" />
+                )}
+                {target.status === 'active' ? 'Отключить' : 'Восстановить'}
+              </button>
+            ) : null}
             {actor.role === 'owner' && target.id !== actor.id ? (
               <button
                 className="ghost-button danger"
                 type="button"
-                disabled={target.status !== 'active' || actionId === target.id}
+                disabled={target.status === 'deleted' || actionId === target.id}
                 onClick={() => {
                   setDeleteTarget(target);
                   deleteDialogRef.current?.showModal();
@@ -3022,90 +4537,6 @@ function AdminSettings() {
   );
 }
 
-function AdminSources({ data }: { data: SiteData }) {
-  return (
-    <div className="admin-grid">
-      <EntityForm
-        endpoint="/api/sources"
-        title="Добавить источник"
-        fields={['sourceName', 'sourceType', 'sourceUrl', 'trustLevel']}
-      />
-      <div className="admin-panel">
-        <h2>Источники новостей и сливов</h2>
-        {data.sources.map((source) => (
-          <article className="source-card" key={source.id}>
-            <strong>{source.sourceName}</strong>
-            <span>
-              {source.sourceType} · доверие: {source.trustLevel}
-            </span>
-            <p>{source.sourceUrl}</p>
-            <small>
-              {source.autoImportEnabled
-                ? 'Автоимпорт включен'
-                : 'Автоимпорт выключен'}
-            </small>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function EntityForm({
-  title,
-  fields,
-  endpoint,
-  method = 'POST',
-}: {
-  title: string;
-  fields: string[];
-  endpoint: string;
-  method?: 'POST' | 'PATCH';
-}) {
-  const [message, setMessage] = useState('');
-
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const payload = Object.fromEntries(new FormData(event.currentTarget));
-
-    if (!hasApiBase()) {
-      setMessage(
-        'Демо-режим: форма готова, сохранение включится после подключения Worker API.',
-      );
-      return;
-    }
-
-    const result = await saveEntity(endpoint, payload, method);
-    setMessage(result.ok ? 'Сохранено.' : result.error);
-  }
-
-  return (
-    <form className="entity-form admin-panel" onSubmit={onSubmit}>
-      <h2>{title}</h2>
-      {fields.map((field) => (
-        <React.Fragment key={field}>
-          <label htmlFor={`field-${field}`}>{field}</label>
-          <input id={`field-${field}`} name={field} />
-        </React.Fragment>
-      ))}
-      <label htmlFor={`${title}-body`}>Полный текст / markdown</label>
-      <textarea id={`${title}-body`} name="body" rows={5} />
-      <div className="button-row">
-        <button className="ghost-button" type="button">
-          Сохранить черновик
-        </button>
-        <button className="primary-button" type="submit">
-          Опубликовать
-        </button>
-        <button className="ghost-button" type="button">
-          Предпросмотр
-        </button>
-      </div>
-      {message ? <p className="form-message">{message}</p> : null}
-    </form>
-  );
-}
-
 function Footer() {
   return (
     <footer className="site-footer">
@@ -3118,10 +4549,29 @@ function Footer() {
       </div>
       <div>
         <a href="#/characters">Персонажи</a>
+        <a href="#/guides">Гайды</a>
+        <a href="#/teams">Команды</a>
+        <a href="#/rotations">Ротации</a>
         <a href="#/tierlists">Тир-листы</a>
-        <a href="#/admin">Админка</a>
+        <a href="#/news">Новости</a>
+        <a href="#/community">Комьюнити</a>
       </div>
     </footer>
+  );
+}
+
+function NotFoundPage() {
+  return (
+    <section className="page-hero compact">
+      <p className="eyebrow">Ошибка 404</p>
+      <h1>Страница не найдена</h1>
+      <p>
+        Возможно, материал переименовали, отправили в архив или ссылка устарела.
+      </p>
+      <a className="primary-button" href="#/">
+        <Home aria-hidden="true" /> Вернуться на главную
+      </a>
+    </section>
   );
 }
 

@@ -1,11 +1,13 @@
 import { seedData } from '../data/seed';
 import type {
   AdminUser,
+  AuditLogEntry,
   AppSettings,
   Comment,
   Role,
   SiteData,
   User,
+  UserWarning,
 } from '../types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
@@ -18,6 +20,10 @@ export type ReactionSummary = {
   likes: number;
   dislikes: number;
   useful: number;
+};
+export type AuthConfig = {
+  registrationEnabled: boolean;
+  needsBootstrap: boolean;
 };
 
 export function hasApiBase() {
@@ -65,7 +71,10 @@ async function request<T>(
       };
     }
 
-    return { ok: true, data: (payload.data ?? payload) as T };
+    return {
+      ok: true,
+      data: (Object.hasOwn(payload, 'data') ? payload.data : payload) as T,
+    };
   } catch (error) {
     return {
       ok: false,
@@ -81,35 +90,56 @@ async function loadCollection<T>(path: string, fallback: T): Promise<T> {
   return result.ok ? result.data : fallback;
 }
 
-export async function loadSiteData(): Promise<SiteData> {
+export async function loadSiteData(
+  options: { includePrivate?: boolean } = {},
+): Promise<SiteData> {
   if (!API_BASE) {
     return seedData;
   }
 
-  const [characters, guides, tierlists, teams, news, leaks, comments] =
-    await Promise.all([
-      loadCollection('/api/characters', seedData.characters),
-      loadCollection('/api/guides', seedData.guides),
-      loadCollection('/api/tierlists', seedData.tierlists),
-      loadCollection('/api/teams', seedData.teams),
-      loadCollection('/api/news', seedData.news),
-      loadCollection('/api/leaks', seedData.leaks),
-      loadCollection(
-        '/api/comments?targetType=site&targetId=home',
-        seedData.comments,
-      ),
-    ]);
-
-  return {
-    ...seedData,
+  const [
     characters,
     guides,
+    rotations,
     tierlists,
     teams,
     news,
     leaks,
     comments,
+    sources,
+  ] = await Promise.all([
+    loadCollection('/api/characters', seedData.characters),
+    loadCollection('/api/guides', seedData.guides),
+    loadCollection('/api/rotations', seedData.rotations),
+    loadCollection('/api/tierlists', seedData.tierlists),
+    loadCollection('/api/teams', seedData.teams),
+    loadCollection('/api/news', seedData.news),
+    loadCollection('/api/leaks', seedData.leaks),
+    loadCollection(
+      '/api/comments?targetType=site&targetId=home',
+      seedData.comments,
+    ),
+    options.includePrivate
+      ? loadCollection('/api/sources', seedData.sources)
+      : Promise.resolve([]),
+  ]);
+
+  return {
+    ...seedData,
+    characters,
+    guides,
+    rotations,
+    tierlists,
+    teams,
+    news,
+    leaks,
+    comments,
+    sources,
   };
+}
+
+export async function loadEntityCollection<T>(path: string) {
+  return request<T[]>(path);
 }
 
 export async function login(username: string, password: string) {
@@ -163,11 +193,11 @@ export async function logout() {
 }
 
 export async function me() {
-  const result = await request<User>('/api/auth/me');
-  if (!result.ok && result.status === 401) {
-    sessionToken = '';
-  }
-  return result;
+  return request<User | null>('/api/auth/me');
+}
+
+export async function loadAuthConfig() {
+  return request<AuthConfig>('/api/auth/config');
 }
 
 export async function updateProfile(displayName: string) {
@@ -241,11 +271,36 @@ export async function loadUsers() {
   return request<AdminUser[]>('/api/users');
 }
 
+export async function loadAuditLog() {
+  return request<AuditLogEntry[]>('/api/audit-log');
+}
+
 export async function updateUserRole(id: string, role: Role) {
   return request<{ success: boolean }>(`/api/users/${id}/role`, {
     method: 'PATCH',
     body: JSON.stringify({ role }),
   });
+}
+
+export async function updateUserStatus(
+  id: string,
+  status: 'active' | 'disabled',
+) {
+  return request<{ success: boolean }>(`/api/users/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function createUserWarning(userId: string, reason: string) {
+  return request<{ id: string }>(`/api/users/${userId}/warnings`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function loadMyWarnings() {
+  return request<UserWarning[]>('/api/auth/warnings');
 }
 
 export async function deleteUser(id: string) {

@@ -41,6 +41,8 @@ jobs:
         run: npm run test:ui
       - name: Build
         run: npm run build
+        env:
+          VITE_PUBLIC_BASE: /nte-meta/
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

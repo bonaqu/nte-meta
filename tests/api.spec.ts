@@ -2,279 +2,636 @@ import {
   expect,
   request as createRequestContext,
   test,
+  type APIRequestContext,
 } from '@playwright/test';
 
 const apiBase = 'http://127.0.0.1:8788';
+const runId = `${Date.now()}-${Math.round(Math.random() * 10000)}`;
+const ownerUsername = `owner_${runId}`;
+const ownerPassword = 'Playwright-Strong-42!';
 
-test('auth, comments and reactions work through Worker and D1', async ({
-  request,
-}) => {
-  const username = `pw_${Date.now()}_${Math.round(Math.random() * 10000)}`;
-  const password = 'Playwright-Strong-42!';
+let owner: APIRequestContext;
+let guest: APIRequestContext;
+let communityCommentId = '';
+let ownerId = '';
 
-  const guidesResponse = await request.get(`${apiBase}/api/guides`);
-  expect(guidesResponse.ok()).toBeTruthy();
-  const guidesPayload = await guidesResponse.json();
-  expect(guidesPayload.data.length).toBeGreaterThan(0);
+test.describe('NTE Meta Worker API', () => {
+  test.describe.configure({ mode: 'serial' });
 
-  const registerResponse = await request.post(`${apiBase}/api/auth/register`, {
-    data: { username, password, confirmPassword: password },
-  });
-  expect(registerResponse.status()).toBe(201);
-  await expect(registerResponse.json()).resolves.toMatchObject({
-    data: { user: { role: 'owner' } },
-  });
+  test.beforeAll(async () => {
+    owner = await createRequestContext.newContext({ baseURL: apiBase });
+    guest = await createRequestContext.newContext({ baseURL: apiBase });
 
-  const meResponse = await request.get(`${apiBase}/api/auth/me`);
-  expect(meResponse.ok()).toBeTruthy();
-  await expect(meResponse.json()).resolves.toMatchObject({
-    data: { username },
-  });
-
-  const profileResponse = await request.patch(`${apiBase}/api/auth/profile`, {
-    data: { displayName: 'Playwright Editor' },
-  });
-  expect(profileResponse.ok()).toBeTruthy();
-  await expect(profileResponse.json()).resolves.toMatchObject({
-    data: { displayName: 'Playwright Editor' },
+    const register = await owner.post('/api/auth/register', {
+      data: {
+        username: ownerUsername,
+        password: ownerPassword,
+        confirmPassword: ownerPassword,
+        bootstrapToken: 'playwright-only-bootstrap-token',
+      },
+    });
+    expect(register.status()).toBe(201);
+    const registeredOwner = await register.json();
+    ownerId = registeredOwner.data.user.id;
+    expect(registeredOwner).toMatchObject({
+      data: { user: { role: 'owner' } },
+    });
   });
 
-  const commentResponse = await request.post(`${apiBase}/api/comments`, {
-    data: {
-      targetType: 'guide',
-      targetId: 'guide-hotori',
-      body: `Комментарий Playwright ${username}`,
-    },
-  });
-  expect(commentResponse.status()).toBe(201);
-  const commentPayload = await commentResponse.json();
-  expect(commentPayload).toMatchObject({
-    data: { author: 'Playwright Editor' },
-  });
-  const commentId = commentPayload.data.id;
-
-  const replyResponse = await request.post(`${apiBase}/api/comments`, {
-    data: {
-      targetType: 'guide',
-      targetId: 'guide-hotori',
-      parentId: commentId,
-      body: `Ответ Playwright ${username}`,
-    },
-  });
-  expect(replyResponse.status()).toBe(201);
-  await expect(replyResponse.json()).resolves.toMatchObject({
-    data: { parentId: commentId },
+  test.afterAll(async () => {
+    await Promise.all([owner.dispose(), guest.dispose()]);
   });
 
-  const editResponse = await request.patch(
-    `${apiBase}/api/comments/${commentId}`,
-    {
-      data: { body: `Обновленный комментарий ${username}` },
-    },
-  );
-  expect(editResponse.ok()).toBeTruthy();
+  test('публичные коллекции доступны с безопасными заголовками', async () => {
+    const authConfig = await guest.get('/api/auth/config');
+    expect(authConfig.ok()).toBeTruthy();
+    await expect(authConfig.json()).resolves.toMatchObject({
+      data: { registrationEnabled: true, needsBootstrap: false },
+    });
 
-  const commentReactionResponse = await request.post(
-    `${apiBase}/api/reactions`,
-    {
+    for (const collection of [
+      'characters',
+      'guides',
+      'rotations',
+      'teams',
+      'tierlists',
+      'news',
+      'leaks',
+    ]) {
+      const response = await guest.get(`/api/${collection}`);
+      expect(response.ok(), collection).toBeTruthy();
+      expect(response.headers()['x-content-type-options']).toBe('nosniff');
+      expect(response.headers()['cache-control']).toContain('public');
+      expect(Array.isArray((await response.json()).data)).toBeTruthy();
+    }
+
+    const rejectedOrigin = await guest.post('/api/auth/login', {
+      headers: { Origin: 'https://attacker.example' },
+      data: { username: 'nobody', password: 'invalid-password' },
+    });
+    expect(rejectedOrigin.status()).toBe(403);
+
+    const wrongContentType = await guest.post('/api/auth/login', {
+      headers: { 'Content-Type': 'text/plain' },
+      data: 'not-json',
+    });
+    expect(wrongContentType.status()).toBe(415);
+  });
+
+  test('профиль, комьюнити, ответы и реакции работают через D1', async () => {
+    const profile = await owner.patch('/api/auth/profile', {
+      data: { displayName: 'Playwright Owner' },
+    });
+    expect(profile.ok()).toBeTruthy();
+
+    const comment = await owner.post('/api/comments', {
+      data: {
+        targetType: 'site',
+        targetId: 'community',
+        body: `Проверка комьюнити ${runId}`,
+      },
+    });
+    expect(comment.status()).toBe(201);
+    communityCommentId = (await comment.json()).data.id;
+
+    const reply = await owner.post('/api/comments', {
+      data: {
+        targetType: 'site',
+        targetId: 'community',
+        parentId: communityCommentId,
+        body: `Ответ в обсуждении ${runId}`,
+      },
+    });
+    expect(reply.status()).toBe(201);
+    await expect(reply.json()).resolves.toMatchObject({
+      data: { parentId: communityCommentId },
+    });
+
+    const orphan = await owner.post('/api/comments', {
+      data: {
+        targetType: 'guide',
+        targetId: 'missing-guide',
+        body: 'Этот комментарий не должен сохраниться',
+      },
+    });
+    expect(orphan.status()).toBe(404);
+
+    const edited = await owner.patch(`/api/comments/${communityCommentId}`, {
+      data: { body: `Обновлённое обсуждение ${runId}` },
+    });
+    expect(edited.ok()).toBeTruthy();
+
+    const useful = await owner.post('/api/reactions', {
       data: {
         targetType: 'comment',
-        targetId: commentId,
+        targetId: communityCommentId,
         reactionType: 'useful',
       },
-    },
-  );
-  expect(commentReactionResponse.ok()).toBeTruthy();
-  await expect(commentReactionResponse.json()).resolves.toMatchObject({
-    data: { useful: 1 },
+    });
+    expect(useful.ok()).toBeTruthy();
+    await expect(useful.json()).resolves.toMatchObject({
+      data: { useful: 1 },
+    });
+
+    const idempotentUseful = await owner.post('/api/reactions', {
+      data: {
+        targetType: 'comment',
+        targetId: communityCommentId,
+        reactionType: 'useful',
+      },
+    });
+    await expect(idempotentUseful.json()).resolves.toMatchObject({
+      data: { useful: 1 },
+    });
+
+    const removeUseful = await owner.delete(
+      `/api/reactions?targetType=comment&targetId=${communityCommentId}&reactionType=useful`,
+    );
+    expect(removeUseful.ok()).toBeTruthy();
+    const summary = await guest.get(
+      `/api/reactions?targetType=comment&targetId=${communityCommentId}`,
+    );
+    await expect(summary.json()).resolves.toMatchObject({
+      data: { useful: 0 },
+    });
+
+    const comments = await guest.get(
+      '/api/comments?targetType=site&targetId=community&sort=popular',
+    );
+    expect(comments.ok()).toBeTruthy();
+    expect(
+      (await comments.json()).data.some(
+        (item: { id: string }) => item.id === communityCommentId,
+      ),
+    ).toBeTruthy();
   });
 
-  const popularComments = await request.get(
-    `${apiBase}/api/comments?targetType=guide&targetId=guide-hotori&sort=popular`,
-  );
-  expect(popularComments.ok()).toBeTruthy();
-  const popularPayload = await popularComments.json();
-  expect(
-    popularPayload.data.some(
-      (comment: { id: string; score: number }) =>
-        comment.id === commentId && comment.score === 1,
-    ),
-  ).toBeTruthy();
-
-  const moderationResponse = await request.get(`${apiBase}/api/comments`);
-  expect(moderationResponse.ok()).toBeTruthy();
-  const moderationPayload = await moderationResponse.json();
-  expect(
-    moderationPayload.data.some(
-      (comment: { id: string }) => comment.id === commentId,
-    ),
-  ).toBeTruthy();
-
-  const reactionResponse = await request.post(`${apiBase}/api/reactions`, {
-    data: {
-      targetType: 'guide',
-      targetId: 'guide-hotori',
-      reactionType: 'useful',
-    },
-  });
-  expect(reactionResponse.ok()).toBeTruthy();
-  const reactionPayload = await reactionResponse.json();
-  expect(reactionPayload.data.useful).toBeGreaterThanOrEqual(1);
-
-  const guideSlug = `playwright-guide-${Date.now()}`;
-  const guideResponse = await request.post(`${apiBase}/api/guides`, {
-    data: {
-      slug: guideSlug,
-      characterId: 'hotori',
-      title: 'Тестовый гайд Playwright',
-      summary: 'Проверка CRUD гайда и вложенных секций.',
+  test('все редакционные сущности проходят CRUD и связи', async () => {
+    const characterSlug = `test-character-${runId}`;
+    const characterPayload = {
+      slug: characterSlug,
+      name: 'Тестовый персонаж',
+      originalName: 'Test Character',
+      rarity: 'S',
+      role: 'Главный DPS',
+      type: 'DPS',
+      attribute: 'Электро',
+      tier: 'A',
+      premiumTier: 'S',
+      tierRank: 20,
+      imageUrl: '/assets/characters/hotori.webp',
+      shortDescription: 'Персонаж для API-регрессии.',
+      summary: 'Проверяет создание, публикацию и удаление записи.',
+      tagsJson: ['тест'],
       status: 'draft',
       patchVersion: 'test',
-      sections: [
-        {
-          title: 'Тестовая секция',
-          type: 'custom',
-          content: 'Контент тестовой секции.',
-        },
-      ],
-    },
-  });
-  expect(guideResponse.status()).toBe(201);
-  const guideId = (await guideResponse.json()).data.id;
+    };
+    const character = await owner.post('/api/characters', {
+      data: characterPayload,
+    });
+    expect(character.status()).toBe(201);
+    const characterId = (await character.json()).data.id;
+    expect((await guest.get(`/api/characters/${characterSlug}`)).status()).toBe(
+      404,
+    );
+    expect((await owner.get(`/api/characters/${characterSlug}`)).ok()).toBe(
+      true,
+    );
+    expect(
+      (
+        await owner.patch(`/api/characters/${characterId}`, {
+          data: { status: 'published' },
+        })
+      ).ok(),
+    ).toBeTruthy();
+    expect((await guest.get(`/api/characters/${characterSlug}`)).ok()).toBe(
+      true,
+    );
 
-  const savedGuideResponse = await request.get(
-    `${apiBase}/api/guides/${guideId}`,
-  );
-  expect(savedGuideResponse.ok()).toBeTruthy();
-  await expect(savedGuideResponse.json()).resolves.toMatchObject({
-    data: {
-      slug: guideSlug,
-      status: 'draft',
-      sections: [{ title: 'Тестовая секция' }],
-    },
-  });
-
-  expect(
-    (await request.delete(`${apiBase}/api/guides/${guideId}`)).ok(),
-  ).toBeTruthy();
-
-  const memberContext = await createRequestContext.newContext();
-  const memberUsername = `${username}_member`;
-  const memberResponse = await memberContext.post(
-    `${apiBase}/api/auth/register`,
-    {
+    const guide = await owner.post('/api/guides', {
       data: {
-        username: memberUsername,
-        password,
-        confirmPassword: password,
+        slug: `test-guide-${runId}`,
+        characterId,
+        title: 'Глубокий тестовый гайд',
+        summary: 'Проверка гибких разделов и их порядка.',
+        status: 'published',
+        patchVersion: 'test',
+        sections: [
+          { title: 'Обзор', type: 'overview', content: 'Первый раздел.' },
+          { title: 'Ротация', type: 'rotation', content: 'Второй раздел.' },
+        ],
       },
-    },
-  );
-  expect(memberResponse.status()).toBe(201);
-  const memberId = (await memberResponse.json()).data.user.id;
-  await memberContext.dispose();
+    });
+    expect(guide.status()).toBe(201);
+    const guideId = (await guide.json()).data.id;
+    const savedGuide = await owner.get(`/api/guides/${guideId}`);
+    const sections = (await savedGuide.json()).data.sections as Array<{
+      id: string;
+      title: string;
+    }>;
+    expect(sections).toHaveLength(2);
 
-  const usersResponse = await request.get(`${apiBase}/api/users`);
-  expect(usersResponse.ok()).toBeTruthy();
-  expect(
-    (await usersResponse.json()).data.some(
-      (user: { id: string; username: string }) =>
-        user.id === memberId && user.username === memberUsername,
-    ),
-  ).toBeTruthy();
-
-  const roleResponse = await request.patch(
-    `${apiBase}/api/users/${memberId}/role`,
-    { data: { role: 'editor' } },
-  );
-  expect(roleResponse.ok()).toBeTruthy();
-
-  const settingsResponse = await request.patch(`${apiBase}/api/settings`, {
-    data: {
-      site: {
-        title: 'NTE Meta',
-        language: 'ru',
-        registrationEnabled: false,
-        leaksRequireApproval: false,
+    const reorder = await owner.patch(
+      `/api/guides/${guideId}/sections/reorder`,
+      {
+        data: { sectionIds: sections.map((item) => item.id).reverse() },
       },
-      seo: {
-        canonical: 'https://bonaqu.github.io/nte-meta/',
-        description:
-          'Русскоязычный meta-hub по Neverness to Everness с глубокими гайдами и тир-листами.',
-      },
-    },
-  });
-  expect(settingsResponse.ok()).toBeTruthy();
+    );
+    expect(reorder.ok()).toBeTruthy();
+    const reorderedGuide = await owner.get(`/api/guides/${guideId}`);
+    expect((await reorderedGuide.json()).data.sections[0].title).toBe(
+      'Ротация',
+    );
 
-  const savedSettings = await request.get(`${apiBase}/api/settings`);
-  expect(savedSettings.ok()).toBeTruthy();
-  await expect(savedSettings.json()).resolves.toMatchObject({
-    data: {
-      site: {
-        registrationEnabled: false,
-        leaksRequireApproval: true,
-      },
-    },
-  });
-
-  const blockedContext = await createRequestContext.newContext();
-  const blockedRegistration = await blockedContext.post(
-    `${apiBase}/api/auth/register`,
-    {
+    const extraSection = await owner.post(`/api/guides/${guideId}/sections`, {
       data: {
-        username: `${username}_blocked`,
-        password,
-        confirmPassword: password,
+        title: 'Секретные фишки',
+        type: 'custom',
+        content: 'Третий раздел.',
       },
-    },
-  );
-  expect(blockedRegistration.status()).toBe(403);
-  await blockedContext.dispose();
+    });
+    expect(extraSection.status()).toBe(201);
+    const extraSectionId = (await extraSection.json()).data.id;
+    expect(
+      (
+        await owner.patch(`/api/guide-sections/${extraSectionId}`, {
+          data: { title: 'Тонкости механики' },
+        })
+      ).ok(),
+    ).toBeTruthy();
 
-  expect(
-    (
-      await request.patch(`${apiBase}/api/settings`, {
+    const rotation = await owner.post('/api/rotations', {
+      data: {
+        guideId,
+        characterId,
+        title: 'Boss rotation',
+        rotationType: 'Boss rotation',
+        purpose: 'Проверка последовательности.',
+        stepsJson: ['Навык', 'Ульта', 'Переключение'],
+        logic: 'Сначала накладываем эффект, затем реализуем окно урона.',
+        status: 'published',
+      },
+    });
+    expect(rotation.status()).toBe(201);
+    const rotationId = (await rotation.json()).data.id;
+
+    const duplicateTeam = await owner.post('/api/teams', {
+      data: {
+        slug: `duplicate-team-${runId}`,
+        title: 'Команда с дублем',
+        teamType: 'Bossing',
+        budget: 'F2P',
+        difficulty: 'Средняя',
+        power: 70,
+        goodAt: 'Боссы',
+        weakAt: 'Фарм',
+        synergy: 'Тест',
+        rotation: 'Тест',
+        members: [
+          { characterId, role: 'DPS' },
+          { characterId, role: 'Support' },
+        ],
+      },
+    });
+    expect(duplicateTeam.status()).toBe(400);
+
+    const team = await owner.post('/api/teams', {
+      data: {
+        slug: `test-team-${runId}`,
+        title: 'Тестовая команда',
+        teamType: 'Bossing',
+        budget: 'F2P',
+        difficulty: 'Средняя',
+        power: 76,
+        goodAt: 'Одиночные цели',
+        weakAt: 'Разрозненные волны',
+        synergy: 'Окна усиления совпадают с основной ротацией.',
+        rotation: 'Поддержка → главный DPS → добивание.',
+        status: 'published',
+        members: [{ characterId, role: 'Главный DPS' }],
+      },
+    });
+    expect(team.status()).toBe(201);
+    const teamId = (await team.json()).data.id;
+
+    const duplicateTier = await owner.post('/api/tierlists', {
+      data: {
+        slug: `duplicate-tier-${runId}`,
+        title: 'Тир-лист с дублем',
+        tierlistType: 'base',
+        patchVersion: 'test',
+        items: [
+          { characterId, tier: 'A' },
+          { characterId, tier: 'B' },
+        ],
+      },
+    });
+    expect(duplicateTier.status()).toBe(400);
+
+    const tierlist = await owner.post('/api/tierlists', {
+      data: {
+        slug: `test-tier-${runId}`,
+        title: 'Тестовый C0 тир-лист',
+        tierlistType: 'base',
+        patchVersion: 'test',
+        status: 'published',
+        changelogJson: ['Создан автотестом'],
+        items: [{ characterId, tier: 'A', note: 'Контрольная позиция' }],
+      },
+    });
+    expect(tierlist.status()).toBe(201);
+    const tierlistId = (await tierlist.json()).data.id;
+
+    const newsSlug = `test-news-${runId}`;
+    const news = await owner.post('/api/news', {
+      data: {
+        slug: newsSlug,
+        title: 'Тестовая новость',
+        summary: 'Черновик не должен быть виден гостю.',
+        bodyMarkdown: '## Проверка\n\nПолный текст новости.',
+        category: 'Обновления',
+        imageUrl: '/assets/news/city-update.webp',
+        tagsJson: ['тест'],
+        status: 'draft',
+      },
+    });
+    expect(news.status()).toBe(201);
+    const newsId = (await news.json()).data.id;
+    expect((await guest.get(`/api/news/${newsSlug}`)).status()).toBe(404);
+    await owner.patch(`/api/news/${newsId}`, {
+      data: { status: 'published' },
+    });
+    expect((await guest.get(`/api/news/${newsSlug}`)).ok()).toBeTruthy();
+
+    const leakSlug = `test-leak-${runId}`;
+    const leak = await owner.post('/api/leaks', {
+      data: {
+        slug: leakSlug,
+        title: 'Тестовый неподтверждённый слив',
+        summary: 'Проверка очереди одобрения.',
+        bodyMarkdown: 'Информация может измениться.',
+        sourceName: 'Тестовый источник',
+        sourceUrl: 'https://t.me/example',
+        trustLevel: 'низкий',
+        leakStatus: 'слух',
+        approved: false,
+      },
+    });
+    expect(leak.status()).toBe(201);
+    const leakId = (await leak.json()).data.id;
+    expect((await guest.get(`/api/leaks/${leakSlug}`)).status()).toBe(404);
+    await owner.patch(`/api/leaks/${leakId}`, {
+      data: { approved: true },
+    });
+    expect((await guest.get(`/api/leaks/${leakSlug}`)).ok()).toBeTruthy();
+
+    const source = await owner.post('/api/sources', {
+      data: {
+        sourceType: 'telegram',
+        sourceUrl: 'https://t.me/example',
+        sourceName: `Тестовый источник ${runId}`,
+        trustLevel: 'средний',
+        autoImportEnabled: false,
+      },
+    });
+    expect(source.status()).toBe(201);
+    const sourceId = (await source.json()).data.id;
+
+    const audit = await owner.get('/api/audit-log');
+    expect(audit.ok()).toBeTruthy();
+    const actions = (await audit.json()).data.map(
+      (entry: { action: string }) => entry.action,
+    );
+    expect(actions).toContain('guides.create');
+    expect(actions).toContain('leaks.update');
+
+    for (const [collection, id] of [
+      ['sources', sourceId],
+      ['leaks', leakId],
+      ['news', newsId],
+      ['tierlists', tierlistId],
+      ['teams', teamId],
+      ['rotations', rotationId],
+      ['guides', guideId],
+      ['characters', characterId],
+    ]) {
+      expect(
+        (await owner.delete(`/api/${collection}/${id}`)).ok(),
+      ).toBeTruthy();
+    }
+    expect(
+      (await owner.delete('/api/characters/does-not-exist')).status(),
+    ).toBe(404);
+  });
+
+  test('роли ограничивают редакционные и административные действия', async () => {
+    const member = await createRequestContext.newContext({ baseURL: apiBase });
+    const username = `member_${runId}`;
+    const registration = await member.post('/api/auth/register', {
+      data: {
+        username,
+        password: ownerPassword,
+        confirmPassword: ownerPassword,
+      },
+    });
+    expect(registration.status()).toBe(201);
+    const memberId = (await registration.json()).data.user.id;
+
+    expect(
+      (
+        await member.post('/api/characters', {
+          data: { name: 'Недоступная запись' },
+        })
+      ).status(),
+    ).toBe(403);
+
+    await owner.patch(`/api/users/${memberId}/role`, {
+      data: { role: 'editor' },
+    });
+    const editorCharacter = await member.post('/api/characters', {
+      data: {
+        slug: `editor-character-${runId}`,
+        name: 'Редакторский персонаж',
+        originalName: 'Editor Character',
+        role: 'Support',
+        type: 'Buffer',
+        attribute: 'Эфир',
+        imageUrl: '/assets/characters/hotori.webp',
+        shortDescription: 'Создан редактором.',
+        summary: 'Проверка серверной роли editor.',
+        status: 'draft',
+      },
+    });
+    expect(editorCharacter.status()).toBe(201);
+    const editorCharacterId = (await editorCharacter.json()).data.id;
+    expect(
+      (
+        await member.post('/api/news', {
+          data: { title: 'Редактор не должен публиковать новость' },
+        })
+      ).status(),
+    ).toBe(403);
+    expect((await member.get('/api/audit-log')).status()).toBe(403);
+
+    await owner.patch(`/api/users/${memberId}/role`, {
+      data: { role: 'moderator' },
+    });
+    expect((await member.get('/api/comments')).ok()).toBeTruthy();
+    expect(
+      (
+        await member.post('/api/guides', {
+          data: { title: 'Модератор не редактор' },
+        })
+      ).status(),
+    ).toBe(403);
+
+    const moderatedUser = await createRequestContext.newContext({
+      baseURL: apiBase,
+    });
+    const moderatedUsername = `moderated_${runId}`;
+    const moderatedRegistration = await moderatedUser.post(
+      '/api/auth/register',
+      {
         data: {
-          site: {
-            title: 'NTE Meta',
-            language: 'ru',
-            registrationEnabled: true,
-            leaksRequireApproval: true,
-          },
-          seo: {
-            canonical: 'https://bonaqu.github.io/nte-meta/',
-            description:
-              'Русскоязычный meta-hub по Neverness to Everness с глубокими гайдами и тир-листами.',
-          },
+          username: moderatedUsername,
+          password: ownerPassword,
+          confirmPassword: ownerPassword,
         },
-      })
-    ).ok(),
-  ).toBeTruthy();
-
-  expect(
-    (await request.delete(`${apiBase}/api/users/${memberId}`)).ok(),
-  ).toBeTruthy();
-
-  const nextPassword = 'Playwright-New-Strong-84!';
-  const passwordResponse = await request.post(
-    `${apiBase}/api/auth/change-password`,
-    {
+      },
+    );
+    const moderatedId = (await moderatedRegistration.json()).data.user.id;
+    const warning = await member.post(`/api/users/${moderatedId}/warnings`, {
       data: {
-        currentPassword: password,
+        reason: 'Повторная публикация непомеченного сюжетного спойлера.',
+      },
+    });
+    expect(warning.status()).toBe(201);
+    const warnings = await moderatedUser.get('/api/auth/warnings');
+    expect((await warnings.json()).data).toHaveLength(1);
+    expect(
+      (
+        await member.post(`/api/users/${ownerId}/warnings`, {
+          data: { reason: 'Недопустимая попытка.' },
+        })
+      ).status(),
+    ).toBe(403);
+
+    expect(
+      (
+        await owner.patch(`/api/users/${moderatedId}/status`, {
+          data: { status: 'disabled' },
+        })
+      ).ok(),
+    ).toBeTruthy();
+    await expect(
+      (await moderatedUser.get('/api/auth/me')).json(),
+    ).resolves.toEqual({
+      data: null,
+    });
+    expect(
+      (
+        await owner.patch(`/api/users/${moderatedId}/status`, {
+          data: { status: 'active' },
+        })
+      ).ok(),
+    ).toBeTruthy();
+
+    await owner.delete(`/api/characters/${editorCharacterId}`);
+    await owner.delete(`/api/users/${moderatedId}`);
+    await owner.delete(`/api/users/${memberId}`);
+    await moderatedUser.dispose();
+    await member.dispose();
+  });
+
+  test('валидация отклоняет опасные и некорректные данные', async () => {
+    const invalidUrl = await owner.post('/api/news', {
+      data: {
+        slug: `invalid-url-${runId}`,
+        title: 'Некорректный URL',
+        summary: 'Проверка серверной валидации.',
+        bodyMarkdown: 'Контент',
+        category: 'Прочее',
+        imageUrl: 'javascript:alert(1)',
+      },
+    });
+    expect(invalidUrl.status()).toBe(400);
+
+    const invalidBudget = await owner.post('/api/teams', {
+      data: {
+        slug: `invalid-budget-${runId}`,
+        title: 'Некорректный бюджет',
+        teamType: 'Bossing',
+        budget: 'Whale',
+        difficulty: 'Высокая',
+        goodAt: 'Боссы',
+        weakAt: 'Фарм',
+        synergy: 'Тест',
+        rotation: 'Тест',
+      },
+    });
+    expect(invalidBudget.status()).toBe(400);
+
+    const oversized = await owner.post('/api/news', {
+      data: {
+        slug: `oversized-${runId}`,
+        title: 'Слишком большой материал',
+        summary: 'Проверка лимита.',
+        bodyMarkdown: 'x'.repeat(60_001),
+        category: 'Прочее',
+        imageUrl: '/assets/news/city-update.webp',
+      },
+    });
+    expect(oversized.status()).toBe(400);
+  });
+
+  test('owner проходит UI-вход и открывает редактор гибкого гайда', async ({
+    page,
+  }) => {
+    await page.goto('/#/admin');
+    await page.getByLabel('Логин').fill(ownerUsername);
+    await page.getByLabel('Пароль').fill(ownerPassword);
+    await page.getByRole('button', { name: 'Войти', exact: true }).click();
+
+    await expect(
+      page.getByRole('heading', { name: 'Профиль', level: 1 }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Гайды', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Markdown editor' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Добавить раздел' }),
+    ).toBeVisible();
+    await expect(page.getByLabel('YouTube URL')).toBeVisible();
+    await page.getByRole('button', { name: 'Выйти' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Вход в NTE Meta' }),
+    ).toBeVisible();
+  });
+
+  test('смена пароля отзывает сессии, login и logout работают', async () => {
+    const nextPassword = 'Playwright-New-Strong-84!';
+    const changed = await owner.post('/api/auth/change-password', {
+      data: {
+        currentPassword: ownerPassword,
         nextPassword,
         nextConfirm: nextPassword,
       },
-    },
-  );
-  expect(passwordResponse.ok()).toBeTruthy();
-  expect((await request.get(`${apiBase}/api/auth/me`)).status()).toBe(401);
+    });
+    expect(changed.ok()).toBeTruthy();
+    await expect((await owner.get('/api/auth/me')).json()).resolves.toEqual({
+      data: null,
+    });
 
-  const loginResponse = await request.post(`${apiBase}/api/auth/login`, {
-    data: { username, password: nextPassword },
+    const login = await owner.post('/api/auth/login', {
+      data: { username: ownerUsername, password: nextPassword },
+    });
+    expect(login.ok()).toBeTruthy();
+    expect((await owner.get('/api/auth/me')).ok()).toBeTruthy();
+
+    expect((await owner.post('/api/auth/logout')).ok()).toBeTruthy();
+    await expect((await owner.get('/api/auth/me')).json()).resolves.toEqual({
+      data: null,
+    });
   });
-  expect(loginResponse.ok()).toBeTruthy();
-
-  const logoutResponse = await request.post(`${apiBase}/api/auth/logout`);
-  expect(logoutResponse.ok()).toBeTruthy();
-  expect((await request.get(`${apiBase}/api/auth/me`)).status()).toBe(401);
 });

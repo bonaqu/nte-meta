@@ -19,7 +19,7 @@ const PUBLIC_GET = new Set([
 const CONTENT_ROLE = 'editor';
 const ADMIN_ROLE = 'admin';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
-const PASSWORD_ITERATIONS = 20000;
+const PASSWORD_ITERATIONS = 210000;
 const SESSION_COOKIE = 'nte_meta_session';
 const MAX_JSON_BYTES = 128 * 1024;
 
@@ -298,6 +298,26 @@ async function router(request, env, ctx) {
 }
 
 async function handleAuth(request, env, parts, ctx) {
+  if (request.method === 'GET' && parts[1] === 'config') {
+    const existing = await env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM users WHERE status = ?',
+    )
+      .bind('active')
+      .first();
+    const siteSettings = await getSetting(env, 'site', {
+      registrationEnabled: true,
+    });
+    const hasUsers = Number(existing?.count || 0) > 0;
+    return json({
+      data: {
+        registrationEnabled: hasUsers
+          ? siteSettings.registrationEnabled !== false
+          : true,
+        needsBootstrap: !hasUsers && Boolean(env.OWNER_BOOTSTRAP_TOKEN),
+      },
+    });
+  }
+
   if (request.method === 'POST' && parts[1] === 'register') {
     await rateLimit(request, env, 'register', 8, 60 * 60);
     const body = await readJson(request);
@@ -316,14 +336,14 @@ async function handleAuth(request, env, parts, ctx) {
     }
 
     if (
-      password.length < 8 ||
+      password.length < 10 ||
       password.length > 128 ||
       password !== confirmPassword
     ) {
       return json(
         {
           error:
-            'Пароль должен быть длиной 8-128 символов, подтверждение должно совпадать',
+            'Пароль должен быть длиной 10-128 символов, подтверждение должно совпадать',
         },
         400,
       );
@@ -405,18 +425,28 @@ async function handleAuth(request, env, parts, ctx) {
       .bind(username, 'active')
       .first();
 
-    if (
-      password.length > 128 ||
-      !user ||
-      !(await verifyPassword(
+    const passwordValid = Boolean(
+      user &&
+      (await verifyPassword(
         password,
         user.password_salt,
         user.password_hash,
         user.password_iterations,
         env,
-      ))
-    ) {
+      )),
+    );
+    if (password.length > 128 || !passwordValid) {
       return json({ error: 'Неверный логин или пароль' }, 401);
+    }
+
+    // Transparently upgrade accounts created with an older work factor.
+    if (Number(user.password_iterations || 0) < PASSWORD_ITERATIONS) {
+      const upgraded = await hashPassword(password, env);
+      await env.DB.prepare(
+        'UPDATE users SET password_hash = ?, password_salt = ?, password_iterations = ?, updated_at = current_timestamp WHERE id = ?',
+      )
+        .bind(upgraded.hash, upgraded.salt, PASSWORD_ITERATIONS, user.id)
+        .run();
     }
 
     await env.DB.prepare(
@@ -480,14 +510,14 @@ async function handleAuth(request, env, parts, ctx) {
     }
 
     if (
-      nextPassword.length < 8 ||
+      nextPassword.length < 10 ||
       nextPassword.length > 128 ||
       nextPassword !== nextConfirm
     ) {
       return json(
         {
           error:
-            'Новый пароль должен быть длиной 8-128 символов, подтверждение должно совпадать',
+            'Новый пароль должен быть длиной 10-128 символов, подтверждение должно совпадать',
         },
         400,
       );
@@ -532,16 +562,81 @@ async function handleAuth(request, env, parts, ctx) {
 
   if (request.method === 'GET' && parts[1] === 'me') {
     const user = await getAuthUser(request, env);
-    if (!user) {
-      return json({ error: 'Не авторизован' }, 401);
-    }
     return json({ data: user });
+  }
+
+  if (request.method === 'GET' && parts[1] === 'warnings') {
+    const user = await requireRole(request, env, 'user');
+    const rows = await env.DB.prepare(
+      `SELECT user_warnings.id, user_warnings.reason, user_warnings.created_at,
+              COALESCE(moderator.display_name, 'Модерация NTE Meta') AS moderator_name
+       FROM user_warnings
+       LEFT JOIN users AS moderator ON moderator.id = user_warnings.created_by
+       WHERE user_warnings.user_id = ? AND user_warnings.status = 'active'
+       ORDER BY user_warnings.created_at DESC`,
+    )
+      .bind(user.id)
+      .all();
+    return json({
+      data: rows.results.map((row) => ({
+        id: row.id,
+        reason: row.reason,
+        moderatorName: row.moderator_name,
+        createdAt: row.created_at,
+      })),
+    });
   }
 
   return json({ error: 'Auth endpoint не найден' }, 404);
 }
 
 async function handleUsers(request, env, parts, ctx) {
+  if (parts[2] === 'warnings') {
+    const actor = await requireRole(request, env, 'moderator');
+    const target = await env.DB.prepare(
+      'SELECT id, role, status FROM users WHERE id = ?',
+    )
+      .bind(parts[1])
+      .first();
+    if (!target || target.status === 'deleted') {
+      return json({ error: 'Пользователь не найден' }, 404);
+    }
+    if (
+      actor.role !== 'owner' &&
+      ROLE_WEIGHT[target.role] >= ROLE_WEIGHT[actor.role]
+    ) {
+      return json(
+        {
+          error: 'Нельзя модерировать пользователя с равной или старшей ролью',
+        },
+        403,
+      );
+    }
+    if (request.method === 'POST') {
+      const body = await readJson(request);
+      const reason = cleanString(body.reason, 5, 1000);
+      const id = crypto.randomUUID();
+      await env.DB.prepare(
+        'INSERT INTO user_warnings (id, user_id, created_by, reason) VALUES (?, ?, ?, ?)',
+      )
+        .bind(id, target.id, actor.id, reason)
+        .run();
+      ctx.waitUntil(
+        logAudit(env, actor.id, 'users.warning', target.id, { reason }),
+      );
+      return json({ data: { id } }, 201);
+    }
+    if (request.method === 'GET') {
+      const rows = await env.DB.prepare(
+        'SELECT id, reason, status, created_at FROM user_warnings WHERE user_id = ? ORDER BY created_at DESC',
+      )
+        .bind(target.id)
+        .all();
+      return json({ data: rows.results });
+    }
+    return json({ error: 'Метод не поддерживается' }, 405);
+  }
+
   const actor = await requireRole(request, env, ADMIN_ROLE);
 
   if (request.method === 'GET') {
@@ -595,6 +690,55 @@ async function handleUsers(request, env, parts, ctx) {
       .run();
     ctx.waitUntil(
       logAudit(env, actor.id, 'users.role', parts[1], { role: nextRole }),
+    );
+    return json({ data: { success: true } });
+  }
+
+  if (request.method === 'PATCH' && parts[2] === 'status') {
+    const body = await readJson(request);
+    const status = String(body.status || '');
+    if (!['active', 'disabled'].includes(status)) {
+      return json({ error: 'Неизвестный статус пользователя' }, 400);
+    }
+    if (parts[1] === actor.id) {
+      return json({ error: 'Нельзя отключить собственный аккаунт' }, 409);
+    }
+    const target = await env.DB.prepare(
+      'SELECT id, role, status FROM users WHERE id = ?',
+    )
+      .bind(parts[1])
+      .first();
+    if (!target || target.status === 'deleted') {
+      return json({ error: 'Пользователь не найден' }, 404);
+    }
+    if (
+      actor.role !== 'owner' &&
+      ROLE_WEIGHT[target.role] >= ROLE_WEIGHT.admin
+    ) {
+      return json({ error: 'Только owner управляет admin/owner' }, 403);
+    }
+    if (
+      target.role === 'owner' &&
+      status === 'disabled' &&
+      (await isLastActiveOwner(env, target.id))
+    ) {
+      return json(
+        { error: 'Нельзя отключить последнего активного owner' },
+        409,
+      );
+    }
+    await env.DB.prepare(
+      'UPDATE users SET status = ?, updated_at = current_timestamp WHERE id = ?',
+    )
+      .bind(status, target.id)
+      .run();
+    if (status === 'disabled') {
+      await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?')
+        .bind(target.id)
+        .run();
+    }
+    ctx.waitUntil(
+      logAudit(env, actor.id, 'users.status', target.id, { status }),
     );
     return json({ data: { success: true } });
   }
@@ -672,6 +816,7 @@ async function handleEntity(request, env, parts, ctx) {
       record.approved_at = new Date().toISOString();
     }
     validateEntityRecord(entity, record, true);
+    await validateEntityRelations(env, entity, body, record.id);
     const insert = buildInsert(config.table, record);
     const statements = [
       env.DB.prepare(insert.sql).bind(...insert.values),
@@ -700,6 +845,7 @@ async function handleEntity(request, env, parts, ctx) {
     if (!target) {
       return json({ error: 'Запись не найдена' }, 404);
     }
+    await validateEntityRelations(env, entity, body, target.id);
     const statements = [
       env.DB.prepare(patch.sql).bind(...patch.values),
       ...buildRelationStatements(env, entity, target.id, body, true),
@@ -712,10 +858,14 @@ async function handleEntity(request, env, parts, ctx) {
   }
 
   if (request.method === 'DELETE' && idOrSlug) {
+    const target = await findEntityId(env, config, idOrSlug);
+    if (!target) {
+      return json({ error: 'Запись не найдена' }, 404);
+    }
     await env.DB.prepare(`DELETE FROM ${config.table} WHERE id = ?`)
-      .bind(idOrSlug)
+      .bind(target.id)
       .run();
-    ctx.waitUntil(logAudit(env, actor.id, `${entity}.delete`, idOrSlug, {}));
+    ctx.waitUntil(logAudit(env, actor.id, `${entity}.delete`, target.id, {}));
     return json({ data: { success: true } });
   }
 
@@ -737,6 +887,10 @@ async function readEntity(env, entity, idOrSlug, request) {
     data = idOrSlug
       ? await getGuide(env, idOrSlug, includeDrafts)
       : await listGuides(env, includeDrafts);
+  } else if (entity === 'rotations') {
+    data = idOrSlug
+      ? await getRotation(env, idOrSlug, includeDrafts)
+      : await listRotations(env, includeDrafts);
   } else if (entity === 'tierlists') {
     data = idOrSlug
       ? await getTierlist(env, idOrSlug, includeDrafts)
@@ -851,6 +1005,24 @@ async function getGuide(env, idOrSlug, includeDrafts = false) {
   return row ? serializeGuideWithRelations(env, row) : null;
 }
 
+async function listRotations(env, includeDrafts = false) {
+  const where = includeDrafts ? '1 = 1' : "status = 'published'";
+  const rows = await env.DB.prepare(
+    `SELECT * FROM rotations WHERE ${where} ORDER BY updated_at DESC, title`,
+  ).all();
+  return rows.results.map(serializeRotation);
+}
+
+async function getRotation(env, id, includeDrafts = false) {
+  const where = includeDrafts ? '1 = 1' : "status = 'published'";
+  const row = await env.DB.prepare(
+    `SELECT * FROM rotations WHERE ${where} AND id = ?`,
+  )
+    .bind(id)
+    .first();
+  return row ? serializeRotation(row) : null;
+}
+
 async function serializeGuideWithRelations(env, row) {
   const sections = await env.DB.prepare(
     'SELECT * FROM guide_sections WHERE guide_id = ? ORDER BY position',
@@ -906,11 +1078,13 @@ async function serializeTierlistWithItems(env, row) {
     .all();
   return {
     id: row.id,
+    slug: row.slug,
     title: row.title,
     kind: row.tierlist_type,
     patch: row.patch_version,
     updatedAt: row.updated_at,
     changelog: parseJson(row.changelog_json, []),
+    status: row.status,
     items: items.results.map((item) => ({
       characterId: item.character_id,
       tier: item.tier,
@@ -947,6 +1121,7 @@ async function serializeTeamWithMembers(env, row) {
     .all();
   return {
     id: row.id,
+    slug: row.slug,
     title: row.title,
     type: row.team_type,
     budget: row.budget,
@@ -956,6 +1131,8 @@ async function serializeTeamWithMembers(env, row) {
     weakAt: row.weak_at,
     synergy: row.synergy,
     rotation: row.rotation,
+    status: row.status,
+    updatedAt: row.updated_at,
     members: members.results.map((member) => ({
       characterId: member.character_id,
       role: member.role,
@@ -966,6 +1143,12 @@ async function serializeTeamWithMembers(env, row) {
 async function createGuideSection(request, env, guideId, ctx) {
   const actor = await requireRole(request, env, CONTENT_ROLE);
   const body = await readJson(request);
+  const guide = await env.DB.prepare('SELECT id FROM guides WHERE id = ?')
+    .bind(guideId)
+    .first();
+  if (!guide) {
+    return json({ error: 'Гайд не найден' }, 404);
+  }
   const id = crypto.randomUUID();
   const positionRow = await env.DB.prepare(
     'SELECT COALESCE(MAX(position), 0) + 1 AS next_position FROM guide_sections WHERE guide_id = ?',
@@ -1001,16 +1184,39 @@ async function handleGuideSection(request, env, parts, ctx) {
 
   if (request.method === 'PATCH') {
     const body = await readJson(request);
+    const section = await env.DB.prepare(
+      'SELECT id FROM guide_sections WHERE id = ?',
+    )
+      .bind(id)
+      .first();
+    if (!section) {
+      return json({ error: 'Секция не найдена' }, 404);
+    }
+    const title =
+      body.title === undefined ? null : cleanString(body.title, 1, 120);
+    const type = body.type === undefined ? null : cleanString(body.type, 1, 40);
+    const content =
+      body.content === undefined
+        ? null
+        : cleanString(body.content, 0, 60000, true);
     await env.DB.prepare(
       'UPDATE guide_sections SET title = COALESCE(?, title), section_type = COALESCE(?, section_type), content_markdown = COALESCE(?, content_markdown), updated_at = current_timestamp WHERE id = ?',
     )
-      .bind(body.title ?? null, body.type ?? null, body.content ?? null, id)
+      .bind(title, type, content, id)
       .run();
     ctx.waitUntil(logAudit(env, actor.id, 'guide_sections.update', id, body));
     return json({ data: { success: true } });
   }
 
   if (request.method === 'DELETE') {
+    const section = await env.DB.prepare(
+      'SELECT id FROM guide_sections WHERE id = ?',
+    )
+      .bind(id)
+      .first();
+    if (!section) {
+      return json({ error: 'Секция не найдена' }, 404);
+    }
     await env.DB.prepare('DELETE FROM guide_sections WHERE id = ?')
       .bind(id)
       .run();
@@ -1116,10 +1322,13 @@ async function handleComments(request, env, ctx) {
     const actor = await requireRole(request, env, 'user');
     const body = await readJson(request);
     const targetType = cleanString(body.targetType, 1, 30);
-    if (!['guide', 'news', 'leak', 'comment'].includes(targetType)) {
+    if (!['guide', 'news', 'leak', 'site'].includes(targetType)) {
       return json({ error: 'Неизвестный тип объекта комментария' }, 400);
     }
     const targetId = cleanString(body.targetId, 1, 80);
+    if (!(await interactionTargetExists(env, targetType, targetId))) {
+      return json({ error: 'Объект для комментария не найден' }, 404);
+    }
     const parentId = body.parentId ? cleanString(body.parentId, 1, 80) : null;
     if (parentId) {
       const parent = await env.DB.prepare(
@@ -1146,6 +1355,13 @@ async function handleComments(request, env, ctx) {
         cleanString(body.body, 1, 4000),
       )
       .run();
+    ctx.waitUntil(
+      logAudit(env, actor.id, 'comments.create', id, {
+        targetType,
+        targetId,
+        parentId,
+      }),
+    );
     return json(
       {
         data: {
@@ -1264,11 +1480,15 @@ async function handleReactions(request, env, parts, ctx) {
   const actor = await requireRole(request, env, 'user');
 
   if (request.method === 'POST') {
+    await rateLimit(request, env, 'reaction', 120, 60 * 60);
     const body = await readJson(request);
     const targetType = cleanString(body.targetType, 1, 30);
     const targetId = cleanString(body.targetId, 1, 80);
-    if (!['guide', 'news', 'leak', 'comment'].includes(targetType)) {
+    if (!['guide', 'news', 'leak', 'comment', 'site'].includes(targetType)) {
       return json({ error: 'Неизвестный тип объекта реакции' }, 400);
+    }
+    if (!(await interactionTargetExists(env, targetType, targetId))) {
+      return json({ error: 'Объект для реакции не найден' }, 404);
     }
     const reactionType = cleanString(body.reactionType || 'useful', 1, 30);
     if (!['like', 'dislike', 'useful'].includes(reactionType)) {
@@ -1292,19 +1512,7 @@ async function handleReactions(request, env, parts, ctx) {
       .bind(id, actor.id, targetType, targetId, reactionType, 1)
       .run();
     if (targetType === 'comment' && reactionType === 'useful') {
-      await env.DB.prepare(
-        `UPDATE comments
-         SET score = (
-           SELECT COALESCE(SUM(value), 0)
-           FROM reactions
-           WHERE target_type = 'comment'
-             AND target_id = comments.id
-             AND reaction_type = 'useful'
-         )
-         WHERE id = ?`,
-      )
-        .bind(targetId)
-        .run();
+      await refreshCommentScore(env, targetId);
     }
     ctx.waitUntil(
       logAudit(env, actor.id, 'reactions.upsert', body.targetId, body),
@@ -1319,14 +1527,79 @@ async function handleReactions(request, env, parts, ctx) {
     );
   }
 
-  if (request.method === 'DELETE' && parts[1]) {
-    await env.DB.prepare('DELETE FROM reactions WHERE id = ? AND user_id = ?')
-      .bind(parts[1], actor.id)
-      .run();
+  if (request.method === 'DELETE') {
+    const url = new URL(request.url);
+    const targetType = url.searchParams.get('targetType');
+    const targetId = url.searchParams.get('targetId');
+    const reactionType = url.searchParams.get('reactionType');
+    if (parts[1]) {
+      await env.DB.prepare('DELETE FROM reactions WHERE id = ? AND user_id = ?')
+        .bind(parts[1], actor.id)
+        .run();
+    } else if (
+      targetType &&
+      targetId &&
+      ['like', 'dislike', 'useful'].includes(reactionType || '')
+    ) {
+      await env.DB.prepare(
+        `DELETE FROM reactions
+         WHERE user_id = ? AND target_type = ? AND target_id = ? AND reaction_type = ?`,
+      )
+        .bind(actor.id, targetType, targetId, reactionType)
+        .run();
+      if (targetType === 'comment' && reactionType === 'useful') {
+        await refreshCommentScore(env, targetId);
+      }
+    } else {
+      return json({ error: 'Нужны параметры удаляемой реакции' }, 400);
+    }
+    ctx.waitUntil(
+      logAudit(env, actor.id, 'reactions.delete', targetId || parts[1], {
+        targetType,
+        reactionType,
+      }),
+    );
     return json({ data: { success: true } });
   }
 
   return json({ error: 'Метод не поддерживается' }, 405);
+}
+
+async function interactionTargetExists(env, targetType, targetId) {
+  if (targetType === 'site') {
+    return targetId === 'community';
+  }
+
+  const targets = {
+    guide: ['guides', "status = 'published'"],
+    news: ['news', "status = 'published'"],
+    leak: ['leaks', 'approved = 1'],
+    comment: ['comments', "status = 'visible'"],
+  };
+  const target = targets[targetType];
+  if (!target) return false;
+  const row = await env.DB.prepare(
+    `SELECT id FROM ${target[0]} WHERE id = ? AND ${target[1]}`,
+  )
+    .bind(targetId)
+    .first();
+  return Boolean(row);
+}
+
+async function refreshCommentScore(env, commentId) {
+  await env.DB.prepare(
+    `UPDATE comments
+     SET score = (
+       SELECT COALESCE(SUM(value), 0)
+       FROM reactions
+       WHERE target_type = 'comment'
+         AND target_id = comments.id
+         AND reaction_type = 'useful'
+     )
+     WHERE id = ?`,
+  )
+    .bind(commentId)
+    .run();
 }
 
 async function handleSettings(request, env, ctx) {
@@ -1423,6 +1696,8 @@ function serializeCharacter(row) {
     shortDescription: row.short_description,
     summary: row.summary,
     tags: parseJson(row.tags_json, []),
+    status: row.status,
+    patch: row.patch_version,
     updatedAt: row.updated_at,
   };
 }
@@ -1440,6 +1715,7 @@ function serializeSection(row) {
 function serializeRotation(row) {
   return {
     id: row.id,
+    guideId: row.guide_id || undefined,
     characterId: row.character_id,
     title: row.title,
     type: row.rotation_type,
@@ -1447,6 +1723,8 @@ function serializeRotation(row) {
     steps: parseJson(row.steps_json, []),
     logic: row.logic,
     mediaUrl: row.media_url || undefined,
+    status: row.status,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -1465,6 +1743,8 @@ function serializeNews(row) {
     sourceUrl: row.source_url || undefined,
     imageUrl: row.image_url,
     tags: parseJson(row.tags_json, []),
+    publishStatus: row.status,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -1483,6 +1763,8 @@ function serializeLeak(row) {
     sourceUrl: row.source_url || undefined,
     approved: Boolean(row.approved),
     tags: parseJson(row.tags_json, []),
+    approvedAt: row.approved_at || undefined,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -1523,6 +1805,7 @@ function serializeSource(row) {
     trustLevel: row.trust_level,
     autoImportEnabled: Boolean(row.auto_import_enabled),
     lastCheckedAt: row.last_checked_at || undefined,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -1789,6 +2072,73 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
   }
 
   return statements;
+}
+
+async function validateEntityRelations(env, entity, body, entityId) {
+  if (entity === 'teams' && Array.isArray(body.members)) {
+    const characterIds = body.members.map((member) =>
+      cleanString(member.characterId, 1, 80),
+    );
+    if (new Set(characterIds).size !== characterIds.length) {
+      throwHttp('Один персонаж не может занимать две позиции в команде', 400);
+    }
+    await assertCharacterIdsExist(env, characterIds);
+  }
+
+  if (entity === 'tierlists' && Array.isArray(body.items)) {
+    const characterIds = body.items.map((item) =>
+      cleanString(item.characterId, 1, 80),
+    );
+    if (new Set(characterIds).size !== characterIds.length) {
+      throwHttp('Персонаж не может повторяться в одном тир-листе', 400);
+    }
+    await assertCharacterIdsExist(env, characterIds);
+  }
+
+  if (entity === 'guides') {
+    if (body.characterId || body.character_id) {
+      await assertCharacterIdsExist(env, [
+        body.characterId || body.character_id,
+      ]);
+    }
+    if (Array.isArray(body.sections)) {
+      const ids = body.sections
+        .map((section) => section.id)
+        .filter((id) => typeof id === 'string' && id);
+      if (new Set(ids).size !== ids.length) {
+        throwHttp('ID разделов гайда должны быть уникальными', 400);
+      }
+      if (ids.length) {
+        const placeholders = ids.map(() => '?').join(', ');
+        const rows = await env.DB.prepare(
+          `SELECT id, guide_id FROM guide_sections WHERE id IN (${placeholders})`,
+        )
+          .bind(...ids)
+          .all();
+        if (rows.results.some((row) => row.guide_id !== entityId)) {
+          throwHttp('Раздел уже принадлежит другому гайду', 409);
+        }
+      }
+    }
+  }
+
+  if (entity === 'rotations' && (body.characterId || body.character_id)) {
+    await assertCharacterIdsExist(env, [body.characterId || body.character_id]);
+  }
+}
+
+async function assertCharacterIdsExist(env, ids) {
+  const uniqueIds = [...new Set(ids.filter(Boolean).map(String))];
+  if (uniqueIds.length === 0) return;
+  const placeholders = uniqueIds.map(() => '?').join(', ');
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS count FROM characters WHERE id IN (${placeholders})`,
+  )
+    .bind(...uniqueIds)
+    .first();
+  if (Number(row?.count || 0) !== uniqueIds.length) {
+    throwHttp('Один или несколько персонажей не найдены', 400);
+  }
 }
 
 function toCamel(value) {

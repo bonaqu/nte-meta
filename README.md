@@ -1,189 +1,226 @@
 # NTE Meta
 
-Русскоязычный meta-hub по **Neverness to Everness**: глубокие гайды, ротации, команды, тир-листы, новости, сливы и комьюнити. Проект построен как SPA на GitHub Pages с Cloudflare Worker API и Cloudflare D1.
+Русскоязычный meta-hub по **Neverness to Everness**: практические гайды, гибкие ротации, команды, тир-листы, новости, сливы и обсуждения игроков.
 
-## Что готово
+Production:
 
-- React + TypeScript + Vite frontend, адаптивная игровая дизайн-система.
-- Главная, персонажи, гайды, S+/S/A/B/C тир-листы, новости, сливы, видео и комьюнити.
-- Админка с ролями, markdown preview, YouTube, кастомными секциями и drag/drop сортировкой.
-- Worker REST API с D1, валидацией, CORS, rate limit, audit log и проверкой ролей.
-- Регистрация, вход, выход, смена пароля и `HttpOnly` session cookie.
-- PBKDF2-SHA-256, индивидуальная соль, 20000 итераций и отдельный Worker pepper; открытые пароли и pepper не хранятся в D1.
-- Профиль поддерживает изменение отображаемого имени и безопасную смену пароля с завершением всех сессий.
-- Owner/admin видят список пользователей из D1 и могут назначать роли в пределах своих полномочий.
-- Owner может мягко удалить чужой аккаунт; Worker немедленно отзывает его активные сессии.
-- Настройки сайта и SEO редактируются в админке и сохраняются в D1; отключение регистрации проверяется на Worker.
-- Все сливы требуют ручного одобрения перед публичной выдачей независимо от клиентского состояния.
-- Комментарии поддерживают ответы, сортировку, редактирование, удаление, отметку полезности и очередь модерации.
-- Реакции работают через API; один пользователь не может одновременно держать like и dislike.
-- Черновики видят только editor/admin/owner; неподтвержденные сливы публично не выдаются.
-- Playwright проверяет frontend, Worker, D1, auth, comments, reactions и logout.
+- сайт: <https://bonaqu.github.io/nte-meta/>
+- API: <https://nte-meta-api.bonaqu.workers.dev>
+- репозиторий: <https://github.com/bonaqu/nte-meta>
+
+## Архитектура
+
+Проект разделен на три независимые части:
+
+1. **React + TypeScript + Vite** отвечает за быстрый адаптивный интерфейс и GitHub Pages.
+2. **Cloudflare Worker** предоставляет REST API, авторизацию, проверку ролей, валидацию и аудит.
+3. **Cloudflare D1** хранит пользователей, контент, комментарии, реакции и настройки.
+
+Такое разделение не передает секреты в браузер, оставляет frontend статическим и бесплатным, а backend можно развивать без переноса сайта.
+
+## Реализовано
+
+- Главная-dashboard, персонажи, гайды, ротации, команды, тир-листы C0/C6, новости, сливы, видео и комьюнити.
+- Поиск и фильтры персонажей по тиру, роли, атрибуту, редкости и тегам.
+- Гайды с произвольными секциями, markdown, live preview, YouTube и drag-and-drop сортировкой.
+- Админка для всего контента, источников, комментариев, пользователей, ролей и настроек.
+- Статусы `draft`, `review`, `published`, предпросмотр и защита непубличных материалов.
+- Регистрация, вход, выход, профиль, смена пароля и безопасные `HttpOnly` session cookies.
+- PBKDF2-SHA-256 с индивидуальной солью, Worker pepper и 210 000 итераций. Старые хеши автоматически усиливаются после успешного входа.
+- Роли `owner`, `admin`, `editor`, `moderator`, `user` с обязательной серверной проверкой прав.
+- Комментарии с ответами, сортировкой, редактированием, удалением, модерацией и предупреждениями.
+- Реакции `like`, `dislike`, `helpful` с ограничением одной оценки каждого типа от пользователя.
+- Ручное одобрение сливов и явная маркировка уровня доверия и статуса.
+- Rate limit для чувствительных действий, CORS allowlist, валидация URL/body и audit log.
+- Skeleton/loading, empty/error/success states, клавиатурная навигация и видимый focus.
+- Build-time prerender публичных маршрутов, sitemap, canonical, OpenGraph и JSON-LD.
+- Playwright-проверки API, D1, ролей, CRUD, responsive layout и WCAG 2.1 AA.
 
 ## Структура
 
 ```text
 .
 ├─ .github/workflows/
-│  ├─ pages.yml                 # проверки и GitHub Pages
-│  └─ worker.yml                # ручной deploy Worker + D1 migrations
+│  ├─ pages.yml                  # проверки, prerender и GitHub Pages
+│  └─ worker.yml                 # ручной deploy Worker и D1 migrations
 ├─ migrations/
-│  ├─ 0001_initial_schema.sql   # полная D1 schema и индексы
-│  └─ 0002_seed_content.sql     # стартовый контент
+│  ├─ 0001_initial_schema.sql    # полная схема, ограничения и индексы
+│  ├─ 0002_seed_content.sql      # стартовые персонажи и материалы
+│  ├─ 0003_profile_and_security.sql
+│  ├─ 0004_security_and_content_cleanup.sql
+│  └─ 0005_moderation_warnings.sql
 ├─ public/
-│  ├─ assets/
-│  │  ├─ characters/            # локальные оптимизированные арты
-│  │  └─ logo.svg
-│  ├─ robots.txt
-│  └─ sitemap.xml
-├─ src/
-│  ├─ data/seed.ts              # graceful fallback без API
-│  ├─ lib/
-│  │  ├─ api.ts                 # типизированный API client
-│  │  ├─ markdown.tsx           # безопасный React renderer
-│  │  └─ youtube.ts
-│  ├─ App.tsx
-│  ├─ main.tsx
-│  ├─ styles.css
-│  ├─ types.ts
-│  └─ worker.js
+│  ├─ assets/characters/         # локальные оптимизированные арты
+│  ├─ logo.svg
+│  └─ robots.txt
 ├─ scripts/
-│  └─ prepare-test-db.mjs        # изолированная D1 для Playwright
+│  ├─ prepare-test-db.mjs        # отдельная локальная D1 для тестов
+│  └─ prerender.mjs              # статические SEO-страницы и sitemap
+├─ src/
+│  ├─ components/ui-state.tsx    # общие loading/error/empty состояния
+│  ├─ data/seed.ts               # fallback-данные при недоступном API
+│  ├─ features/admin/            # формы и редакторы контента админки
+│  ├─ lib/
+│  │  ├─ api.ts                  # типизированный API client
+│  │  ├─ markdown.tsx            # безопасный React markdown renderer
+│  │  ├─ seo.ts                  # metadata для клиентской навигации
+│  │  └─ youtube.ts              # проверка и privacy-friendly embed
+│  ├─ App.tsx                    # маршруты и публичные представления
+│  ├─ styles.css                 # дизайн-система и responsive layout
+│  ├─ types.ts                   # общие типы frontend/API
+│  └─ worker.js                  # Cloudflare Worker REST API
 ├─ tests/
-│  ├─ api.spec.ts
-│  └─ smoke.spec.ts
+│  ├─ api.spec.ts                # auth, роли, CRUD, модерация
+│  ├─ portal.spec.ts             # публичные продуктовые сценарии
+│  ├─ quality.spec.ts            # a11y, изображения, переполнение
+│  └─ smoke.spec.ts              # базовая загрузка приложения
 ├─ .dev.vars.example
 ├─ .env.example
 ├─ index.html
 ├─ package.json
 ├─ playwright.config.ts
-├─ tsconfig.json
 ├─ vite.config.ts
 └─ wrangler.jsonc
 ```
 
 ## Локальный запуск
 
-Установить зависимости и применить локальные миграции:
-
 ```powershell
-Set-Location "D:\Projects\nte-meta"
+Set-Location "D:\Projects\nte-hub"
 npm install
 npm run db:migrate:local
 ```
 
-Терминал 1, API:
+Терминал 1, Worker и локальная D1:
 
 ```powershell
+Set-Location "D:\Projects\nte-hub"
 npm run worker:dev -- --local --port 8787
 ```
 
 Терминал 2, frontend:
 
 ```powershell
+Set-Location "D:\Projects\nte-hub"
 $env:VITE_API_BASE_URL="http://127.0.0.1:8787"
 npm run dev -- --port 4173
 ```
 
-Открыть `http://127.0.0.1:4173`.
+Откройте <http://127.0.0.1:4173>.
 
-Проверки:
+## Проверки
 
 ```powershell
+npm run format:check
 npm run typecheck
 npm run lint
 npm run build
 npm run test:ui
+npm audit
 ```
 
-## Production deploy
+`npm run test:ui` сам создает изолированную тестовую D1 и запускает нужные локальные серверы.
 
-Текущие production-ресурсы:
+## Создание первого owner
 
-- Frontend: `https://bonaqu.github.io/nte-meta/`
-- API: `https://nte-meta-api.bonaqu.workers.dev`
-- D1: `nte-meta-db`, регион `WEUR`
+Эти шаги нужны только для новой пустой D1. В текущей production-базе owner уже создан.
 
-Cloudflare D1 создан, миграции применены, Worker развернут. `OWNER_BOOTSTRAP_TOKEN` хранится только как Cloudflare secret.
-
-### Обновить production
+1. Задайте два Cloudflare secret. Значения не сохраняйте в Git и не вставляйте во frontend:
 
 ```powershell
-Set-Location "D:\Projects\nte-meta"
+npx wrangler secret put PASSWORD_PEPPER
+npx wrangler secret put OWNER_BOOTSTRAP_TOKEN
+```
+
+2. Примените миграции и разверните Worker:
+
+```powershell
 npm run db:migrate:remote
 npm run worker:deploy -- --env=""
 ```
 
-### Создать первого owner
+3. Откройте `https://bonaqu.github.io/nte-meta/admin`, выберите регистрацию и заполните логин, пароль и код первого owner.
+4. После создания аккаунта следующий зарегистрированный пользователь всегда получит роль `user`. Код bootstrap больше не принимается, пока в базе есть активные пользователи.
+5. Для аварийного восстановления храните bootstrap-код в менеджере паролей или замените его новым через `npx wrangler secret put OWNER_BOOTSTRAP_TOKEN`.
+
+Пароль должен содержать не меньше 10 символов. Worker никогда не возвращает хеш, соль, pepper или session token клиенту.
+
+## Production deploy
+
+### Worker и D1
 
 ```powershell
-$workerUrl = "https://nte-meta-api.bonaqu.workers.dev"
-$ownerLogin = "YOUR_OWNER_LOGIN"
-$ownerPassword = Read-Host "Новый пароль owner"
-$bootstrapToken = Read-Host "Одноразовый код owner"
-$body = @{
-  username = $ownerLogin
-  password = $ownerPassword
-  confirmPassword = $ownerPassword
-  bootstrapToken = $bootstrapToken
-} | ConvertTo-Json
-
-Invoke-RestMethod `
-  -Uri "$workerUrl/api/auth/register" `
-  -Method Post `
-  -ContentType "application/json" `
-  -Body $body
-
-Remove-Variable ownerPassword, bootstrapToken
-npx wrangler secret delete OWNER_BOOTSTRAP_TOKEN
+Set-Location "D:\Projects\nte-hub"
+npm run db:migrate:remote
+npm run worker:deploy -- --env=""
 ```
 
-Первый пользователь создается как `owner`. Следующие регистрации получают роль `user`.
+`wrangler deploy` сохраняет Cloudflare secrets; они не находятся в `wrangler.jsonc`.
 
-После создания owner Cloudflare secret можно оставить: Worker больше не использует его для обычных регистраций, а конфигурация требует его наличия перед каждым production deploy.
+### GitHub Pages
 
-### GitHub Actions
+Push в ветку `bonaqu_projects` запускает `.github/workflows/pages.yml`. Workflow выполняет типизацию, lint, Playwright, production build, prerender и публикацию `dist`.
 
-Repository variable `VITE_API_BASE_URL` должна содержать `https://nte-meta-api.bonaqu.workers.dev`.
+Repository variable:
 
-Для workflow `Deploy Cloudflare Worker` добавьте secrets:
+```text
+VITE_API_BASE_URL=https://nte-meta-api.bonaqu.workers.dev
+```
+
+Для ручного workflow Worker нужны GitHub secrets:
 
 ```text
 CLOUDFLARE_API_TOKEN
 CLOUDFLARE_ACCOUNT_ID
 ```
 
-Cloudflare API Token должен иметь минимум `Workers Scripts: Edit` и `D1: Edit` для нужного аккаунта.
-
-GitHub Pages собирается workflow `Deploy GitHub Pages`. Worker workflow запускается вручную в разделе `Actions`.
+Токену достаточно прав `Workers Scripts: Edit` и `D1: Edit` на нужном аккаунте.
 
 ## Роли
 
-- `owner`: полный доступ, роли admin/owner, пользователи, настройки.
-- `admin`: контент, сливы, новости, модерация, назначение editor/moderator.
-- `editor`: персонажи, гайды, секции, ротации, команды, тир-листы.
-- `moderator`: редактирование и скрытие комментариев.
-- `user`: профиль, комментарии и реакции.
+| Роль        | Возможности                                                      |
+| ----------- | ---------------------------------------------------------------- |
+| `owner`     | Полный доступ, роли, статусы и удаление пользователей, настройки |
+| `admin`     | Контент, источники, новости/сливы, модерация, editor/moderator   |
+| `editor`    | Персонажи, гайды, секции, ротации, команды, тир-листы            |
+| `moderator` | Комментарии, скрытие, удаление и предупреждения                  |
+| `user`      | Профиль, комментарии и реакции                                   |
 
-Права всегда проверяются в Worker, а не только в интерфейсе.
+Иерархия и права проверяются Worker для каждого защищенного endpoint. Скрытие кнопки в интерфейсе не считается защитой.
 
 ## API
 
-Поддержаны `/api/auth/*`, включая профиль и смену пароля, `/api/users/*`, CRUD для `characters`, `guides`, `rotations`, `teams`, `tierlists`, `news`, `leaks`, а также `guide-sections`, `comments`, `reactions`, `settings`, `sources` и `audit-log`.
+Основные группы маршрутов:
 
-Команды и тир-листы принимают вложенные `members`/`items`. Гайд может создаваться с `sections`, а затем секции редактируются и сортируются отдельными endpoints.
+- `/api/auth/*` — конфигурация регистрации, регистрация, сессия, профиль, пароль и предупреждения;
+- `/api/users/*` — роли, статус аккаунта, предупреждения и мягкое удаление;
+- `/api/characters`, `/api/guides`, `/api/guide-sections`, `/api/rotations`;
+- `/api/teams`, `/api/tierlists`, `/api/news`, `/api/leaks`;
+- `/api/comments`, `/api/reactions`;
+- `/api/sources`, `/api/settings`, `/api/audit-log`.
+
+API отвечает в едином формате `{ "data": ... }` или `{ "error": { "code", "message" } }`. Команды/тир-листы принимают вложенные `members`/`items`, а гайд может сразу создаваться с массивом секций.
 
 ## SEO
 
-GitHub Pages остается выбранным бесплатным frontend-хостингом, потому что это требование проекта. Hash routing надежен для SPA, но поисковые системы не считают fragment URL отдельными документами. Поэтому текущий sitemap должен описывать только реальные статические URL.
+GitHub Pages остается бесплатным статическим хостингом, но сайт больше не зависит только от hash routing. Во время `npm run build` скрипт `scripts/prerender.mjs` получает опубликованный контент из API и создает реальные документы:
 
-Лучшее дальнейшее SEO-улучшение без платного сервера: build-time prerender гайдов/новостей или перенос frontend на Cloudflare Pages с файловыми маршрутами. Worker и D1 при этом менять не потребуется.
+```text
+/nte-meta/characters/<slug>/
+/nte-meta/guides/<slug>/
+/nte-meta/news/<slug>/
+/nte-meta/leaks/<slug>/
+/nte-meta/teams/<slug>/
+```
+
+Каждый документ получает собственные `title`, description, canonical, OpenGraph и JSON-LD. Клиентская навигация после загрузки остается быстрой SPA-навигацией. Это лучший бесплатный компромисс для GitHub Pages; перенос на Cloudflare Pages не требуется для текущего объема.
 
 ## Следующие улучшения
 
-- Очередь импорта Telegram/website/youtube/twitter через `sources`.
-- R2 для артов и автоматическая генерация responsive WebP/AVIF.
-- Build-time prerender и отдельные OpenGraph изображения материалов.
-- История ревизий контента и сравнение тир-листов между патчами.
-- Mute/ban/warnings и расширенная очередь модерации.
-- Полнотекстовый поиск D1 FTS по гайдам и секциям.
+- Автоматический импорт Telegram/website/YouTube/X в очередь `sources` с обязательным ручным одобрением.
+- Cloudflare R2 для пользовательских артов и генерация responsive AVIF/WebP.
+- История ревизий материалов и сравнение тир-листов между патчами.
+- D1 FTS-поиск по гайдам, секциям, новостям и комментариям.
+- Временные mute/ban, снятие предупреждений и журнал решений модератора.
+- Уникальные OpenGraph-изображения для персонажей и материалов.
+- Собственный домен и Cloudflare Web Analytics после согласования privacy-политики.

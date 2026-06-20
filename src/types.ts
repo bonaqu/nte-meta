@@ -28,6 +28,8 @@ export interface Character {
   shortDescription: string;
   summary: string;
   tags: string[];
+  status?: Exclude<PublishStatus, 'pending_review'>;
+  patch?: string;
   updatedAt: string;
 }
 
@@ -41,6 +43,7 @@ export interface GuideSection {
 
 export interface Rotation {
   id: string;
+  guideId?: string;
   characterId: string;
   title: string;
   type: string;
@@ -48,6 +51,8 @@ export interface Rotation {
   steps: string[];
   logic: string;
   mediaUrl?: string;
+  status?: Exclude<PublishStatus, 'pending_review'>;
+  updatedAt?: string;
 }
 
 export interface TeamMember {
@@ -57,6 +62,7 @@ export interface TeamMember {
 
 export interface Team {
   id: string;
+  slug?: string;
   title: string;
   type: string;
   budget: 'F2P' | 'Premium' | 'Mixed';
@@ -67,6 +73,8 @@ export interface Team {
   synergy: string;
   rotation: string;
   members: TeamMember[];
+  status?: Exclude<PublishStatus, 'pending_review'>;
+  updatedAt?: string;
 }
 
 export interface Guide {
@@ -92,12 +100,14 @@ export interface TierListItem {
 
 export interface TierList {
   id: string;
+  slug?: string;
   title: string;
   kind: 'base' | 'premium';
   patch: string;
   updatedAt: string;
   items: TierListItem[];
   changelog: string[];
+  status?: Exclude<PublishStatus, 'pending_review'>;
 }
 
 export interface NewsItem {
@@ -113,6 +123,8 @@ export interface NewsItem {
   sourceUrl?: string;
   imageUrl: string;
   tags: string[];
+  publishStatus?: PublishStatus;
+  updatedAt?: string;
 }
 
 export interface LeakItem {
@@ -128,6 +140,8 @@ export interface LeakItem {
   sourceUrl?: string;
   approved: boolean;
   tags: string[];
+  approvedAt?: string;
+  updatedAt?: string;
 }
 
 export interface VideoGuide {
@@ -144,7 +158,7 @@ export interface VideoGuide {
 export interface Comment {
   id: string;
   userId?: string;
-  targetType: 'guide' | 'news' | 'leak' | 'comment';
+  targetType: 'guide' | 'news' | 'leak' | 'comment' | 'site';
   targetId: string;
   author: string;
   body: string;
@@ -163,9 +177,16 @@ export interface User {
 }
 
 export interface AdminUser extends User {
-  status: 'active' | 'deleted' | 'banned';
+  status: 'active' | 'disabled' | 'deleted';
   createdAt: string;
   lastLoginAt?: string;
+}
+
+export interface UserWarning {
+  id: string;
+  reason: string;
+  moderatorName: string;
+  createdAt: string;
 }
 
 export interface AppSettings {
@@ -189,11 +210,22 @@ export interface Source {
   trustLevel: TrustLevel;
   autoImportEnabled: boolean;
   lastCheckedAt?: string;
+  updatedAt?: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  user_id?: string;
+  action: string;
+  target_id?: string;
+  details_json: string;
+  created_at: string;
 }
 
 export interface SiteData {
   characters: Character[];
   guides: Guide[];
+  rotations: Rotation[];
   tierlists: TierList[];
   teams: Team[];
   news: NewsItem[];

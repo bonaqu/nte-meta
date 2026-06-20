@@ -1,0 +1,78 @@
+import AxeBuilder from '@axe-core/playwright';
+import { expect, test } from '@playwright/test';
+
+const publicRoutes = [
+  '/',
+  '/#/characters',
+  '/#/characters/hotori',
+  '/#/news/patch-10-first-meta-notes',
+  '/#/community',
+  '/#/admin',
+];
+
+test.describe('Качество интерфейса NTE Meta', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  for (const route of publicRoutes) {
+    test(`WCAG 2.1 AA: ${route}`, async ({ page }) => {
+      await page.goto(route);
+      await page.locator('main').waitFor();
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+
+      expect(
+        results.violations,
+        results.violations
+          .map((item) => `${item.id}: ${item.help} (${item.nodes.length})`)
+          .join('\n'),
+      ).toEqual([]);
+    });
+  }
+
+  test('основные экраны не создают горизонтальную прокрутку', async ({
+    page,
+  }) => {
+    for (const width of [390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const route of publicRoutes.slice(0, 5)) {
+        await page.goto(route);
+        await page.locator('main').waitFor();
+        const dimensions = await page.evaluate(() => ({
+          viewport: document.documentElement.clientWidth,
+          content: document.documentElement.scrollWidth,
+        }));
+        expect(
+          dimensions.content,
+          `${route} at ${width}px`,
+        ).toBeLessThanOrEqual(dimensions.viewport + 1);
+      }
+    }
+  });
+
+  test('изображения резервируют место и успешно загружаются', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const images = page.locator('main img');
+    await expect(images.first()).toBeVisible();
+    expect(
+      await page
+        .locator('main img:not([width]), main img:not([height])')
+        .count(),
+    ).toBe(0);
+    for (let index = 0; index < (await images.count()); index += 1) {
+      await images.nth(index).scrollIntoViewIfNeeded();
+    }
+    await page.waitForTimeout(200);
+    expect(
+      await images.evaluateAll(
+        (nodes) =>
+          nodes.filter((node) => {
+            const image = node as HTMLImageElement;
+            return !image.complete || image.naturalWidth === 0;
+          }).length,
+      ),
+    ).toBe(0);
+  });
+});

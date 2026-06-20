@@ -470,7 +470,7 @@ const guides: Guide[] = [
     patch: '1.0',
     author: 'NTE Meta',
     updatedAt: '2026-06-02',
-    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    videoUrl: undefined,
     sections: guideSectionsHotori,
     rotations: [
       {
@@ -722,23 +722,7 @@ const leaks: LeakItem[] = [
   },
 ];
 
-const videos: VideoGuide[] = [
-  {
-    id: 'video-hotori',
-    title: 'Хотори: как не сломать burst-окно',
-    youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-    description:
-      'Видео-шаблон с таймкодами и текстовой расшифровкой для будущего редакционного гайда.',
-    publishedAt: '2026-06-02',
-    characterIds: ['hotori'],
-    teamIds: ['team-chaos-eclipse'],
-    timestamps: [
-      { time: '00:00', label: 'Краткий вывод' },
-      { time: '01:12', label: 'Базовая ротация' },
-      { time: '03:44', label: 'Ошибки новичков' },
-    ],
-  },
-];
+const videos: VideoGuide[] = [];
 
 const sources: Source[] = [
   {
@@ -762,6 +746,7 @@ const sources: Source[] = [
 export const seedData: SiteData = {
   characters: characterBase,
   guides,
+  rotations: guides.flatMap((guide) => guide.rotations),
   tierlists,
   teams,
   news,

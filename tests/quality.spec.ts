@@ -53,7 +53,9 @@ test.describe('Качество интерфейса NTE Meta', () => {
   test('изображения резервируют место и успешно загружаются', async ({
     page,
   }) => {
-    await page.goto('/');
+    // Прямой human-readable URL ловит ошибки относительных путей, которые не
+    // заметны при hash-навигации с корневой страницы.
+    await page.goto('/characters/hotori/');
     const images = page.locator('main img');
     await expect(images.first()).toBeVisible();
     expect(

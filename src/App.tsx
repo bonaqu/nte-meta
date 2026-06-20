@@ -77,6 +77,7 @@ import {
   updateUserRole,
 } from './lib/api';
 import { applyMarkdownAction, MarkdownPreview } from './lib/markdown';
+import { resolveAssetUrl } from './lib/assets';
 import {
   formatDate,
   getCharacter,
@@ -542,7 +543,12 @@ function Header({
           {mobileOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
         </button>
         <a className="brand-link" href="#/" aria-label="NTE Meta - на главную">
-          <img src="assets/logo.svg" alt="" width="40" height="40" />
+          <img
+            src={resolveAssetUrl('assets/logo.svg')}
+            alt=""
+            width="40"
+            height="40"
+          />
           <span>
             <strong>NTE Meta</strong>
             <small>русская мета, гайды и комьюнити</small>
@@ -630,7 +636,7 @@ function HomePage({ data, loading }: { data: SiteData; loading: boolean }) {
               href={`#/characters/${character.slug}`}
             >
               <img
-                src={character.imageUrl}
+                src={resolveAssetUrl(character.imageUrl)}
                 alt={character.name}
                 width="280"
                 height="360"
@@ -770,7 +776,7 @@ function CharacterCard({ character }: { character: Character }) {
         aria-label={`Открыть гайд ${character.name}`}
       >
         <img
-          src={character.imageUrl}
+          src={resolveAssetUrl(character.imageUrl)}
           alt={character.name}
           width="360"
           height="460"
@@ -796,7 +802,7 @@ function GuideCard({ guide, data }: { guide: Guide; data: SiteData }) {
   return (
     <article className="guide-card">
       <img
-        src={character?.imageUrl || 'assets/logo.svg'}
+        src={resolveAssetUrl(character?.imageUrl || 'assets/logo.svg')}
         alt={character?.name || guide.title}
         width="460"
         height="280"
@@ -829,7 +835,13 @@ function GuideCard({ guide, data }: { guide: Guide; data: SiteData }) {
 function NewsCompactCard({ item }: { item: NewsItem }) {
   return (
     <article className="compact-card">
-      <img src={item.imageUrl} alt="" width="96" height="96" loading="lazy" />
+      <img
+        src={resolveAssetUrl(item.imageUrl)}
+        alt=""
+        width="96"
+        height="96"
+        loading="lazy"
+      />
       <div>
         <span>
           {item.category} · {formatDate(item.date)}
@@ -877,7 +889,7 @@ function TierPreview({ grouped }: { grouped: Record<Tier, Character[]> }) {
                 title={character.name}
               >
                 <img
-                  src={character.imageUrl}
+                  src={resolveAssetUrl(character.imageUrl)}
                   alt={character.name}
                   width="58"
                   height="58"
@@ -1126,7 +1138,7 @@ function CharacterHero({ character }: { character: Character }) {
   return (
     <section className="guide-hero">
       <img
-        src={character.splashUrl}
+        src={resolveAssetUrl(character.splashUrl)}
         alt={character.name}
         width="520"
         height="620"
@@ -1360,7 +1372,7 @@ function TeamCard({
               href={`#/characters/${character.slug}`}
             >
               <img
-                src={character.imageUrl}
+                src={resolveAssetUrl(character.imageUrl)}
                 alt={character.name}
                 width="54"
                 height="54"
@@ -1868,7 +1880,7 @@ function NewsPage({ data }: { data: SiteData }) {
             {data.news.map((item) => (
               <article className="news-card" key={item.id}>
                 <img
-                  src={item.imageUrl}
+                  src={resolveAssetUrl(item.imageUrl)}
                   alt=""
                   width="460"
                   height="260"
@@ -1978,7 +1990,7 @@ function NewsDetailPage({
       <article className="editorial-article">
         <header className="editorial-hero">
           <img
-            src={item.imageUrl}
+            src={resolveAssetUrl(item.imageUrl)}
             alt=""
             width="1280"
             height="720"
@@ -2213,7 +2225,7 @@ function TeamDetailPage({ data, slug }: { data: SiteData; slug: string }) {
                 href={`#/characters/${character.slug}`}
               >
                 <img
-                  src={character.imageUrl}
+                  src={resolveAssetUrl(character.imageUrl)}
                   alt={character.name}
                   width="220"
                   height="280"
@@ -3859,7 +3871,7 @@ function AdminTierlists({
             return (
               <article key={item.characterId}>
                 <img
-                  src={character.imageUrl}
+                  src={resolveAssetUrl(character.imageUrl)}
                   alt=""
                   width="56"
                   height="56"

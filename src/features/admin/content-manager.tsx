@@ -19,6 +19,7 @@ import type {
   Team,
   TeamMember,
 } from '../../types';
+import { resolveAssetUrl } from '../../lib/assets';
 
 type EditorValues = Record<string, unknown>;
 type FieldKind =
@@ -655,7 +656,7 @@ export function AdminCharactersManager({
         <article className="cms-character-preview">
           {textValue(values, 'imageUrl') ? (
             <img
-              src={textValue(values, 'imageUrl')}
+              src={resolveAssetUrl(textValue(values, 'imageUrl'))}
               alt=""
               width="300"
               height="380"

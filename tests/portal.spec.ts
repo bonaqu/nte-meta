@@ -134,7 +134,7 @@ test.describe('Публичный портал NTE Meta', () => {
     );
   });
 
-  test('видео-раздел не подменяет отсутствующие материалы фиктивными роликами', async ({
+  test('видео-раздел показывает явный редакционный плейсхолдер', async ({
     page,
   }) => {
     await page.goto('/#/videos');
@@ -147,7 +147,9 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(
       page.getByRole('link', { name: 'Открыть текстовые гайды' }),
     ).toBeVisible();
-    await expect(page.locator('iframe')).toHaveCount(0);
+    await expect(
+      page.getByTitle('Редакционный плейсхолдер NTE Meta'),
+    ).toBeVisible();
   });
 
   test('мобильное меню доступно с клавиатуры и layout не уезжает', async ({

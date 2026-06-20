@@ -593,8 +593,41 @@ test.describe('NTE Meta Worker API', () => {
     await page.getByRole('button', { name: 'Войти', exact: true }).click();
 
     await expect(
-      page.getByRole('heading', { name: 'Профиль', level: 1 }),
+      page.getByRole('heading', { name: 'Dashboard', level: 1 }),
     ).toBeVisible();
+    await page.getByRole('button', { name: 'Билды', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Редактор билда' }),
+    ).toBeVisible();
+    await page
+      .getByLabel('Дуги, модули и статы')
+      .fill('## Тестовый билд\n- Дуга: Playwright Arc\n- Статы: крит и атака');
+    await page
+      .getByRole('button', { name: /(?:Создать|Обновить) билд/ })
+      .click();
+    await expect(page.getByText(/Билд сохранён/)).toBeVisible();
+    await page
+      .getByRole('button', { name: 'Видео-гайды', exact: true })
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Редактор видео-гайда' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Поставить тестовый ролик' }),
+    ).toBeVisible();
+    await page
+      .getByRole('button', { name: 'Поставить тестовый ролик' })
+      .click();
+    await page
+      .getByLabel('Расшифровка и таймкоды')
+      .fill('## Таймкоды\n00:00 — тестовый ролик');
+    await page.getByLabel('Статус материала').selectOption('published');
+    await page.getByRole('button', { name: 'Сохранить видео-гайд' }).click();
+    await expect(page.getByText('Видео-гайд опубликован.')).toBeVisible();
+    await page.getByRole('button', { name: 'Убрать видео' }).click();
+    await page.getByLabel('Расшифровка и таймкоды').fill('');
+    await page.getByRole('button', { name: 'Сохранить видео-гайд' }).click();
+    await expect(page.getByText('Видео-гайд опубликован.')).toBeVisible();
     await page.getByRole('button', { name: 'Гайды', exact: true }).click();
     await expect(
       page.getByRole('heading', { name: 'Markdown editor' }),
@@ -603,6 +636,13 @@ test.describe('NTE Meta Worker API', () => {
       page.getByRole('button', { name: 'Добавить раздел' }),
     ).toBeVisible();
     await expect(page.getByLabel('YouTube URL')).toBeVisible();
+    await page.locator('a.profile-chip').click();
+    await expect(
+      page.getByRole('heading', { name: 'Профиль', level: 1 }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Открыть админку' }),
+    ).toBeVisible();
     await page.getByRole('button', { name: 'Выйти' }).click();
     await expect(
       page.getByRole('heading', { name: 'Вход в NTE Meta' }),

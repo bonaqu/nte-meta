@@ -145,7 +145,6 @@ const navItems = [
   { label: 'Новости', href: '#/news', icon: Newspaper },
   { label: 'Видео-гайды', href: '#/videos', icon: Video },
   { label: 'Комьюнити-хаб', href: '#/community', icon: MessageCircle },
-  { label: 'Админка / Профиль', href: '#/admin', icon: ShieldCheck },
 ];
 
 const roleWeight: Record<User['role'], number> = {
@@ -224,7 +223,7 @@ function App() {
       const viewer = currentUser.ok ? currentUser.data : null;
       const siteData = await loadSiteData({
         includePrivate: Boolean(
-          viewer && roleWeight[viewer.role] >= roleWeight.admin,
+          viewer && roleWeight[viewer.role] >= roleWeight.editor,
         ),
       });
 
@@ -252,7 +251,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!user || roleWeight[user.role] < roleWeight.admin) return;
+    if (!user || roleWeight[user.role] < roleWeight.editor) return;
     loadSiteData({ includePrivate: true }).then(setData);
   }, [user]);
 
@@ -407,10 +406,11 @@ function App() {
         'Обсуждения, комментарии и оценки материалов NTE Meta.',
         '/community/',
       ],
-      admin: [
-        'Профиль и CMS',
-        'Профиль пользователя и редакционная CMS NTE Meta.',
-        '/admin/',
+      admin: ['Админка', 'Защищённая редакционная CMS NTE Meta.', '/admin/'],
+      profile: [
+        'Профиль',
+        'Настройки аккаунта и безопасность пользователя NTE Meta.',
+        '/profile/',
       ],
     };
     const fallback = sectionTitles[activeSection] || [
@@ -466,6 +466,8 @@ function App() {
     page = <VideosPage data={data} />;
   } else if (section === 'community') {
     page = <CommunityPage data={data} user={user} />;
+  } else if (section === 'profile') {
+    page = <ProfilePage user={user} setUser={setUser} />;
   } else if (section === 'admin') {
     page = (
       <AdminPage data={data} user={user} setUser={setUser} setData={setData} />
@@ -529,6 +531,11 @@ function Header({
   mobileOpen: boolean;
   setMobileOpen: (value: boolean) => void;
 }) {
+  const headerNavItems =
+    user && roleWeight[user.role] >= roleWeight.moderator
+      ? [...navItems, { label: 'Админка', href: '#/admin', icon: ShieldCheck }]
+      : navItems;
+
   return (
     <header className="site-header">
       <div className="brand" role="banner">
@@ -560,7 +567,7 @@ function Header({
         className={`top-nav ${mobileOpen ? 'is-open' : ''}`}
         aria-label="Основная навигация"
       >
-        {navItems.map((item) => {
+        {headerNavItems.map((item) => {
           const Icon = item.icon;
           const itemRoute = item.href.replace(/^#\/?/, '');
           const isActive =
@@ -581,7 +588,7 @@ function Header({
           );
         })}
       </nav>
-      <a className="profile-chip" href="#/admin">
+      <a className="profile-chip" href="#/profile">
         <UserCircle aria-hidden="true" />
         <span>
           {user
@@ -1262,7 +1269,11 @@ function GuideDetail({
         </div>
       </section>
       {guide.videoUrl ? (
-        <VideoEmbed url={guide.videoUrl} title={guide.title} />
+        <VideoEmbed
+          url={guide.videoUrl}
+          title={guide.title}
+          transcript={guide.transcript}
+        />
       ) : null}
       <CommentsBlock
         targetType="guide"
@@ -1400,7 +1411,15 @@ function TeamCard({
   );
 }
 
-function VideoEmbed({ url, title }: { url: string; title: string }) {
+function VideoEmbed({
+  url,
+  title,
+  transcript,
+}: {
+  url: string;
+  title: string;
+  transcript?: string;
+}) {
   const embedUrl = getYoutubeEmbedUrl(url);
   if (!embedUrl) {
     return null;
@@ -1419,6 +1438,12 @@ function VideoEmbed({ url, title }: { url: string; title: string }) {
         allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
       />
+      {transcript ? (
+        <div className="video-transcript">
+          <h3>Текстовая расшифровка</h3>
+          <MarkdownPreview value={transcript} />
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -2320,6 +2345,9 @@ function RotationsPage({ data }: { data: SiteData }) {
 
 function VideosPage({ data }: { data: SiteData }) {
   const videoGuides = data.guides.filter((guide) => guide.videoUrl);
+  const placeholderEmbed = getYoutubeEmbedUrl(
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+  );
 
   return (
     <div className="page-stack">
@@ -2361,16 +2389,29 @@ function VideosPage({ data }: { data: SiteData }) {
           );
         })}
         {videoGuides.length === 0 ? (
-          <EmptyState
-            icon={Video}
-            title="Видео-гайды готовятся"
-            text="Здесь появятся проверенные ролики редакции. Пока используйте текстовые гайды: в них уже есть ротации, команды и ошибки."
-            action={
+          <article className="video-card video-placeholder-card">
+            {placeholderEmbed ? (
+              <iframe
+                className="video-frame"
+                src={placeholderEmbed}
+                title="Редакционный плейсхолдер NTE Meta"
+                loading="lazy"
+                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            ) : null}
+            <div>
+              <p className="eyebrow">Редакционный плейсхолдер</p>
+              <h2>Видео-гайды готовятся</h2>
+              <p>
+                Да, пока это тот самый ролик. Настоящие разборы появятся здесь
+                вместе с таймкодами и полной текстовой версией.
+              </p>
               <a className="primary-button" href="#/guides">
                 <BookOpen aria-hidden="true" /> Открыть текстовые гайды
               </a>
-            }
-          />
+            </div>
+          </article>
         ) : null}
       </section>
     </div>
@@ -2400,7 +2441,7 @@ function CommunityPage({ data, user }: { data: SiteData; user: User | null }) {
             Гости читают гайды, новости, тир-листы и сливы. Комментирование,
             оценки и профиль требуют регистрации.
           </p>
-          <a className="primary-button" href="#/admin">
+          <a className="primary-button" href="#/profile">
             <LockKeyhole aria-hidden="true" />
             {user ? 'Открыть профиль' : 'Войти или зарегистрироваться'}
           </a>
@@ -2424,11 +2465,58 @@ function CommunityPage({ data, user }: { data: SiteData; user: User | null }) {
   );
 }
 
+function ProfilePage({
+  user,
+  setUser,
+}: {
+  user: User | null;
+  setUser: (user: User | null) => void;
+}) {
+  if (!user) {
+    return (
+      <div className="profile-page">
+        <AuthPanel setUser={setUser} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="page-stack profile-page">
+      <section className="page-hero compact">
+        <h1>Профиль</h1>
+        <p>
+          Аккаунт, безопасность и предупреждения находятся отдельно от
+          редакционной CMS.
+        </p>
+        <div className="button-row">
+          {roleWeight[user.role] >= roleWeight.moderator ? (
+            <a className="primary-button" href="#/admin">
+              <ShieldCheck aria-hidden="true" /> Открыть админку
+            </a>
+          ) : null}
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={async () => {
+              await logout();
+              setUser(null);
+            }}
+          >
+            <LogOut aria-hidden="true" /> Выйти
+          </button>
+        </div>
+      </section>
+      <ProfilePanel user={user} setUser={setUser} />
+    </div>
+  );
+}
+
 const adminTabs = [
-  'profile',
   'dashboard',
   'characters',
   'guides',
+  'builds',
+  'videos',
   'rotations',
   'teams',
   'tierlists',
@@ -2442,10 +2530,11 @@ const adminTabs = [
 ] as const;
 
 const adminLabels: Record<(typeof adminTabs)[number], string> = {
-  profile: 'Профиль',
   dashboard: 'Dashboard',
   characters: 'Персонажи',
   guides: 'Гайды',
+  builds: 'Билды',
+  videos: 'Видео-гайды',
   rotations: 'Ротации',
   teams: 'Команды',
   tierlists: 'Тир-листы',
@@ -2459,10 +2548,11 @@ const adminLabels: Record<(typeof adminTabs)[number], string> = {
 };
 
 const adminTabRole: Record<(typeof adminTabs)[number], User['role']> = {
-  profile: 'user',
   dashboard: 'moderator',
   characters: 'editor',
   guides: 'editor',
+  builds: 'editor',
+  videos: 'editor',
   rotations: 'editor',
   teams: 'editor',
   tierlists: 'editor',
@@ -2486,7 +2576,7 @@ function AdminPage({
   setUser: (user: User | null) => void;
   setData: React.Dispatch<React.SetStateAction<SiteData>>;
 }) {
-  const [tab, setTab] = useState<(typeof adminTabs)[number]>('profile');
+  const [tab, setTab] = useState<(typeof adminTabs)[number]>('dashboard');
   const visibleTabs = useMemo(
     () =>
       user
@@ -2499,12 +2589,36 @@ function AdminPage({
 
   useEffect(() => {
     if (user && !visibleTabs.includes(tab)) {
-      setTab('profile');
+      setTab('dashboard');
     }
   }, [tab, user, visibleTabs]);
 
   async function refreshContent() {
     setData(await loadSiteData({ includePrivate: true }));
+  }
+
+  if (!user) {
+    return (
+      <div className="profile-page">
+        <AuthPanel setUser={setUser} />
+      </div>
+    );
+  }
+
+  if (roleWeight[user.role] < roleWeight.moderator) {
+    return (
+      <div className="page-stack profile-page">
+        <section className="page-hero compact">
+          <h1>Админка недоступна</h1>
+          <p>
+            Редакционная CMS доступна только moderator, editor, admin и owner.
+          </p>
+          <a className="primary-button" href="#/profile">
+            <UserCircle aria-hidden="true" /> Вернуться в профиль
+          </a>
+        </section>
+      </div>
+    );
   }
 
   return (
@@ -2524,86 +2638,77 @@ function AdminPage({
         ))}
       </aside>
       <section className="admin-content">
-        {!user ? (
-          <AuthPanel setUser={setUser} />
-        ) : (
-          <>
-            <div className="admin-topline">
-              <div>
-                <p className="eyebrow">Роль: {user.role}</p>
-                <h1>{adminLabels[tab]}</h1>
-              </div>
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={async () => {
-                  await logout();
-                  setUser(null);
-                }}
-              >
-                <LogOut aria-hidden="true" />
-                Выйти
-              </button>
-            </div>
-            <Suspense fallback={<SkeletonGrid label="Загрузка редактора" />}>
-              {tab === 'profile' ? (
-                <ProfilePanel user={user} setUser={setUser} />
-              ) : null}
-              {tab === 'dashboard' ? <AdminDashboard data={data} /> : null}
-              {tab === 'characters' ? (
-                <AdminCharactersManager
-                  items={data.characters}
-                  onRefresh={refreshContent}
-                />
-              ) : null}
-              {tab === 'guides' ? (
-                <AdminGuides data={data} setData={setData} />
-              ) : null}
-              {tab === 'rotations' ? (
-                <AdminRotationsManager
-                  items={data.rotations}
-                  characters={data.characters}
-                  guides={data.guides}
-                  onRefresh={refreshContent}
-                />
-              ) : null}
-              {tab === 'teams' ? (
-                <AdminTeamsManager
-                  items={data.teams}
-                  characters={data.characters}
-                  onRefresh={refreshContent}
-                />
-              ) : null}
-              {tab === 'tierlists' ? (
-                <AdminTierlists data={data} setData={setData} />
-              ) : null}
-              {tab === 'news' ? (
-                <AdminNewsManager
-                  items={data.news}
-                  onRefresh={refreshContent}
-                />
-              ) : null}
-              {tab === 'leaks' ? (
-                <AdminLeaksManager
-                  items={data.leaks}
-                  onRefresh={refreshContent}
-                />
-              ) : null}
-              {tab === 'comments' ? (
-                <AdminComments data={data} user={user} />
-              ) : null}
-              {tab === 'users' ? <AdminUsers actor={user} /> : null}
-              {tab === 'settings' ? <AdminSettings /> : null}
-              {tab === 'sources' ? (
-                <AdminSourcesManager
-                  items={data.sources}
-                  onRefresh={refreshContent}
-                />
-              ) : null}
-              {tab === 'audit' ? <AdminAuditLog /> : null}
-            </Suspense>
-          </>
-        )}
+        <div className="admin-topline">
+          <div>
+            <p className="eyebrow">Роль: {user.role}</p>
+            <h1>{adminLabels[tab]}</h1>
+          </div>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={async () => {
+              await logout();
+              setUser(null);
+            }}
+          >
+            <LogOut aria-hidden="true" />
+            Выйти
+          </button>
+        </div>
+        <Suspense fallback={<SkeletonGrid label="Загрузка редактора" />}>
+          {tab === 'dashboard' ? <AdminDashboard data={data} /> : null}
+          {tab === 'characters' ? (
+            <AdminCharactersManager
+              items={data.characters}
+              onRefresh={refreshContent}
+            />
+          ) : null}
+          {tab === 'guides' ? (
+            <AdminGuides data={data} setData={setData} />
+          ) : null}
+          {tab === 'builds' ? (
+            <AdminBuilds data={data} setData={setData} />
+          ) : null}
+          {tab === 'videos' ? (
+            <AdminVideos data={data} setData={setData} />
+          ) : null}
+          {tab === 'rotations' ? (
+            <AdminRotationsManager
+              items={data.rotations}
+              characters={data.characters}
+              guides={data.guides}
+              onRefresh={refreshContent}
+            />
+          ) : null}
+          {tab === 'teams' ? (
+            <AdminTeamsManager
+              items={data.teams}
+              characters={data.characters}
+              onRefresh={refreshContent}
+            />
+          ) : null}
+          {tab === 'tierlists' ? (
+            <AdminTierlists data={data} setData={setData} />
+          ) : null}
+          {tab === 'news' ? (
+            <AdminNewsManager items={data.news} onRefresh={refreshContent} />
+          ) : null}
+          {tab === 'leaks' ? (
+            <AdminLeaksManager items={data.leaks} onRefresh={refreshContent} />
+          ) : null}
+          {tab === 'comments' ? (
+            <AdminComments data={data} user={user} />
+          ) : null}
+          {tab === 'users' ? <AdminUsers actor={user} /> : null}
+          {tab === 'settings' ? <AdminSettings /> : null}
+          {tab === 'sources' ? (
+            <AdminSourcesManager
+              items={data.sources}
+              onRefresh={refreshContent}
+            />
+          ) : null}
+          {tab === 'audit' ? <AdminAuditLog /> : null}
+        </Suspense>
       </section>
     </div>
   );
@@ -2944,6 +3049,319 @@ function AdminDashboard({ data }: { data: SiteData }) {
           </li>
         </ul>
       </div>
+    </div>
+  );
+}
+
+const BUILD_SECTION_TEMPLATE = `## Рекомендуемый билд
+
+### Лучшая дуга
+Укажите сигнатурную или оптимальную дугу и объясните, почему она работает.
+
+### Альтернативная дуга
+Добавьте F2P-вариант и условия, при которых он не уступает.
+
+### Модули и основные статы
+- Основной стат: ...
+- Комплект модулей: ...
+
+### Саб-статы
+1. Приоритет №1
+2. Приоритет №2
+
+### Что менять без сигнатурки
+Опишите практическую замену и поправку ротации.`;
+
+function AdminBuilds({
+  data,
+  setData,
+}: {
+  data: SiteData;
+  setData: React.Dispatch<React.SetStateAction<SiteData>>;
+}) {
+  const [guideId, setGuideId] = useState(data.guides[0]?.id || '');
+  const guide = data.guides.find((item) => item.id === guideId);
+  const buildSection = guide?.sections.find(
+    (section) => section.type === 'build',
+  );
+  const [content, setContent] = useState(
+    buildSection?.content || BUILD_SECTION_TEMPLATE,
+  );
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    const nextGuide = data.guides.find((item) => item.id === guideId);
+    const nextBuild = nextGuide?.sections.find(
+      (section) => section.type === 'build',
+    );
+    setContent(nextBuild?.content || BUILD_SECTION_TEMPLATE);
+  }, [data.guides, guideId]);
+
+  async function saveBuild() {
+    if (!guide) return;
+    setPending(true);
+    setMessage('');
+    const result = buildSection
+      ? await saveEntity<{ success: boolean }>(
+          `/api/guide-sections/${buildSection.id}`,
+          {
+            title: 'Билд: дуги, модули и статы',
+            type: 'build',
+            content,
+          },
+          'PATCH',
+        )
+      : await saveEntity<{ id: string }>(
+          `/api/guides/${guide.id}/sections`,
+          {
+            title: 'Билд: дуги, модули и статы',
+            type: 'build',
+            content,
+          },
+          'POST',
+        );
+
+    if (result.ok) {
+      setData(await loadSiteData({ includePrivate: true }));
+      setMessage(
+        guide.status === 'published'
+          ? 'Билд сохранён и уже виден в опубликованном гайде.'
+          : 'Билд сохранён. Опубликуйте родительский гайд, когда материал готов.',
+      );
+    } else {
+      setMessage(result.error);
+    }
+    setPending(false);
+  }
+
+  if (!guide) {
+    return (
+      <EmptyState
+        icon={BookOpen}
+        title="Сначала создайте гайд"
+        text="Билд хранится как гибкая секция персонажного гайда и наследует его статус публикации."
+      />
+    );
+  }
+
+  return (
+    <div className="admin-grid two-columns cms-focused-editor">
+      <section className="admin-panel entity-form">
+        <p className="eyebrow">Секция персонажного гайда</p>
+        <h2>Редактор билда</h2>
+        <label htmlFor="build-guide-picker">Персонажный гайд</label>
+        <select
+          id="build-guide-picker"
+          value={guide.id}
+          onChange={(event) => {
+            setGuideId(event.target.value);
+            setMessage('');
+          }}
+        >
+          {data.guides.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.title} · {item.status}
+            </option>
+          ))}
+        </select>
+        <label htmlFor="build-content">Дуги, модули и статы</label>
+        <textarea
+          id="build-content"
+          rows={24}
+          value={content}
+          onChange={(event) => setContent(event.target.value)}
+        />
+        <button
+          className="primary-button"
+          type="button"
+          disabled={pending}
+          onClick={saveBuild}
+        >
+          <CheckCircle2 aria-hidden="true" />
+          {pending
+            ? 'Сохраняем...'
+            : buildSection
+              ? 'Обновить билд'
+              : 'Создать билд'}
+        </button>
+        <p className="form-message" aria-live="polite">
+          {message}
+        </p>
+      </section>
+      <section className="admin-panel preview-panel">
+        <p className="eyebrow">Live preview</p>
+        <h2>{guide.title}</h2>
+        <MarkdownPreview value={content} />
+      </section>
+    </div>
+  );
+}
+
+function AdminVideos({
+  data,
+  setData,
+}: {
+  data: SiteData;
+  setData: React.Dispatch<React.SetStateAction<SiteData>>;
+}) {
+  const [guideId, setGuideId] = useState(data.guides[0]?.id || '');
+  const guide = data.guides.find((item) => item.id === guideId);
+  const [videoUrl, setVideoUrl] = useState(guide?.videoUrl || '');
+  const [transcript, setTranscript] = useState(guide?.transcript || '');
+  const [status, setStatus] = useState<Guide['status']>(
+    guide?.status || 'draft',
+  );
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState('');
+  const embedUrl = getYoutubeEmbedUrl(videoUrl);
+
+  useEffect(() => {
+    const nextGuide = data.guides.find((item) => item.id === guideId);
+    setVideoUrl(nextGuide?.videoUrl || '');
+    setTranscript(nextGuide?.transcript || '');
+    setStatus(nextGuide?.status || 'draft');
+  }, [data.guides, guideId]);
+
+  async function saveVideoGuide() {
+    if (!guide) return;
+    setPending(true);
+    setMessage('');
+    const result = await saveEntity<{ success: boolean }>(
+      `/api/guides/${guide.id}`,
+      {
+        videoUrl,
+        transcriptMarkdown: transcript,
+        status,
+      },
+      'PATCH',
+    );
+    if (result.ok) {
+      setData(await loadSiteData({ includePrivate: true }));
+      setMessage(
+        status === 'published'
+          ? 'Видео-гайд опубликован.'
+          : 'Видео-гайд сохранён без публичной публикации.',
+      );
+    } else {
+      setMessage(result.error);
+    }
+    setPending(false);
+  }
+
+  if (!guide) {
+    return (
+      <EmptyState
+        icon={Video}
+        title="Сначала создайте гайд"
+        text="Видео связывается с текстовым гайдом, чтобы игрок всегда получал ротацию и расшифровку."
+      />
+    );
+  }
+
+  return (
+    <div className="admin-grid two-columns cms-focused-editor">
+      <section className="admin-panel entity-form">
+        <p className="eyebrow">YouTube + текст</p>
+        <h2>Редактор видео-гайда</h2>
+        <label htmlFor="video-guide-picker">Связанный гайд</label>
+        <select
+          id="video-guide-picker"
+          value={guide.id}
+          onChange={(event) => {
+            setGuideId(event.target.value);
+            setMessage('');
+          }}
+        >
+          {data.guides.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.title} · {item.status}
+            </option>
+          ))}
+        </select>
+        <label htmlFor="video-guide-url">YouTube URL</label>
+        <input
+          id="video-guide-url"
+          type="url"
+          value={videoUrl}
+          placeholder="https://www.youtube.com/watch?v=..."
+          onChange={(event) => setVideoUrl(event.target.value)}
+        />
+        <div className="button-row">
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() =>
+              setVideoUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+            }
+          >
+            <Video aria-hidden="true" /> Поставить тестовый ролик
+          </button>
+          {videoUrl ? (
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => setVideoUrl('')}
+            >
+              <X aria-hidden="true" /> Убрать видео
+            </button>
+          ) : null}
+        </div>
+        <label htmlFor="video-guide-status">Статус материала</label>
+        <select
+          id="video-guide-status"
+          value={status}
+          onChange={(event) => setStatus(event.target.value as Guide['status'])}
+        >
+          <option value="draft">Черновик</option>
+          <option value="pending_review">На проверке</option>
+          <option value="published">Опубликован</option>
+          <option value="archived">Архив</option>
+        </select>
+        <label htmlFor="video-guide-transcript">Расшифровка и таймкоды</label>
+        <textarea
+          id="video-guide-transcript"
+          rows={16}
+          value={transcript}
+          placeholder={'## Таймкоды\n00:00 — вступление\n\n## Расшифровка'}
+          onChange={(event) => setTranscript(event.target.value)}
+        />
+        <button
+          className="primary-button"
+          type="button"
+          disabled={pending || (Boolean(videoUrl) && !embedUrl)}
+          onClick={saveVideoGuide}
+        >
+          <CheckCircle2 aria-hidden="true" />
+          {pending ? 'Сохраняем...' : 'Сохранить видео-гайд'}
+        </button>
+        <p className="form-message" aria-live="polite">
+          {Boolean(videoUrl) && !embedUrl
+            ? 'Проверьте YouTube URL: не удалось получить video ID.'
+            : message}
+        </p>
+      </section>
+      <section className="admin-panel preview-panel">
+        <p className="eyebrow">Предпросмотр</p>
+        <h2>{guide.title}</h2>
+        {embedUrl ? (
+          <iframe
+            className="video-frame"
+            src={embedUrl}
+            title={`Предпросмотр: ${guide.title}`}
+            loading="lazy"
+            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        ) : (
+          <EmptyState
+            icon={Video}
+            title="Видео пока не выбрано"
+            text="Вставьте YouTube URL или используйте тестовый ролик."
+          />
+        )}
+        {transcript ? <MarkdownPreview value={transcript} /> : null}
+      </section>
     </div>
   );
 }

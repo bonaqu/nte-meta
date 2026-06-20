@@ -19,7 +19,9 @@ const PUBLIC_GET = new Set([
 const CONTENT_ROLE = 'editor';
 const ADMIN_ROLE = 'admin';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
-const PASSWORD_ITERATIONS = 210000;
+// Cloudflare Workers Web Crypto rejects PBKDF2 values above 100,000.
+// Salt + HMAC pepper remain mandatory, while this keeps auth deployable.
+const PASSWORD_ITERATIONS = 100000;
 const SESSION_COOKIE = 'nte_meta_session';
 const MAX_JSON_BYTES = 128 * 1024;
 
@@ -1045,6 +1047,7 @@ async function serializeGuideWithRelations(env, row) {
     author: row.author_name,
     updatedAt: row.updated_at,
     videoUrl: row.video_url || undefined,
+    transcript: row.transcript_markdown || undefined,
     sections: sections.results.map(serializeSection),
     rotations: rotations.results.map(serializeRotation),
   };

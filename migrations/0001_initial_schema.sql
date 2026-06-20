@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   display_name TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   password_salt TEXT NOT NULL,
-  password_iterations INTEGER NOT NULL DEFAULT 180000,
+  password_iterations INTEGER NOT NULL DEFAULT 100000,
   role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('owner', 'admin', 'moderator', 'editor', 'user')),
   avatar_url TEXT,
   bio TEXT,

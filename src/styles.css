@@ -1860,6 +1860,11 @@
     align-items: center;
   }
 
+  .admin-topline h1 {
+    font-size: 3rem;
+    line-height: 1;
+  }
+
   .admin-table {
     display: grid;
     gap: 8px;
@@ -1957,6 +1962,31 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
+  }
+
+  .profile-page {
+    inline-size: min(100%, 1180px);
+    margin-inline: auto;
+  }
+
+  .profile-page > .auth-panel {
+    margin-inline: auto;
+  }
+
+  .cms-focused-editor {
+    align-items: start;
+  }
+
+  .preview-panel {
+    align-content: start;
+    min-inline-size: 0;
+  }
+
+  .video-transcript {
+    display: grid;
+    gap: 12px;
+    padding-block-start: 18px;
+    border-block-start: 1px solid var(--border);
   }
 
   .section-sorter {
@@ -2285,6 +2315,10 @@
     .site-footer {
       align-items: start;
       flex-direction: column;
+    }
+
+    .admin-topline h1 {
+      font-size: 2.2rem;
     }
 
     .compact-card {

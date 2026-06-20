@@ -88,6 +88,7 @@ export interface Guide {
   author: string;
   updatedAt: string;
   videoUrl?: string;
+  transcript?: string;
   sections: GuideSection[];
   rotations: Rotation[];
 }

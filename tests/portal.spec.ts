@@ -27,7 +27,7 @@ test.describe('Публичный портал NTE Meta', () => {
     expect(consoleErrors).toEqual([]);
   });
 
-  test('поиск и фильтры персонажей ведут в подробный гайд', async ({
+  test('поиск персонажей ведёт в lore-профиль, а мета остаётся в гайдах', async ({
     page,
   }) => {
     await page.goto('/#/characters');
@@ -38,16 +38,22 @@ test.describe('Публичный портал NTE Meta', () => {
     await page.getByPlaceholder('Имя, роль, тег...').fill('Хотори');
     await expect(page.getByText(/Найдено: 1 из/)).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Открыть гайд Хотори' }),
+      page.getByRole('link', { name: 'Открыть страницу персонажа Хотори' }),
     ).toBeVisible();
 
-    await page.getByRole('link', { name: 'Открыть гайд Хотори' }).click();
+    await page
+      .getByRole('link', { name: 'Открыть страницу персонажа Хотори' })
+      .click();
     await expect(
       page.getByRole('heading', { name: 'Хотори', exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: /Базовая, оптимальная/ }),
+      page.getByRole('heading', { name: 'Биография' }),
     ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Пробуждения C0-C6' }),
+    ).toBeVisible();
+    await expect(page.locator('.guide-section-card')).toHaveCount(0);
     await expect(page.getByText('Комментарии и обсуждения')).toBeVisible();
   });
 
@@ -74,36 +80,18 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(page.getByText(/доверие: средний/i)).toBeVisible();
   });
 
-  test('команды, ротации и тир-листы работают как связанные инструменты', async ({
+  test('отряды и ротации находятся внутри гайда, тир-листы переключаются', async ({
     page,
   }) => {
-    await page.goto('/#/teams');
+    await page.goto('/#/guides/hotori-burst-guide');
     await expect(
-      page.getByRole('heading', { name: 'Команды NTE Meta' }),
+      page.getByRole('heading', {
+        name: 'Лучшие отряды и ротации для Хотори',
+      }),
     ).toBeVisible();
-    await page.getByLabel('Бюджет').selectOption('F2P');
-    await expect(
-      page.getByRole('heading', { name: 'Starter Core' }),
-    ).toBeVisible();
-    await page
-      .getByRole('article')
-      .filter({ hasText: 'Starter Core' })
-      .getByRole('link', { name: /Разобрать команду/ })
-      .click();
-    await expect(
-      page.getByRole('heading', { name: 'Starter Core' }),
-    ).toBeVisible();
-    await expect(page.getByText('Рекомендуемая ротация')).toBeVisible();
-
-    await page.goto('/#/rotations');
-    await expect(page.getByRole('heading', { name: 'Ротации' })).toBeVisible();
-    await page.getByLabel('Персонаж').selectOption('hotori');
-    await expect(
-      page.getByRole('heading', { name: 'Простая ротация Хотори' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Boss rotation' }),
-    ).toBeVisible();
+    await expect(page.getByText('Командная ротация')).toBeVisible();
+    await expect(page.locator('a[href="#/teams"]')).toHaveCount(0);
+    await expect(page.locator('a[href="#/rotations"]')).toHaveCount(0);
 
     await page.goto('/#/tierlists');
     await expect(page.getByText('Base C0 тир-лист')).toBeVisible();
@@ -111,19 +99,10 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(page.getByText('Premium C6 тир-лист')).toBeVisible();
   });
 
-  test('комьюнити и авторизация имеют понятные пустые и гостевые состояния', async ({
+  test('авторизация отделена от CMS, отдельного пустого комьюнити-раздела нет', async ({
     page,
   }) => {
-    await page.goto('/#/community');
-    await expect(
-      page.getByRole('heading', { name: 'Комьюнити-хаб' }),
-    ).toBeVisible();
-    await expect(
-      page.getByText(/комментирование, оценки и профиль/i),
-    ).toBeVisible();
-    await page
-      .getByRole('link', { name: 'Войти или зарегистрироваться' })
-      .click();
+    await page.goto('/#/profile');
     await expect(
       page.getByRole('heading', { name: 'Вход в NTE Meta' }),
     ).toBeVisible();
@@ -132,6 +111,25 @@ test.describe('Публичный портал NTE Meta', () => {
       'autocomplete',
       'current-password',
     );
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Основная навигация' })
+        .getByRole('link', { name: 'Комьюнити-хаб' }),
+    ).toHaveCount(0);
+  });
+
+  test('Главная открывается из prerender-профиля и не остаётся профилем', async ({
+    page,
+  }) => {
+    await page.goto('/profile/');
+    await page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .getByRole('link', { name: 'Главная', exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/profile\/#\/$/);
+    await expect(
+      page.getByRole('heading', { name: 'NTE Meta', exact: true }),
+    ).toBeVisible();
   });
 
   test('видео-раздел показывает явный редакционный плейсхолдер', async ({

@@ -4,6 +4,7 @@ import type {
   AuditLogEntry,
   AppSettings,
   Comment,
+  EditorPermissions,
   Role,
   SiteData,
   User,
@@ -279,6 +280,16 @@ export async function updateUserRole(id: string, role: Role) {
   return request<{ success: boolean }>(`/api/users/${id}/role`, {
     method: 'PATCH',
     body: JSON.stringify({ role }),
+  });
+}
+
+export async function updateEditorPermissions(
+  id: string,
+  permissions: EditorPermissions,
+) {
+  return request<EditorPermissions>(`/api/users/${id}/editor-permissions`, {
+    method: 'PATCH',
+    body: JSON.stringify(permissions),
   });
 }
 

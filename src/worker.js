@@ -18,12 +18,28 @@ const PUBLIC_GET = new Set([
 ]);
 const CONTENT_ROLE = 'editor';
 const ADMIN_ROLE = 'admin';
+const CONTENT_SCOPES = new Set([
+  'characters',
+  'guides',
+  'tierlists',
+  'news',
+  'leaks',
+  'videos',
+]);
+const DEFAULT_EDITOR_PERMISSIONS = {
+  grade: 'junior',
+  scopes: ['guides', 'characters'],
+  canCreate: true,
+  canEdit: true,
+  canPublish: true,
+  canDelete: false,
+};
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
 // Cloudflare Workers Web Crypto rejects PBKDF2 values above 100,000.
 // Salt + HMAC pepper remain mandatory, while this keeps auth deployable.
 const PASSWORD_ITERATIONS = 100000;
 const SESSION_COOKIE = 'nte_meta_session';
-const MAX_JSON_BYTES = 128 * 1024;
+const MAX_JSON_BYTES = 512 * 1024;
 
 const tableConfig = {
   characters: {
@@ -85,6 +101,7 @@ const tableConfig = {
     table: 'teams',
     writable: [
       'slug',
+      'guide_id',
       'title',
       'team_type',
       'budget',
@@ -94,6 +111,7 @@ const tableConfig = {
       'weak_at',
       'synergy',
       'rotation',
+      'rotation_steps_json',
       'status',
     ],
     role: CONTENT_ROLE,
@@ -127,7 +145,7 @@ const tableConfig = {
       'tags_json',
       'status',
     ],
-    role: ADMIN_ROLE,
+    role: CONTENT_ROLE,
   },
   leaks: {
     table: 'leaks',
@@ -144,7 +162,7 @@ const tableConfig = {
       'approved',
       'tags_json',
     ],
-    role: ADMIN_ROLE,
+    role: CONTENT_ROLE,
   },
   sources: {
     table: 'sources',
@@ -422,7 +440,16 @@ async function handleAuth(request, env, parts, ctx) {
     const username = cleanString(body.username, 3, 32);
     const password = String(body.password || '');
     const user = await env.DB.prepare(
-      'SELECT * FROM users WHERE lower(username) = lower(?) AND status = ?',
+      `SELECT users.*,
+              editor_permissions.grade AS editor_grade,
+              editor_permissions.scopes_json AS editor_scopes_json,
+              editor_permissions.can_create AS editor_can_create,
+              editor_permissions.can_edit AS editor_can_edit,
+              editor_permissions.can_publish AS editor_can_publish,
+              editor_permissions.can_delete AS editor_can_delete
+       FROM users
+       LEFT JOIN editor_permissions ON editor_permissions.user_id = users.id
+       WHERE lower(users.username) = lower(?) AND users.status = ?`,
     )
       .bind(username, 'active')
       .first();
@@ -458,16 +485,20 @@ async function handleAuth(request, env, parts, ctx) {
       .run();
     const session = await createSession(env, user.id, request);
     ctx.waitUntil(cleanupAuthData(env));
+    const responseUser = {
+      id: user.id,
+      username: user.username,
+      displayName: user.display_name,
+      role: user.role,
+    };
+    if (user.role === 'editor') {
+      responseUser.editorPermissions = serializeEditorPermissions(user);
+    }
     return sessionResponse(
       request,
       {
         token: session.token,
-        user: {
-          id: user.id,
-          username: user.username,
-          displayName: user.display_name,
-          role: user.role,
-        },
+        user: responseUser,
       },
       session.expiresAt,
     );
@@ -641,9 +672,77 @@ async function handleUsers(request, env, parts, ctx) {
 
   const actor = await requireRole(request, env, ADMIN_ROLE);
 
+  if (request.method === 'PATCH' && parts[2] === 'editor-permissions') {
+    const target = await env.DB.prepare(
+      'SELECT id, role, status FROM users WHERE id = ?',
+    )
+      .bind(parts[1])
+      .first();
+    if (!target || target.status === 'deleted') {
+      return json({ error: 'Пользователь не найден' }, 404);
+    }
+    if (target.role !== 'editor') {
+      return json(
+        {
+          error: 'Точные права назначаются только пользователям с ролью editor',
+        },
+        409,
+      );
+    }
+
+    const body = await readJson(request);
+    const permissions = normalizeEditorPermissions(body);
+    await env.DB.prepare(
+      `INSERT INTO editor_permissions (
+         user_id, grade, scopes_json, can_create, can_edit,
+         can_publish, can_delete, updated_by
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         grade = excluded.grade,
+         scopes_json = excluded.scopes_json,
+         can_create = excluded.can_create,
+         can_edit = excluded.can_edit,
+         can_publish = excluded.can_publish,
+         can_delete = excluded.can_delete,
+         updated_by = excluded.updated_by,
+         updated_at = current_timestamp`,
+    )
+      .bind(
+        target.id,
+        permissions.grade,
+        JSON.stringify(permissions.scopes),
+        permissions.canCreate ? 1 : 0,
+        permissions.canEdit ? 1 : 0,
+        permissions.canPublish ? 1 : 0,
+        permissions.canDelete ? 1 : 0,
+        actor.id,
+      )
+      .run();
+    ctx.waitUntil(
+      logAudit(
+        env,
+        actor.id,
+        'users.editor_permissions',
+        target.id,
+        permissions,
+      ),
+    );
+    return json({ data: permissions });
+  }
+
   if (request.method === 'GET') {
     const rows = await env.DB.prepare(
-      'SELECT id, username, display_name, role, status, created_at, last_login_at FROM users ORDER BY created_at DESC',
+      `SELECT users.id, users.username, users.display_name, users.role,
+              users.status, users.created_at, users.last_login_at,
+              editor_permissions.grade AS editor_grade,
+              editor_permissions.scopes_json AS editor_scopes_json,
+              editor_permissions.can_create AS editor_can_create,
+              editor_permissions.can_edit AS editor_can_edit,
+              editor_permissions.can_publish AS editor_can_publish,
+              editor_permissions.can_delete AS editor_can_delete
+       FROM users
+       LEFT JOIN editor_permissions ON editor_permissions.user_id = users.id
+       ORDER BY users.created_at DESC`,
     ).all();
     return json({ data: rows.results.map(serializeUser) });
   }
@@ -685,11 +784,20 @@ async function handleUsers(request, env, parts, ctx) {
         409,
       );
     }
-    await env.DB.prepare(
-      'UPDATE users SET role = ?, updated_at = current_timestamp WHERE id = ?',
-    )
-      .bind(nextRole, parts[1])
-      .run();
+    const statements = [
+      env.DB.prepare(
+        'UPDATE users SET role = ?, updated_at = current_timestamp WHERE id = ?',
+      ).bind(nextRole, parts[1]),
+    ];
+    if (nextRole === 'editor') {
+      statements.push(
+        env.DB.prepare(
+          `INSERT OR IGNORE INTO editor_permissions (user_id, updated_by)
+           VALUES (?, ?)`,
+        ).bind(parts[1], actor.id),
+      );
+    }
+    await env.DB.batch(statements);
     ctx.waitUntil(
       logAudit(env, actor.id, 'users.role', parts[1], { role: nextRole }),
     );
@@ -799,10 +907,16 @@ async function handleEntity(request, env, parts, ctx) {
     return readEntity(env, entity, idOrSlug, request);
   }
 
-  const actor = await requireRole(request, env, config.role);
-
   if (request.method === 'POST') {
     const body = await readJson(request);
+    const actor = await authorizeEntityMutation(
+      request,
+      env,
+      entity,
+      'create',
+      body,
+      config.role,
+    );
     const record = normalizeRecord(config, body);
     record.id = record.id || crypto.randomUUID();
     if (entity === 'guides') {
@@ -833,6 +947,14 @@ async function handleEntity(request, env, parts, ctx) {
 
   if (request.method === 'PATCH' && idOrSlug) {
     const body = await readJson(request);
+    const actor = await authorizeEntityMutation(
+      request,
+      env,
+      entity,
+      'edit',
+      body,
+      config.role,
+    );
     const record = normalizeRecord(config, body);
     if (entity === 'leaks' && record.approved) {
       record.approved_by = actor.id;
@@ -860,6 +982,14 @@ async function handleEntity(request, env, parts, ctx) {
   }
 
   if (request.method === 'DELETE' && idOrSlug) {
+    const actor = await authorizeEntityMutation(
+      request,
+      env,
+      entity,
+      'delete',
+      {},
+      config.role,
+    );
     const target = await findEntityId(env, config, idOrSlug);
     if (!target) {
       return json({ error: 'Запись не найдена' }, 404);
@@ -874,11 +1004,51 @@ async function handleEntity(request, env, parts, ctx) {
   return json({ error: 'Метод не поддерживается' }, 405);
 }
 
+function entityPermissionScope(entity, body = {}) {
+  if (entity === 'teams' || entity === 'rotations') return 'guides';
+  if (entity === 'guides') {
+    const keys = Object.keys(body).map((key) =>
+      key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase()),
+    );
+    const videoOnly =
+      keys.length > 0 &&
+      keys.every((key) =>
+        ['videoUrl', 'transcriptMarkdown', 'status'].includes(key),
+      );
+    return videoOnly ? 'videos' : 'guides';
+  }
+  return entity;
+}
+
+async function authorizeEntityMutation(
+  request,
+  env,
+  entity,
+  action,
+  body,
+  fallbackRole,
+) {
+  const scope = entityPermissionScope(entity, body);
+  if (!CONTENT_SCOPES.has(scope)) {
+    return requireRole(request, env, fallbackRole);
+  }
+  const actor = await requireContentPermission(request, env, scope, action);
+  const wantsPublish =
+    body.status === 'published' ||
+    body.publishStatus === 'published' ||
+    (entity === 'leaks' && Boolean(body.approved));
+  if (wantsPublish && action !== 'delete') {
+    await requireContentPermission(request, env, scope, 'publish', actor);
+  }
+  return actor;
+}
+
 async function readEntity(env, entity, idOrSlug, request) {
   const user = await getAuthUser(request, env);
-  const includeDrafts = Boolean(
-    user && ROLE_WEIGHT[user.role] >= ROLE_WEIGHT.editor,
-  );
+  const scope = entityPermissionScope(entity);
+  const includeDrafts =
+    userHasContentPermission(user, scope, 'edit') ||
+    (entity === 'guides' && userHasContentPermission(user, 'videos', 'edit'));
   let data;
 
   if (entity === 'characters') {
@@ -918,10 +1088,7 @@ async function readEntity(env, entity, idOrSlug, request) {
         ).results;
     data = idOrSlug ? serializeNews(rows[0]) : rows.map(serializeNews);
   } else if (entity === 'leaks') {
-    const where =
-      user && ROLE_WEIGHT[user.role] >= ROLE_WEIGHT.admin
-        ? '1=1'
-        : 'approved = 1';
+    const where = includeDrafts ? '1=1' : 'approved = 1';
     const rows = idOrSlug
       ? [
           await env.DB.prepare(
@@ -972,7 +1139,7 @@ async function readEntity(env, entity, idOrSlug, request) {
 async function listCharacters(env, includeDrafts = false) {
   const where = includeDrafts ? '1 = 1' : "status = 'published'";
   const rows = await env.DB.prepare(
-    `SELECT * FROM characters WHERE ${where} ORDER BY tier_rank, name`,
+    `${characterProfileSelect()} WHERE ${where} ORDER BY tier_rank, name`,
   ).all();
   return rows.results.map(serializeCharacter);
 }
@@ -980,11 +1147,33 @@ async function listCharacters(env, includeDrafts = false) {
 async function getCharacter(env, idOrSlug, includeDrafts = false) {
   const where = includeDrafts ? '1 = 1' : "status = 'published'";
   const row = await env.DB.prepare(
-    `SELECT * FROM characters WHERE ${where} AND (id = ? OR slug = ?)`,
+    `${characterProfileSelect()} WHERE ${where} AND (characters.id = ? OR slug = ?)`,
   )
     .bind(idOrSlug, idOrSlug)
     .first();
   return row ? serializeCharacter(row) : null;
+}
+
+function characterProfileSelect() {
+  return `SELECT characters.*,
+    character_profiles.faction AS profile_faction,
+    character_profiles.birthday AS profile_birthday,
+    character_profiles.biography_short AS profile_biography_short,
+    character_profiles.biography_markdown AS profile_biography_markdown,
+    character_profiles.trivia_markdown AS profile_trivia_markdown,
+    character_profiles.role_tags_json AS profile_role_tags_json,
+    character_profiles.voice_actors_json AS profile_voice_actors_json,
+    character_profiles.materials_json AS profile_materials_json,
+    character_profiles.base_stats_json AS profile_base_stats_json,
+    character_profiles.abilities_json AS profile_abilities_json,
+    character_profiles.skins_json AS profile_skins_json,
+    character_profiles.friendship_json AS profile_friendship_json,
+    character_profiles.gifts_json AS profile_gifts_json,
+    character_profiles.voice_lines_json AS profile_voice_lines_json,
+    character_profiles.awakenings_json AS profile_awakenings_json,
+    character_profiles.consoles_json AS profile_consoles_json
+  FROM characters
+  LEFT JOIN character_profiles ON character_profiles.character_id = characters.id`;
 }
 
 async function listGuides(env, includeDrafts = false) {
@@ -1125,6 +1314,7 @@ async function serializeTeamWithMembers(env, row) {
   return {
     id: row.id,
     slug: row.slug,
+    guideId: row.guide_id || undefined,
     title: row.title,
     type: row.team_type,
     budget: row.budget,
@@ -1134,6 +1324,12 @@ async function serializeTeamWithMembers(env, row) {
     weakAt: row.weak_at,
     synergy: row.synergy,
     rotation: row.rotation,
+    rotationSteps: parseJson(row.rotation_steps_json, []).length
+      ? parseJson(row.rotation_steps_json, [])
+      : String(row.rotation || '')
+          .split('\n')
+          .map((step) => step.trim())
+          .filter(Boolean),
     status: row.status,
     updatedAt: row.updated_at,
     members: members.results.map((member) => ({
@@ -1144,7 +1340,7 @@ async function serializeTeamWithMembers(env, row) {
 }
 
 async function createGuideSection(request, env, guideId, ctx) {
-  const actor = await requireRole(request, env, CONTENT_ROLE);
+  const actor = await requireContentPermission(request, env, 'guides', 'edit');
   const body = await readJson(request);
   const guide = await env.DB.prepare('SELECT id FROM guides WHERE id = ?')
     .bind(guideId)
@@ -1179,7 +1375,12 @@ async function createGuideSection(request, env, guideId, ctx) {
 }
 
 async function handleGuideSection(request, env, parts, ctx) {
-  const actor = await requireRole(request, env, CONTENT_ROLE);
+  const actor = await requireContentPermission(
+    request,
+    env,
+    'guides',
+    request.method === 'DELETE' ? 'delete' : 'edit',
+  );
   const id = parts[1];
   if (!id) {
     return json({ error: 'Нужен id секции' }, 400);
@@ -1231,7 +1432,7 @@ async function handleGuideSection(request, env, parts, ctx) {
 }
 
 async function reorderGuideSections(request, env, guideId, ctx) {
-  const actor = await requireRole(request, env, CONTENT_ROLE);
+  const actor = await requireContentPermission(request, env, 'guides', 'edit');
   const body = await readJson(request);
   const ids = Array.isArray(body.sectionIds) ? body.sectionIds : [];
 
@@ -1325,7 +1526,7 @@ async function handleComments(request, env, ctx) {
     const actor = await requireRole(request, env, 'user');
     const body = await readJson(request);
     const targetType = cleanString(body.targetType, 1, 30);
-    if (!['guide', 'news', 'leak', 'site'].includes(targetType)) {
+    if (!['guide', 'character', 'news', 'leak', 'site'].includes(targetType)) {
       return json({ error: 'Неизвестный тип объекта комментария' }, 400);
     }
     const targetId = cleanString(body.targetId, 1, 80);
@@ -1575,6 +1776,7 @@ async function interactionTargetExists(env, targetType, targetId) {
 
   const targets = {
     guide: ['guides', "status = 'published'"],
+    character: ['characters', "status = 'published'"],
     news: ['news', "status = 'published'"],
     leak: ['leaks', 'approved = 1'],
     comment: ['comments', "status = 'visible'"],
@@ -1699,6 +1901,25 @@ function serializeCharacter(row) {
     shortDescription: row.short_description,
     summary: row.summary,
     tags: parseJson(row.tags_json, []),
+    profile: {
+      faction: row.profile_faction || '',
+      birthday: row.profile_birthday || '',
+      biographyShort:
+        row.profile_biography_short || row.short_description || '',
+      biography: row.profile_biography_markdown || row.summary || '',
+      trivia: row.profile_trivia_markdown || '',
+      roleTags: parseJson(row.profile_role_tags_json, [row.role]),
+      voiceActors: parseJson(row.profile_voice_actors_json, []),
+      materials: parseJson(row.profile_materials_json, []),
+      baseStats: parseJson(row.profile_base_stats_json, []),
+      abilities: parseJson(row.profile_abilities_json, []),
+      skins: parseJson(row.profile_skins_json, []),
+      friendship: parseJson(row.profile_friendship_json, []),
+      gifts: parseJson(row.profile_gifts_json, []),
+      voiceLines: parseJson(row.profile_voice_lines_json, []),
+      awakenings: parseJson(row.profile_awakenings_json, []),
+      consoles: parseJson(row.profile_consoles_json, []),
+    },
     status: row.status,
     patch: row.patch_version,
     updatedAt: row.updated_at,
@@ -1788,7 +2009,7 @@ function serializeComment(row) {
 }
 
 function serializeUser(row) {
-  return {
+  const user = {
     id: row.id,
     username: row.username,
     displayName: row.display_name,
@@ -1796,6 +2017,61 @@ function serializeUser(row) {
     status: row.status,
     createdAt: row.created_at,
     lastLoginAt: row.last_login_at,
+  };
+  if (row.role === 'editor') {
+    user.editorPermissions = serializeEditorPermissions(row);
+  }
+  return user;
+}
+
+function serializeEditorPermissions(row) {
+  const storedScopes = parseJson(
+    row.editor_scopes_json,
+    DEFAULT_EDITOR_PERMISSIONS.scopes,
+  );
+  return {
+    grade: row.editor_grade || DEFAULT_EDITOR_PERMISSIONS.grade,
+    scopes: (Array.isArray(storedScopes)
+      ? storedScopes
+      : DEFAULT_EDITOR_PERMISSIONS.scopes
+    ).filter((scope) => CONTENT_SCOPES.has(scope)),
+    canCreate:
+      row.editor_can_create === null || row.editor_can_create === undefined
+        ? DEFAULT_EDITOR_PERMISSIONS.canCreate
+        : Boolean(row.editor_can_create),
+    canEdit:
+      row.editor_can_edit === null || row.editor_can_edit === undefined
+        ? DEFAULT_EDITOR_PERMISSIONS.canEdit
+        : Boolean(row.editor_can_edit),
+    canPublish:
+      row.editor_can_publish === null || row.editor_can_publish === undefined
+        ? DEFAULT_EDITOR_PERMISSIONS.canPublish
+        : Boolean(row.editor_can_publish),
+    canDelete:
+      row.editor_can_delete === null || row.editor_can_delete === undefined
+        ? DEFAULT_EDITOR_PERMISSIONS.canDelete
+        : Boolean(row.editor_can_delete),
+  };
+}
+
+function normalizeEditorPermissions(value) {
+  const grade = String(value.grade || 'junior');
+  if (!['junior', 'editor', 'senior', 'lead'].includes(grade)) {
+    throwHttp('Неизвестный грейд редактора', 400);
+  }
+  const scopes = Array.isArray(value.scopes)
+    ? [...new Set(value.scopes.map(String))]
+    : [];
+  if (scopes.some((scope) => !CONTENT_SCOPES.has(scope))) {
+    throwHttp('Передан неизвестный раздел доступа', 400);
+  }
+  return {
+    grade,
+    scopes,
+    canCreate: Boolean(value.canCreate),
+    canEdit: Boolean(value.canEdit),
+    canPublish: Boolean(value.canPublish),
+    canDelete: Boolean(value.canDelete),
   };
 }
 
@@ -1973,9 +2249,134 @@ function validateEntityRecord(entity, record, isCreate) {
   }
 }
 
+function normalizeCharacterProfile(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throwHttp('Профиль персонажа должен быть объектом', 400);
+  }
+
+  const collection = (name, limit, mapper) => {
+    const items = value[name] ?? [];
+    if (!Array.isArray(items) || items.length > limit) {
+      throwHttp(
+        `Поле profile.${name} должно содержать не больше ${limit} записей`,
+        400,
+      );
+    }
+    return items.map(mapper);
+  };
+  const text = (input, max = 8000) => {
+    const result = String(input || '').trim();
+    if (result.length > max) throwHttp('Поле профиля слишком длинное', 400);
+    return result;
+  };
+  const url = (input) => {
+    const result = text(input, 1000);
+    if (result) validateResourceUrl(result, 'profile URL');
+    return result;
+  };
+  const id = (input) => text(input, 80) || crypto.randomUUID();
+
+  const friendship = collection('friendship', 10, (item) => {
+    const level = Number(item.level);
+    if (!Number.isInteger(level) || level < 1 || level > 10) {
+      throwHttp('Уровень симпатии должен быть от 1 до 10', 400);
+    }
+    return {
+      level,
+      rewardName: text(item.rewardName, 160),
+      rewardIconUrl: url(item.rewardIconUrl),
+      description: text(item.description, 2000),
+    };
+  });
+
+  const awakenings = collection('awakenings', 7, (item) => {
+    const level = Number(item.level);
+    if (!Number.isInteger(level) || level < 0 || level > 6) {
+      throwHttp('Пробуждение должно иметь уровень от 0 до 6', 400);
+    }
+    return {
+      level,
+      name: text(item.name, 160),
+      iconUrl: url(item.iconUrl),
+      description: text(item.description, 8000),
+    };
+  });
+
+  return {
+    faction: text(value.faction, 160),
+    birthday: text(value.birthday, 80),
+    biographyShort: text(value.biographyShort, 1000),
+    biography: text(value.biography, 60000),
+    trivia: text(value.trivia, 60000),
+    roleTags: collection('roleTags', 12, (item) => text(item, 80)).filter(
+      Boolean,
+    ),
+    voiceActors: collection('voiceActors', 12, (item) => ({
+      language: text(item.language, 40),
+      name: text(item.name, 160),
+    })),
+    materials: collection('materials', 80, (item) => ({
+      id: id(item.id),
+      name: text(item.name, 160),
+      iconUrl: url(item.iconUrl),
+      amount: text(item.amount, 80),
+      source: text(item.source, 1000),
+    })),
+    baseStats: collection('baseStats', 40, (item) => ({
+      id: id(item.id),
+      label: text(item.label, 120),
+      value: text(item.value, 120),
+    })),
+    abilities: collection('abilities', 30, (item) => ({
+      id: id(item.id),
+      name: text(item.name, 160),
+      type: text(item.type, 80),
+      iconUrl: url(item.iconUrl),
+      description: text(item.description, 8000),
+    })),
+    skins: collection('skins', 30, (item) => ({
+      id: id(item.id),
+      name: text(item.name, 160),
+      imageUrl: url(item.imageUrl),
+      description: text(item.description, 4000),
+    })),
+    friendship,
+    gifts: collection('gifts', 40, (item) => ({
+      id: id(item.id),
+      name: text(item.name, 160),
+      iconUrl: url(item.iconUrl),
+      effect: text(item.effect, 1000),
+    })),
+    voiceLines: collection('voiceLines', 200, (item) => ({
+      id: id(item.id),
+      title: text(item.title, 160),
+      language: text(item.language, 40),
+      audioUrl: url(item.audioUrl),
+    })),
+    awakenings,
+    consoles: collection('consoles', 20, (item) => ({
+      id: id(item.id),
+      name: text(item.name, 160),
+      imageUrls: Array.isArray(item.imageUrls)
+        ? item.imageUrls.slice(0, 8).map(url)
+        : [],
+      description: text(item.description, 8000),
+      features: Array.isArray(item.features)
+        ? item.features.slice(0, 30).map((feature) => text(feature, 1000))
+        : [],
+      recommendedModules: text(item.recommendedModules, 8000),
+    })),
+  };
+}
+
 function validateResourceUrl(value, field) {
   const text = String(value);
-  if (text.startsWith('/')) return;
+  if (
+    text.startsWith('/') ||
+    text.startsWith('assets/') ||
+    text.startsWith('./assets/')
+  )
+    return;
   try {
     const url = new URL(text);
     if (!['https:', 'http:'].includes(url.protocol))
@@ -1997,6 +2398,57 @@ async function findEntityId(env, config, idOrSlug) {
 
 function buildRelationStatements(env, entity, entityId, body, replace) {
   const statements = [];
+
+  if (entity === 'characters' && body.profile !== undefined) {
+    const profile = normalizeCharacterProfile(body.profile);
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO character_profiles (
+           character_id, faction, birthday, biography_short,
+           biography_markdown, trivia_markdown, role_tags_json,
+           voice_actors_json, materials_json, base_stats_json,
+           abilities_json, skins_json, friendship_json, gifts_json,
+           voice_lines_json, awakenings_json, consoles_json
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(character_id) DO UPDATE SET
+           faction = excluded.faction,
+           birthday = excluded.birthday,
+           biography_short = excluded.biography_short,
+           biography_markdown = excluded.biography_markdown,
+           trivia_markdown = excluded.trivia_markdown,
+           role_tags_json = excluded.role_tags_json,
+           voice_actors_json = excluded.voice_actors_json,
+           materials_json = excluded.materials_json,
+           base_stats_json = excluded.base_stats_json,
+           abilities_json = excluded.abilities_json,
+           skins_json = excluded.skins_json,
+           friendship_json = excluded.friendship_json,
+           gifts_json = excluded.gifts_json,
+           voice_lines_json = excluded.voice_lines_json,
+           awakenings_json = excluded.awakenings_json,
+           consoles_json = excluded.consoles_json,
+           updated_at = current_timestamp`,
+      ).bind(
+        entityId,
+        profile.faction,
+        profile.birthday,
+        profile.biographyShort,
+        profile.biography,
+        profile.trivia,
+        JSON.stringify(profile.roleTags),
+        JSON.stringify(profile.voiceActors),
+        JSON.stringify(profile.materials),
+        JSON.stringify(profile.baseStats),
+        JSON.stringify(profile.abilities),
+        JSON.stringify(profile.skins),
+        JSON.stringify(profile.friendship),
+        JSON.stringify(profile.gifts),
+        JSON.stringify(profile.voiceLines),
+        JSON.stringify(profile.awakenings),
+        JSON.stringify(profile.consoles),
+      ),
+    );
+  }
 
   if (entity === 'teams' && Array.isArray(body.members)) {
     if (body.members.length > 8)
@@ -2088,6 +2540,14 @@ async function validateEntityRelations(env, entity, body, entityId) {
     await assertCharacterIdsExist(env, characterIds);
   }
 
+  if (entity === 'teams' && (body.guideId || body.guide_id)) {
+    const guideId = cleanString(body.guideId || body.guide_id, 1, 80);
+    const guide = await env.DB.prepare('SELECT id FROM guides WHERE id = ?')
+      .bind(guideId)
+      .first();
+    if (!guide) throwHttp('Связанный гайд не найден', 400);
+  }
+
   if (entity === 'tierlists' && Array.isArray(body.items)) {
     const characterIds = body.items.map((item) =>
       cleanString(item.characterId, 1, 80),
@@ -2100,9 +2560,16 @@ async function validateEntityRelations(env, entity, body, entityId) {
 
   if (entity === 'guides') {
     if (body.characterId || body.character_id) {
-      await assertCharacterIdsExist(env, [
-        body.characterId || body.character_id,
-      ]);
+      const characterId = body.characterId || body.character_id;
+      await assertCharacterIdsExist(env, [characterId]);
+      const duplicate = await env.DB.prepare(
+        'SELECT id FROM guides WHERE character_id = ? AND id <> ?',
+      )
+        .bind(characterId, entityId)
+        .first();
+      if (duplicate) {
+        throwHttp('Для этого персонажа уже существует гайд', 409);
+      }
     }
     if (Array.isArray(body.sections)) {
       const ids = body.sections
@@ -2175,9 +2642,17 @@ async function getAuthUser(request, env) {
     return null;
   }
   const row = await env.DB.prepare(
-    `SELECT users.id, users.username, users.display_name, users.role, sessions.expires_at
+    `SELECT users.id, users.username, users.display_name, users.role,
+            sessions.expires_at,
+            editor_permissions.grade AS editor_grade,
+            editor_permissions.scopes_json AS editor_scopes_json,
+            editor_permissions.can_create AS editor_can_create,
+            editor_permissions.can_edit AS editor_can_edit,
+            editor_permissions.can_publish AS editor_can_publish,
+            editor_permissions.can_delete AS editor_can_delete
      FROM sessions
      JOIN users ON users.id = sessions.user_id
+     LEFT JOIN editor_permissions ON editor_permissions.user_id = users.id
      WHERE sessions.token_hash = ? AND users.status = 'active'`,
   )
     .bind(tokenHash)
@@ -2187,12 +2662,16 @@ async function getAuthUser(request, env) {
     return null;
   }
 
-  return {
+  const user = {
     id: row.id,
     username: row.username,
     displayName: row.display_name,
     role: row.role,
   };
+  if (row.role === 'editor') {
+    user.editorPermissions = serializeEditorPermissions(row);
+  }
+  return user;
 }
 
 async function requireRole(request, env, minRole) {
@@ -2204,6 +2683,36 @@ async function requireRole(request, env, minRole) {
     throwHttp('Недостаточно прав', 403);
   }
   return user;
+}
+
+async function requireContentPermission(
+  request,
+  env,
+  scope,
+  action,
+  knownUser,
+) {
+  const user = knownUser || (await requireRole(request, env, CONTENT_ROLE));
+  if (!userHasContentPermission(user, scope, action)) {
+    throwHttp('Для этого действия редактору не выданы права', 403);
+  }
+  return user;
+}
+
+function userHasContentPermission(user, scope, action) {
+  if (!user) return false;
+  if (user.role === 'owner' || user.role === 'admin') return true;
+  if (user.role !== 'editor') return false;
+  const permissions = user.editorPermissions || DEFAULT_EDITOR_PERMISSIONS;
+  const actionKey = {
+    create: 'canCreate',
+    edit: 'canEdit',
+    publish: 'canPublish',
+    delete: 'canDelete',
+  }[action];
+  return Boolean(
+    permissions.scopes.includes(scope) && actionKey && permissions[actionKey],
+  );
 }
 
 async function createSession(env, userId, request) {

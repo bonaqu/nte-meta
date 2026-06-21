@@ -73,6 +73,7 @@ import {
   updateComment,
   updateProfile,
   updateSettings,
+  updateEditorPermissions,
   updateUserStatus,
   updateUserRole,
 } from './lib/api';
@@ -89,26 +90,32 @@ import {
 } from './lib/site-data';
 import { getYoutubeEmbedUrl } from './lib/youtube';
 import { setPageMetadata } from './lib/seo';
+import { canManageContent, editorGradeLabel } from './lib/permissions';
 import type {
   AdminUser,
   AuditLogEntry,
   AppSettings,
   Character,
   Comment,
+  ContentScope,
+  EditorGrade,
+  EditorPermissions,
   Guide,
   GuideSection,
   LeakItem,
   NewsItem,
   Role,
   SiteData,
+  Team,
+  TeamMember,
   Tier,
   User,
   UserWarning,
 } from './types';
 
-const AdminCharactersManager = lazy(() =>
-  import('./features/admin/content-manager').then((module) => ({
-    default: module.AdminCharactersManager,
+const AdminCharacterEditor = lazy(() =>
+  import('./features/admin/character-editor').then((module) => ({
+    default: module.AdminCharacterEditor,
   })),
 );
 const AdminNewsManager = lazy(() =>
@@ -126,17 +133,6 @@ const AdminSourcesManager = lazy(() =>
     default: module.AdminSourcesManager,
   })),
 );
-const AdminRotationsManager = lazy(() =>
-  import('./features/admin/content-manager').then((module) => ({
-    default: module.AdminRotationsManager,
-  })),
-);
-const AdminTeamsManager = lazy(() =>
-  import('./features/admin/content-manager').then((module) => ({
-    default: module.AdminTeamsManager,
-  })),
-);
-
 const navItems = [
   { label: 'Главная', href: '#/', icon: Home },
   { label: 'Гайды', href: '#/guides', icon: BookOpen },
@@ -144,7 +140,6 @@ const navItems = [
   { label: 'Тир-листы', href: '#/tierlists', icon: Star },
   { label: 'Новости', href: '#/news', icon: Newspaper },
   { label: 'Видео-гайды', href: '#/videos', icon: Video },
-  { label: 'Комьюнити-хаб', href: '#/community', icon: MessageCircle },
 ];
 
 const roleWeight: Record<User['role'], number> = {
@@ -156,6 +151,9 @@ const roleWeight: Record<User['role'], number> = {
 };
 const roleOptions = [
   'Все роли',
+  'DD',
+  'Sub DD',
+  'Damage Booster',
   'Burst DPS',
   'Sustain DPS',
   'AoE DPS',
@@ -171,6 +169,8 @@ const roleOptions = [
 const typeOptions = [
   'Все типы',
   'DPS',
+  'Sub DPS',
+  'Damage Booster',
   'Support',
   'Buffer',
   'Debuffer',
@@ -184,8 +184,11 @@ const tierOptions = ['Любой тир', ...tierOrder];
 
 function useHashRoute() {
   function getRoute() {
-    const hashRoute = window.location.hash.replace(/^#\/?/, '');
-    if (hashRoute) return hashRoute;
+    // Важно отличать «хэша нет» от корневого `#/`. Иначе переход на Главную
+    // с prerender-страницы /profile/ ошибочно оставляет пользователя в профиле.
+    if (window.location.hash.startsWith('#/')) {
+      return window.location.hash.replace(/^#\/?/, '');
+    }
 
     const basePath = import.meta.env.BASE_URL.replace(/^\.?\//, '/');
     const pathname = window.location.pathname;
@@ -288,9 +291,6 @@ function App() {
     const leak = data.leaks.find(
       (item) => item.id === activeSlug || item.slug === activeSlug,
     );
-    const team = data.teams.find(
-      (item) => item.id === activeSlug || item.slug === activeSlug,
-    );
 
     if (activeSection === 'news' && newsItem) {
       setPageMetadata({
@@ -343,23 +343,15 @@ function App() {
     }
     if (activeSection === 'characters' && character) {
       setPageMetadata({
-        title: `${character.name} — гайд, билд и команды`,
-        description: character.shortDescription,
+        title: `${character.name} — биография, способности и озвучка`,
+        description:
+          character.profile?.biographyShort || character.shortDescription,
         path: `/characters/${character.slug}/`,
         image: character.splashUrl,
         type: 'article',
       });
       return;
     }
-    if (activeSection === 'teams' && team) {
-      setPageMetadata({
-        title: `${team.title} — состав и ротация`,
-        description: team.synergy,
-        path: `/teams/${team.slug || team.id}/`,
-      });
-      return;
-    }
-
     const sectionTitles: Record<string, [string, string, string]> = {
       characters: [
         'Персонажи',
@@ -386,25 +378,10 @@ function App() {
         'Слухи и сливы NTE с источниками, статусами и уровнем доверия.',
         '/leaks/',
       ],
-      teams: [
-        'Команды',
-        'F2P и Premium команды NTE с ролями и ротациями.',
-        '/teams/',
-      ],
-      rotations: [
-        'Ротации',
-        'Простые, advanced, boss и AoE-ротации персонажей NTE.',
-        '/rotations/',
-      ],
       videos: [
         'Видео-гайды',
         'Видео-гайды NTE Meta с таймкодами и текстовыми материалами.',
         '/videos/',
-      ],
-      community: [
-        'Комьюнити-хаб',
-        'Обсуждения, комментарии и оценки материалов NTE Meta.',
-        '/community/',
       ],
       admin: ['Админка', 'Защищённая редакционная CMS NTE Meta.', '/admin/'],
       profile: [
@@ -425,52 +402,51 @@ function App() {
     });
   }, [data, route]);
 
-  const [section, slug] = route.split('/');
+  const [section, slug, entityId] = route.split('/');
   let page = <HomePage data={data} loading={loading} />;
 
   if (section === 'characters') {
     page = slug ? (
-      <CharacterGuidePage data={data} slug={slug} user={user} />
+      <CharacterDetailPage data={data} slug={slug} user={user} />
     ) : (
-      <CharactersPage data={data} />
+      <CharactersPage data={data} user={user} />
     );
   } else if (section === 'guides') {
     page = slug ? (
       <GuidePage data={data} slug={slug} user={user} />
     ) : (
-      <GuidesPage data={data} />
+      <GuidesPage data={data} user={user} />
     );
   } else if (section === 'tierlists') {
-    page = <TierListsPage data={data} />;
+    page = <TierListsPage data={data} user={user} />;
   } else if (section === 'news') {
     page = slug ? (
       <NewsDetailPage data={data} slug={slug} user={user} />
     ) : (
-      <NewsPage data={data} />
+      <NewsPage data={data} user={user} />
     );
   } else if (section === 'leaks') {
     page = slug ? (
       <LeakDetailPage data={data} slug={slug} user={user} />
     ) : (
-      <LeaksPage data={data} />
+      <LeaksPage data={data} user={user} />
     );
-  } else if (section === 'teams') {
-    page = slug ? (
-      <TeamDetailPage data={data} slug={slug} />
-    ) : (
-      <TeamsPage data={data} />
-    );
-  } else if (section === 'rotations') {
-    page = <RotationsPage data={data} />;
+  } else if (section === 'teams' || section === 'rotations') {
+    page = <GuidesPage data={data} user={user} />;
   } else if (section === 'videos') {
-    page = <VideosPage data={data} />;
-  } else if (section === 'community') {
-    page = <CommunityPage data={data} user={user} />;
+    page = <VideosPage data={data} user={user} />;
   } else if (section === 'profile') {
     page = <ProfilePage user={user} setUser={setUser} />;
   } else if (section === 'admin') {
     page = (
-      <AdminPage data={data} user={user} setUser={setUser} setData={setData} />
+      <AdminPage
+        data={data}
+        user={user}
+        setUser={setUser}
+        setData={setData}
+        requestedTab={slug}
+        requestedEntityId={entityId}
+      />
     );
   } else if (section) {
     page = <NotFoundPage />;
@@ -725,10 +701,10 @@ function HomePage({ data, loading }: { data: SiteData; loading: boolean }) {
             Делитесь находками, проверяйте ротации вместе и отмечайте полезные
             ответы. Все публикации доступны модерации.
           </p>
-          <a className="ghost-button" href="#/community">
-            <MessageCircle aria-hidden="true" />
-            Открыть комьюнити-хаб
-          </a>
+          <p className="inline-note">
+            Обсуждения находятся прямо под гайдами, новостями и страницами
+            персонажей, поэтому отдельный пустой раздел больше не нужен.
+          </p>
         </div>
         <div className="comment-preview">
           {data.comments.length ? (
@@ -742,7 +718,7 @@ function HomePage({ data, loading }: { data: SiteData; loading: boolean }) {
           ) : (
             <EmptyState
               title="Пока тихо"
-              text="Начните первое обсуждение в комьюнити-хабе."
+              text="Первое обсуждение появится после комментария под материалом."
             />
           )}
         </div>
@@ -755,7 +731,7 @@ function MetricsStrip({ data }: { data: SiteData }) {
   const metrics = [
     { label: 'Персонажей', value: data.characters.length, icon: Gamepad2 },
     { label: 'Гайдов', value: data.guides.length, icon: BookOpen },
-    { label: 'Команд', value: data.teams.length, icon: Users },
+    { label: 'Отрядов в гайдах', value: data.teams.length, icon: Users },
     { label: 'Новостей', value: data.news.length, icon: Newspaper },
   ];
 
@@ -780,7 +756,7 @@ function CharacterCard({ character }: { character: Character }) {
     <article className="character-card">
       <a
         href={`#/characters/${character.slug}`}
-        aria-label={`Открыть гайд ${character.name}`}
+        aria-label={`Открыть страницу персонажа ${character.name}`}
       >
         <img
           src={resolveAssetUrl(character.imageUrl)}
@@ -921,7 +897,7 @@ function Tags({ tags }: { tags: string[] }) {
   );
 }
 
-function CharactersPage({ data }: { data: SiteData }) {
+function CharactersPage({ data, user }: { data: SiteData; user: User | null }) {
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const [role, setRole] = useState('Все роли');
@@ -957,7 +933,9 @@ function CharactersPage({ data }: { data: SiteData }) {
           !normalizedQuery || searchText.includes(normalizedQuery);
         return (
           queryMatch &&
-          (role === 'Все роли' || character.role === role) &&
+          (role === 'Все роли' ||
+            character.role === role ||
+            character.profile?.roleTags.includes(role)) &&
           (type === 'Все типы' || character.type === type) &&
           (rarity === 'Любая редкость' || character.rarity === rarity) &&
           (tier === 'Любой тир' || character.tier === tier) &&
@@ -973,9 +951,14 @@ function CharactersPage({ data }: { data: SiteData }) {
         <p className="eyebrow">База персонажей</p>
         <h1>Персонажи Neverness to Everness</h1>
         <p>
-          Поиск, роли, атрибуты, редкость, тип и текущая редакционная позиция в
-          тир-листе.
+          Биографии, фракции, способности, ресурсы прокачки, симпатия, озвучка и
+          пробуждения. Практическая мета находится в разделе гайдов.
         </p>
+        {canManageContent(user, 'characters', 'create') ? (
+          <a className="primary-button" href="#/admin/characters/new">
+            <Plus aria-hidden="true" /> Добавить персонажа
+          </a>
+        ) : null}
       </section>
       <section className="filter-panel" aria-label="Фильтры персонажей">
         <label>
@@ -1075,7 +1058,7 @@ function SelectFilter({
   );
 }
 
-function CharacterGuidePage({
+function CharacterDetailPage({
   data,
   slug,
   user,
@@ -1085,7 +1068,6 @@ function CharacterGuidePage({
   user: User | null;
 }) {
   const character = getCharacter(data, slug);
-  const guide = data.guides.find((item) => item.characterId === character?.id);
 
   if (!character) {
     return (
@@ -1095,21 +1077,374 @@ function CharacterGuidePage({
       />
     );
   }
-
-  if (!guide) {
-    return (
-      <div className="page-stack">
-        <CharacterHero character={character} />
-        <EmptyState
-          title="Гайд скоро"
-          text="Карточка персонажа готова, а редакционный гайд можно создать в админке."
-        />
-      </div>
-    );
-  }
+  const profile = character.profile || {
+    faction: '',
+    birthday: '',
+    biographyShort: character.shortDescription,
+    biography: character.summary,
+    trivia: '',
+    roleTags: [character.role],
+    voiceActors: [],
+    materials: [],
+    baseStats: [],
+    abilities: [],
+    skins: [],
+    friendship: [],
+    gifts: [],
+    voiceLines: [],
+    awakenings: [],
+    consoles: [],
+  };
+  const guide = data.guides.find((item) => item.characterId === character.id);
 
   return (
-    <GuideDetail data={data} guide={guide} character={character} user={user} />
+    <div className="page-stack character-profile-page">
+      <section className="character-lore-hero">
+        <img
+          src={resolveAssetUrl(character.splashUrl)}
+          alt={character.name}
+          width="520"
+          height="620"
+          loading="eager"
+        />
+        <div>
+          <p className="eyebrow">
+            {character.originalName} · {profile.faction || 'Фракция уточняется'}
+          </p>
+          <h1>{character.name}</h1>
+          <p>{profile.biographyShort || character.shortDescription}</p>
+          <dl className="guide-facts">
+            <div>
+              <dt>День рождения</dt>
+              <dd>{profile.birthday || 'Не указан'}</dd>
+            </div>
+            <div>
+              <dt>Атрибут</dt>
+              <dd>{character.attribute}</dd>
+            </div>
+            <div>
+              <dt>Редкость</dt>
+              <dd>{character.rarity}</dd>
+            </div>
+            <div>
+              <dt>Фракция</dt>
+              <dd>{profile.faction || 'Не указана'}</dd>
+            </div>
+          </dl>
+          <Tags
+            tags={profile.roleTags.length ? profile.roleTags : character.tags}
+          />
+          <div className="button-row">
+            {guide ? (
+              <a className="primary-button" href={`#/guides/${guide.slug}`}>
+                <BookOpen aria-hidden="true" /> Открыть гайд
+              </a>
+            ) : null}
+            {canManageContent(user, 'characters', 'edit') ? (
+              <a
+                className="ghost-button"
+                href={`#/admin/characters/${character.id}`}
+              >
+                <Pencil aria-hidden="true" /> Редактировать персонажа
+              </a>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      <nav className="character-section-nav" aria-label="Разделы персонажа">
+        <a href="#character-biography">Биография</a>
+        <a href="#character-abilities">Способности</a>
+        <a href="#character-awakenings">Пробуждения</a>
+        <a href="#character-consoles">Консоль</a>
+        <a href="#character-progression">Прокачка</a>
+        <a href="#character-voice">Озвучка</a>
+      </nav>
+
+      <section className="character-detail-section" id="character-biography">
+        <SectionHeader
+          title="Биография"
+          text="История персонажа без мета-билдов и боевых ротаций."
+        />
+        <MarkdownPreview value={profile.biography || character.summary} />
+        {profile.voiceActors.length ? (
+          <dl className="voice-actor-grid">
+            {profile.voiceActors.map((actor) => (
+              <div key={`${actor.language}-${actor.name}`}>
+                <dt>{actor.language}</dt>
+                <dd>{actor.name}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+      </section>
+
+      <section className="character-detail-section" id="character-abilities">
+        <SectionHeader
+          title="Способности"
+          text="Точные игровые навыки и начальные показатели."
+        />
+        {profile.baseStats.length ? (
+          <dl className="character-stat-grid">
+            {profile.baseStats.map((stat) => (
+              <div key={stat.id}>
+                <dt>{stat.label}</dt>
+                <dd>{stat.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+        {profile.abilities.length ? (
+          <div className="ability-list">
+            {profile.abilities.map((ability) => (
+              <article key={ability.id}>
+                {ability.iconUrl ? (
+                  <img
+                    src={resolveAssetUrl(ability.iconUrl)}
+                    alt=""
+                    width="64"
+                    height="64"
+                    loading="lazy"
+                  />
+                ) : null}
+                <div>
+                  <p className="eyebrow">{ability.type}</p>
+                  <h3>{ability.name}</h3>
+                  <MarkdownPreview value={ability.description} />
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="Способности уточняются"
+            text="Редакция добавит описания после проверки игровых данных."
+          />
+        )}
+      </section>
+
+      <section className="character-detail-section" id="character-awakenings">
+        <SectionHeader
+          title="Пробуждения C0-C6"
+          text="Каждый уровень показан отдельно, чтобы сравнение было прозрачным."
+        />
+        {profile.awakenings.length ? (
+          <div className="awakening-grid">
+            {[...profile.awakenings]
+              .sort((a, b) => a.level - b.level)
+              .map((awakening) => (
+                <article key={`${awakening.level}-${awakening.name}`}>
+                  {awakening.iconUrl ? (
+                    <img
+                      src={resolveAssetUrl(awakening.iconUrl)}
+                      alt=""
+                      width="58"
+                      height="58"
+                      loading="lazy"
+                    />
+                  ) : null}
+                  <div>
+                    <p className="eyebrow">C{awakening.level}</p>
+                    <h3>
+                      {awakening.name || `Пробуждение C${awakening.level}`}
+                    </h3>
+                    <MarkdownPreview value={awakening.description} />
+                  </div>
+                </article>
+              ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="Пробуждения не добавлены"
+            text="Для C0 персонаж используется без дополнительных пробуждений."
+          />
+        )}
+      </section>
+
+      <section className="character-detail-section" id="character-consoles">
+        <SectionHeader
+          title="Консоль и модули"
+          text="Рекомендуемые консоли, их особенности и подходящие модули."
+        />
+        {profile.consoles.length ? (
+          <div className="console-list">
+            {profile.consoles.map((consoleItem) => (
+              <article key={consoleItem.id}>
+                <div className="console-gallery">
+                  {consoleItem.imageUrls.map((imageUrl) => (
+                    <img
+                      key={imageUrl}
+                      src={resolveAssetUrl(imageUrl)}
+                      alt={consoleItem.name}
+                      width="260"
+                      height="180"
+                      loading="lazy"
+                    />
+                  ))}
+                </div>
+                <h3>{consoleItem.name}</h3>
+                <MarkdownPreview value={consoleItem.description} />
+                <ul>
+                  {consoleItem.features.map((feature) => (
+                    <li key={feature}>{feature}</li>
+                  ))}
+                </ul>
+                {consoleItem.recommendedModules ? (
+                  <>
+                    <h4>Рекомендуемые модули</h4>
+                    <MarkdownPreview value={consoleItem.recommendedModules} />
+                  </>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="Консоль пока не выбрана"
+            text="Раздел появится после редакционной проверки модулей и эффектов."
+          />
+        )}
+      </section>
+
+      <section className="character-detail-section" id="character-progression">
+        <SectionHeader
+          title="Прокачка и симпатия"
+          text="Материалы, источники, награды дружбы и любимые подарки."
+        />
+        {profile.materials.length ? (
+          <div className="material-grid">
+            {profile.materials.map((material) => (
+              <article key={material.id}>
+                {material.iconUrl ? (
+                  <img
+                    src={resolveAssetUrl(material.iconUrl)}
+                    alt=""
+                    width="54"
+                    height="54"
+                    loading="lazy"
+                  />
+                ) : null}
+                <div>
+                  <h3>{material.name}</h3>
+                  <strong>{material.amount}</strong>
+                  <p>{material.source}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : null}
+        {profile.friendship.length ? (
+          <div className="friendship-track">
+            {[...profile.friendship]
+              .sort((a, b) => a.level - b.level)
+              .map((level) => (
+                <article key={level.level}>
+                  <strong>{level.level}</strong>
+                  {level.rewardIconUrl ? (
+                    <img
+                      src={resolveAssetUrl(level.rewardIconUrl)}
+                      alt=""
+                      width="48"
+                      height="48"
+                      loading="lazy"
+                    />
+                  ) : null}
+                  <div>
+                    <h3>
+                      {level.rewardName || `Уровень симпатии ${level.level}`}
+                    </h3>
+                    <p>{level.description}</p>
+                  </div>
+                </article>
+              ))}
+          </div>
+        ) : null}
+        {profile.gifts.length ? (
+          <div className="gift-grid">
+            {profile.gifts.map((gift) => (
+              <article key={gift.id}>
+                {gift.iconUrl ? (
+                  <img
+                    src={resolveAssetUrl(gift.iconUrl)}
+                    alt=""
+                    width="54"
+                    height="54"
+                    loading="lazy"
+                  />
+                ) : null}
+                <div>
+                  <h3>{gift.name}</h3>
+                  <p>{gift.effect}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
+      {profile.skins.length ? (
+        <section className="character-detail-section">
+          <SectionHeader title="Гардероб" />
+          <div className="skin-grid">
+            {profile.skins.map((skin) => (
+              <article key={skin.id}>
+                {skin.imageUrl ? (
+                  <img
+                    src={resolveAssetUrl(skin.imageUrl)}
+                    alt={skin.name}
+                    width="320"
+                    height="420"
+                    loading="lazy"
+                  />
+                ) : null}
+                <h3>{skin.name}</h3>
+                <p>{skin.description}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="character-detail-section" id="character-voice">
+        <SectionHeader
+          title="Озвучка"
+          text="Реплики на английском, японском, корейском и китайском языках."
+        />
+        {profile.voiceLines.length ? (
+          <div className="voice-line-list">
+            {profile.voiceLines.map((line) => (
+              <article key={line.id}>
+                <div>
+                  <strong>{line.title}</strong>
+                  <span>{line.language}</span>
+                </div>
+                <audio controls preload="none" src={line.audioUrl}>
+                  Ваш браузер не поддерживает аудио.
+                </audio>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="Аудио пока не загружено"
+            text="Редакторы смогут добавить реплики для каждого языка отдельно."
+          />
+        )}
+      </section>
+
+      {profile.trivia ? (
+        <section className="character-detail-section">
+          <SectionHeader title="Пасхалки и интересные факты" />
+          <MarkdownPreview value={profile.trivia} />
+        </section>
+      ) : null}
+      <CommentsBlock
+        targetType="character"
+        targetId={character.id}
+        data={data}
+        user={user}
+      />
+    </div>
   );
 }
 
@@ -1192,8 +1527,10 @@ function GuideDetail({
   character: Character;
   user: User | null;
 }) {
-  const relatedTeams = data.teams.filter((team) =>
-    team.members.some((member) => member.characterId === character.id),
+  const relatedTeams = data.teams.filter(
+    (team) =>
+      team.guideId === guide.id ||
+      team.members.some((member) => member.characterId === character.id),
   );
   const orderedSections = [...guide.sections].sort(
     (a, b) => a.position - b.position,
@@ -1207,7 +1544,14 @@ function GuideDetail({
           <p>Гайд · патч {guide.patch}</p>
           <strong>{guide.title}</strong>
         </div>
-        <RatingBar targetType="guide" targetId={guide.id} user={user} />
+        <div className="guide-toolbar-actions">
+          <RatingBar targetType="guide" targetId={guide.id} user={user} />
+          {canManageContent(user, 'guides', 'edit') ? (
+            <a className="ghost-button" href={`#/admin/guides/${guide.id}`}>
+              <Pencil aria-hidden="true" /> Редактировать гайд
+            </a>
+          ) : null}
+        </div>
       </section>
       <section className="guide-layout">
         <aside className="toc" aria-label="Навигация по гайду">
@@ -1233,39 +1577,22 @@ function GuideDetail({
         </div>
       </section>
       <section className="content-band">
-        <SectionHeader eyebrow="Ротации" title="Отдельная сущность ротаций" />
-        <div className="rotation-grid">
-          {guide.rotations.length ? (
-            guide.rotations.map((rotation) => (
-              <article className="rotation-card" key={rotation.id}>
-                <p className="eyebrow">{rotation.type}</p>
-                <h3>{rotation.title}</h3>
-                <p>{rotation.purpose}</p>
-                <ol>
-                  {rotation.steps.map((step) => (
-                    <li key={step}>{step}</li>
-                  ))}
-                </ol>
-                <strong>{rotation.logic}</strong>
-              </article>
+        <SectionHeader
+          eyebrow="Внутри гайда"
+          title={`Лучшие отряды и ротации для ${character.name}`}
+          text="У каждого состава своя последовательность переключений персонажей и навыков."
+        />
+        <div className="team-grid">
+          {relatedTeams.length ? (
+            relatedTeams.map((team) => (
+              <TeamCard key={team.id} team={team} data={data} />
             ))
           ) : (
             <EmptyState
-              title="Ротации не добавлены"
-              text="Редактор может создать простую, advanced или boss-ротацию в админке."
+              title="Отряды пока не добавлены"
+              text="Редактор сможет собрать состав и расписать его ротацию прямо в этом гайде."
             />
           )}
-        </div>
-      </section>
-      <section className="content-band">
-        <SectionHeader
-          eyebrow="Команды"
-          title={`Команды для ${character.name}`}
-        />
-        <div className="team-grid">
-          {relatedTeams.map((team) => (
-            <TeamCard key={team.id} team={team} data={data} />
-          ))}
         </div>
       </section>
       {guide.videoUrl ? (
@@ -1394,6 +1721,19 @@ function TeamCard({
           ) : null;
         })}
       </div>
+      {team.rotationSteps?.length || team.rotation ? (
+        <div className="team-rotation-sequence">
+          <strong>Командная ротация</strong>
+          <ol>
+            {(team.rotationSteps?.length
+              ? team.rotationSteps
+              : team.rotation.split('\n').filter(Boolean)
+            ).map((step, index) => (
+              <li key={`${team.id}-step-${index}`}>{step}</li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
       <dl className="team-details">
         <div>
           <dt>Где хороша</dt>
@@ -1404,9 +1744,7 @@ function TeamCard({
           <dd>{team.weakAt}</dd>
         </div>
       </dl>
-      <a className="text-button" href={`#/teams/${team.slug || team.id}`}>
-        Разобрать команду <ChevronRight aria-hidden="true" />
-      </a>
+      <span className="team-difficulty">Сложность: {team.difficulty}</span>
     </article>
   );
 }
@@ -1811,34 +2149,120 @@ function CommentsBlock({
   );
 }
 
-function GuidesPage({ data }: { data: SiteData }) {
+function GuidesPage({ data, user }: { data: SiteData; user: User | null }) {
+  const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
+  const [role, setRole] = useState('Все роли');
+  const [type, setType] = useState('Все типы');
+  const [rarity, setRarity] = useState('Любая редкость');
+  const [tier, setTier] = useState('Любой тир');
+  const [attribute, setAttribute] = useState('Любой атрибут');
+  const attributes = useMemo(
+    () => [
+      'Любой атрибут',
+      ...new Set(data.characters.map((character) => character.attribute)),
+    ],
+    [data.characters],
+  );
+  const filtered = useMemo(() => {
+    const needle = normalizeSearchText(deferredQuery);
+    return data.guides.filter((guide) => {
+      const character = getGuideCharacter(data, guide);
+      if (!character) return false;
+      const searchText = normalizeSearchText(
+        `${guide.title} ${guide.summary} ${getCharacterSearchText(character)}`,
+      );
+      return (
+        (!needle || searchText.includes(needle)) &&
+        (role === 'Все роли' ||
+          character.role === role ||
+          character.profile?.roleTags.includes(role)) &&
+        (type === 'Все типы' || character.type === type) &&
+        (rarity === 'Любая редкость' || character.rarity === rarity) &&
+        (tier === 'Любой тир' || character.tier === tier) &&
+        (attribute === 'Любой атрибут' || character.attribute === attribute)
+      );
+    });
+  }, [attribute, data, deferredQuery, rarity, role, tier, type]);
+
   return (
     <div className="page-stack">
       <section className="page-hero compact">
         <p className="eyebrow">Практические материалы</p>
         <h1>Гайды NTE Meta</h1>
         <p>
-          Глубина вместо количества: ротации, билды, команды, ошибки и скрытые
-          механики.
+          Только персонажные гайды. Билды, лучшие отряды и пошаговые командные
+          ротации собраны внутри каждого материала.
         </p>
+        {canManageContent(user, 'guides', 'create') ? (
+          <a className="primary-button" href="#/admin/guides/new">
+            <Plus aria-hidden="true" /> Создать гайд
+          </a>
+        ) : null}
       </section>
-      <nav className="content-tabs" aria-label="Материалы по мете">
-        <a aria-current="page" className="active" href="#/guides">
-          Гайды
-        </a>
-        <a href="#/teams">Команды</a>
-        <a href="#/rotations">Ротации</a>
-      </nav>
-      <section className="guide-grid">
-        {data.guides.map((guide) => (
-          <GuideCard key={guide.id} guide={guide} data={data} />
-        ))}
-      </section>
+      <search className="filter-panel" aria-label="Фильтры гайдов">
+        <label>
+          <span>Поиск</span>
+          <Search aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Имя, роль, тег..."
+            aria-describedby="guide-results-count"
+          />
+        </label>
+        <SelectFilter
+          label="Тир"
+          value={tier}
+          setValue={setTier}
+          options={tierOptions}
+        />
+        <SelectFilter
+          label="Роль"
+          value={role}
+          setValue={setRole}
+          options={roleOptions}
+        />
+        <SelectFilter
+          label="Тип"
+          value={type}
+          setValue={setType}
+          options={typeOptions}
+        />
+        <SelectFilter
+          label="Атрибут"
+          value={attribute}
+          setValue={setAttribute}
+          options={attributes}
+        />
+        <SelectFilter
+          label="Редкость"
+          value={rarity}
+          setValue={setRarity}
+          options={rarityOptions}
+        />
+      </search>
+      <p id="guide-results-count" className="filter-summary" aria-live="polite">
+        Найдено: {filtered.length} из {data.guides.length}
+      </p>
+      {filtered.length ? (
+        <section className="guide-grid">
+          {filtered.map((guide) => (
+            <GuideCard key={guide.id} guide={guide} data={data} />
+          ))}
+        </section>
+      ) : (
+        <EmptyState
+          title="Гайды не найдены"
+          text="Измените фильтры или создайте новый персонажный гайд."
+        />
+      )}
     </div>
   );
 }
 
-function TierListsPage({ data }: { data: SiteData }) {
+function TierListsPage({ data, user }: { data: SiteData; user: User | null }) {
   const [kind, setKind] = useState<'base' | 'premium'>('base');
   const { tierlist, grouped } = groupTierItems(data, kind);
 
@@ -1851,6 +2275,11 @@ function TierListsPage({ data }: { data: SiteData }) {
           Отдельно для base C0 и premium C6, чтобы F2P-игроки не сравнивали себя
           с whale-условиями.
         </p>
+        {canManageContent(user, 'tierlists', 'edit') ? (
+          <a className="primary-button" href="#/admin/tierlists">
+            <Pencil aria-hidden="true" /> Редактировать тир-листы
+          </a>
+        ) : null}
       </section>
       <section className="segmented-control" aria-label="Тип тир-листа">
         <button
@@ -1887,7 +2316,7 @@ function TierListsPage({ data }: { data: SiteData }) {
   );
 }
 
-function NewsPage({ data }: { data: SiteData }) {
+function NewsPage({ data, user }: { data: SiteData; user: User | null }) {
   return (
     <div className="page-stack">
       <section className="page-hero compact">
@@ -1897,6 +2326,18 @@ function NewsPage({ data }: { data: SiteData }) {
           Официальные материалы не смешиваются со сливами. У каждого слуха есть
           статус, источник и уровень доверия.
         </p>
+        <div className="button-row">
+          {canManageContent(user, 'news', 'create') ? (
+            <a className="primary-button" href="#/admin/news/new">
+              <Plus aria-hidden="true" /> Добавить новость
+            </a>
+          ) : null}
+          {canManageContent(user, 'leaks', 'create') ? (
+            <a className="ghost-button" href="#/admin/leaks/new">
+              <Plus aria-hidden="true" /> Добавить слив
+            </a>
+          ) : null}
+        </div>
       </section>
       <section className="split-band">
         <div>
@@ -2032,6 +2473,11 @@ function NewsDetailPage({
               sourceUrl={item.sourceUrl}
             />
             <Tags tags={item.tags} />
+            {canManageContent(user, 'news', 'edit') ? (
+              <a className="ghost-button" href={`#/admin/news/${item.id}`}>
+                <Pencil aria-hidden="true" /> Редактировать новость
+              </a>
+            ) : null}
           </div>
         </header>
         <div className="editorial-body">
@@ -2055,7 +2501,7 @@ function NewsDetailPage({
   );
 }
 
-function LeaksPage({ data }: { data: SiteData }) {
+function LeaksPage({ data, user }: { data: SiteData; user: User | null }) {
   const approvedLeaks = data.leaks.filter((item) => item.approved);
 
   return (
@@ -2067,6 +2513,11 @@ function LeaksPage({ data }: { data: SiteData }) {
           Каждый материал показывает статус, доверие и оригинальный источник.
           Информация может измениться или быть опровергнута.
         </p>
+        {canManageContent(user, 'leaks', 'create') ? (
+          <a className="primary-button" href="#/admin/leaks/new">
+            <Plus aria-hidden="true" /> Добавить слив
+          </a>
+        ) : null}
       </section>
       <section className="news-grid">
         {approvedLeaks.map((item) => (
@@ -2129,6 +2580,11 @@ function LeakDetailPage({
             sourceName={item.sourceName}
             sourceUrl={item.sourceUrl}
           />
+          {canManageContent(user, 'leaks', 'edit') ? (
+            <a className="ghost-button" href={`#/admin/leaks/${item.id}`}>
+              <Pencil aria-hidden="true" /> Редактировать слив
+            </a>
+          ) : null}
           <Tags tags={item.tags} />
         </header>
         <div className="editorial-body">
@@ -2152,198 +2608,7 @@ function LeakDetailPage({
   );
 }
 
-function TeamsPage({ data }: { data: SiteData }) {
-  const [budget, setBudget] = useState('Все');
-  const [teamType, setTeamType] = useState('Все');
-  const teamTypes = useMemo(
-    () => ['Все', ...Array.from(new Set(data.teams.map((team) => team.type)))],
-    [data.teams],
-  );
-  const filteredTeams = useMemo(
-    () =>
-      data.teams.filter(
-        (team) =>
-          (budget === 'Все' || team.budget === budget) &&
-          (teamType === 'Все' || team.type === teamType),
-      ),
-    [budget, data.teams, teamType],
-  );
-
-  return (
-    <div className="page-stack">
-      <section className="page-hero compact">
-        <h1>Команды NTE Meta</h1>
-        <p>
-          Готовые составы для старта, фарма, боссов и эндгейма с объяснением
-          синергии и рекомендуемой ротацией.
-        </p>
-      </section>
-      <nav className="content-tabs" aria-label="Материалы по мете">
-        <a href="#/guides">Гайды</a>
-        <a aria-current="page" className="active" href="#/teams">
-          Команды
-        </a>
-        <a href="#/rotations">Ротации</a>
-      </nav>
-      <section className="filter-panel compact-filters">
-        <SelectFilter
-          label="Бюджет"
-          value={budget}
-          setValue={setBudget}
-          options={['Все', 'F2P', 'Mixed', 'Premium']}
-        />
-        <SelectFilter
-          label="Тип команды"
-          value={teamType}
-          setValue={setTeamType}
-          options={teamTypes}
-        />
-      </section>
-      <section className="team-grid">
-        {filteredTeams.map((team) => (
-          <TeamCard key={team.id} team={team} data={data} />
-        ))}
-      </section>
-    </div>
-  );
-}
-
-function TeamDetailPage({ data, slug }: { data: SiteData; slug: string }) {
-  const team = data.teams.find(
-    (item) => item.id === slug || item.slug === slug,
-  );
-
-  if (!team) {
-    return (
-      <EmptyState
-        title="Команда не найдена"
-        text="Состав мог быть снят с публикации или перенесен в другой патч."
-      />
-    );
-  }
-
-  return (
-    <div className="page-stack">
-      <section className="page-hero compact team-detail-hero">
-        <p className="eyebrow">
-          {team.type} · {team.budget} · сложность: {team.difficulty}
-        </p>
-        <h1>{team.title}</h1>
-        <p>{team.synergy}</p>
-        <div className="power-meter">
-          <progress
-            aria-label={`Сила команды ${team.power} из 100`}
-            max="100"
-            value={team.power}
-          />
-          <strong>{team.power}/100</strong>
-        </div>
-      </section>
-      <section className="content-band">
-        <SectionHeader title="Состав и роли" />
-        <div className="team-member-detail-grid">
-          {team.members.map((member) => {
-            const character = getCharacter(data, member.characterId);
-            return character ? (
-              <a
-                key={member.characterId}
-                href={`#/characters/${character.slug}`}
-              >
-                <img
-                  src={resolveAssetUrl(character.imageUrl)}
-                  alt={character.name}
-                  width="220"
-                  height="280"
-                  loading="lazy"
-                />
-                <strong>{character.name}</strong>
-                <span>{member.role}</span>
-              </a>
-            ) : null;
-          })}
-        </div>
-      </section>
-      <section className="split-band">
-        <div>
-          <SectionHeader title="Где команда сильна" />
-          <p>{team.goodAt}</p>
-        </div>
-        <div>
-          <SectionHeader title="Ограничения" />
-          <p>{team.weakAt}</p>
-        </div>
-      </section>
-      <section className="content-band">
-        <SectionHeader title="Рекомендуемая ротация" />
-        <p className="team-rotation-copy">{team.rotation}</p>
-      </section>
-    </div>
-  );
-}
-
-function RotationsPage({ data }: { data: SiteData }) {
-  const [characterId, setCharacterId] = useState('Все');
-  const filteredRotations = useMemo(
-    () =>
-      data.rotations.filter(
-        (rotation) =>
-          characterId === 'Все' || rotation.characterId === characterId,
-      ),
-    [characterId, data.rotations],
-  );
-
-  return (
-    <div className="page-stack">
-      <section className="page-hero compact">
-        <h1>Ротации</h1>
-        <p>
-          Пошаговые последовательности с назначением и объяснением логики:
-          простые, boss, AoE, F2P-friendly и min-max варианты.
-        </p>
-      </section>
-      <nav className="content-tabs" aria-label="Материалы по мете">
-        <a href="#/guides">Гайды</a>
-        <a href="#/teams">Команды</a>
-        <a aria-current="page" className="active" href="#/rotations">
-          Ротации
-        </a>
-      </nav>
-      <section className="filter-panel compact-filters">
-        <SelectFilter
-          label="Персонаж"
-          value={characterId}
-          setValue={setCharacterId}
-          options={['Все', ...data.characters.map((character) => character.id)]}
-          optionLabels={Object.fromEntries(
-            data.characters.map((character) => [character.id, character.name]),
-          )}
-        />
-      </section>
-      <section className="rotation-grid">
-        {filteredRotations.map((rotation) => {
-          const character = getCharacter(data, rotation.characterId);
-          return (
-            <article className="rotation-card detailed" key={rotation.id}>
-              <p className="eyebrow">
-                {rotation.type} · {character?.name || 'Персонаж'}
-              </p>
-              <h2>{rotation.title}</h2>
-              <p>{rotation.purpose}</p>
-              <ol>
-                {rotation.steps.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
-              <strong>{rotation.logic}</strong>
-            </article>
-          );
-        })}
-      </section>
-    </div>
-  );
-}
-
-function VideosPage({ data }: { data: SiteData }) {
+function VideosPage({ data, user }: { data: SiteData; user: User | null }) {
   const videoGuides = data.guides.filter((guide) => guide.videoUrl);
   const placeholderEmbed = getYoutubeEmbedUrl(
     'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
@@ -2358,6 +2623,11 @@ function VideosPage({ data }: { data: SiteData }) {
           Каждый ролик можно связать с персонажами, командами и текстовой
           расшифровкой.
         </p>
+        {canManageContent(user, 'videos', 'edit') ? (
+          <a className="primary-button" href="#/admin/videos">
+            <Pencil aria-hidden="true" /> Управлять видео-гайдами
+          </a>
+        ) : null}
       </section>
       <section className="video-grid">
         {videoGuides.map((guide) => {
@@ -2384,6 +2654,14 @@ function VideosPage({ data }: { data: SiteData }) {
                 <a className="text-button" href={`#/guides/${guide.slug}`}>
                   Текстовая версия <ChevronRight aria-hidden="true" />
                 </a>
+                {canManageContent(user, 'videos', 'edit') ? (
+                  <a
+                    className="ghost-button"
+                    href={`#/admin/videos/${guide.id}`}
+                  >
+                    <Pencil aria-hidden="true" /> Редактировать видео
+                  </a>
+                ) : null}
               </div>
             </article>
           );
@@ -2414,53 +2692,6 @@ function VideosPage({ data }: { data: SiteData }) {
           </article>
         ) : null}
       </section>
-    </div>
-  );
-}
-
-function CommunityPage({ data, user }: { data: SiteData; user: User | null }) {
-  return (
-    <div className="page-stack">
-      <section className="page-hero compact">
-        <p className="eyebrow">Комментарии, реакции, роли</p>
-        <h1>Комьюнити-хаб</h1>
-        <p>
-          Место для разборов ротаций, вопросов по сборкам и практических находок
-          игроков. Ответы можно оценивать, а нарушения отправляются на
-          модерацию.
-        </p>
-      </section>
-      <section className="split-band">
-        <div className="content-band flat">
-          <h2>
-            {user
-              ? `Профиль: ${user.displayName}`
-              : 'Что видно без авторизации'}
-          </h2>
-          <p>
-            Гости читают гайды, новости, тир-листы и сливы. Комментирование,
-            оценки и профиль требуют регистрации.
-          </p>
-          <a className="primary-button" href="#/profile">
-            <LockKeyhole aria-hidden="true" />
-            {user ? 'Открыть профиль' : 'Войти или зарегистрироваться'}
-          </a>
-        </div>
-        <div className="content-band flat">
-          <h2>Правила коротко</h2>
-          <ul className="check-list">
-            <li>Проверяйте факты и отделяйте тесты от предположений.</li>
-            <li>Не публикуйте сюжетные спойлеры без предупреждения.</li>
-            <li>Критикуйте сборку или аргумент, а не автора.</li>
-          </ul>
-        </div>
-      </section>
-      <CommentsBlock
-        targetType="site"
-        targetId="community"
-        data={data}
-        user={user}
-      />
     </div>
   );
 }
@@ -2515,10 +2746,7 @@ const adminTabs = [
   'dashboard',
   'characters',
   'guides',
-  'builds',
   'videos',
-  'rotations',
-  'teams',
   'tierlists',
   'news',
   'leaks',
@@ -2533,10 +2761,7 @@ const adminLabels: Record<(typeof adminTabs)[number], string> = {
   dashboard: 'Dashboard',
   characters: 'Персонажи',
   guides: 'Гайды',
-  builds: 'Билды',
   videos: 'Видео-гайды',
-  rotations: 'Ротации',
-  teams: 'Команды',
   tierlists: 'Тир-листы',
   news: 'Новости',
   leaks: 'Сливы',
@@ -2551,13 +2776,10 @@ const adminTabRole: Record<(typeof adminTabs)[number], User['role']> = {
   dashboard: 'moderator',
   characters: 'editor',
   guides: 'editor',
-  builds: 'editor',
   videos: 'editor',
-  rotations: 'editor',
-  teams: 'editor',
   tierlists: 'editor',
-  news: 'admin',
-  leaks: 'admin',
+  news: 'editor',
+  leaks: 'editor',
   comments: 'moderator',
   users: 'admin',
   settings: 'admin',
@@ -2565,25 +2787,58 @@ const adminTabRole: Record<(typeof adminTabs)[number], User['role']> = {
   audit: 'admin',
 };
 
+const adminTabScope: Partial<Record<(typeof adminTabs)[number], ContentScope>> =
+  {
+    characters: 'characters',
+    guides: 'guides',
+    videos: 'videos',
+    tierlists: 'tierlists',
+    news: 'news',
+    leaks: 'leaks',
+  };
+
+function canOpenAdminTab(user: User, tab: (typeof adminTabs)[number]) {
+  const scope = adminTabScope[tab];
+  if (scope) {
+    return (
+      canManageContent(user, scope, 'edit') ||
+      canManageContent(user, scope, 'create')
+    );
+  }
+  return roleWeight[user.role] >= roleWeight[adminTabRole[tab]];
+}
+
+function contentAccess(user: User, scope: ContentScope) {
+  return {
+    canCreate: canManageContent(user, scope, 'create'),
+    canPublish: canManageContent(user, scope, 'publish'),
+    canDelete: canManageContent(user, scope, 'delete'),
+  };
+}
+
 function AdminPage({
   data,
   user,
   setUser,
   setData,
+  requestedTab,
+  requestedEntityId,
 }: {
   data: SiteData;
   user: User | null;
   setUser: (user: User | null) => void;
   setData: React.Dispatch<React.SetStateAction<SiteData>>;
+  requestedTab?: string;
+  requestedEntityId?: string;
 }) {
-  const [tab, setTab] = useState<(typeof adminTabs)[number]>('dashboard');
+  const requested = adminTabs.includes(
+    requestedTab as (typeof adminTabs)[number],
+  )
+    ? (requestedTab as (typeof adminTabs)[number])
+    : 'dashboard';
+  const [tab, setTab] = useState<(typeof adminTabs)[number]>(requested);
   const visibleTabs = useMemo(
-    () =>
-      user
-        ? adminTabs.filter(
-            (item) => roleWeight[user.role] >= roleWeight[adminTabRole[item]],
-          )
-        : [],
+    () => (user ? adminTabs.filter((item) => canOpenAdminTab(user, item)) : []),
     [user],
   );
 
@@ -2592,6 +2847,15 @@ function AdminPage({
       setTab('dashboard');
     }
   }, [tab, user, visibleTabs]);
+
+  useEffect(() => {
+    if (
+      requestedTab &&
+      adminTabs.includes(requestedTab as (typeof adminTabs)[number])
+    ) {
+      setTab(requestedTab as (typeof adminTabs)[number]);
+    }
+  }, [requestedTab]);
 
   async function refreshContent() {
     setData(await loadSiteData({ includePrivate: true }));
@@ -2626,21 +2890,21 @@ function AdminPage({
       <aside className="admin-sidebar" aria-label="Разделы админки">
         <strong>NTE Meta CMS</strong>
         {visibleTabs.map((item) => (
-          <button
+          <a
             key={item}
             className={tab === item ? 'active' : ''}
-            type="button"
+            href={`#/admin/${item}`}
             onClick={() => setTab(item)}
           >
             <PanelLeft aria-hidden="true" />
             {adminLabels[item]}
-          </button>
+          </a>
         ))}
       </aside>
       <section className="admin-content">
         <div className="admin-topline">
           <div>
-            <p className="eyebrow">Роль: {user.role}</p>
+            <p className="eyebrow">Доступ: {editorGradeLabel(user)}</p>
             <h1>{adminLabels[tab]}</h1>
           </div>
           <button
@@ -2658,43 +2922,55 @@ function AdminPage({
         <Suspense fallback={<SkeletonGrid label="Загрузка редактора" />}>
           {tab === 'dashboard' ? <AdminDashboard data={data} /> : null}
           {tab === 'characters' ? (
-            <AdminCharactersManager
+            <AdminCharacterEditor
               items={data.characters}
+              initialSelectedId={requestedEntityId}
+              access={{
+                canCreate: canManageContent(user, 'characters', 'create'),
+                canPublish: canManageContent(user, 'characters', 'publish'),
+                canDelete: canManageContent(user, 'characters', 'delete'),
+              }}
               onRefresh={refreshContent}
             />
           ) : null}
           {tab === 'guides' ? (
-            <AdminGuides data={data} setData={setData} />
-          ) : null}
-          {tab === 'builds' ? (
-            <AdminBuilds data={data} setData={setData} />
-          ) : null}
-          {tab === 'videos' ? (
-            <AdminVideos data={data} setData={setData} />
-          ) : null}
-          {tab === 'rotations' ? (
-            <AdminRotationsManager
-              items={data.rotations}
-              characters={data.characters}
-              guides={data.guides}
-              onRefresh={refreshContent}
+            <AdminGuides
+              data={data}
+              setData={setData}
+              user={user}
+              initialGuideId={requestedEntityId}
             />
           ) : null}
-          {tab === 'teams' ? (
-            <AdminTeamsManager
-              items={data.teams}
-              characters={data.characters}
-              onRefresh={refreshContent}
+          {tab === 'videos' ? (
+            <AdminVideos
+              data={data}
+              setData={setData}
+              initialGuideId={requestedEntityId}
+              access={contentAccess(user, 'videos')}
             />
           ) : null}
           {tab === 'tierlists' ? (
-            <AdminTierlists data={data} setData={setData} />
+            <AdminTierlists
+              data={data}
+              setData={setData}
+              canPublish={canManageContent(user, 'tierlists', 'publish')}
+            />
           ) : null}
           {tab === 'news' ? (
-            <AdminNewsManager items={data.news} onRefresh={refreshContent} />
+            <AdminNewsManager
+              items={data.news}
+              initialSelectedId={requestedEntityId}
+              access={contentAccess(user, 'news')}
+              onRefresh={refreshContent}
+            />
           ) : null}
           {tab === 'leaks' ? (
-            <AdminLeaksManager items={data.leaks} onRefresh={refreshContent} />
+            <AdminLeaksManager
+              items={data.leaks}
+              initialSelectedId={requestedEntityId}
+              access={contentAccess(user, 'leaks')}
+              onRefresh={refreshContent}
+            />
           ) : null}
           {tab === 'comments' ? (
             <AdminComments data={data} user={user} />
@@ -3072,140 +3348,20 @@ const BUILD_SECTION_TEMPLATE = `## Рекомендуемый билд
 ### Что менять без сигнатурки
 Опишите практическую замену и поправку ротации.`;
 
-function AdminBuilds({
-  data,
-  setData,
-}: {
-  data: SiteData;
-  setData: React.Dispatch<React.SetStateAction<SiteData>>;
-}) {
-  const [guideId, setGuideId] = useState(data.guides[0]?.id || '');
-  const guide = data.guides.find((item) => item.id === guideId);
-  const buildSection = guide?.sections.find(
-    (section) => section.type === 'build',
-  );
-  const [content, setContent] = useState(
-    buildSection?.content || BUILD_SECTION_TEMPLATE,
-  );
-  const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState('');
-
-  useEffect(() => {
-    const nextGuide = data.guides.find((item) => item.id === guideId);
-    const nextBuild = nextGuide?.sections.find(
-      (section) => section.type === 'build',
-    );
-    setContent(nextBuild?.content || BUILD_SECTION_TEMPLATE);
-  }, [data.guides, guideId]);
-
-  async function saveBuild() {
-    if (!guide) return;
-    setPending(true);
-    setMessage('');
-    const result = buildSection
-      ? await saveEntity<{ success: boolean }>(
-          `/api/guide-sections/${buildSection.id}`,
-          {
-            title: 'Билд: дуги, модули и статы',
-            type: 'build',
-            content,
-          },
-          'PATCH',
-        )
-      : await saveEntity<{ id: string }>(
-          `/api/guides/${guide.id}/sections`,
-          {
-            title: 'Билд: дуги, модули и статы',
-            type: 'build',
-            content,
-          },
-          'POST',
-        );
-
-    if (result.ok) {
-      setData(await loadSiteData({ includePrivate: true }));
-      setMessage(
-        guide.status === 'published'
-          ? 'Билд сохранён и уже виден в опубликованном гайде.'
-          : 'Билд сохранён. Опубликуйте родительский гайд, когда материал готов.',
-      );
-    } else {
-      setMessage(result.error);
-    }
-    setPending(false);
-  }
-
-  if (!guide) {
-    return (
-      <EmptyState
-        icon={BookOpen}
-        title="Сначала создайте гайд"
-        text="Билд хранится как гибкая секция персонажного гайда и наследует его статус публикации."
-      />
-    );
-  }
-
-  return (
-    <div className="admin-grid two-columns cms-focused-editor">
-      <section className="admin-panel entity-form">
-        <p className="eyebrow">Секция персонажного гайда</p>
-        <h2>Редактор билда</h2>
-        <label htmlFor="build-guide-picker">Персонажный гайд</label>
-        <select
-          id="build-guide-picker"
-          value={guide.id}
-          onChange={(event) => {
-            setGuideId(event.target.value);
-            setMessage('');
-          }}
-        >
-          {data.guides.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.title} · {item.status}
-            </option>
-          ))}
-        </select>
-        <label htmlFor="build-content">Дуги, модули и статы</label>
-        <textarea
-          id="build-content"
-          rows={24}
-          value={content}
-          onChange={(event) => setContent(event.target.value)}
-        />
-        <button
-          className="primary-button"
-          type="button"
-          disabled={pending}
-          onClick={saveBuild}
-        >
-          <CheckCircle2 aria-hidden="true" />
-          {pending
-            ? 'Сохраняем...'
-            : buildSection
-              ? 'Обновить билд'
-              : 'Создать билд'}
-        </button>
-        <p className="form-message" aria-live="polite">
-          {message}
-        </p>
-      </section>
-      <section className="admin-panel preview-panel">
-        <p className="eyebrow">Live preview</p>
-        <h2>{guide.title}</h2>
-        <MarkdownPreview value={content} />
-      </section>
-    </div>
-  );
-}
-
 function AdminVideos({
   data,
   setData,
+  initialGuideId,
+  access,
 }: {
   data: SiteData;
   setData: React.Dispatch<React.SetStateAction<SiteData>>;
+  initialGuideId?: string;
+  access: { canCreate: boolean; canPublish: boolean; canDelete: boolean };
 }) {
-  const [guideId, setGuideId] = useState(data.guides[0]?.id || '');
+  const [guideId, setGuideId] = useState(
+    initialGuideId || data.guides[0]?.id || '',
+  );
   const guide = data.guides.find((item) => item.id === guideId);
   const [videoUrl, setVideoUrl] = useState(guide?.videoUrl || '');
   const [transcript, setTranscript] = useState(guide?.transcript || '');
@@ -3215,6 +3371,10 @@ function AdminVideos({
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const embedUrl = getYoutubeEmbedUrl(videoUrl);
+
+  useEffect(() => {
+    if (initialGuideId) setGuideId(initialGuideId);
+  }, [initialGuideId]);
 
   useEffect(() => {
     const nextGuide = data.guides.find((item) => item.id === guideId);
@@ -3232,7 +3392,7 @@ function AdminVideos({
       {
         videoUrl,
         transcriptMarkdown: transcript,
-        status,
+        ...(access.canPublish ? { status } : {}),
       },
       'PATCH',
     );
@@ -3311,6 +3471,7 @@ function AdminVideos({
         <select
           id="video-guide-status"
           value={status}
+          disabled={!access.canPublish}
           onChange={(event) => setStatus(event.target.value as Guide['status'])}
         >
           <option value="draft">Черновик</option>
@@ -3372,6 +3533,7 @@ function GuideCreateFields({ characters }: { characters: Character[] }) {
       <label>
         Персонаж
         <select name="characterId" required>
+          <option value="">Выберите персонажа</option>
           {characters.map((character) => (
             <option key={character.id} value={character.id}>
               {character.name}
@@ -3402,12 +3564,16 @@ function GuideCreateFields({ characters }: { characters: Character[] }) {
 function AdminGuides({
   data,
   setData,
+  user,
+  initialGuideId,
 }: {
   data: SiteData;
   setData: React.Dispatch<React.SetStateAction<SiteData>>;
+  user: User;
+  initialGuideId?: string;
 }) {
   const [selectedGuideId, setSelectedGuideId] = useState(
-    data.guides[0]?.id || '',
+    initialGuideId || data.guides[0]?.id || 'new',
   );
   const guide = data.guides.find((item) => item.id === selectedGuideId);
   const [sections, setSections] = useState<GuideSection[]>(() =>
@@ -3432,15 +3598,27 @@ function AdminGuides({
   const createGuideDialogRef = useRef<HTMLDialogElement>(null);
   const deleteGuideDialogRef = useRef<HTMLDialogElement>(null);
   const deleteSectionDialogRef = useRef<HTMLDialogElement>(null);
+  const canCreate = canManageContent(user, 'guides', 'create');
+  const canPublish = canManageContent(user, 'guides', 'publish');
+  const canDelete = canManageContent(user, 'guides', 'delete');
+  const availableGuideCharacters = data.characters.filter(
+    (character) =>
+      !data.guides.some((item) => item.characterId === character.id),
+  );
 
   useEffect(() => {
+    if (initialGuideId) setSelectedGuideId(initialGuideId);
+  }, [initialGuideId]);
+
+  useEffect(() => {
+    if (selectedGuideId === 'new') return;
     if (
       selectedGuideId &&
       data.guides.some((item) => item.id === selectedGuideId)
     ) {
       return;
     }
-    setSelectedGuideId(data.guides[0]?.id || '');
+    setSelectedGuideId(data.guides[0]?.id || 'new');
   }, [data.guides, selectedGuideId]);
 
   useEffect(() => {
@@ -3542,6 +3720,25 @@ function AdminGuides({
     setMarkdown(nextSection.content);
   }
 
+  function addBuildSection() {
+    const existing = sections.find((section) => section.type === 'build');
+    if (existing) {
+      selectSection(existing);
+      setMessage('Раздел билда уже есть — открыли его для редактирования.');
+      return;
+    }
+    const nextSection: GuideSection = {
+      id: `custom-${Date.now()}`,
+      title: 'Билд: дуги, модули и статы',
+      type: 'build',
+      content: BUILD_SECTION_TEMPLATE,
+      position: sections.length + 1,
+    };
+    setSections((value) => [...value, nextSection]);
+    setSelectedSectionId(nextSection.id);
+    setMarkdown(nextSection.content);
+  }
+
   function applyAction(action: string) {
     const textarea = textareaRef.current;
     if (!textarea) {
@@ -3616,7 +3813,7 @@ function AdminGuides({
         summary: guideMeta.summary,
         patchVersion: guideMeta.patch,
         videoUrl: guideMeta.videoUrl,
-        status: guideMeta.status,
+        ...(canPublish ? { status: guideMeta.status } : {}),
       },
       'PATCH',
     );
@@ -3767,14 +3964,20 @@ function AdminGuides({
   if (!activeGuide) {
     return (
       <form className="admin-panel entity-form" onSubmit={createGuide}>
-        <p className="eyebrow">Пустая база</p>
-        <h2>Создать первый гайд</h2>
+        <p className="eyebrow">Новый персонажный материал</p>
+        <h2>Создать гайд</h2>
         <p>
-          После создания появится редактор секций, metadata, видео и статуса
-          публикации.
+          После создания появятся разделы, билд, отряды, командные ротации,
+          видео и предпросмотр.
         </p>
-        <GuideCreateFields characters={data.characters} />
-        <button className="primary-button" type="submit" disabled={pending}>
+        <GuideCreateFields characters={availableGuideCharacters} />
+        <button
+          className="primary-button"
+          type="submit"
+          disabled={
+            pending || !canCreate || availableGuideCharacters.length === 0
+          }
+        >
           <Plus aria-hidden="true" /> Создать черновик
         </button>
         <p className="form-message" aria-live="polite">
@@ -3793,20 +3996,24 @@ function AdminGuides({
             <h2>{activeGuide.title}</h2>
           </div>
           <div className="button-row">
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => createGuideDialogRef.current?.showModal()}
-            >
-              <Plus aria-hidden="true" /> Создать гайд
-            </button>
-            <button
-              className="ghost-button danger"
-              type="button"
-              onClick={() => deleteGuideDialogRef.current?.showModal()}
-            >
-              <Trash2 aria-hidden="true" /> Удалить гайд
-            </button>
+            {canCreate ? (
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => createGuideDialogRef.current?.showModal()}
+              >
+                <Plus aria-hidden="true" /> Создать гайд
+              </button>
+            ) : null}
+            {canDelete ? (
+              <button
+                className="ghost-button danger"
+                type="button"
+                onClick={() => deleteGuideDialogRef.current?.showModal()}
+              >
+                <Trash2 aria-hidden="true" /> Удалить гайд
+              </button>
+            ) : null}
           </div>
         </div>
         <label htmlFor="guide-picker">Редактируемый гайд</label>
@@ -3850,6 +4057,7 @@ function AdminGuides({
             Статус
             <select
               value={guideMeta.status}
+              disabled={!canPublish}
               onChange={(event) =>
                 setGuideMeta((current) => ({
                   ...current,
@@ -3859,7 +4067,9 @@ function AdminGuides({
             >
               <option value="draft">Черновик</option>
               <option value="pending_review">На проверке</option>
-              <option value="published">Опубликован</option>
+              {canPublish || guideMeta.status === 'published' ? (
+                <option value="published">Опубликован</option>
+              ) : null}
               <option value="archived">Архив</option>
             </select>
           </label>
@@ -3900,18 +4110,35 @@ function AdminGuides({
         </button>
       </section>
 
+      <GuideTeamsEditor
+        data={data}
+        guide={activeGuide}
+        setData={setData}
+        canCreate={canCreate}
+        canPublish={canPublish}
+        canDelete={canDelete}
+      />
+
       <div className="admin-grid two-columns">
         <div className="admin-panel">
           <div className="panel-title-row">
             <h2>Секции гайда</h2>
-            <button
-              className="primary-button"
-              type="button"
-              onClick={addSection}
-            >
-              <Plus aria-hidden="true" />
-              Добавить раздел
-            </button>
+            <div className="button-row">
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={addBuildSection}
+              >
+                <ClipboardList aria-hidden="true" /> Добавить билд
+              </button>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={addSection}
+              >
+                <Plus aria-hidden="true" /> Добавить раздел
+              </button>
+            </div>
           </div>
           <div
             className="section-sorter"
@@ -3954,14 +4181,16 @@ function AdminGuides({
             >
               <ChevronDown aria-hidden="true" />
             </button>
-            <button
-              className="ghost-button danger"
-              type="button"
-              disabled={!selectedSectionId}
-              onClick={() => deleteSectionDialogRef.current?.showModal()}
-            >
-              <Trash2 aria-hidden="true" /> Удалить секцию
-            </button>
+            {canDelete ? (
+              <button
+                className="ghost-button danger"
+                type="button"
+                disabled={!selectedSectionId}
+                onClick={() => deleteSectionDialogRef.current?.showModal()}
+              >
+                <Trash2 aria-hidden="true" /> Удалить секцию
+              </button>
+            ) : null}
             <button
               className="primary-button"
               type="button"
@@ -4042,12 +4271,16 @@ function AdminGuides({
       <dialog className="confirm-dialog" ref={createGuideDialogRef}>
         <form method="dialog" onSubmit={createGuide}>
           <h2>Создать гайд</h2>
-          <GuideCreateFields characters={data.characters} />
+          <GuideCreateFields characters={availableGuideCharacters} />
           <div className="button-row">
             <button className="ghost-button" value="cancel">
               Отменить
             </button>
-            <button className="primary-button" type="submit">
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={availableGuideCharacters.length === 0}
+            >
               <Plus aria-hidden="true" /> Создать черновик
             </button>
           </div>
@@ -4097,12 +4330,462 @@ function AdminGuides({
   );
 }
 
+function GuideTeamsEditor({
+  data,
+  guide,
+  setData,
+  canCreate,
+  canPublish,
+  canDelete,
+}: {
+  data: SiteData;
+  guide: Guide;
+  setData: React.Dispatch<React.SetStateAction<SiteData>>;
+  canCreate: boolean;
+  canPublish: boolean;
+  canDelete: boolean;
+}) {
+  const relatedTeams = useMemo(
+    () =>
+      data.teams.filter(
+        (team) =>
+          team.guideId === guide.id ||
+          (!team.guideId &&
+            team.members.some(
+              (member) => member.characterId === guide.characterId,
+            )),
+      ),
+    [data.teams, guide.characterId, guide.id],
+  );
+  const [selectedId, setSelectedId] = useState(relatedTeams[0]?.id || 'new');
+  const [draft, setDraft] = useState<Team>(
+    () => relatedTeams[0] || createGuideTeamDraft(guide),
+  );
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState('');
+  const deleteDialogRef = useRef<HTMLDialogElement>(null);
+  const selected = relatedTeams.find((team) => team.id === selectedId);
+
+  useEffect(() => {
+    const next = relatedTeams.find((team) => team.id === selectedId);
+    setDraft(next || createGuideTeamDraft(guide));
+  }, [guide, relatedTeams, selectedId]);
+
+  useEffect(() => {
+    if (selectedId === 'new') return;
+    if (!relatedTeams.some((team) => team.id === selectedId)) {
+      setSelectedId(relatedTeams[0]?.id || 'new');
+    }
+  }, [relatedTeams, selectedId]);
+
+  function updateMember(index: number, member: TeamMember) {
+    const members = [...draft.members];
+    members[index] = member;
+    setDraft((current) => ({ ...current, members }));
+  }
+
+  function updateStep(index: number, step: string) {
+    const rotationSteps = [...(draft.rotationSteps || [])];
+    rotationSteps[index] = step;
+    setDraft((current) => ({ ...current, rotationSteps }));
+  }
+
+  async function saveTeam(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    setMessage('');
+    const rotationSteps = (draft.rotationSteps || []).filter((step) =>
+      step.trim(),
+    );
+    const result = await saveEntity<{ id?: string; success?: boolean }>(
+      selected ? `/api/teams/${selected.id}` : '/api/teams',
+      {
+        ...draft,
+        guideId: guide.id,
+        rotation: rotationSteps.join('\n'),
+        rotationStepsJson: rotationSteps,
+        ...(canPublish || !selected ? { status: draft.status || 'draft' } : {}),
+      },
+      selected ? 'PATCH' : 'POST',
+    );
+    if (result.ok) {
+      if (result.data.id) setSelectedId(result.data.id);
+      setData(await loadSiteData({ includePrivate: true }));
+      setMessage('Отряд и его командная ротация сохранены.');
+    } else {
+      setMessage(result.error);
+    }
+    setPending(false);
+  }
+
+  async function deleteTeam() {
+    if (!selected) return;
+    deleteDialogRef.current?.close();
+    setPending(true);
+    const result = await deleteEntity(`/api/teams/${selected.id}`);
+    if (result.ok) {
+      setSelectedId('new');
+      setData(await loadSiteData({ includePrivate: true }));
+      setMessage('Отряд удалён из гайда.');
+    } else {
+      setMessage(result.error);
+    }
+    setPending(false);
+  }
+
+  return (
+    <details className="admin-panel embedded-team-editor" open>
+      <summary>
+        <span>
+          <strong>Отряды и командные ротации</strong>
+          <small>Часть гайда: {relatedTeams.length} составов</small>
+        </span>
+      </summary>
+      <div className="embedded-team-layout">
+        <aside aria-label="Отряды этого гайда">
+          {relatedTeams.map((team) => (
+            <button
+              type="button"
+              key={team.id}
+              className={team.id === selectedId ? 'active' : ''}
+              aria-pressed={team.id === selectedId}
+              onClick={() => setSelectedId(team.id)}
+            >
+              <Users aria-hidden="true" />
+              <span>
+                <strong>{team.title}</strong>
+                <small>
+                  {team.budget} · {team.type}
+                </small>
+              </span>
+            </button>
+          ))}
+          {canCreate ? (
+            <button
+              className="add-team-button"
+              type="button"
+              onClick={() => setSelectedId('new')}
+            >
+              <Plus aria-hidden="true" /> Новый отряд
+            </button>
+          ) : null}
+        </aside>
+        <form className="embedded-team-form" onSubmit={saveTeam}>
+          <div className="editor-field-grid">
+            <label>
+              Название отряда
+              <input
+                required
+                value={draft.title}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Тип
+              <input
+                required
+                value={draft.type}
+                placeholder="Burst, Bossing, AoE..."
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    type: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Бюджет
+              <select
+                value={draft.budget}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    budget: event.target.value as Team['budget'],
+                  }))
+                }
+              >
+                <option>F2P</option>
+                <option>Mixed</option>
+                <option>Premium</option>
+              </select>
+            </label>
+            <label>
+              Сложность
+              <input
+                required
+                value={draft.difficulty}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    difficulty: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Сила, 0-100
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={draft.power}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    power: Number(event.target.value),
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Статус
+              <select
+                value={draft.status || 'draft'}
+                disabled={!canPublish}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    status: event.target.value as Team['status'],
+                  }))
+                }
+              >
+                <option value="draft">Черновик</option>
+                <option value="published">Опубликован вместе с гайдом</option>
+                <option value="archived">Архив</option>
+              </select>
+            </label>
+            <label className="wide-field">
+              Почему состав работает
+              <textarea
+                rows={4}
+                required
+                value={draft.synergy}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    synergy: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Где хорош
+              <input
+                required
+                value={draft.goodAt}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    goodAt: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Где слаб
+              <input
+                required
+                value={draft.weakAt}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    weakAt: event.target.value,
+                  }))
+                }
+              />
+            </label>
+          </div>
+
+          <fieldset className="team-member-editor">
+            <legend>Состав и роли</legend>
+            {draft.members.map((member, index) => (
+              <div key={`${member.characterId}-${index}`}>
+                <label>
+                  Персонаж {index + 1}
+                  <select
+                    value={member.characterId}
+                    onChange={(event) =>
+                      updateMember(index, {
+                        ...member,
+                        characterId: event.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Выберите</option>
+                    {data.characters.map((character) => (
+                      <option key={character.id} value={character.id}>
+                        {character.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Роль в составе
+                  <input
+                    value={member.role}
+                    onChange={(event) =>
+                      updateMember(index, {
+                        ...member,
+                        role: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+                <button
+                  className="icon-button danger"
+                  type="button"
+                  aria-label={`Удалить персонажа ${index + 1}`}
+                  onClick={() =>
+                    setDraft((current) => ({
+                      ...current,
+                      members: current.members.filter(
+                        (_, memberIndex) => memberIndex !== index,
+                      ),
+                    }))
+                  }
+                >
+                  <Trash2 aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+            <button
+              className="ghost-button"
+              type="button"
+              disabled={draft.members.length >= 8}
+              onClick={() =>
+                setDraft((current) => ({
+                  ...current,
+                  members: [
+                    ...current.members,
+                    { characterId: '', role: 'Support' },
+                  ],
+                }))
+              }
+            >
+              <Plus aria-hidden="true" /> Добавить персонажа
+            </button>
+          </fieldset>
+
+          <fieldset className="rotation-step-editor">
+            <legend>Пошаговая ротация всей команды</legend>
+            <p>
+              Одна строка — одно переключение персонажа или применение навыка.
+            </p>
+            {(draft.rotationSteps || []).map((step, index) => (
+              <div key={`${selectedId}-rotation-${index}`}>
+                <span>{index + 1}</span>
+                <input
+                  value={step}
+                  placeholder="Хотори: навык → смена на Байканг..."
+                  onChange={(event) => updateStep(index, event.target.value)}
+                />
+                <button
+                  className="icon-button danger"
+                  type="button"
+                  aria-label={`Удалить шаг ${index + 1}`}
+                  onClick={() =>
+                    setDraft((current) => ({
+                      ...current,
+                      rotationSteps: (current.rotationSteps || []).filter(
+                        (_, stepIndex) => stepIndex !== index,
+                      ),
+                    }))
+                  }
+                >
+                  <Trash2 aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() =>
+                setDraft((current) => ({
+                  ...current,
+                  rotationSteps: [...(current.rotationSteps || []), ''],
+                }))
+              }
+            >
+              <Plus aria-hidden="true" /> Добавить шаг
+            </button>
+          </fieldset>
+
+          <div className="button-row">
+            <button className="primary-button" type="submit" disabled={pending}>
+              <CheckCircle2 aria-hidden="true" />{' '}
+              {pending ? 'Сохраняем...' : 'Сохранить отряд'}
+            </button>
+            {selected && canDelete ? (
+              <button
+                className="ghost-button danger"
+                type="button"
+                onClick={() => deleteDialogRef.current?.showModal()}
+              >
+                <Trash2 aria-hidden="true" /> Удалить отряд
+              </button>
+            ) : null}
+          </div>
+          <p className="form-message" aria-live="polite">
+            {message}
+          </p>
+        </form>
+      </div>
+      <dialog className="confirm-dialog" ref={deleteDialogRef}>
+        <form method="dialog">
+          <h2>Удалить отряд?</h2>
+          <p>Состав и его ротация исчезнут из этого гайда.</p>
+          <div className="button-row">
+            <button className="ghost-button" value="cancel">
+              Отменить
+            </button>
+            <button
+              className="primary-button danger-action"
+              type="button"
+              onClick={() => void deleteTeam()}
+            >
+              <Trash2 aria-hidden="true" /> Удалить
+            </button>
+          </div>
+        </form>
+      </dialog>
+    </details>
+  );
+}
+
+function createGuideTeamDraft(guide: Guide): Team {
+  return {
+    id: 'new',
+    slug: '',
+    guideId: guide.id,
+    title: '',
+    type: 'Burst',
+    budget: 'Mixed',
+    difficulty: 'Средняя',
+    power: 70,
+    goodAt: '',
+    weakAt: '',
+    synergy: '',
+    rotation: '',
+    rotationSteps: [''],
+    members: [{ characterId: guide.characterId, role: 'Main DPS' }],
+    status: 'draft',
+  };
+}
+
 function AdminTierlists({
   data,
   setData,
+  canPublish,
 }: {
   data: SiteData;
   setData: React.Dispatch<React.SetStateAction<SiteData>>;
+  canPublish: boolean;
 }) {
   const [kind, setKind] = useState<'base' | 'premium'>('base');
   const tierlist =
@@ -4116,6 +4799,8 @@ function AdminTierlists({
   );
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
+  const [draggedCharacterId, setDraggedCharacterId] = useState('');
+  const [characterToAdd, setCharacterToAdd] = useState('');
 
   useEffect(() => {
     setItems(tierlist?.items || []);
@@ -4148,6 +4833,23 @@ function AdminTierlists({
     );
   }
 
+  function moveCharacter(characterId: string, nextTier: Tier) {
+    setItems((current) => {
+      const existing = current.find((item) => item.characterId === characterId);
+      if (existing) {
+        return current.map((item) =>
+          item.characterId === characterId ? { ...item, tier: nextTier } : item,
+        );
+      }
+      return [...current, { characterId, tier: nextTier, note: '' }];
+    });
+    setDraggedCharacterId('');
+  }
+
+  const availableCharacters = data.characters.filter(
+    (character) => !items.some((item) => item.characterId === character.id),
+  );
+
   async function saveTierlist() {
     if (!tierlist) return;
     setPending(true);
@@ -4156,7 +4858,7 @@ function AdminTierlists({
       title,
       tierlistType: kind,
       patchVersion: patch,
-      status,
+      ...(canPublish ? { status } : {}),
       changelogJson: changelog
         .split('\n')
         .map((line) => line.trim())
@@ -4251,6 +4953,7 @@ function AdminTierlists({
             Статус
             <select
               value={status}
+              disabled={!canPublish}
               onChange={(event) =>
                 setStatus(
                   event.target.value as NonNullable<typeof tierlist.status>,
@@ -4275,10 +4978,75 @@ function AdminTierlists({
 
       <section className="admin-panel">
         <SectionHeader
-          title="Предпросмотр"
-          text="Публичное распределение обновляется сразу при выборе тира."
+          title="Распределение персонажей"
+          text="Перетащите иконку в нужную строку. Выпадающие списки ниже остаются доступной клавиатурной альтернативой."
         />
-        <TierPreview grouped={grouped} />
+        <div
+          className="tier-board-editor"
+          aria-label="Редактор распределения по тирам"
+        >
+          {tierOrder.map((tier) => (
+            <section
+              className={`tier-drop-row tier-${tier.replace('+', 'plus')}`}
+              key={tier}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={() => {
+                if (draggedCharacterId) moveCharacter(draggedCharacterId, tier);
+              }}
+            >
+              <strong>{tier}</strong>
+              <div>
+                {grouped[tier].map((character) => (
+                  <button
+                    type="button"
+                    draggable
+                    key={character.id}
+                    title={`${character.name}: перетащить в другой тир`}
+                    onDragStart={() => setDraggedCharacterId(character.id)}
+                    onDragEnd={() => setDraggedCharacterId('')}
+                  >
+                    <img
+                      src={resolveAssetUrl(character.imageUrl)}
+                      alt=""
+                      width="62"
+                      height="62"
+                      loading="lazy"
+                    />
+                    <span>{character.name}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+        <div className="tier-add-character">
+          <label htmlFor="tier-character-add">
+            Добавить персонажа в тир-лист
+          </label>
+          <select
+            id="tier-character-add"
+            value={characterToAdd}
+            onChange={(event) => setCharacterToAdd(event.target.value)}
+          >
+            <option value="">Выберите персонажа</option>
+            {availableCharacters.map((character) => (
+              <option key={character.id} value={character.id}>
+                {character.name}
+              </option>
+            ))}
+          </select>
+          <button
+            className="ghost-button"
+            type="button"
+            disabled={!characterToAdd}
+            onClick={() => {
+              moveCharacter(characterToAdd, 'A');
+              setCharacterToAdd('');
+            }}
+          >
+            <Plus aria-hidden="true" /> Добавить в A
+          </button>
+        </div>
       </section>
 
       <section className="admin-panel">
@@ -4324,6 +5092,22 @@ function AdminTierlists({
                     }
                   />
                 </label>
+                <button
+                  className="icon-button danger"
+                  type="button"
+                  title="Убрать персонажа из тир-листа"
+                  aria-label={`Убрать ${character.name} из тир-листа`}
+                  onClick={() =>
+                    setItems((current) =>
+                      current.filter(
+                        (candidate) =>
+                          candidate.characterId !== item.characterId,
+                      ),
+                    )
+                  }
+                >
+                  <Trash2 aria-hidden="true" />
+                </button>
               </article>
             );
           })}
@@ -4560,6 +5344,23 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
 }
 
 const userRoles: Role[] = ['user', 'moderator', 'editor', 'admin', 'owner'];
+const editorGrades: EditorGrade[] = ['junior', 'editor', 'senior', 'lead'];
+const editorScopeLabels: Record<ContentScope, string> = {
+  characters: 'Персонажи',
+  guides: 'Гайды',
+  tierlists: 'Тир-листы',
+  news: 'Новости',
+  leaks: 'Сливы',
+  videos: 'Видео-гайды',
+};
+const defaultEditorPermissions: EditorPermissions = {
+  grade: 'junior',
+  scopes: ['guides', 'characters'],
+  canCreate: true,
+  canEdit: true,
+  canPublish: true,
+  canDelete: false,
+};
 
 function AdminAuditLog() {
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
@@ -4653,10 +5454,52 @@ function AdminUsers({ actor }: { actor: User }) {
     if (result.ok) {
       setUsers((current) =>
         current.map((user) =>
-          user.id === target.id ? { ...user, role } : user,
+          user.id === target.id
+            ? {
+                ...user,
+                role,
+                editorPermissions:
+                  role === 'editor'
+                    ? user.editorPermissions || defaultEditorPermissions
+                    : user.editorPermissions,
+              }
+            : user,
         ),
       );
       setMessage(`Роль ${target.displayName} изменена на ${role}.`);
+    } else {
+      setMessage(result.error);
+    }
+    setActionId('');
+  }
+
+  function patchEditorPermissions(
+    targetId: string,
+    patchValue: Partial<EditorPermissions>,
+  ) {
+    setUsers((current) =>
+      current.map((user) =>
+        user.id === targetId
+          ? {
+              ...user,
+              editorPermissions: {
+                ...defaultEditorPermissions,
+                ...user.editorPermissions,
+                ...patchValue,
+              },
+            }
+          : user,
+      ),
+    );
+  }
+
+  async function saveEditorPermissions(target: AdminUser) {
+    const permissions = target.editorPermissions || defaultEditorPermissions;
+    setActionId(target.id);
+    const result = await updateEditorPermissions(target.id, permissions);
+    if (result.ok) {
+      patchEditorPermissions(target.id, result.data);
+      setMessage(`Права редактора ${target.displayName} сохранены.`);
     } else {
       setMessage(result.error);
     }
@@ -4757,6 +5600,99 @@ function AdminUsers({ actor }: { actor: User }) {
                 ))}
               </select>
             </label>
+            {target.role === 'editor' ? (
+              <details className="editor-permissions-panel">
+                <summary>Грейд и точные права</summary>
+                <label>
+                  Грейд
+                  <select
+                    value={
+                      target.editorPermissions?.grade ||
+                      defaultEditorPermissions.grade
+                    }
+                    onChange={(event) =>
+                      patchEditorPermissions(target.id, {
+                        grade: event.target.value as EditorGrade,
+                      })
+                    }
+                  >
+                    {editorGrades.map((grade) => (
+                      <option key={grade} value={grade}>
+                        {
+                          {
+                            junior: 'Младший редактор',
+                            editor: 'Редактор',
+                            senior: 'Старший редактор',
+                            lead: 'Ведущий редактор',
+                          }[grade]
+                        }
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <fieldset>
+                  <legend>Разделы</legend>
+                  {(Object.keys(editorScopeLabels) as ContentScope[]).map(
+                    (scope) => {
+                      const scopes =
+                        target.editorPermissions?.scopes ||
+                        defaultEditorPermissions.scopes;
+                      return (
+                        <label key={scope} className="check-row">
+                          <input
+                            type="checkbox"
+                            checked={scopes.includes(scope)}
+                            onChange={(event) =>
+                              patchEditorPermissions(target.id, {
+                                scopes: event.target.checked
+                                  ? [...scopes, scope]
+                                  : scopes.filter((item) => item !== scope),
+                              })
+                            }
+                          />
+                          {editorScopeLabels[scope]}
+                        </label>
+                      );
+                    },
+                  )}
+                </fieldset>
+                <fieldset>
+                  <legend>Действия</legend>
+                  {(
+                    [
+                      ['canCreate', 'Создавать'],
+                      ['canEdit', 'Редактировать'],
+                      ['canPublish', 'Публиковать'],
+                      ['canDelete', 'Удалять'],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <label key={key} className="check-row">
+                      <input
+                        type="checkbox"
+                        checked={
+                          target.editorPermissions?.[key] ??
+                          defaultEditorPermissions[key]
+                        }
+                        onChange={(event) =>
+                          patchEditorPermissions(target.id, {
+                            [key]: event.target.checked,
+                          })
+                        }
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </fieldset>
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={actionId === target.id}
+                  onClick={() => void saveEditorPermissions(target)}
+                >
+                  <CheckCircle2 aria-hidden="true" /> Сохранить права
+                </button>
+              </details>
+            ) : null}
             {target.id !== actor.id && target.status !== 'deleted' ? (
               <button
                 className="ghost-button"
@@ -4980,11 +5916,10 @@ function Footer() {
       <div>
         <a href="#/characters">Персонажи</a>
         <a href="#/guides">Гайды</a>
-        <a href="#/teams">Команды</a>
-        <a href="#/rotations">Ротации</a>
         <a href="#/tierlists">Тир-листы</a>
         <a href="#/news">Новости</a>
-        <a href="#/community">Комьюнити</a>
+        <a href="#/leaks">Сливы</a>
+        <a href="#/videos">Видео-гайды</a>
       </div>
     </footer>
   );

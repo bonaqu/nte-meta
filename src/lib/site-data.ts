@@ -53,6 +53,9 @@ export function getCharacterSearchText(character: Character) {
       character.tier,
       character.premiumTier,
       character.tags.join(' '),
+      character.profile?.faction || '',
+      character.profile?.roleTags.join(' ') || '',
+      character.profile?.biographyShort || '',
     ].join(' '),
   );
 }

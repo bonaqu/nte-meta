@@ -12,6 +12,115 @@ export type LeakStatus = 'слух' | 'слив' | 'подтверждено' | 
 
 export type TrustLevel = 'низкий' | 'средний' | 'высокий';
 
+export type EditorGrade = 'junior' | 'editor' | 'senior' | 'lead';
+export type ContentScope =
+  | 'characters'
+  | 'guides'
+  | 'tierlists'
+  | 'news'
+  | 'leaks'
+  | 'videos';
+export type ContentAction = 'create' | 'edit' | 'publish' | 'delete';
+
+export interface EditorPermissions {
+  grade: EditorGrade;
+  scopes: ContentScope[];
+  canCreate: boolean;
+  canEdit: boolean;
+  canPublish: boolean;
+  canDelete: boolean;
+}
+
+export interface CharacterVoiceActor {
+  language: 'Русский' | 'Английский' | 'Японский' | 'Корейский' | 'Китайский';
+  name: string;
+}
+
+export interface CharacterMaterial {
+  id: string;
+  name: string;
+  iconUrl: string;
+  amount: string;
+  source: string;
+}
+
+export interface CharacterAbility {
+  id: string;
+  name: string;
+  type: string;
+  iconUrl: string;
+  description: string;
+}
+
+export interface CharacterStat {
+  id: string;
+  label: string;
+  value: string;
+}
+
+export interface CharacterSkin {
+  id: string;
+  name: string;
+  imageUrl: string;
+  description: string;
+}
+
+export interface CharacterFriendshipLevel {
+  level: number;
+  rewardName: string;
+  rewardIconUrl: string;
+  description: string;
+}
+
+export interface CharacterGift {
+  id: string;
+  name: string;
+  iconUrl: string;
+  effect: string;
+}
+
+export interface CharacterVoiceLine {
+  id: string;
+  title: string;
+  language: 'Английский' | 'Японский' | 'Корейский' | 'Китайский';
+  audioUrl: string;
+}
+
+export interface CharacterAwakening {
+  level: number;
+  name: string;
+  iconUrl: string;
+  description: string;
+}
+
+export interface CharacterConsole {
+  id: string;
+  name: string;
+  imageUrls: string[];
+  description: string;
+  features: string[];
+  recommendedModules: string;
+}
+
+export interface CharacterProfile {
+  faction: string;
+  birthday: string;
+  biographyShort: string;
+  biography: string;
+  trivia: string;
+  roleTags: string[];
+  voiceActors: CharacterVoiceActor[];
+  materials: CharacterMaterial[];
+  baseStats: CharacterStat[];
+  abilities: CharacterAbility[];
+  skins: CharacterSkin[];
+  friendship: CharacterFriendshipLevel[];
+  gifts: CharacterGift[];
+  voiceLines: CharacterVoiceLine[];
+  awakenings: CharacterAwakening[];
+  consoles: CharacterConsole[];
+}
+
 export interface Character {
   id: string;
   slug: string;
@@ -28,6 +137,7 @@ export interface Character {
   shortDescription: string;
   summary: string;
   tags: string[];
+  profile?: CharacterProfile;
   status?: Exclude<PublishStatus, 'pending_review'>;
   patch?: string;
   updatedAt: string;
@@ -72,6 +182,8 @@ export interface Team {
   weakAt: string;
   synergy: string;
   rotation: string;
+  rotationSteps?: string[];
+  guideId?: string;
   members: TeamMember[];
   status?: Exclude<PublishStatus, 'pending_review'>;
   updatedAt?: string;
@@ -159,7 +271,7 @@ export interface VideoGuide {
 export interface Comment {
   id: string;
   userId?: string;
-  targetType: 'guide' | 'news' | 'leak' | 'comment' | 'site';
+  targetType: 'guide' | 'character' | 'news' | 'leak' | 'comment' | 'site';
   targetId: string;
   author: string;
   body: string;
@@ -175,6 +287,7 @@ export interface User {
   username: string;
   displayName: string;
   role: Role;
+  editorPermissions?: EditorPermissions;
 }
 
 export interface AdminUser extends User {

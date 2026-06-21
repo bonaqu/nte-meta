@@ -24,21 +24,10 @@ const sections = [
     'Сливы и слухи',
     'Слухи и сливы NTE с источниками, статусами и уровнем доверия.',
   ],
-  ['teams', 'Команды', 'F2P и Premium команды NTE с ролями и ротациями.'],
-  [
-    'rotations',
-    'Ротации',
-    'Простые, advanced, boss и AoE-ротации персонажей NTE.',
-  ],
   [
     'videos',
     'Видео-гайды',
     'Видео-гайды NTE Meta с текстовыми версиями и таймкодами.',
-  ],
-  [
-    'community',
-    'Комьюнити-хаб',
-    'Обсуждения, комментарии и оценки материалов NTE Meta.',
   ],
   ['admin', 'Админка', 'Защищённая редакционная CMS NTE Meta.'],
   [
@@ -127,8 +116,8 @@ async function loadCollection(name) {
   }
 }
 
-const [characters, guides, news, leaks, teams] = await Promise.all(
-  ['characters', 'guides', 'news', 'leaks', 'teams'].map(loadCollection),
+const [characters, guides, news, leaks] = await Promise.all(
+  ['characters', 'guides', 'news', 'leaks'].map(loadCollection),
 );
 
 const pages = [
@@ -136,7 +125,7 @@ const pages = [
     route: '',
     title: 'Русская мета Neverness to Everness',
     description:
-      'NTE Meta - русскоязычный meta-hub: тир-листы, глубокие гайды, ротации, команды, новости, сливы и комьюнити.',
+      'NTE Meta - русскоязычный meta-hub: тир-листы, глубокие персонажные гайды, новости, сливы и обсуждения под материалами.',
   },
   ...sections.map(([route, title, description]) => ({
     route,
@@ -145,8 +134,8 @@ const pages = [
   })),
   ...characters.map((item) => ({
     route: `characters/${item.slug}`,
-    title: `${item.name} - гайд, билд и команды`,
-    description: item.shortDescription,
+    title: `${item.name} - биография, способности и озвучка`,
+    description: item.profile?.biographyShort || item.shortDescription,
     image: item.splashUrl,
     article: true,
   })),
@@ -174,12 +163,6 @@ const pages = [
     date: item.updatedAt || item.date,
     article: true,
     schemaType: 'Article',
-  })),
-  ...teams.map((item) => ({
-    route: `teams/${item.slug || item.id}`,
-    title: `${item.title} - состав и ротация`,
-    description: item.synergy,
-    date: item.updatedAt,
   })),
 ];
 

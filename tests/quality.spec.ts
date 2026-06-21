@@ -5,8 +5,9 @@ const publicRoutes = [
   '/',
   '/#/characters',
   '/#/characters/hotori',
+  '/#/guides/hotori-burst-guide',
+  '/#/tierlists',
   '/#/news/patch-10-first-meta-notes',
-  '/#/community',
   '/#/profile',
   '/#/admin',
 ];

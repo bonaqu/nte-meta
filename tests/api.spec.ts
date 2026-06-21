@@ -298,6 +298,7 @@ test.describe('NTE Meta Worker API', () => {
     const team = await owner.post('/api/teams', {
       data: {
         slug: `test-team-${runId}`,
+        guideId,
         title: 'Тестовая команда',
         teamType: 'Bossing',
         budget: 'F2P',
@@ -307,12 +308,26 @@ test.describe('NTE Meta Worker API', () => {
         weakAt: 'Разрозненные волны',
         synergy: 'Окна усиления совпадают с основной ротацией.',
         rotation: 'Поддержка → главный DPS → добивание.',
+        rotationStepsJson: [
+          'Support: усиление команды',
+          'Главный DPS: навык и ульта',
+          'Support: возврат к подготовке',
+        ],
         status: 'published',
         members: [{ characterId, role: 'Главный DPS' }],
       },
     });
     expect(team.status()).toBe(201);
     const teamId = (await team.json()).data.id;
+    const teamRead = await owner.get(`/api/teams/${teamId}`);
+    expect((await teamRead.json()).data).toMatchObject({
+      guideId,
+      rotationSteps: [
+        'Support: усиление команды',
+        'Главный DPS: навык и ульта',
+        'Support: возврат к подготовке',
+      ],
+    });
 
     const duplicateTier = await owner.post('/api/tierlists', {
       data: {
@@ -460,10 +475,34 @@ test.describe('NTE Meta Worker API', () => {
         shortDescription: 'Создан редактором.',
         summary: 'Проверка серверной роли editor.',
         status: 'draft',
+        profile: {
+          faction: 'Тестовая фракция',
+          birthday: '21 июня',
+          biographyShort: 'Краткая биография.',
+          biography: 'Подробная биография персонажа.',
+          trivia: 'Проверенный интересный факт.',
+          roleTags: ['Support', 'Buffer'],
+          abilities: [
+            {
+              id: 'editor-ability',
+              name: 'Тестовый навык',
+              type: 'Активный',
+              iconUrl: 'assets/characters/Hotori.webp',
+              description: 'Описание навыка.',
+            },
+          ],
+        },
       },
     });
     expect(editorCharacter.status()).toBe(201);
     const editorCharacterId = (await editorCharacter.json()).data.id;
+    const editorCharacterRead = await member.get(
+      `/api/characters/${editorCharacterId}`,
+    );
+    expect((await editorCharacterRead.json()).data.profile).toMatchObject({
+      faction: 'Тестовая фракция',
+      roleTags: ['Support', 'Buffer'],
+    });
     expect(
       (
         await member.post('/api/news', {
@@ -472,6 +511,46 @@ test.describe('NTE Meta Worker API', () => {
       ).status(),
     ).toBe(403);
     expect((await member.get('/api/audit-log')).status()).toBe(403);
+
+    const permissions = await owner.patch(
+      `/api/users/${memberId}/editor-permissions`,
+      {
+        data: {
+          grade: 'senior',
+          scopes: ['news'],
+          canCreate: true,
+          canEdit: true,
+          canPublish: true,
+          canDelete: false,
+        },
+      },
+    );
+    expect(permissions.status()).toBe(200);
+    const editorNews = await member.post('/api/news', {
+      data: {
+        slug: `editor-news-${runId}`,
+        title: 'Новость редактора с точечным доступом',
+        summary: 'Проверка индивидуального scope для редактора.',
+        bodyMarkdown: '## Текст\nПроверка доступа.',
+        category: 'Прочее',
+        imageUrl: 'assets/news/patch.webp',
+        status: 'draft',
+      },
+    });
+    expect(editorNews.status()).toBe(201);
+    const editorNewsId = (await editorNews.json()).data.id;
+    expect((await member.delete(`/api/news/${editorNewsId}`)).status()).toBe(
+      403,
+    );
+    const usersWithPermissions = await owner.get('/api/users');
+    const editorSnapshot = (await usersWithPermissions.json()).data.find(
+      (user: { id: string }) => user.id === memberId,
+    );
+    expect(editorSnapshot.editorPermissions).toMatchObject({
+      grade: 'senior',
+      scopes: ['news'],
+      canDelete: false,
+    });
 
     await owner.patch(`/api/users/${memberId}/role`, {
       data: { role: 'moderator' },
@@ -537,6 +616,7 @@ test.describe('NTE Meta Worker API', () => {
     ).toBeTruthy();
 
     await owner.delete(`/api/characters/${editorCharacterId}`);
+    await owner.delete(`/api/news/${editorNewsId}`);
     await owner.delete(`/api/users/${moderatedId}`);
     await owner.delete(`/api/users/${memberId}`);
     await moderatedUser.dispose();
@@ -595,19 +675,23 @@ test.describe('NTE Meta Worker API', () => {
     await expect(
       page.getByRole('heading', { name: 'Dashboard', level: 1 }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Билды', exact: true }).click();
+    const sidebar = page.getByRole('complementary', {
+      name: 'Разделы админки',
+    });
+    await sidebar.getByRole('link', { name: 'Гайды', exact: true }).click();
     await expect(
-      page.getByRole('heading', { name: 'Редактор билда' }),
+      page.getByRole('heading', { name: 'Markdown editor' }),
     ).toBeVisible();
-    await page
-      .getByLabel('Дуги, модули и статы')
-      .fill('## Тестовый билд\n- Дуга: Playwright Arc\n- Статы: крит и атака');
-    await page
-      .getByRole('button', { name: /(?:Создать|Обновить) билд/ })
-      .click();
-    await expect(page.getByText(/Билд сохранён/)).toBeVisible();
-    await page
-      .getByRole('button', { name: 'Видео-гайды', exact: true })
+    await expect(
+      page.getByText('Отряды и командные ротации', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Добавить билд' }),
+    ).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: 'Команды' })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: 'Ротации' })).toHaveCount(0);
+    await sidebar
+      .getByRole('link', { name: 'Видео-гайды', exact: true })
       .click();
     await expect(
       page.getByRole('heading', { name: 'Редактор видео-гайда' }),
@@ -628,7 +712,7 @@ test.describe('NTE Meta Worker API', () => {
     await page.getByLabel('Расшифровка и таймкоды').fill('');
     await page.getByRole('button', { name: 'Сохранить видео-гайд' }).click();
     await expect(page.getByText('Видео-гайд опубликован.')).toBeVisible();
-    await page.getByRole('button', { name: 'Гайды', exact: true }).click();
+    await sidebar.getByRole('link', { name: 'Гайды', exact: true }).click();
     await expect(
       page.getByRole('heading', { name: 'Markdown editor' }),
     ).toBeVisible();

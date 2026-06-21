@@ -49,6 +49,17 @@ type FieldDefinition = {
 };
 
 type ManagedItem = { id: string };
+type ManagerAccess = {
+  canCreate: boolean;
+  canPublish: boolean;
+  canDelete: boolean;
+};
+
+const fullAccess: ManagerAccess = {
+  canCreate: true,
+  canPublish: true,
+  canDelete: true,
+};
 
 type ManagerConfig<T extends ManagedItem> = {
   endpoint: string;
@@ -105,10 +116,12 @@ function FieldControl({
   field,
   values,
   setValue,
+  disabled = false,
 }: {
   field: FieldDefinition;
   values: EditorValues;
   setValue: (name: string, value: unknown) => void;
+  disabled?: boolean;
 }) {
   const id = `cms-${field.name}`;
   const describedBy = field.help ? `${id}-help` : undefined;
@@ -121,6 +134,7 @@ function FieldControl({
           name={field.name}
           type="checkbox"
           checked={booleanValue(values, field.name)}
+          disabled={disabled}
           onChange={(event) => setValue(field.name, event.target.checked)}
         />
         <span>
@@ -217,6 +231,7 @@ function FieldControl({
           name={field.name}
           value={textValue(values, field.name)}
           required={field.required}
+          disabled={disabled}
           aria-describedby={describedBy}
           onChange={(event) => setValue(field.name, event.target.value)}
         >
@@ -234,6 +249,7 @@ function FieldControl({
           name={field.name}
           value={textValue(values, field.name)}
           required={field.required}
+          disabled={disabled}
           rows={field.rows || (field.kind === 'markdown' ? 12 : 5)}
           aria-describedby={describedBy}
           onChange={(event) => setValue(field.name, event.target.value)}
@@ -242,13 +258,8 @@ function FieldControl({
         <input
           id={id}
           name={field.name}
-          type={
-            field.kind === 'url'
-              ? 'url'
-              : field.kind === 'number'
-                ? 'number'
-                : 'text'
-          }
+          type={field.kind === 'number' ? 'number' : 'text'}
+          inputMode={field.kind === 'url' ? 'url' : undefined}
           value={
             field.kind === 'number'
               ? numberValue(values, field.name)
@@ -257,6 +268,7 @@ function FieldControl({
           min={field.min}
           max={field.max}
           required={field.required}
+          disabled={disabled}
           aria-describedby={describedBy}
           onChange={(event) =>
             setValue(
@@ -277,12 +289,18 @@ export function ContentManager<T extends ManagedItem>({
   items,
   config,
   onRefresh,
+  initialSelectedId,
+  access = fullAccess,
 }: {
   items: T[];
   config: ManagerConfig<T>;
   onRefresh: () => Promise<void>;
+  initialSelectedId?: string;
+  access?: ManagerAccess;
 }) {
-  const [selectedId, setSelectedId] = useState(items[0]?.id || 'new');
+  const [selectedId, setSelectedId] = useState(
+    initialSelectedId || items[0]?.id || 'new',
+  );
   const [values, setValues] = useState<EditorValues>(() =>
     items[0] ? config.fromItem(items[0]) : config.empty(),
   );
@@ -310,8 +328,15 @@ export function ContentManager<T extends ManagedItem>({
     const item = items.find((candidate) => candidate.id === selectedId);
     setValues(item ? config.fromItem(item) : config.empty());
     setPreviewOpen(false);
-    setMessage('');
   }, [items, selectedId]);
+
+  useEffect(() => {
+    setMessage('');
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (initialSelectedId) setSelectedId(initialSelectedId);
+  }, [initialSelectedId]);
 
   function setValue(name: string, value: unknown) {
     setValues((current) => ({ ...current, [name]: value }));
@@ -335,11 +360,17 @@ export function ContentManager<T extends ManagedItem>({
 
     setPending(true);
     setMessage('');
+    const payload = config.toPayload(values, publishStatus);
+    if (!access.canPublish && selectedItem) {
+      delete payload.status;
+      delete payload.publishStatus;
+      delete payload.approved;
+    }
     const result = await saveEntity<{ id?: string; success?: boolean }>(
       selectedItem
         ? `${config.endpoint}/${encodeURIComponent(selectedItem.id)}`
         : config.endpoint,
-      config.toPayload(values, publishStatus),
+      payload,
       selectedItem ? 'PATCH' : 'POST',
     );
 
@@ -386,15 +417,18 @@ export function ContentManager<T extends ManagedItem>({
             <p className="eyebrow">{items.length} записей</p>
             <h2>{config.title}</h2>
           </div>
-          <button
-            className="icon-button"
-            type="button"
-            title={`Создать: ${config.singular}`}
-            aria-label={`Создать: ${config.singular}`}
-            onClick={startCreate}
-          >
-            <FilePlus2 aria-hidden="true" />
-          </button>
+          {access.canCreate ? (
+            <button
+              className="primary-button compact-action"
+              type="button"
+              title={`Создать: ${config.singular}`}
+              aria-label={`Создать: ${config.singular}`}
+              onClick={startCreate}
+            >
+              <FilePlus2 aria-hidden="true" />
+              Создать
+            </button>
+          ) : null}
         </div>
         <p>{config.description}</p>
         <label className="cms-search">
@@ -447,7 +481,7 @@ export function ContentManager<T extends ManagedItem>({
               {selectedItem ? config.itemTitle(selectedItem) : config.singular}
             </h2>
           </div>
-          {selectedItem ? (
+          {selectedItem && access.canDelete ? (
             <button
               className="icon-button danger"
               type="button"
@@ -467,6 +501,7 @@ export function ContentManager<T extends ManagedItem>({
               key={field.name}
               values={values}
               setValue={setValue}
+              disabled={!access.canPublish && field.name === 'approved'}
             />
           ))}
         </div>
@@ -477,19 +512,21 @@ export function ContentManager<T extends ManagedItem>({
               className="ghost-button"
               type="button"
               disabled={pending}
-              onClick={() => void persist('draft')}
+              onClick={() => void persist(selectedItem ? undefined : 'draft')}
             >
-              Сохранить черновик
+              {selectedItem ? 'Сохранить изменения' : 'Сохранить черновик'}
             </button>
           ) : null}
-          <button className="primary-button" type="submit" disabled={pending}>
-            <CheckCircle2 aria-hidden="true" />
-            {pending
-              ? 'Сохраняем...'
-              : config.supportsPublishing === false
-                ? 'Сохранить'
-                : 'Опубликовать'}
-          </button>
+          {access.canPublish || config.supportsPublishing === false ? (
+            <button className="primary-button" type="submit" disabled={pending}>
+              <CheckCircle2 aria-hidden="true" />
+              {pending
+                ? 'Сохраняем...'
+                : config.supportsPublishing === false
+                  ? 'Сохранить'
+                  : 'Опубликовать'}
+            </button>
+          ) : null}
           <button
             className="ghost-button"
             type="button"
@@ -693,9 +730,13 @@ const newsCategories = options([
 export function AdminNewsManager({
   items,
   onRefresh,
+  initialSelectedId,
+  access,
 }: {
   items: NewsItem[];
   onRefresh: () => Promise<void>;
+  initialSelectedId?: string;
+  access?: ManagerAccess;
 }) {
   const config = useMemo<ManagerConfig<NewsItem>>(
     () => ({
@@ -788,15 +829,27 @@ export function AdminNewsManager({
     }),
     [],
   );
-  return <ContentManager config={config} items={items} onRefresh={onRefresh} />;
+  return (
+    <ContentManager
+      config={config}
+      items={items}
+      onRefresh={onRefresh}
+      initialSelectedId={initialSelectedId}
+      access={access}
+    />
+  );
 }
 
 export function AdminLeaksManager({
   items,
   onRefresh,
+  initialSelectedId,
+  access,
 }: {
   items: LeakItem[];
   onRefresh: () => Promise<void>;
+  initialSelectedId?: string;
+  access?: ManagerAccess;
 }) {
   const config = useMemo<ManagerConfig<LeakItem>>(
     () => ({
@@ -890,7 +943,15 @@ export function AdminLeaksManager({
     }),
     [],
   );
-  return <ContentManager config={config} items={items} onRefresh={onRefresh} />;
+  return (
+    <ContentManager
+      config={config}
+      items={items}
+      onRefresh={onRefresh}
+      initialSelectedId={initialSelectedId}
+      access={access}
+    />
+  );
 }
 
 export function AdminSourcesManager({

@@ -2004,7 +2004,7 @@ async function handleSystemStatus(request, env) {
       d1: 'ok',
       generatedAt: new Date().toISOString(),
       counts,
-      migrations: { latestKnown: '0010_remove_s_plus_tier.sql' },
+      migrations: { latestKnown: '0011_clean_editorial_placeholder_copy.sql' },
     },
   });
 }

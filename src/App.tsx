@@ -4665,6 +4665,7 @@ function AdminGuides({
               ['spoiler', 'Spoiler'],
               ['table', 'Table'],
               ['link', 'Link'],
+              ['image', 'Image URL'],
               ['youtube', 'YouTube'],
             ].map(([action, label]) => (
               <button

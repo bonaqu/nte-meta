@@ -1169,6 +1169,16 @@
     background: rgb(38 217 255 / 0.08);
   }
 
+  .markdown-preview img {
+    inline-size: 100%;
+    max-block-size: 520px;
+    aspect-ratio: 16 / 9;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    background: rgb(0 0 0 / 0.28);
+  }
+
   .spoiler {
     padding: 12px;
     border: 1px solid var(--border);

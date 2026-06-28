@@ -12,7 +12,7 @@ function getSafeLink(value: string) {
 
 function renderInline(text: string) {
   const parts = text.split(
-    /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g,
+    /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|!\[[^\]]*\]\([^)]+\)|\[[^\]]+\]\([^)]+\))/g,
   );
 
   return parts.map((part, index) => {
@@ -26,6 +26,23 @@ function renderInline(text: string) {
 
     if (part.startsWith('`') && part.endsWith('`')) {
       return <code key={index}>{part.slice(1, -1)}</code>;
+    }
+
+    const image = part.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (image) {
+      const src = getSafeLink(image[2]);
+      if (!src) {
+        return <React.Fragment key={index}>{image[1] || 'Изображение'}</React.Fragment>;
+      }
+      return (
+        <img
+          key={index}
+          src={src}
+          alt={image[1] || ''}
+          loading="lazy"
+          decoding="async"
+        />
+      );
     }
 
     const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
@@ -244,6 +261,7 @@ export function applyMarkdownAction(
     spoiler: `:::spoiler Заголовок\n${selected}\n:::`,
     table: '| Колонка | Значение |\n| --- | --- |\n| Пример | Текст |',
     link: `[${selected}](https://example.com)`,
+    image: `![${selected}](https://example.com/image.webp)`,
     youtube: '@youtube(https://www.youtube.com/watch?v=VIDEO_ID)',
   };
 

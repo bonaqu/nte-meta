@@ -760,10 +760,44 @@ test.describe('NTE Meta Worker API', () => {
   });
   await dataTransfer.dispose();
   await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Закрыть редактор' }).click();
+  await page.getByRole('button', { name: 'Закрыть редактор' }).click();
+
+  const uiNewsSlug = `ui-news-${runId}`;
+  await page.getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Главная', exact: true })
+    .click();
+  await expect(page.getByRole('heading', { name: 'NTE Meta' })).toBeVisible();
+  await page.getByRole('button', { name: 'Добавить новость' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Добавить новость', level: 1 }),
+  ).toBeVisible();
+  const newsDialog = page.locator('dialog[open]');
+  const newsForm = newsDialog.locator('.cms-editor');
+  await newsForm.getByLabel('Заголовок').fill(`UI публикация ${runId}`);
+  await newsForm.getByLabel('Slug URL').fill(uiNewsSlug);
+  await newsForm
+    .getByLabel('Краткое описание')
+    .fill('Проверка inline публикации новости.');
+  await newsForm
+    .getByLabel('Полный текст Markdown')
+    .fill('## Проверка\nНовая страница должна открыться сразу после публикации.');
+  await newsForm.getByLabel('URL изображения').fill('/assets/news/city-update.webp');
+  await newsForm.getByLabel('Теги через запятую').fill('ui, публикация');
+  await newsForm.getByRole('button', { name: 'Опубликовать' }).click();
+  await expect(page).toHaveURL(new RegExp(`/#/news/${uiNewsSlug}$`));
+  await expect(
+    page.getByRole('heading', { name: `UI публикация ${runId}` }),
+  ).toBeVisible();
+  await expect(
+    page.locator('.editorial-body').getByText(
+      'Новая страница должна открыться сразу после публикации.',
+      { exact: true },
+    ),
+  ).toBeVisible();
+
   await page.locator('a.profile-chip').click();
-    await expect(
-      page.getByRole('heading', { name: 'Профиль', level: 1 }),
+  await expect(
+    page.getByRole('heading', { name: 'Профиль', level: 1 }),
     ).toBeVisible();
     await expect(
       page.getByRole('link', { name: 'Открыть админку' }),

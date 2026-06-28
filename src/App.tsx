@@ -218,7 +218,7 @@ function useHashRoute() {
     if (basePath !== '/' && pathname.startsWith(basePath)) {
       return pathname.slice(basePath.length).replace(/^\/|\/$/g, '');
     }
-    return '';
+    return pathname.replace(/^\/|\/$/g, '');
   }
 
   const [route, setRoute] = useState(() => getRoute());

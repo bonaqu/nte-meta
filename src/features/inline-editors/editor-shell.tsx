@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 
 type EditorShellProps = {
@@ -21,6 +21,7 @@ export function EditorShell({
   children,
 }: EditorShellProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -54,7 +55,7 @@ export function EditorShell({
     <dialog
       ref={dialogRef}
       className="editor-shell"
-      aria-labelledby="editor-shell-title"
+      aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault();
         requestClose();
@@ -67,7 +68,7 @@ export function EditorShell({
         <header className="editor-shell__header">
           <div>
             {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-            <h1 id="editor-shell-title">{title}</h1>
+            <h1 id={titleId}>{title}</h1>
             {description ? <p>{description}</p> : null}
           </div>
           <button className="icon-button" type="button" aria-label="Закрыть редактор" onClick={requestClose}>

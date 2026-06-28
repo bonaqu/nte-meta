@@ -1,6 +1,6 @@
 import type { Character, Guide, SiteData, Tier } from '../types';
 
-export const tierOrder: Tier[] = ['S+', 'S', 'A', 'B', 'C'];
+export const tierOrder: Tier[] = ['S+', 'S', 'A', 'B', 'C', 'D'];
 
 export function formatDate(date: string) {
   return new Intl.DateTimeFormat('ru-RU', {

@@ -57,6 +57,7 @@ test.describe('NTE Meta Worker API', () => {
       'tierlists',
       'news',
       'leaks',
+      'threads',
     ]) {
       const response = await guest.get(`/api/${collection}`);
       expect(response.ok(), collection).toBeTruthy();
@@ -664,62 +665,40 @@ test.describe('NTE Meta Worker API', () => {
     expect(oversized.status()).toBe(400);
   });
 
-  test('owner проходит UI-вход и открывает редактор гибкого гайда', async ({
+  test('owner проходит UI-вход и открывает inline-редактор гайда', async ({
     page,
   }) => {
     await page.goto('/#/admin');
     await page.getByLabel('Логин').fill(ownerUsername);
     await page.getByLabel('Пароль').fill(ownerPassword);
     await page.getByRole('button', { name: 'Войти', exact: true }).click();
-
     await expect(
       page.getByRole('heading', { name: 'Dashboard', level: 1 }),
     ).toBeVisible();
     const sidebar = page.getByRole('complementary', {
       name: 'Разделы админки',
     });
-    await sidebar.getByRole('link', { name: 'Гайды', exact: true }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Markdown editor' }),
-    ).toBeVisible();
-    await expect(
-      page.getByText('Отряды и командные ротации', { exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Добавить билд' }),
-    ).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: 'Гайды', exact: true })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: 'Персонажи', exact: true })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: 'Видео-гайды', exact: true })).toHaveCount(0);
     await expect(sidebar.getByRole('link', { name: 'Команды' })).toHaveCount(0);
     await expect(sidebar.getByRole('link', { name: 'Ротации' })).toHaveCount(0);
-    await sidebar
-      .getByRole('link', { name: 'Видео-гайды', exact: true })
+
+    await page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .getByRole('link', { name: 'Гайды', exact: true })
       .click();
     await expect(
-      page.getByRole('heading', { name: 'Редактор видео-гайда' }),
+      page.getByRole('heading', { name: 'Гайды NTE Meta', exact: true }),
     ).toBeVisible();
+    await page.getByRole('button', { name: 'Создать гайд' }).click();
     await expect(
-      page.getByRole('button', { name: 'Поставить тестовый ролик' }),
+      page.getByRole('heading', { name: 'Добавить гайд', level: 1 }),
     ).toBeVisible();
-    await page
-      .getByRole('button', { name: 'Поставить тестовый ролик' })
-      .click();
-    await page
-      .getByLabel('Расшифровка и таймкоды')
-      .fill('## Таймкоды\n00:00 — тестовый ролик');
-    await page.getByLabel('Статус материала').selectOption('published');
-    await page.getByRole('button', { name: 'Сохранить видео-гайд' }).click();
-    await expect(page.getByText('Видео-гайд опубликован.')).toBeVisible();
-    await page.getByRole('button', { name: 'Убрать видео' }).click();
-    await page.getByLabel('Расшифровка и таймкоды').fill('');
-    await page.getByRole('button', { name: 'Сохранить видео-гайд' }).click();
-    await expect(page.getByText('Видео-гайд опубликован.')).toBeVisible();
-    await sidebar.getByRole('link', { name: 'Гайды', exact: true }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Markdown editor' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Добавить раздел' }),
-    ).toBeVisible();
-    await expect(page.getByLabel('YouTube URL')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Создать гайд' })).toBeVisible();
+    await expect(page.getByLabel('Slug')).toBeVisible();
+    await expect(page.getByLabel('Краткое описание')).toBeVisible();
+    await page.getByRole('button', { name: 'Закрыть редактор' }).click();
     await page.locator('a.profile-chip').click();
     await expect(
       page.getByRole('heading', { name: 'Профиль', level: 1 }),
@@ -728,9 +707,7 @@ test.describe('NTE Meta Worker API', () => {
       page.getByRole('link', { name: 'Открыть админку' }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Выйти' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Вход в NTE Meta' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Вход в NTE Meta' })).toBeVisible();
   });
 
   test('смена пароля отзывает сессии, login и logout работают', async () => {

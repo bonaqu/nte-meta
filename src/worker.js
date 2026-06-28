@@ -15,6 +15,7 @@ const PUBLIC_GET = new Set([
   'news',
   'leaks',
   'comments',
+  'threads',
 ]);
 const CONTENT_ROLE = 'editor';
 const ADMIN_ROLE = 'admin';
@@ -176,6 +177,20 @@ const tableConfig = {
     ],
     role: ADMIN_ROLE,
   },
+  threads: {
+    table: 'community_threads',
+    slug: true,
+    writable: [
+      'slug',
+      'title',
+      'summary',
+      'body_markdown',
+      'author_name',
+      'status',
+      'tags_json',
+    ],
+    role: 'user',
+  },
 };
 
 export default {
@@ -296,6 +311,22 @@ async function router(request, env, ctx) {
 
   if (parts[0] === 'reactions') {
     return handleReactions(request, env, parts, ctx);
+  }
+
+  if (parts[0] === 'threads') {
+    return handleThreads(request, env, parts, ctx);
+  }
+
+  if (parts[0] === 'character-import' && parts[1] === 'lookup') {
+    return handleCharacterImportLookup(request, env);
+  }
+
+  if (parts[0] === 'system' && parts[1] === 'status') {
+    return handleSystemStatus(request, env);
+  }
+
+  if (parts[0] === 'warnings') {
+    return handleWarnings(request, env, parts, ctx);
   }
 
   if (parts[0] === 'settings') {
@@ -1526,7 +1557,11 @@ async function handleComments(request, env, ctx) {
     const actor = await requireRole(request, env, 'user');
     const body = await readJson(request);
     const targetType = cleanString(body.targetType, 1, 30);
-    if (!['guide', 'character', 'news', 'leak', 'site'].includes(targetType)) {
+    if (
+      !['guide', 'character', 'news', 'leak', 'site', 'thread'].includes(
+        targetType,
+      )
+    ) {
       return json({ error: 'Неизвестный тип объекта комментария' }, 400);
     }
     const targetId = cleanString(body.targetId, 1, 80);
@@ -1657,6 +1692,112 @@ async function handleComments(request, env, ctx) {
   return json({ error: 'Метод не поддерживается' }, 405);
 }
 
+async function handleThreads(request, env, parts, ctx) {
+  const idOrSlug = parts[1];
+  if (request.method === 'GET') {
+    const includeHidden =
+      ROLE_WEIGHT[(await getAuthUser(request, env))?.role] >= ROLE_WEIGHT.moderator;
+    const data = idOrSlug
+      ? await getThread(env, idOrSlug, includeHidden)
+      : await listThreads(env, includeHidden);
+    if (idOrSlug && !data) {
+      return json({ error: 'Тред не найден' }, 404);
+    }
+    return json({ data });
+  }
+
+  const actor = await requireRole(request, env, 'user');
+  if (request.method === 'POST') {
+    await rateLimit(request, env, 'thread', 10, 60 * 60);
+    const body = await readJson(request);
+    const id = crypto.randomUUID();
+    const title = cleanString(body.title, 5, 120);
+    const summary = cleanString(body.summary || title, 0, 240);
+    const markdown = cleanString(body.body || body.bodyMarkdown, 10, 20000);
+    const tags = Array.isArray(body.tags) ? body.tags.slice(0, 12) : [];
+    const slug = slugify(String(body.slug || title));
+    await env.DB.prepare(
+      `INSERT INTO community_threads
+       (id, slug, title, summary, body_markdown, author_id, author_name, status, tags_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
+    )
+      .bind(
+        id,
+        slug,
+        title,
+        summary,
+        markdown,
+        actor.id,
+        actor.displayName,
+        JSON.stringify(tags),
+      )
+      .run();
+    ctx.waitUntil(logAudit(env, actor.id, 'threads.create', id, { slug }));
+    return json({ data: await getThread(env, id, true) }, 201);
+  }
+
+  const thread = await env.DB.prepare(
+    'SELECT * FROM community_threads WHERE id = ? OR slug = ?',
+  )
+    .bind(idOrSlug, idOrSlug)
+    .first();
+  if (!thread) return json({ error: 'Тред не найден' }, 404);
+  const canModerate = ROLE_WEIGHT[actor.role] >= ROLE_WEIGHT.moderator;
+  const ownsThread = thread.author_id === actor.id;
+  if (!canModerate && !ownsThread) {
+    return json({ error: 'Недостаточно прав' }, 403);
+  }
+
+  if (request.method === 'PATCH') {
+    const body = await readJson(request);
+    const updates = [];
+    const values = [];
+    const setString = (column, value, min, max) => {
+      if (value === undefined) return;
+      updates.push(`${column} = ?`);
+      values.push(cleanString(value, min, max));
+    };
+    setString('title', body.title, 5, 120);
+    setString('summary', body.summary, 0, 240);
+    setString('body_markdown', body.body || body.bodyMarkdown, 10, 20000);
+    if (Array.isArray(body.tags)) {
+      updates.push('tags_json = ?');
+      values.push(JSON.stringify(body.tags.slice(0, 12)));
+    }
+    if (canModerate && body.status) {
+      const status = cleanString(body.status, 1, 20);
+      if (!['open', 'closed', 'hidden'].includes(status)) {
+        return json({ error: 'Неизвестный статус треда' }, 400);
+      }
+      updates.push('status = ?');
+      values.push(status);
+    }
+    if (!updates.length) {
+      return json({ error: 'Нет изменений для сохранения' }, 400);
+    }
+    updates.push('updated_at = current_timestamp');
+    await env.DB.prepare(
+      `UPDATE community_threads SET ${updates.join(', ')} WHERE id = ?`,
+    )
+      .bind(...values, thread.id)
+      .run();
+    ctx.waitUntil(logAudit(env, actor.id, 'threads.update', thread.id, body));
+    return json({ data: await getThread(env, thread.id, true) });
+  }
+
+  if (request.method === 'DELETE') {
+    await env.DB.prepare(
+      "UPDATE community_threads SET status = 'hidden', updated_at = current_timestamp WHERE id = ?",
+    )
+      .bind(thread.id)
+      .run();
+    ctx.waitUntil(logAudit(env, actor.id, 'threads.hide', thread.id, {}));
+    return json({ data: { success: true } });
+  }
+
+  return json({ error: 'Метод не поддерживается' }, 405);
+}
+
 async function handleReactions(request, env, parts, ctx) {
   if (request.method === 'GET') {
     const url = new URL(request.url);
@@ -1688,7 +1829,11 @@ async function handleReactions(request, env, parts, ctx) {
     const body = await readJson(request);
     const targetType = cleanString(body.targetType, 1, 30);
     const targetId = cleanString(body.targetId, 1, 80);
-    if (!['guide', 'news', 'leak', 'comment', 'site'].includes(targetType)) {
+    if (
+      !['guide', 'news', 'leak', 'comment', 'site', 'thread'].includes(
+        targetType,
+      )
+    ) {
       return json({ error: 'Неизвестный тип объекта реакции' }, 400);
     }
     if (!(await interactionTargetExists(env, targetType, targetId))) {
@@ -1780,6 +1925,7 @@ async function interactionTargetExists(env, targetType, targetId) {
     news: ['news', "status = 'published'"],
     leak: ['leaks', 'approved = 1'],
     comment: ['comments', "status = 'visible'"],
+    thread: ['community_threads', "status <> 'hidden'"],
   };
   const target = targets[targetType];
   if (!target) return false;
@@ -1805,6 +1951,103 @@ async function refreshCommentScore(env, commentId) {
   )
     .bind(commentId)
     .run();
+}
+
+async function handleCharacterImportLookup(request, env) {
+  await requireContentPermission(request, env, 'characters', 'edit');
+  if (request.method !== 'POST') {
+    return json({ error: 'Метод не поддерживается' }, 405);
+  }
+  const body = await readJson(request);
+  const query = cleanString(body.query, 2, 120);
+  const sources = await env.DB.prepare(
+    "SELECT source_name, source_url, trust_level FROM sources WHERE auto_import_enabled = 1 AND source_type IN ('website', 'manual') ORDER BY trust_level DESC LIMIT 5",
+  ).all();
+  return json({
+    data: {
+      found: false,
+      message:
+        sources.results.length > 0
+          ? `Автоимпорт для "${query}" пока не подключен. Найденные источники требуют ручной проверки.`
+          : 'Источники базовой информации пока не настроены. Заполните поля вручную и не публикуйте неподтвержденные факты.',
+      sources: sources.results.map((source) => ({
+        name: source.source_name,
+        url: source.source_url,
+        trust: source.trust_level,
+      })),
+      fields: {},
+    },
+  });
+}
+
+async function handleSystemStatus(request, env) {
+  await requireRole(request, env, ADMIN_ROLE);
+  if (request.method !== 'GET') {
+    return json({ error: 'Метод не поддерживается' }, 405);
+  }
+  const tables = [
+    ['users', 'users'],
+    ['characters', 'characters'],
+    ['guides', 'guides'],
+    ['news', 'news'],
+    ['leaks', 'leaks'],
+    ['threads', 'community_threads'],
+  ];
+  const counts = {};
+  for (const [key, table] of tables) {
+    const row = await env.DB.prepare(`SELECT COUNT(*) count FROM ${table}`).first();
+    counts[key] = Number(row?.count || 0);
+  }
+  return json({
+    data: {
+      api: 'ok',
+      d1: 'ok',
+      generatedAt: new Date().toISOString(),
+      counts,
+      migrations: { latestKnown: '0007_inline_editing_threads_tiers.sql' },
+    },
+  });
+}
+
+async function handleWarnings(request, env, parts, ctx) {
+  const actor = await requireRole(request, env, 'moderator');
+  if (request.method === 'GET' && !parts[1]) {
+    const rows = await env.DB.prepare(
+      `SELECT user_warnings.*, users.display_name AS user_name,
+              COALESCE(moderator.display_name, 'Модерация NTE Meta') AS moderator_name
+       FROM user_warnings
+       LEFT JOIN users ON users.id = user_warnings.user_id
+       LEFT JOIN users AS moderator ON moderator.id = user_warnings.created_by
+       ORDER BY user_warnings.created_at DESC
+       LIMIT 200`,
+    ).all();
+    return json({
+      data: rows.results.map((warning) => ({
+        id: warning.id,
+        userId: warning.user_id,
+        reason: warning.reason,
+        moderatorName: warning.moderator_name,
+        createdAt: warning.created_at,
+        status: warning.status,
+        userName: warning.user_name,
+      })),
+    });
+  }
+  if (request.method === 'PATCH' && parts[1]) {
+    const body = await readJson(request);
+    const status = cleanString(body.status, 1, 20);
+    if (!['active', 'dismissed'].includes(status)) {
+      return json({ error: 'Неизвестный статус предупреждения' }, 400);
+    }
+    await env.DB.prepare('UPDATE user_warnings SET status = ? WHERE id = ?')
+      .bind(status, parts[1])
+      .run();
+    ctx.waitUntil(
+      logAudit(env, actor.id, 'warnings.status', parts[1], { status }),
+    );
+    return json({ data: { success: true } });
+  }
+  return json({ error: 'Warnings endpoint не найден' }, 404);
 }
 
 async function handleSettings(request, env, ctx) {
@@ -1989,6 +2232,58 @@ function serializeLeak(row) {
     tags: parseJson(row.tags_json, []),
     approvedAt: row.approved_at || undefined,
     updatedAt: row.updated_at,
+  };
+}
+
+async function listThreads(env, includeHidden = false) {
+  const where = includeHidden ? '1 = 1' : "community_threads.status <> 'hidden'";
+  const rows = await env.DB.prepare(
+    `SELECT community_threads.*,
+            COUNT(comments.id) AS comments_count
+     FROM community_threads
+     LEFT JOIN comments ON comments.target_type = 'thread'
+       AND comments.target_id = community_threads.id
+       AND comments.status = 'visible'
+     WHERE ${where}
+     GROUP BY community_threads.id
+     ORDER BY community_threads.updated_at DESC
+     LIMIT 80`,
+  ).all();
+  return rows.results.map(serializeThread);
+}
+
+async function getThread(env, idOrSlug, includeHidden = false) {
+  const where = includeHidden ? '1 = 1' : "community_threads.status <> 'hidden'";
+  const row = await env.DB.prepare(
+    `SELECT community_threads.*,
+            COUNT(comments.id) AS comments_count
+     FROM community_threads
+     LEFT JOIN comments ON comments.target_type = 'thread'
+       AND comments.target_id = community_threads.id
+       AND comments.status = 'visible'
+     WHERE ${where} AND (community_threads.id = ? OR community_threads.slug = ?)
+     GROUP BY community_threads.id`,
+  )
+    .bind(idOrSlug, idOrSlug)
+    .first();
+  return row ? serializeThread(row) : null;
+}
+
+function serializeThread(row) {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    summary: row.summary,
+    body: row.body_markdown,
+    author: row.author_name || 'NTE Meta',
+    authorId: row.author_id || undefined,
+    status: row.status,
+    tags: parseJson(row.tags_json, []),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    commentsCount: Number(row.comments_count || 0),
+    score: Number(row.score || 0),
   };
 }
 
@@ -2483,7 +2778,7 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
         ),
       );
     body.items.forEach((item, index) => {
-      if (!['S+', 'S', 'A', 'B', 'C'].includes(item.tier))
+      if (!['S+', 'S', 'A', 'B', 'C', 'D'].includes(item.tier))
         throwHttp('Неизвестный тир в позиции', 400);
       statements.push(
         env.DB.prepare(
@@ -2963,7 +3258,7 @@ function withCors(request, env, response) {
     response.status === 200 &&
     !hasSession &&
     !response.headers.has('Set-Cookie') &&
-    /^\/api\/(characters|guides|rotations|teams|tierlists|news|leaks)(\/|$)/.test(
+      /^\/api\/(characters|guides|rotations|teams|tierlists|news|leaks|threads)(\/|$)/.test(
       url.pathname,
     )
   ) {

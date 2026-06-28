@@ -37,7 +37,6 @@ import {
   Trash2,
   UserCircle,
   Users,
-  Video,
   X,
 } from 'lucide-react';
 import {
@@ -63,7 +62,9 @@ import {
   loadReactionSummary,
   loadSettings,
   loadSiteData,
+  loadSystemStatus,
   loadUsers,
+  loadWarnings,
   login,
   logout,
   me,
@@ -76,6 +77,7 @@ import {
   updateEditorPermissions,
   updateUserStatus,
   updateUserRole,
+  updateWarningStatus,
 } from './lib/api';
 import { applyMarkdownAction, MarkdownPreview } from './lib/markdown';
 import { resolveAssetUrl } from './lib/assets';
@@ -91,12 +93,14 @@ import {
 import { getYoutubeEmbedUrl } from './lib/youtube';
 import { setPageMetadata } from './lib/seo';
 import { canManageContent, editorGradeLabel } from './lib/permissions';
+import { EditorShell } from './features/inline-editors/editor-shell';
 import type {
   AdminUser,
   AuditLogEntry,
   AppSettings,
   Character,
   Comment,
+  CommunityThread,
   ContentScope,
   EditorGrade,
   EditorPermissions,
@@ -106,6 +110,7 @@ import type {
   NewsItem,
   Role,
   SiteData,
+  SystemStatus,
   Team,
   TeamMember,
   Tier,
@@ -138,8 +143,6 @@ const navItems = [
   { label: 'Гайды', href: '#/guides', icon: BookOpen },
   { label: 'Персонажи', href: '#/characters', icon: Gamepad2 },
   { label: 'Тир-листы', href: '#/tierlists', icon: Star },
-  { label: 'Новости', href: '#/news', icon: Newspaper },
-  { label: 'Видео-гайды', href: '#/videos', icon: Video },
 ];
 
 const roleWeight: Record<User['role'], number> = {
@@ -149,6 +152,12 @@ const roleWeight: Record<User['role'], number> = {
   admin: 4,
   owner: 5,
 };
+
+function canAccessAdmin(user: User | null) {
+  return Boolean(user && ['moderator', 'admin', 'owner'].includes(user.role));
+}
+
+type SiteDataSetter = React.Dispatch<React.SetStateAction<SiteData>>;
 const roleOptions = [
   'Все роли',
   'DD',
@@ -181,6 +190,18 @@ const typeOptions = [
 ];
 const rarityOptions = ['Любая редкость', 'S', 'A', 'Нулевой'];
 const tierOptions = ['Любой тир', ...tierOrder];
+
+function makeSlug(value: string) {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/ё/g, 'e')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9а-я]+/gi, '-')
+      .replace(/^-+|-+$/g, '') || `thread-${Date.now()}`
+  );
+}
 
 function useHashRoute() {
   function getRoute() {
@@ -291,6 +312,9 @@ function App() {
     const leak = data.leaks.find(
       (item) => item.id === activeSlug || item.slug === activeSlug,
     );
+    const thread = data.threads.find(
+      (item) => item.id === activeSlug || item.slug === activeSlug,
+    );
 
     if (activeSection === 'news' && newsItem) {
       setPageMetadata({
@@ -321,6 +345,23 @@ function App() {
           headline: leak.title,
           description: leak.summary,
           datePublished: leak.date,
+        },
+      });
+      return;
+    }
+    if (activeSection === 'threads' && thread) {
+      setPageMetadata({
+        title: thread.title,
+        description: thread.summary,
+        path: `/threads/${thread.slug}/`,
+        type: 'article',
+        structuredData: {
+          '@type': 'DiscussionForumPosting',
+          headline: thread.title,
+          text: thread.summary,
+          datePublished: thread.createdAt,
+          dateModified: thread.updatedAt || thread.createdAt,
+          author: { '@type': 'Person', name: thread.author },
         },
       });
       return;
@@ -368,21 +409,6 @@ function App() {
         'Base C0 и Premium C6 тир-листы NTE Meta.',
         '/tierlists/',
       ],
-      news: [
-        'Новости',
-        'Новости Neverness to Everness и редакционные разборы.',
-        '/news/',
-      ],
-      leaks: [
-        'Сливы',
-        'Слухи и сливы NTE с источниками, статусами и уровнем доверия.',
-        '/leaks/',
-      ],
-      videos: [
-        'Видео-гайды',
-        'Видео-гайды NTE Meta с таймкодами и текстовыми материалами.',
-        '/videos/',
-      ],
       admin: ['Админка', 'Защищённая редакционная CMS NTE Meta.', '/admin/'],
       profile: [
         'Профиль',
@@ -402,39 +428,47 @@ function App() {
     });
   }, [data, route]);
 
-  const [section, slug, entityId] = route.split('/');
-  let page = <HomePage data={data} loading={loading} />;
+  const [section, slug] = route.split('/');
+  let page = (
+    <HomePage data={data} loading={loading} user={user} setData={setData} />
+  );
 
   if (section === 'characters') {
     page = slug ? (
-      <CharacterDetailPage data={data} slug={slug} user={user} />
+      <CharacterDetailPage data={data} slug={slug} user={user} setData={setData} />
     ) : (
-      <CharactersPage data={data} user={user} />
+      <CharactersPage data={data} user={user} setData={setData} />
     );
   } else if (section === 'guides') {
     page = slug ? (
-      <GuidePage data={data} slug={slug} user={user} />
+      <GuidePage data={data} slug={slug} user={user} setData={setData} />
     ) : (
-      <GuidesPage data={data} user={user} />
+      <GuidesPage data={data} user={user} setData={setData} />
     );
   } else if (section === 'tierlists') {
-    page = <TierListsPage data={data} user={user} />;
+    page = <TierListsPage data={data} user={user} setData={setData} />;
   } else if (section === 'news') {
     page = slug ? (
-      <NewsDetailPage data={data} slug={slug} user={user} />
+      <NewsDetailPage data={data} slug={slug} user={user} setData={setData} />
     ) : (
-      <NewsPage data={data} user={user} />
+      <HomePage data={data} loading={loading} user={user} setData={setData} />
     );
   } else if (section === 'leaks') {
     page = slug ? (
-      <LeakDetailPage data={data} slug={slug} user={user} />
+      <LeakDetailPage data={data} slug={slug} user={user} setData={setData} />
     ) : (
-      <LeaksPage data={data} user={user} />
+      <HomePage data={data} loading={loading} user={user} setData={setData} />
     );
   } else if (section === 'teams' || section === 'rotations') {
-    page = <GuidesPage data={data} user={user} />;
+    page = <GuidesPage data={data} user={user} setData={setData} />;
   } else if (section === 'videos') {
-    page = <VideosPage data={data} user={user} />;
+    page = <GuidesPage data={data} user={user} setData={setData} />;
+  } else if (section === 'threads') {
+    page = slug ? (
+      <ThreadPage data={data} slug={slug} user={user} setData={setData} />
+    ) : (
+      <HomePage data={data} loading={loading} user={user} setData={setData} />
+    );
   } else if (section === 'profile') {
     page = <ProfilePage user={user} setUser={setUser} />;
   } else if (section === 'admin') {
@@ -445,7 +479,6 @@ function App() {
         setUser={setUser}
         setData={setData}
         requestedTab={slug}
-        requestedEntityId={entityId}
       />
     );
   } else if (section) {
@@ -507,10 +540,9 @@ function Header({
   mobileOpen: boolean;
   setMobileOpen: (value: boolean) => void;
 }) {
-  const headerNavItems =
-    user && roleWeight[user.role] >= roleWeight.moderator
-      ? [...navItems, { label: 'Админка', href: '#/admin', icon: ShieldCheck }]
-      : navItems;
+  const headerNavItems = canAccessAdmin(user)
+    ? [...navItems, { label: 'Админка', href: '#/admin', icon: ShieldCheck }]
+    : navItems;
 
   return (
     <header className="site-header">
@@ -576,12 +608,43 @@ function Header({
   );
 }
 
-function HomePage({ data, loading }: { data: SiteData; loading: boolean }) {
+function HomePage({
+  data,
+  loading,
+  user,
+  setData,
+}: {
+  data: SiteData;
+  loading: boolean;
+  user: User | null;
+  setData: React.Dispatch<React.SetStateAction<SiteData>>;
+}) {
   const latestGuides = data.guides.slice(0, 3);
   const latestNews = data.news.slice(0, 2);
   const latestLeaks = data.leaks.filter((leak) => leak.approved).slice(0, 2);
   const { grouped } = groupTierItems(data, 'base');
   const popularCharacters = data.characters.slice(0, 6);
+  const [homeEditor, setHomeEditor] = useState<
+    'guide' | 'news' | 'leak' | 'thread' | null
+  >(null);
+  const [homeEditorItemId, setHomeEditorItemId] = useState('new');
+  const canCreateGuide = canManageContent(user, 'guides', 'create');
+  const canCreateNews = canManageContent(user, 'news', 'create');
+  const canCreateLeak = canManageContent(user, 'leaks', 'create');
+  const canCreateThread = Boolean(user);
+
+  async function refreshContent() {
+    setData(
+      await loadSiteData({
+        includePrivate: Boolean(user && roleWeight[user.role] >= roleWeight.editor),
+      }),
+    );
+  }
+
+  function openHomeEditor(kind: 'guide' | 'news' | 'leak', itemId = 'new') {
+    setHomeEditorItemId(itemId);
+    setHomeEditor(kind);
+  }
 
   return (
     <div className="page-stack">
@@ -641,9 +704,20 @@ function HomePage({ data, loading }: { data: SiteData; loading: boolean }) {
           title="Последние гайды"
           text="Карточки показывают персонажа, патч, автора и краткий практический вывод."
           action={
-            <a className="text-button" href="#/guides">
-              Все гайды <ChevronRight aria-hidden="true" />
-            </a>
+            <div className="section-actions">
+              {canCreateGuide ? (
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => openHomeEditor('guide')}
+                >
+                  <Plus aria-hidden="true" /> Добавить гайд
+                </button>
+              ) : null}
+              <a className="text-button" href="#/guides">
+                Все гайды <ChevronRight aria-hidden="true" />
+              </a>
+            </div>
           }
         />
         <div className="guide-grid">
@@ -655,18 +729,62 @@ function HomePage({ data, loading }: { data: SiteData; loading: boolean }) {
 
       <section className="split-band">
         <div>
-          <SectionHeader eyebrow="Редакция" title="Свежие новости" />
+          <SectionHeader
+            eyebrow="Редакция"
+            title="Свежие новости"
+            action={
+              canCreateNews ? (
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => openHomeEditor('news')}
+                >
+                  <Plus aria-hidden="true" /> Добавить новость
+                </button>
+              ) : null
+            }
+          />
           <div className="compact-list">
             {latestNews.map((item) => (
-              <NewsCompactCard key={item.id} item={item} />
+              <NewsCompactCard
+                key={item.id}
+                item={item}
+                onEdit={
+                  canManageContent(user, 'news', 'edit')
+                    ? () => openHomeEditor('news', item.id)
+                    : undefined
+                }
+              />
             ))}
           </div>
         </div>
         <div>
-          <SectionHeader eyebrow="Отдельно от фактов" title="Сливы / слухи" />
+          <SectionHeader
+            eyebrow="Отдельно от фактов"
+            title="Сливы / слухи"
+            action={
+              canCreateLeak ? (
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => openHomeEditor('leak')}
+                >
+                  <Plus aria-hidden="true" /> Добавить слив
+                </button>
+              ) : null
+            }
+          />
           <div className="compact-list">
             {latestLeaks.map((item) => (
-              <LeakCompactCard key={item.id} item={item} />
+              <LeakCompactCard
+                key={item.id}
+                item={item}
+                onEdit={
+                  canManageContent(user, 'leaks', 'edit')
+                    ? () => openHomeEditor('leak', item.id)
+                    : undefined
+                }
+              />
             ))}
           </div>
         </div>
@@ -696,35 +814,369 @@ function HomePage({ data, loading }: { data: SiteData; loading: boolean }) {
       <section className="community-band">
         <div>
           <p className="eyebrow">Комьюнити</p>
-          <h2>Последние обсуждения игроков</h2>
+          <h2>Треды и обсуждения игроков</h2>
           <p>
-            Делитесь находками, проверяйте ротации вместе и отмечайте полезные
-            ответы. Все публикации доступны модерации.
+            Создавайте треды с вопросами по отрядам, ротациям, ресурсам и
+            патчам. Комментарии под материалами остаются там же, где контекст.
           </p>
-          <p className="inline-note">
-            Обсуждения находятся прямо под гайдами, новостями и страницами
-            персонажей, поэтому отдельный пустой раздел больше не нужен.
-          </p>
+          {canCreateThread ? (
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => setHomeEditor('thread')}
+            >
+              <MessageCircle aria-hidden="true" /> Создать тред
+            </button>
+          ) : (
+            <a className="ghost-button" href="#/profile">
+              <UserCircle aria-hidden="true" /> Войти для треда
+            </a>
+          )}
         </div>
         <div className="comment-preview">
-          {data.comments.length ? (
-            data.comments.slice(0, 2).map((comment) => (
-              <article key={comment.id}>
-                <strong>{comment.author}</strong>
-                <p>{comment.body}</p>
-                <span>{comment.score} полезно</span>
+          {data.threads.length ? (
+            data.threads.slice(0, 3).map((thread) => (
+              <article key={thread.id}>
+                <strong>{thread.title}</strong>
+                <p>{thread.summary}</p>
+                <span>
+                  {thread.commentsCount || 0} комментариев ·{' '}
+                  {formatDate(thread.updatedAt || thread.createdAt)}
+                </span>
+                <a className="text-button" href={`#/threads/${thread.slug}`}>
+                  Открыть тред <ChevronRight aria-hidden="true" />
+                </a>
               </article>
             ))
           ) : (
             <EmptyState
               title="Пока тихо"
-              text="Первое обсуждение появится после комментария под материалом."
+              text="Первый тред появится после публикации игроком или редакцией."
             />
           )}
         </div>
       </section>
+
+      <EditorShell
+        open={homeEditor === 'guide'}
+        title={homeEditorItemId === 'new' ? 'Добавить гайд' : 'Редактировать гайд'}
+        eyebrow="Inline CMS"
+        description="Персонажный гайд создаётся прямо из главной и сразу попадёт в раздел гайдов после публикации."
+        onClose={() => setHomeEditor(null)}
+      >
+        {user ? (
+          <Suspense fallback={<SkeletonGrid label="Загрузка редактора гайда" />}>
+            <AdminGuides
+              data={data}
+              setData={setData}
+              user={user}
+              initialGuideId={homeEditorItemId}
+            />
+          </Suspense>
+        ) : null}
+      </EditorShell>
+
+      <EditorShell
+        open={homeEditor === 'news'}
+        title={homeEditorItemId === 'new' ? 'Добавить новость' : 'Редактировать новость'}
+        eyebrow="Редакция"
+        onClose={() => setHomeEditor(null)}
+      >
+        <Suspense fallback={<SkeletonGrid label="Загрузка редактора новости" />}>
+          <AdminNewsManager
+            items={data.news}
+            initialSelectedId={homeEditorItemId}
+            access={user ? contentAccess(user, 'news') : undefined}
+            onRefresh={refreshContent}
+          />
+        </Suspense>
+      </EditorShell>
+
+      <EditorShell
+        open={homeEditor === 'leak'}
+        title={homeEditorItemId === 'new' ? 'Добавить слив' : 'Редактировать слив'}
+        eyebrow="Слухи отдельно от фактов"
+        onClose={() => setHomeEditor(null)}
+      >
+        <Suspense fallback={<SkeletonGrid label="Загрузка редактора слива" />}>
+          <AdminLeaksManager
+            items={data.leaks}
+            initialSelectedId={homeEditorItemId}
+            access={user ? contentAccess(user, 'leaks') : undefined}
+            onRefresh={refreshContent}
+          />
+        </Suspense>
+      </EditorShell>
+
+      <EditorShell
+        open={homeEditor === 'thread'}
+        title="Создать тред"
+        eyebrow="Комьюнити"
+        onClose={() => setHomeEditor(null)}
+      >
+        {user ? (
+          <ThreadEditor
+            user={user}
+            onSaved={async () => {
+              await refreshContent();
+              setHomeEditor(null);
+            }}
+          />
+        ) : null}
+      </EditorShell>
     </div>
   );
+}
+
+function ThreadEditor({
+  user,
+  thread,
+  onSaved,
+}: {
+  user: User;
+  thread?: CommunityThread;
+  onSaved: () => Promise<void> | void;
+}) {
+  const draftKey = `nte-thread-draft-${thread?.id || 'new'}`;
+  const storedDraft = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem(draftKey) || '{}') as Partial<CommunityThread>;
+    } catch {
+      return {};
+    }
+  }, [draftKey]);
+  const [title, setTitle] = useState(storedDraft.title || thread?.title || '');
+  const [slug, setSlug] = useState(storedDraft.slug || thread?.slug || '');
+  const [summary, setSummary] = useState(storedDraft.summary || thread?.summary || '');
+  const [body, setBody] = useState(storedDraft.body || thread?.body || '');
+  const [tags, setTags] = useState((storedDraft.tags || thread?.tags || []).join(', '));
+  const [status, setStatus] = useState<CommunityThread['status']>(thread?.status || 'open');
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const draft = { title, slug, summary, body, tags: parseTags(tags), status };
+    localStorage.setItem(draftKey, JSON.stringify(draft));
+  }, [body, draftKey, slug, status, summary, tags, title]);
+
+  function updateTitle(value: string) {
+    setTitle(value);
+    if (!thread && !slug.trim()) setSlug(makeSlug(value));
+  }
+
+  async function saveThread(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!title.trim() || !summary.trim() || !body.trim()) {
+      setMessage('Заполните заголовок, краткое описание и текст треда.');
+      return;
+    }
+
+    setPending(true);
+    setMessage('');
+    const payload = {
+      title: title.trim(),
+      slug: makeSlug(slug || title),
+      summary: summary.trim(),
+      body: body.trim(),
+      tags: parseTags(tags),
+      status,
+    };
+    const result = await saveEntity<CommunityThread>(
+      thread ? `/api/threads/${thread.id}` : '/api/threads',
+      payload,
+      thread ? 'PATCH' : 'POST',
+    );
+    if (result.ok) {
+      localStorage.removeItem(draftKey);
+      setMessage(thread ? 'Тред обновлен.' : 'Тред опубликован.');
+      await onSaved();
+    } else {
+      setMessage(result.error);
+    }
+    setPending(false);
+  }
+
+  return (
+    <form className="editor-form thread-editor" onSubmit={saveThread}>
+      <div className="editor-form__tabs" role="tablist" aria-label="Разделы редактора треда">
+        <span className="active">Материал</span>
+        <span>Предпросмотр</span>
+      </div>
+      <div className="editor-form__grid">
+        <section className="admin-panel entity-form">
+          <label htmlFor="thread-title">Заголовок</label>
+          <input
+            id="thread-title"
+            value={title}
+            minLength={4}
+            maxLength={120}
+            onChange={(event) => updateTitle(event.target.value)}
+            required
+          />
+          <label htmlFor="thread-slug">Slug</label>
+          <input
+            id="thread-slug"
+            value={slug}
+            maxLength={140}
+            onChange={(event) => setSlug(makeSlug(event.target.value))}
+            required
+          />
+          <label htmlFor="thread-summary">Краткое описание</label>
+          <textarea
+            id="thread-summary"
+            value={summary}
+            rows={3}
+            maxLength={240}
+            onChange={(event) => setSummary(event.target.value)}
+            required
+          />
+          <label htmlFor="thread-body">Текст треда</label>
+          <MarkdownToolbar
+            textareaRef={textareaRef}
+            value={body}
+            onChange={setBody}
+          />
+          <textarea
+            id="thread-body"
+            ref={textareaRef}
+            value={body}
+            rows={14}
+            maxLength={12000}
+            onChange={(event) => setBody(event.target.value)}
+            required
+          />
+          <label htmlFor="thread-tags">Теги</label>
+          <input
+            id="thread-tags"
+            value={tags}
+            placeholder="вопрос, ротация, патч"
+            onChange={(event) => setTags(event.target.value)}
+          />
+          <label htmlFor="thread-status">Статус</label>
+          <select
+            id="thread-status"
+            value={status}
+            onChange={(event) => setStatus(event.target.value as CommunityThread['status'])}
+          >
+            <option value="open">Открыт</option>
+            <option value="closed">Закрыт</option>
+            {roleWeight[user.role] >= roleWeight.moderator ? (
+              <option value="hidden">Скрыт</option>
+            ) : null}
+          </select>
+        </section>
+        <section className="admin-panel preview-panel">
+          <p className="eyebrow">Предпросмотр</p>
+          <h2>{title || 'Новый тред'}</h2>
+          <p>{summary || 'Краткое описание появится здесь.'}</p>
+          <Tags tags={parseTags(tags)} />
+          <MarkdownPreview value={body || '_Текст треда пока пуст._'} />
+        </section>
+      </div>
+      <div className="editor-shell__footer">
+        <button className="primary-button" type="submit" disabled={pending}>
+          <CheckCircle2 aria-hidden="true" />
+          {pending ? 'Сохраняем...' : thread ? 'Сохранить тред' : 'Опубликовать тред'}
+        </button>
+        <span className="form-message" aria-live="polite">
+          {message || 'Черновик автоматически хранится в этом браузере.'}
+        </span>
+      </div>
+    </form>
+  );
+}
+
+function ThreadPage({
+  data,
+  slug,
+  user,
+  setData,
+}: {
+  data: SiteData;
+  slug: string;
+  user: User | null;
+  setData: SiteDataSetter;
+}) {
+  const thread = data.threads.find((item) => item.slug === slug || item.id === slug);
+  const [editorOpen, setEditorOpen] = useState(false);
+
+  async function refreshContent() {
+    setData(
+      await loadSiteData({
+        includePrivate: Boolean(user && roleWeight[user.role] >= roleWeight.editor),
+      }),
+    );
+  }
+
+  if (!thread || thread.status === 'hidden') {
+    return (
+      <EmptyState
+        title="Тред не найден"
+        text="Он мог быть скрыт модерацией или ссылка устарела."
+      />
+    );
+  }
+
+  const canEditThread =
+    Boolean(user && thread.authorId === user.id) ||
+    Boolean(user && roleWeight[user.role] >= roleWeight.moderator);
+
+  return (
+    <div className="page-stack">
+      <article className="editorial-article thread-article">
+        <header className="editorial-copy-hero">
+          <p className="eyebrow">
+            Комьюнити · {thread.author} · {formatDate(thread.createdAt)}
+          </p>
+          <h1>{thread.title}</h1>
+          <p>{thread.summary}</p>
+          <Tags tags={thread.tags} />
+          {canEditThread ? (
+            <button className="ghost-button" type="button" onClick={() => setEditorOpen(true)}>
+              <Pencil aria-hidden="true" /> Редактировать тред
+            </button>
+          ) : null}
+        </header>
+        <div className="editorial-body">
+          <MarkdownPreview value={thread.body} />
+        </div>
+      </article>
+      <section className="guide-toolbar">
+        <div>
+          <p>Обсуждение</p>
+          <strong>{thread.commentsCount || 0} комментариев</strong>
+        </div>
+        <RatingBar targetType="thread" targetId={thread.id} user={user} />
+      </section>
+      <CommentsBlock targetType="thread" targetId={thread.id} data={data} user={user} />
+      <EditorShell
+        open={editorOpen}
+        title="Редактировать тред"
+        eyebrow="Комьюнити"
+        onClose={() => setEditorOpen(false)}
+      >
+        {user ? (
+          <ThreadEditor
+            user={user}
+            thread={thread}
+            onSaved={async () => {
+              await refreshContent();
+              setEditorOpen(false);
+            }}
+          />
+        ) : null}
+      </EditorShell>
+    </div>
+  );
+}
+
+function parseTags(value: string) {
+  return value
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .slice(0, 8);
 }
 
 function MetricsStrip({ data }: { data: SiteData }) {
@@ -779,7 +1231,15 @@ function CharacterCard({ character }: { character: Character }) {
   );
 }
 
-function GuideCard({ guide, data }: { guide: Guide; data: SiteData }) {
+function GuideCard({
+  guide,
+  data,
+  onEdit,
+}: {
+  guide: Guide;
+  data: SiteData;
+  onEdit?: () => void;
+}) {
   const character = getGuideCharacter(data, guide);
 
   return (
@@ -810,12 +1270,17 @@ function GuideCard({ guide, data }: { guide: Guide; data: SiteData }) {
         <a className="text-button" href={`#/guides/${guide.slug}`}>
           Читать гайд <ChevronRight aria-hidden="true" />
         </a>
+        {onEdit ? (
+          <button className="text-button" type="button" onClick={onEdit}>
+            <Pencil aria-hidden="true" /> Редактировать
+          </button>
+        ) : null}
       </div>
     </article>
   );
 }
 
-function NewsCompactCard({ item }: { item: NewsItem }) {
+function NewsCompactCard({ item, onEdit }: { item: NewsItem; onEdit?: () => void }) {
   return (
     <article className="compact-card">
       <img
@@ -831,12 +1296,22 @@ function NewsCompactCard({ item }: { item: NewsItem }) {
         </span>
         <h3>{item.title}</h3>
         <p>{item.summary}</p>
+        <div className="button-row">
+          <a className="text-button" href={`#/news/${item.slug}`}>
+            Перейти в новость <ChevronRight aria-hidden="true" />
+          </a>
+          {onEdit ? (
+            <button className="text-button" type="button" onClick={onEdit}>
+              <Pencil aria-hidden="true" /> Редактировать
+            </button>
+          ) : null}
+        </div>
       </div>
     </article>
   );
 }
 
-function LeakCompactCard({ item }: { item: LeakItem }) {
+function LeakCompactCard({ item, onEdit }: { item: LeakItem; onEdit?: () => void }) {
   return (
     <article className="compact-card leak">
       <CircleAlert aria-hidden="true" />
@@ -850,9 +1325,16 @@ function LeakCompactCard({ item }: { item: LeakItem }) {
           Не подтверждено: информация может измениться. Источник:{' '}
           {item.sourceName}
         </small>
-        <a className="text-button" href={`#/leaks/${item.slug}`}>
-          Открыть материал <ChevronRight aria-hidden="true" />
-        </a>
+        <div className="button-row">
+          <a className="text-button" href={`#/leaks/${item.slug}`}>
+            Перейти в слив <ChevronRight aria-hidden="true" />
+          </a>
+          {onEdit ? (
+            <button className="text-button" type="button" onClick={onEdit}>
+              <Pencil aria-hidden="true" /> Редактировать
+            </button>
+          ) : null}
+        </div>
       </div>
     </article>
   );
@@ -897,7 +1379,57 @@ function Tags({ tags }: { tags: string[] }) {
   );
 }
 
-function CharactersPage({ data, user }: { data: SiteData; user: User | null }) {
+function MarkdownToolbar({
+  textareaRef,
+  value,
+  onChange,
+}: {
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const actions = [
+    ['bold', 'B'],
+    ['italic', 'I'],
+    ['h2', 'H2'],
+    ['list', '•'],
+    ['quote', 'Цитата'],
+    ['link', 'Ссылка'],
+    ['youtube', 'YouTube'],
+  ];
+
+  function apply(action: string) {
+    const textarea = textareaRef.current;
+    const next = applyMarkdownAction(
+      value,
+      textarea?.selectionStart || 0,
+      textarea?.selectionEnd || 0,
+      action,
+    );
+    onChange(next);
+    window.requestAnimationFrame(() => textarea?.focus());
+  }
+
+  return (
+    <div className="toolbar" aria-label="Markdown toolbar">
+      {actions.map(([action, label]) => (
+        <button key={action} type="button" onClick={() => apply(action)}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CharactersPage({
+  data,
+  user,
+  setData,
+}: {
+  data: SiteData;
+  user: User | null;
+  setData: SiteDataSetter;
+}) {
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const [role, setRole] = useState('Все роли');
@@ -905,6 +1437,7 @@ function CharactersPage({ data, user }: { data: SiteData; user: User | null }) {
   const [rarity, setRarity] = useState('Любая редкость');
   const [tier, setTier] = useState('Любой тир');
   const [attribute, setAttribute] = useState('Любой атрибут');
+  const [editorOpen, setEditorOpen] = useState(false);
   const indexedCharacters = useMemo(
     () =>
       data.characters.map((character) => ({
@@ -945,6 +1478,14 @@ function CharactersPage({ data, user }: { data: SiteData; user: User | null }) {
       .map(({ character }) => character);
   }, [attribute, deferredQuery, indexedCharacters, rarity, role, tier, type]);
 
+  async function refreshContent() {
+    setData(
+      await loadSiteData({
+        includePrivate: Boolean(user && roleWeight[user.role] >= roleWeight.editor),
+      }),
+    );
+  }
+
   return (
     <div className="page-stack">
       <section className="page-hero compact">
@@ -955,9 +1496,9 @@ function CharactersPage({ data, user }: { data: SiteData; user: User | null }) {
           пробуждения. Практическая мета находится в разделе гайдов.
         </p>
         {canManageContent(user, 'characters', 'create') ? (
-          <a className="primary-button" href="#/admin/characters/new">
+          <button className="primary-button" type="button" onClick={() => setEditorOpen(true)}>
             <Plus aria-hidden="true" /> Добавить персонажа
-          </a>
+          </button>
         ) : null}
       </section>
       <section className="filter-panel" aria-label="Фильтры персонажей">
@@ -1018,9 +1559,27 @@ function CharactersPage({ data, user }: { data: SiteData; user: User | null }) {
       ) : (
         <EmptyState
           title="Персонажи не найдены"
-          text="Сбросьте фильтры или добавьте нового персонажа через админку."
+          text="Сбросьте фильтры или добавьте нового персонажа прямо из этого раздела."
         />
       )}
+      <EditorShell
+        open={editorOpen}
+        title="Добавить персонажа"
+        eyebrow="База персонажей"
+        description="Карточка персонажа хранит лор, профиль, способности, материалы, озвучку и косметику. Билды остаются в гайдах."
+        onClose={() => setEditorOpen(false)}
+      >
+        {user ? (
+          <Suspense fallback={<SkeletonGrid label="Загрузка редактора персонажа" />}>
+            <AdminCharacterEditor
+              items={data.characters}
+              initialSelectedId="new"
+              access={contentAccess(user, 'characters')}
+              onRefresh={refreshContent}
+            />
+          </Suspense>
+        ) : null}
+      </EditorShell>
     </div>
   );
 }
@@ -1062,12 +1621,16 @@ function CharacterDetailPage({
   data,
   slug,
   user,
+  setData,
 }: {
   data: SiteData;
   slug: string;
   user: User | null;
+  setData: SiteDataSetter;
 }) {
   const character = getCharacter(data, slug);
+  const [characterEditorOpen, setCharacterEditorOpen] = useState(false);
+  const [guideEditorOpen, setGuideEditorOpen] = useState(false);
 
   if (!character) {
     return (
@@ -1096,6 +1659,14 @@ function CharacterDetailPage({
     consoles: [],
   };
   const guide = data.guides.find((item) => item.characterId === character.id);
+
+  async function refreshContent() {
+    setData(
+      await loadSiteData({
+        includePrivate: Boolean(user && roleWeight[user.role] >= roleWeight.editor),
+      }),
+    );
+  }
 
   return (
     <div className="page-stack character-profile-page">
@@ -1137,16 +1708,23 @@ function CharacterDetailPage({
           <div className="button-row">
             {guide ? (
               <a className="primary-button" href={`#/guides/${guide.slug}`}>
-                <BookOpen aria-hidden="true" /> Открыть гайд
+                <BookOpen aria-hidden="true" /> Гайд на персонажа
               </a>
-            ) : null}
+            ) : canManageContent(user, 'guides', 'create') ? (
+              <button className="primary-button" type="button" onClick={() => setGuideEditorOpen(true)}>
+                <Plus aria-hidden="true" /> Создать гайд
+              </button>
+            ) : (
+              <span className="status-label status-draft">Гайд скоро</span>
+            )}
             {canManageContent(user, 'characters', 'edit') ? (
-              <a
+              <button
                 className="ghost-button"
-                href={`#/admin/characters/${character.id}`}
+                type="button"
+                onClick={() => setCharacterEditorOpen(true)}
               >
                 <Pencil aria-hidden="true" /> Редактировать персонажа
-              </a>
+              </button>
             ) : null}
           </div>
         </div>
@@ -1444,6 +2022,37 @@ function CharacterDetailPage({
         data={data}
         user={user}
       />
+      <EditorShell
+        open={characterEditorOpen}
+        title={`Редактировать: ${character.name}`}
+        eyebrow="Карточка персонажа"
+        description="Лор, профиль, способности, материалы, озвучка, симпатия и косметика. Команды и ротации редактируются в гайде."
+        onClose={() => setCharacterEditorOpen(false)}
+      >
+        {user ? (
+          <Suspense fallback={<SkeletonGrid label="Загрузка редактора персонажа" />}>
+            <AdminCharacterEditor
+              items={data.characters}
+              initialSelectedId={character.id}
+              access={contentAccess(user, 'characters')}
+              onRefresh={refreshContent}
+            />
+          </Suspense>
+        ) : null}
+      </EditorShell>
+      <EditorShell
+        open={guideEditorOpen}
+        title={`Создать гайд: ${character.name}`}
+        eyebrow="Гайд персонажа"
+        description="Создайте персонажный meta-гайд. Отряды, ротации, видео и билды будут редактироваться внутри гайда."
+        onClose={() => setGuideEditorOpen(false)}
+      >
+        {user ? (
+          <Suspense fallback={<SkeletonGrid label="Загрузка редактора гайда" />}>
+            <AdminGuides data={data} setData={setData} user={user} initialGuideId="new" />
+          </Suspense>
+        ) : null}
+      </EditorShell>
     </div>
   );
 }
@@ -1452,10 +2061,12 @@ function GuidePage({
   data,
   slug,
   user,
+  setData,
 }: {
   data: SiteData;
   slug: string;
   user: User | null;
+  setData: SiteDataSetter;
 }) {
   const guide = data.guides.find(
     (item) => item.slug === slug || item.id === slug,
@@ -1472,7 +2083,13 @@ function GuidePage({
   }
 
   return (
-    <GuideDetail data={data} guide={guide} character={character} user={user} />
+    <GuideDetail
+      data={data}
+      guide={guide}
+      character={character}
+      user={user}
+      setData={setData}
+    />
   );
 }
 
@@ -1521,12 +2138,15 @@ function GuideDetail({
   guide,
   character,
   user,
+  setData,
 }: {
   data: SiteData;
   guide: Guide;
   character: Character;
   user: User | null;
+  setData: SiteDataSetter;
 }) {
+  const [editorOpen, setEditorOpen] = useState(false);
   const relatedTeams = data.teams.filter(
     (team) =>
       team.guideId === guide.id ||
@@ -1545,11 +2165,14 @@ function GuideDetail({
           <strong>{guide.title}</strong>
         </div>
         <div className="guide-toolbar-actions">
+          <a className="ghost-button" href={`#/characters/${character.slug}`}>
+            <UserCircle aria-hidden="true" /> О персонаже
+          </a>
           <RatingBar targetType="guide" targetId={guide.id} user={user} />
           {canManageContent(user, 'guides', 'edit') ? (
-            <a className="ghost-button" href={`#/admin/guides/${guide.id}`}>
+            <button className="ghost-button" type="button" onClick={() => setEditorOpen(true)}>
               <Pencil aria-hidden="true" /> Редактировать гайд
-            </a>
+            </button>
           ) : null}
         </div>
       </section>
@@ -1608,6 +2231,24 @@ function GuideDetail({
         data={data}
         user={user}
       />
+      <EditorShell
+        open={editorOpen}
+        title={`Редактировать гайд: ${character.name}`}
+        eyebrow="Meta-гайд"
+        description="Секции гайда, команды, ротации и видео редактируются здесь, без отдельного публичного раздела команд."
+        onClose={() => setEditorOpen(false)}
+      >
+        {user ? (
+          <Suspense fallback={<SkeletonGrid label="Загрузка редактора гайда" />}>
+            <AdminGuides
+              data={data}
+              setData={setData}
+              user={user}
+              initialGuideId={guide.id}
+            />
+          </Suspense>
+        ) : null}
+      </EditorShell>
     </div>
   );
 }
@@ -2149,7 +2790,15 @@ function CommentsBlock({
   );
 }
 
-function GuidesPage({ data, user }: { data: SiteData; user: User | null }) {
+function GuidesPage({
+  data,
+  user,
+  setData,
+}: {
+  data: SiteData;
+  user: User | null;
+  setData: SiteDataSetter;
+}) {
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const [role, setRole] = useState('Все роли');
@@ -2157,6 +2806,7 @@ function GuidesPage({ data, user }: { data: SiteData; user: User | null }) {
   const [rarity, setRarity] = useState('Любая редкость');
   const [tier, setTier] = useState('Любой тир');
   const [attribute, setAttribute] = useState('Любой атрибут');
+  const [editorGuideId, setEditorGuideId] = useState<string | null>(null);
   const attributes = useMemo(
     () => [
       'Любой атрибут',
@@ -2195,9 +2845,9 @@ function GuidesPage({ data, user }: { data: SiteData; user: User | null }) {
           ротации собраны внутри каждого материала.
         </p>
         {canManageContent(user, 'guides', 'create') ? (
-          <a className="primary-button" href="#/admin/guides/new">
+        <button className="primary-button" type="button" onClick={() => setEditorGuideId('new')}>
             <Plus aria-hidden="true" /> Создать гайд
-          </a>
+        </button>
         ) : null}
       </section>
       <search className="filter-panel" aria-label="Фильтры гайдов">
@@ -2249,7 +2899,16 @@ function GuidesPage({ data, user }: { data: SiteData; user: User | null }) {
       {filtered.length ? (
         <section className="guide-grid">
           {filtered.map((guide) => (
-            <GuideCard key={guide.id} guide={guide} data={data} />
+            <GuideCard
+              key={guide.id}
+              guide={guide}
+              data={data}
+              onEdit={
+                canManageContent(user, 'guides', 'edit')
+                  ? () => setEditorGuideId(guide.id)
+                  : undefined
+              }
+            />
           ))}
         </section>
       ) : (
@@ -2258,27 +2917,54 @@ function GuidesPage({ data, user }: { data: SiteData; user: User | null }) {
           text="Измените фильтры или создайте новый персонажный гайд."
         />
       )}
+      <EditorShell
+        open={Boolean(editorGuideId)}
+        title={editorGuideId === 'new' ? 'Добавить гайд' : 'Редактировать гайд'}
+        eyebrow="Meta-гайды"
+        description="Секции, команды, ротации и видео редактируются внутри одного персонажного гайда."
+        onClose={() => setEditorGuideId(null)}
+      >
+        {user ? (
+          <Suspense fallback={<SkeletonGrid label="Загрузка редактора гайда" />}>
+            <AdminGuides
+              data={data}
+              setData={setData}
+              user={user}
+              initialGuideId={editorGuideId || undefined}
+            />
+          </Suspense>
+        ) : null}
+      </EditorShell>
     </div>
   );
 }
 
-function TierListsPage({ data, user }: { data: SiteData; user: User | null }) {
+function TierListsPage({
+  data,
+  user,
+  setData,
+}: {
+  data: SiteData;
+  user: User | null;
+  setData: SiteDataSetter;
+}) {
   const [kind, setKind] = useState<'base' | 'premium'>('base');
+  const [editorOpen, setEditorOpen] = useState(false);
   const { tierlist, grouped } = groupTierItems(data, kind);
 
   return (
     <div className="page-stack">
       <section className="page-hero compact">
-        <p className="eyebrow">S+ · S · A · B · C</p>
+        <p className="eyebrow">S+ · S · A · B · C · D</p>
         <h1>Тир-листы</h1>
         <p>
           Отдельно для base C0 и premium C6, чтобы F2P-игроки не сравнивали себя
           с whale-условиями.
         </p>
         {canManageContent(user, 'tierlists', 'edit') ? (
-          <a className="primary-button" href="#/admin/tierlists">
+          <button className="primary-button" type="button" onClick={() => setEditorOpen(true)}>
             <Pencil aria-hidden="true" /> Редактировать тир-листы
-          </a>
+          </button>
         ) : null}
       </section>
       <section className="segmented-control" aria-label="Тип тир-листа">
@@ -2312,78 +2998,23 @@ function TierListsPage({ data, user }: { data: SiteData; user: User | null }) {
           ))}
         </div>
       </section>
-    </div>
-  );
-}
-
-function NewsPage({ data, user }: { data: SiteData; user: User | null }) {
-  return (
-    <div className="page-stack">
-      <section className="page-hero compact">
-        <p className="eyebrow">Новости отдельно, слухи отдельно</p>
-        <h1>Новости и сливы</h1>
-        <p>
-          Официальные материалы не смешиваются со сливами. У каждого слуха есть
-          статус, источник и уровень доверия.
-        </p>
-        <div className="button-row">
-          {canManageContent(user, 'news', 'create') ? (
-            <a className="primary-button" href="#/admin/news/new">
-              <Plus aria-hidden="true" /> Добавить новость
-            </a>
-          ) : null}
-          {canManageContent(user, 'leaks', 'create') ? (
-            <a className="ghost-button" href="#/admin/leaks/new">
-              <Plus aria-hidden="true" /> Добавить слив
-            </a>
-          ) : null}
-        </div>
-      </section>
-      <section className="split-band">
-        <div>
-          <SectionHeader title="Новости" />
-          <div className="news-grid">
-            {data.news.map((item) => (
-              <article className="news-card" key={item.id}>
-                <img
-                  src={resolveAssetUrl(item.imageUrl)}
-                  alt=""
-                  width="460"
-                  height="260"
-                  loading="lazy"
-                />
-                <div>
-                  <p className="eyebrow">
-                    {item.category} · {formatDate(item.date)}
-                  </p>
-                  <h3>{item.title}</h3>
-                  <p>{item.summary}</p>
-                  <Tags tags={item.tags} />
-                  <a className="text-button" href={`#/news/${item.slug}`}>
-                    Читать полностью <ChevronRight aria-hidden="true" />
-                  </a>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-        <div>
-          <SectionHeader
-            title="Сливы из источников"
-            text="Автоимпорт подготовлен архитектурно, публикация только после одобрения."
-            action={
-              <a className="text-button" href="#/leaks">
-                Все сливы <ChevronRight aria-hidden="true" />
-              </a>
-            }
-          />
-          <div className="compact-list">
-            {data.leaks.map((item) => (
-              <LeakCompactCard key={item.id} item={item} />
-            ))}
-          </div>
-        </div>
-      </section>
+      <EditorShell
+        open={editorOpen}
+        title="Редактировать тир-лист"
+        eyebrow="Base C0 / Premium C6"
+        description="Перемещайте персонажей между тирами, меняйте позицию и заметки без отдельной CMS-страницы."
+        onClose={() => setEditorOpen(false)}
+      >
+        {user ? (
+          <Suspense fallback={<SkeletonGrid label="Загрузка редактора тир-листа" />}>
+            <AdminTierlists
+              data={data}
+              setData={setData}
+              canPublish={canManageContent(user, 'tierlists', 'publish')}
+            />
+          </Suspense>
+        ) : null}
+      </EditorShell>
     </div>
   );
 }
@@ -2433,14 +3064,25 @@ function NewsDetailPage({
   data,
   slug,
   user,
+  setData,
 }: {
   data: SiteData;
   slug: string;
   user: User | null;
+  setData: SiteDataSetter;
 }) {
   const item = data.news.find(
     (newsItem) => newsItem.slug === slug || newsItem.id === slug,
   );
+  const [editorOpen, setEditorOpen] = useState(false);
+
+  async function refreshContent() {
+    setData(
+      await loadSiteData({
+        includePrivate: Boolean(user && roleWeight[user.role] >= roleWeight.editor),
+      }),
+    );
+  }
 
   if (!item) {
     return (
@@ -2474,9 +3116,9 @@ function NewsDetailPage({
             />
             <Tags tags={item.tags} />
             {canManageContent(user, 'news', 'edit') ? (
-              <a className="ghost-button" href={`#/admin/news/${item.id}`}>
+              <button className="ghost-button" type="button" onClick={() => setEditorOpen(true)}>
                 <Pencil aria-hidden="true" /> Редактировать новость
-              </a>
+              </button>
             ) : null}
           </div>
         </header>
@@ -2497,45 +3139,21 @@ function NewsDetailPage({
         data={data}
         user={user}
       />
-    </div>
-  );
-}
-
-function LeaksPage({ data, user }: { data: SiteData; user: User | null }) {
-  const approvedLeaks = data.leaks.filter((item) => item.approved);
-
-  return (
-    <div className="page-stack">
-      <section className="page-hero compact leak-hero">
-        <p className="eyebrow">Слухи не являются фактами</p>
-        <h1>Сливы и неподтвержденная информация</h1>
-        <p>
-          Каждый материал показывает статус, доверие и оригинальный источник.
-          Информация может измениться или быть опровергнута.
-        </p>
-        {canManageContent(user, 'leaks', 'create') ? (
-          <a className="primary-button" href="#/admin/leaks/new">
-            <Plus aria-hidden="true" /> Добавить слив
-          </a>
-        ) : null}
-      </section>
-      <section className="news-grid">
-        {approvedLeaks.map((item) => (
-          <article className="news-card leak-card" key={item.id}>
-            <div>
-              <p className="eyebrow">
-                {item.status} · доверие: {item.trustLevel}
-              </p>
-              <h2>{item.title}</h2>
-              <p>{item.summary}</p>
-              <Tags tags={item.tags} />
-              <a className="text-button" href={`#/leaks/${item.slug}`}>
-                Открыть слив <ChevronRight aria-hidden="true" />
-              </a>
-            </div>
-          </article>
-        ))}
-      </section>
+      <EditorShell
+        open={editorOpen}
+        title="Редактировать новость"
+        eyebrow="Редакция"
+        onClose={() => setEditorOpen(false)}
+      >
+        <Suspense fallback={<SkeletonGrid label="Загрузка редактора новости" />}>
+          <AdminNewsManager
+            items={data.news}
+            initialSelectedId={item.id}
+            access={user ? contentAccess(user, 'news') : undefined}
+            onRefresh={refreshContent}
+          />
+        </Suspense>
+      </EditorShell>
     </div>
   );
 }
@@ -2544,14 +3162,25 @@ function LeakDetailPage({
   data,
   slug,
   user,
+  setData,
 }: {
   data: SiteData;
   slug: string;
   user: User | null;
+  setData: SiteDataSetter;
 }) {
   const item = data.leaks.find(
     (leakItem) => leakItem.slug === slug || leakItem.id === slug,
   );
+  const [editorOpen, setEditorOpen] = useState(false);
+
+  async function refreshContent() {
+    setData(
+      await loadSiteData({
+        includePrivate: Boolean(user && roleWeight[user.role] >= roleWeight.editor),
+      }),
+    );
+  }
 
   if (!item || !item.approved) {
     return (
@@ -2581,9 +3210,9 @@ function LeakDetailPage({
             sourceUrl={item.sourceUrl}
           />
           {canManageContent(user, 'leaks', 'edit') ? (
-            <a className="ghost-button" href={`#/admin/leaks/${item.id}`}>
+            <button className="ghost-button" type="button" onClick={() => setEditorOpen(true)}>
               <Pencil aria-hidden="true" /> Редактировать слив
-            </a>
+            </button>
           ) : null}
           <Tags tags={item.tags} />
         </header>
@@ -2604,94 +3233,21 @@ function LeakDetailPage({
         data={data}
         user={user}
       />
-    </div>
-  );
-}
-
-function VideosPage({ data, user }: { data: SiteData; user: User | null }) {
-  const videoGuides = data.guides.filter((guide) => guide.videoUrl);
-  const placeholderEmbed = getYoutubeEmbedUrl(
-    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-  );
-
-  return (
-    <div className="page-stack">
-      <section className="page-hero compact">
-        <p className="eyebrow">YouTube + текст</p>
-        <h1>Видео-гайды</h1>
-        <p>
-          Каждый ролик можно связать с персонажами, командами и текстовой
-          расшифровкой.
-        </p>
-        {canManageContent(user, 'videos', 'edit') ? (
-          <a className="primary-button" href="#/admin/videos">
-            <Pencil aria-hidden="true" /> Управлять видео-гайдами
-          </a>
-        ) : null}
-      </section>
-      <section className="video-grid">
-        {videoGuides.map((guide) => {
-          const embedUrl = getYoutubeEmbedUrl(guide.videoUrl || '');
-          const character = getGuideCharacter(data, guide);
-          return (
-            <article className="video-card" key={guide.id}>
-              {embedUrl ? (
-                <iframe
-                  className="video-frame"
-                  src={embedUrl}
-                  title={guide.title}
-                  loading="lazy"
-                  allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                />
-              ) : null}
-              <div>
-                <p className="eyebrow">
-                  {character?.name || 'NTE Meta'} · патч {guide.patch}
-                </p>
-                <h3>{guide.title}</h3>
-                <p>{guide.summary}</p>
-                <a className="text-button" href={`#/guides/${guide.slug}`}>
-                  Текстовая версия <ChevronRight aria-hidden="true" />
-                </a>
-                {canManageContent(user, 'videos', 'edit') ? (
-                  <a
-                    className="ghost-button"
-                    href={`#/admin/videos/${guide.id}`}
-                  >
-                    <Pencil aria-hidden="true" /> Редактировать видео
-                  </a>
-                ) : null}
-              </div>
-            </article>
-          );
-        })}
-        {videoGuides.length === 0 ? (
-          <article className="video-card video-placeholder-card">
-            {placeholderEmbed ? (
-              <iframe
-                className="video-frame"
-                src={placeholderEmbed}
-                title="Редакционный плейсхолдер NTE Meta"
-                loading="lazy"
-                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
-            ) : null}
-            <div>
-              <p className="eyebrow">Редакционный плейсхолдер</p>
-              <h2>Видео-гайды готовятся</h2>
-              <p>
-                Да, пока это тот самый ролик. Настоящие разборы появятся здесь
-                вместе с таймкодами и полной текстовой версией.
-              </p>
-              <a className="primary-button" href="#/guides">
-                <BookOpen aria-hidden="true" /> Открыть текстовые гайды
-              </a>
-            </div>
-          </article>
-        ) : null}
-      </section>
+      <EditorShell
+        open={editorOpen}
+        title="Редактировать слив"
+        eyebrow="Слухи и источники"
+        onClose={() => setEditorOpen(false)}
+      >
+        <Suspense fallback={<SkeletonGrid label="Загрузка редактора слива" />}>
+          <AdminLeaksManager
+            items={data.leaks}
+            initialSelectedId={item.id}
+            access={user ? contentAccess(user, 'leaks') : undefined}
+            onRefresh={refreshContent}
+          />
+        </Suspense>
+      </EditorShell>
     </div>
   );
 }
@@ -2720,7 +3276,7 @@ function ProfilePage({
           редакционной CMS.
         </p>
         <div className="button-row">
-          {roleWeight[user.role] >= roleWeight.moderator ? (
+          {canAccessAdmin(user) ? (
             <a className="primary-button" href="#/admin">
               <ShieldCheck aria-hidden="true" /> Открыть админку
             </a>
@@ -2744,58 +3300,39 @@ function ProfilePage({
 
 const adminTabs = [
   'dashboard',
-  'characters',
-  'guides',
-  'videos',
-  'tierlists',
-  'news',
-  'leaks',
   'comments',
+  'warnings',
   'users',
   'settings',
   'sources',
+  'system',
   'audit',
 ] as const;
 
 const adminLabels: Record<(typeof adminTabs)[number], string> = {
   dashboard: 'Dashboard',
-  characters: 'Персонажи',
-  guides: 'Гайды',
-  videos: 'Видео-гайды',
-  tierlists: 'Тир-листы',
-  news: 'Новости',
-  leaks: 'Сливы',
   comments: 'Комментарии',
+  warnings: 'Предупреждения',
   users: 'Пользователи',
   settings: 'Настройки',
   sources: 'Источники',
+  system: 'Статус API/D1',
   audit: 'Audit log',
 };
 
 const adminTabRole: Record<(typeof adminTabs)[number], User['role']> = {
   dashboard: 'moderator',
-  characters: 'editor',
-  guides: 'editor',
-  videos: 'editor',
-  tierlists: 'editor',
-  news: 'editor',
-  leaks: 'editor',
   comments: 'moderator',
+  warnings: 'moderator',
   users: 'admin',
   settings: 'admin',
   sources: 'admin',
+  system: 'admin',
   audit: 'admin',
 };
 
 const adminTabScope: Partial<Record<(typeof adminTabs)[number], ContentScope>> =
-  {
-    characters: 'characters',
-    guides: 'guides',
-    videos: 'videos',
-    tierlists: 'tierlists',
-    news: 'news',
-    leaks: 'leaks',
-  };
+  {};
 
 function canOpenAdminTab(user: User, tab: (typeof adminTabs)[number]) {
   const scope = adminTabScope[tab];
@@ -2822,14 +3359,12 @@ function AdminPage({
   setUser,
   setData,
   requestedTab,
-  requestedEntityId,
 }: {
   data: SiteData;
   user: User | null;
   setUser: (user: User | null) => void;
   setData: React.Dispatch<React.SetStateAction<SiteData>>;
   requestedTab?: string;
-  requestedEntityId?: string;
 }) {
   const requested = adminTabs.includes(
     requestedTab as (typeof adminTabs)[number],
@@ -2869,13 +3404,13 @@ function AdminPage({
     );
   }
 
-  if (roleWeight[user.role] < roleWeight.moderator) {
+  if (!canAccessAdmin(user)) {
     return (
       <div className="page-stack profile-page">
         <section className="page-hero compact">
           <h1>Админка недоступна</h1>
           <p>
-            Редакционная CMS доступна только moderator, editor, admin и owner.
+            Системная админка доступна только moderator, admin и owner.
           </p>
           <a className="primary-button" href="#/profile">
             <UserCircle aria-hidden="true" /> Вернуться в профиль
@@ -2921,60 +3456,10 @@ function AdminPage({
         </div>
         <Suspense fallback={<SkeletonGrid label="Загрузка редактора" />}>
           {tab === 'dashboard' ? <AdminDashboard data={data} /> : null}
-          {tab === 'characters' ? (
-            <AdminCharacterEditor
-              items={data.characters}
-              initialSelectedId={requestedEntityId}
-              access={{
-                canCreate: canManageContent(user, 'characters', 'create'),
-                canPublish: canManageContent(user, 'characters', 'publish'),
-                canDelete: canManageContent(user, 'characters', 'delete'),
-              }}
-              onRefresh={refreshContent}
-            />
-          ) : null}
-          {tab === 'guides' ? (
-            <AdminGuides
-              data={data}
-              setData={setData}
-              user={user}
-              initialGuideId={requestedEntityId}
-            />
-          ) : null}
-          {tab === 'videos' ? (
-            <AdminVideos
-              data={data}
-              setData={setData}
-              initialGuideId={requestedEntityId}
-              access={contentAccess(user, 'videos')}
-            />
-          ) : null}
-          {tab === 'tierlists' ? (
-            <AdminTierlists
-              data={data}
-              setData={setData}
-              canPublish={canManageContent(user, 'tierlists', 'publish')}
-            />
-          ) : null}
-          {tab === 'news' ? (
-            <AdminNewsManager
-              items={data.news}
-              initialSelectedId={requestedEntityId}
-              access={contentAccess(user, 'news')}
-              onRefresh={refreshContent}
-            />
-          ) : null}
-          {tab === 'leaks' ? (
-            <AdminLeaksManager
-              items={data.leaks}
-              initialSelectedId={requestedEntityId}
-              access={contentAccess(user, 'leaks')}
-              onRefresh={refreshContent}
-            />
-          ) : null}
           {tab === 'comments' ? (
             <AdminComments data={data} user={user} />
           ) : null}
+          {tab === 'warnings' ? <AdminWarnings /> : null}
           {tab === 'users' ? <AdminUsers actor={user} /> : null}
           {tab === 'settings' ? <AdminSettings /> : null}
           {tab === 'sources' ? (
@@ -2983,6 +3468,7 @@ function AdminPage({
               onRefresh={refreshContent}
             />
           ) : null}
+          {tab === 'system' ? <AdminSystemStatus /> : null}
           {tab === 'audit' ? <AdminAuditLog /> : null}
         </Suspense>
       </section>
@@ -3307,17 +3793,39 @@ function AdminDashboard({ data }: { data: SiteData }) {
     <div className="admin-grid">
       <MetricsStrip data={data} />
       <div className="admin-panel">
+        <h2>Быстрые переходы к контенту</h2>
+        <div className="button-row">
+          <a className="ghost-button" href="#/guides">
+            <BookOpen aria-hidden="true" /> Гайды
+          </a>
+          <a className="ghost-button" href="#/characters">
+            <Gamepad2 aria-hidden="true" /> Персонажи
+          </a>
+          <a className="ghost-button" href="#/tierlists">
+            <Star aria-hidden="true" /> Тир-лист
+          </a>
+          <a className="ghost-button" href="#/">
+            <Newspaper aria-hidden="true" /> Новости и сливы
+          </a>
+        </div>
+        <p>
+          Создание и редактирование контента теперь находится в самих публичных
+          разделах. Эта панель оставлена для модерации, пользователей, источников
+          и системных настроек.
+        </p>
+      </div>
+      <div className="admin-panel">
         <h2>Что видят роли</h2>
         <ul>
           <li>user: профиль, комментарии, оценки.</li>
           <li>
-            editor: создание и редактирование гайдов, черновиков и секций.
+            editor: inline-кнопки создания и редактирования разрешённого контента.
           </li>
           <li>
             moderator: скрытие комментариев, предупреждения, базовая модерация.
           </li>
           <li>
-            admin: контент, новости, сливы, пользователи editor/moderator.
+            admin: пользователи, роли, источники, настройки и системный статус.
           </li>
           <li>
             owner: полный доступ, роли admin/owner, настройки и удаление
@@ -3347,185 +3855,6 @@ const BUILD_SECTION_TEMPLATE = `## Рекомендуемый билд
 
 ### Что менять без сигнатурки
 Опишите практическую замену и поправку ротации.`;
-
-function AdminVideos({
-  data,
-  setData,
-  initialGuideId,
-  access,
-}: {
-  data: SiteData;
-  setData: React.Dispatch<React.SetStateAction<SiteData>>;
-  initialGuideId?: string;
-  access: { canCreate: boolean; canPublish: boolean; canDelete: boolean };
-}) {
-  const [guideId, setGuideId] = useState(
-    initialGuideId || data.guides[0]?.id || '',
-  );
-  const guide = data.guides.find((item) => item.id === guideId);
-  const [videoUrl, setVideoUrl] = useState(guide?.videoUrl || '');
-  const [transcript, setTranscript] = useState(guide?.transcript || '');
-  const [status, setStatus] = useState<Guide['status']>(
-    guide?.status || 'draft',
-  );
-  const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState('');
-  const embedUrl = getYoutubeEmbedUrl(videoUrl);
-
-  useEffect(() => {
-    if (initialGuideId) setGuideId(initialGuideId);
-  }, [initialGuideId]);
-
-  useEffect(() => {
-    const nextGuide = data.guides.find((item) => item.id === guideId);
-    setVideoUrl(nextGuide?.videoUrl || '');
-    setTranscript(nextGuide?.transcript || '');
-    setStatus(nextGuide?.status || 'draft');
-  }, [data.guides, guideId]);
-
-  async function saveVideoGuide() {
-    if (!guide) return;
-    setPending(true);
-    setMessage('');
-    const result = await saveEntity<{ success: boolean }>(
-      `/api/guides/${guide.id}`,
-      {
-        videoUrl,
-        transcriptMarkdown: transcript,
-        ...(access.canPublish ? { status } : {}),
-      },
-      'PATCH',
-    );
-    if (result.ok) {
-      setData(await loadSiteData({ includePrivate: true }));
-      setMessage(
-        status === 'published'
-          ? 'Видео-гайд опубликован.'
-          : 'Видео-гайд сохранён без публичной публикации.',
-      );
-    } else {
-      setMessage(result.error);
-    }
-    setPending(false);
-  }
-
-  if (!guide) {
-    return (
-      <EmptyState
-        icon={Video}
-        title="Сначала создайте гайд"
-        text="Видео связывается с текстовым гайдом, чтобы игрок всегда получал ротацию и расшифровку."
-      />
-    );
-  }
-
-  return (
-    <div className="admin-grid two-columns cms-focused-editor">
-      <section className="admin-panel entity-form">
-        <p className="eyebrow">YouTube + текст</p>
-        <h2>Редактор видео-гайда</h2>
-        <label htmlFor="video-guide-picker">Связанный гайд</label>
-        <select
-          id="video-guide-picker"
-          value={guide.id}
-          onChange={(event) => {
-            setGuideId(event.target.value);
-            setMessage('');
-          }}
-        >
-          {data.guides.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.title} · {item.status}
-            </option>
-          ))}
-        </select>
-        <label htmlFor="video-guide-url">YouTube URL</label>
-        <input
-          id="video-guide-url"
-          type="url"
-          value={videoUrl}
-          placeholder="https://www.youtube.com/watch?v=..."
-          onChange={(event) => setVideoUrl(event.target.value)}
-        />
-        <div className="button-row">
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={() =>
-              setVideoUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
-            }
-          >
-            <Video aria-hidden="true" /> Поставить тестовый ролик
-          </button>
-          {videoUrl ? (
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => setVideoUrl('')}
-            >
-              <X aria-hidden="true" /> Убрать видео
-            </button>
-          ) : null}
-        </div>
-        <label htmlFor="video-guide-status">Статус материала</label>
-        <select
-          id="video-guide-status"
-          value={status}
-          disabled={!access.canPublish}
-          onChange={(event) => setStatus(event.target.value as Guide['status'])}
-        >
-          <option value="draft">Черновик</option>
-          <option value="pending_review">На проверке</option>
-          <option value="published">Опубликован</option>
-          <option value="archived">Архив</option>
-        </select>
-        <label htmlFor="video-guide-transcript">Расшифровка и таймкоды</label>
-        <textarea
-          id="video-guide-transcript"
-          rows={16}
-          value={transcript}
-          placeholder={'## Таймкоды\n00:00 — вступление\n\n## Расшифровка'}
-          onChange={(event) => setTranscript(event.target.value)}
-        />
-        <button
-          className="primary-button"
-          type="button"
-          disabled={pending || (Boolean(videoUrl) && !embedUrl)}
-          onClick={saveVideoGuide}
-        >
-          <CheckCircle2 aria-hidden="true" />
-          {pending ? 'Сохраняем...' : 'Сохранить видео-гайд'}
-        </button>
-        <p className="form-message" aria-live="polite">
-          {Boolean(videoUrl) && !embedUrl
-            ? 'Проверьте YouTube URL: не удалось получить video ID.'
-            : message}
-        </p>
-      </section>
-      <section className="admin-panel preview-panel">
-        <p className="eyebrow">Предпросмотр</p>
-        <h2>{guide.title}</h2>
-        {embedUrl ? (
-          <iframe
-            className="video-frame"
-            src={embedUrl}
-            title={`Предпросмотр: ${guide.title}`}
-            loading="lazy"
-            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          />
-        ) : (
-          <EmptyState
-            icon={Video}
-            title="Видео пока не выбрано"
-            text="Вставьте YouTube URL или используйте тестовый ролик."
-          />
-        )}
-        {transcript ? <MarkdownPreview value={transcript} /> : null}
-      </section>
-    </div>
-  );
-}
 
 function GuideCreateFields({ characters }: { characters: Character[] }) {
   return (
@@ -5362,6 +5691,146 @@ const defaultEditorPermissions: EditorPermissions = {
   canDelete: false,
 };
 
+function AdminWarnings() {
+  const [warnings, setWarnings] = useState<UserWarning[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [actionId, setActionId] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    loadWarnings().then((result) => {
+      if (!mounted) return;
+      if (result.ok) {
+        setWarnings(result.data);
+      } else {
+        setMessage(result.error);
+      }
+      setLoading(false);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  async function updateStatus(warning: UserWarning, status: 'active' | 'resolved') {
+    setActionId(warning.id);
+    const result = await updateWarningStatus(warning.id, status);
+    if (result.ok) {
+      setWarnings((current) =>
+        current.map((item) => (item.id === warning.id ? { ...item, status } : item)),
+      );
+      setMessage(status === 'resolved' ? 'Предупреждение закрыто.' : 'Предупреждение снова активно.');
+    } else {
+      setMessage(result.error);
+    }
+    setActionId('');
+  }
+
+  return (
+    <section className="admin-panel">
+      <div className="panel-title-row">
+        <div>
+          <p className="eyebrow">Модерация</p>
+          <h2>Предупреждения пользователей</h2>
+        </div>
+        <span>{warnings.length} записей</span>
+      </div>
+      <p className="form-message" aria-live="polite">
+        {loading ? 'Загружаем предупреждения...' : message}
+      </p>
+      <div className="comment-list">
+        {warnings.length ? (
+          warnings.map((warning) => (
+            <article className={`comment-card status-${warning.status || 'active'}`} key={warning.id}>
+              <div className="comment-heading">
+                <strong>{warning.reason}</strong>
+                <span>
+                  {warning.userName || warning.userId || 'Пользователь'} · {formatDate(warning.createdAt)}
+                </span>
+              </div>
+              {warning.note ? <p>{warning.note}</p> : null}
+              <div className="button-row">
+                <button
+                  className="ghost-button"
+                  type="button"
+                  disabled={actionId === warning.id}
+                  onClick={() =>
+                    updateStatus(
+                      warning,
+                      (warning.status || 'active') === 'active' ? 'resolved' : 'active',
+                    )
+                  }
+                >
+                  {(warning.status || 'active') === 'active' ? 'Закрыть' : 'Вернуть'}
+                </button>
+              </div>
+            </article>
+          ))
+        ) : (
+          <EmptyState
+            title="Предупреждений нет"
+            text="Когда модераторы будут выдавать предупреждения, они появятся здесь."
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function AdminSystemStatus() {
+  const [status, setStatus] = useState<SystemStatus | null>(null);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    loadSystemStatus().then((result) => {
+      if (!mounted) return;
+      if (result.ok) {
+        setStatus(result.data);
+      } else {
+        setMessage(result.error);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return (
+    <section className="admin-panel">
+      <div className="panel-title-row">
+        <div>
+          <p className="eyebrow">Worker + D1</p>
+          <h2>Системный статус</h2>
+        </div>
+        <span>{status?.api || 'checking'}</span>
+      </div>
+      <p className="form-message" aria-live="polite">
+        {message || status?.migrationState || 'Проверяем API и D1...'}
+      </p>
+      {status ? (
+        <dl className="character-stat-grid">
+          <div>
+            <dt>API</dt>
+            <dd>{status.api}</dd>
+          </div>
+          <div>
+            <dt>D1</dt>
+            <dd>{status.d1}</dd>
+          </div>
+          {Object.entries(status.counts || {}).map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </section>
+  );
+}
+
 function AdminAuditLog() {
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -5917,9 +6386,8 @@ function Footer() {
         <a href="#/characters">Персонажи</a>
         <a href="#/guides">Гайды</a>
         <a href="#/tierlists">Тир-листы</a>
-        <a href="#/news">Новости</a>
-        <a href="#/leaks">Сливы</a>
-        <a href="#/videos">Видео-гайды</a>
+        <a href="#/">Новости и сливы</a>
+        <a href="#/">Комьюнити</a>
       </div>
     </footer>
   );

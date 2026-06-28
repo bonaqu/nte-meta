@@ -1,6 +1,6 @@
 # NTE Meta
 
-Русскоязычный meta-hub по **Neverness to Everness**: практические гайды персонажей, составы и ротации внутри гайдов, тир-листы, новости, сливы и обсуждения игроков.
+Русскоязычный meta-hub по **Neverness to Everness**: глубокие персонажные гайды, команды и ротации внутри гайдов, тир-листы, новости, сливы и обсуждения игроков.
 
 Production:
 
@@ -10,81 +10,59 @@ Production:
 
 ## Архитектура
 
-Проект разделен на три независимые части:
+Проект остается на бесплатной схеме **GitHub Pages + Vite/React + prerender + Cloudflare Worker API + Cloudflare D1**.
 
-1. **React + TypeScript + Vite** отвечает за быстрый адаптивный интерфейс и GitHub Pages.
-2. **Cloudflare Worker** предоставляет REST API, авторизацию, проверку ролей, валидацию и аудит.
-3. **Cloudflare D1** хранит пользователей, контент, комментарии, реакции и настройки.
+1. **React + TypeScript + Vite** отвечает за публичный интерфейс, inline-редакторы и GitHub Pages.
+2. **Cloudflare Worker** предоставляет REST API, авторизацию, роли, валидацию, rate limit и audit log.
+3. **Cloudflare D1** хранит пользователей, контент, комментарии, реакции, sources и настройки.
 
-Такое разделение не передает секреты в браузер, оставляет frontend статическим и бесплатным, а backend можно развивать без переноса сайта.
+Секреты не попадают во frontend. `VITE_API_BASE_URL` для production должен указывать на Worker: `https://nte-meta-api.bonaqu.workers.dev`.
 
 ## Реализовано
 
-- Главная-dashboard, отдельная база персонажей, гайды персонажей, тир-листы C0/C6, новости, сливы и видео-гайды.
+- Минимальная шапка: Главная, Гайды, Персонажи, Тир-листы; системная админка видна только `moderator/admin/owner`.
+- Новости и сливы находятся на главной; detail routes `/news/<slug>/` и `/leaks/<slug>/` остаются для ссылок и SEO.
+- Гайды являются главным meta-продуктом: секции, команды, ротации, YouTube и билды редактируются внутри гайда.
+- Страница персонажа отделена от гайда: lore/profile, способности, материалы, озвучка, симпатия, скины и CTA “Гайд на персонажа”.
+- Inline-редакторы в нужных разделах: гайды, персонажи, новости, сливы, тир-лист и комьюнити-треды.
+- Системная админка: dashboard, пользователи, права редакторов, модерация комментариев, предупреждения, sources, настройки, audit log, статус API/D1.
+- Единый тир-лист Base C0 / Premium C6 с тирами `S+`, `S`, `A`, `B`, `C`, `D`.
+- Комьюнити-треды v1: создание треда, markdown, теги, комментарии и реакции.
 - Поиск и фильтры персонажей и гайдов по тиру, роли, типу, атрибуту, редкости и тегам.
-- Гайды с произвольными секциями, markdown, live preview, YouTube, drag-and-drop сортировкой, отрядами и пошаговыми командными ротациями.
-- Страницы персонажей не дублируют гайды: в них хранятся lore, биография, сэйю, способности, пробуждения C0-C6, ресурсы, характеристики, гардероб, симпатия, подарки, реплики и консоли.
-- Отдельный пользовательский профиль и защищённая staff-админка для контента, источников, комментариев, пользователей, ролей и настроек.
-- Единообразные редакторы персонажей, гайдов, тир-листов, новостей, сливов и видео с понятными кнопками создания и редактирования прямо на публичных страницах.
-- Точечные права редакторов по разделам и действиям, а также грейды «Младший», «Редактор», «Старший» и «Ведущий».
-- Статусы `draft`, `review`, `published`, предпросмотр и защита непубличных материалов.
-- Регистрация, вход, выход, профиль, смена пароля и безопасные `HttpOnly` session cookies.
-- PBKDF2-SHA-256 с индивидуальной солью, Worker pepper и максимальными для Cloudflare Workers 100 000 итераций. Старые хеши автоматически усиливаются после успешного входа.
-- Роли `owner`, `admin`, `editor`, `moderator`, `user` с обязательной серверной проверкой прав.
-- Комментарии с ответами, сортировкой, редактированием, удалением, модерацией и предупреждениями.
-- Реакции `like`, `dislike`, `helpful` с ограничением одной оценки каждого типа от пользователя.
-- Ручное одобрение сливов и явная маркировка уровня доверия и статуса.
-- Rate limit для чувствительных действий, CORS allowlist, валидация URL/body и audit log.
-- Skeleton/loading, empty/error/success states, клавиатурная навигация и видимый focus.
-- Build-time prerender публичных маршрутов, sitemap, canonical, OpenGraph и JSON-LD.
-- Playwright-проверки API, D1, ролей, CRUD, responsive layout и WCAG 2.1 AA.
 
 ## Структура
 
 ```text
 .
 ├─ .github/workflows/
-│  ├─ pages.yml                  # проверки, prerender и GitHub Pages
-│  └─ worker.yml                 # ручной deploy Worker и D1 migrations
+│  ├─ pages.yml
+│  └─ worker.yml
 ├─ migrations/
-│  ├─ 0001_initial_schema.sql    # полная схема, ограничения и индексы
-│  ├─ 0002_seed_content.sql      # стартовые персонажи и материалы
+│  ├─ 0001_initial_schema.sql
+│  ├─ 0002_seed_content.sql
 │  ├─ 0003_profile_and_security.sql
 │  ├─ 0004_security_and_content_cleanup.sql
 │  ├─ 0005_moderation_warnings.sql
-│  └─ 0006_editorial_architecture.sql # профили персонажей и права редакторов
-├─ public/
-│  ├─ assets/characters/         # локальные оптимизированные арты
-│  ├─ logo.svg
-│  └─ robots.txt
+│  ├─ 0006_editorial_architecture.sql
+│  └─ 0007_inline_editing_threads_tiers.sql
 ├─ scripts/
-│  ├─ prepare-test-db.mjs        # отдельная локальная D1 для тестов
-│  └─ prerender.mjs              # статические SEO-страницы и sitemap
+│  ├─ prepare-test-db.mjs
+│  └─ prerender.mjs
 ├─ src/
-│  ├─ components/ui-state.tsx    # общие loading/error/empty состояния
-│  ├─ data/seed.ts               # fallback-данные при недоступном API
-│  ├─ features/admin/            # формы и редакторы контента staff-админки
+│  ├─ components/
+│  ├─ data/
+│  ├─ features/admin/
+│  ├─ features/inline-editors/
 │  ├─ lib/
-│  │  ├─ api.ts                  # типизированный API client
-│  │  ├─ markdown.tsx            # безопасный React markdown renderer
-│  │  ├─ seo.ts                  # metadata для клиентской навигации
-│  │  └─ youtube.ts              # проверка и privacy-friendly embed
-│  ├─ App.tsx                    # маршруты и публичные представления
-│  ├─ styles.css                 # дизайн-система и responsive layout
-│  ├─ types.ts                   # общие типы frontend/API
-│  └─ worker.js                  # Cloudflare Worker REST API
-├─ tests/
-│  ├─ api.spec.ts                # auth, роли, CRUD, модерация
-│  ├─ portal.spec.ts             # публичные продуктовые сценарии
-│  ├─ quality.spec.ts            # a11y, изображения, переполнение
-│  └─ smoke.spec.ts              # базовая загрузка приложения
-├─ .dev.vars.example
-├─ .env.example
-├─ index.html
-├─ package.json
-├─ playwright.config.ts
-├─ vite.config.ts
-└─ wrangler.jsonc
+│  ├─ App.tsx
+│  ├─ styles.css
+│  ├─ types.ts
+│  └─ worker.js
+└─ tests/
+   ├─ api.spec.ts
+   ├─ portal.spec.ts
+   ├─ quality.spec.ts
+   └─ smoke.spec.ts
 ```
 
 ## Локальный запуск
@@ -98,14 +76,12 @@ npm run db:migrate:local
 Терминал 1, Worker и локальная D1:
 
 ```powershell
-Set-Location "D:\Projects\nte-hub"
 npm run worker:dev -- --local --port 8787
 ```
 
 Терминал 2, frontend:
 
 ```powershell
-Set-Location "D:\Projects\nte-hub"
 $env:VITE_API_BASE_URL="http://127.0.0.1:8787"
 npm run dev -- --port 4173
 ```
@@ -115,115 +91,95 @@ npm run dev -- --port 4173
 ## Проверки
 
 ```powershell
-npm run format:check
 npm run typecheck
 npm run lint
 npm run build
-npm run test:ui
-npm audit
+npm run test:ui -- tests/portal.spec.ts tests/api.spec.ts tests/quality.spec.ts
 ```
 
 `npm run test:ui` сам создает изолированную тестовую D1 и запускает нужные локальные серверы.
 
 ## Создание первого owner
 
-Эти шаги нужны только для новой пустой D1. В текущей production-базе owner уже создан.
-
-1. Задайте два Cloudflare secret. Значения не сохраняйте в Git и не вставляйте во frontend:
+Для новой пустой D1 задайте Worker secrets:
 
 ```powershell
 npx wrangler secret put PASSWORD_PEPPER
 npx wrangler secret put OWNER_BOOTSTRAP_TOKEN
 ```
 
-2. Примените миграции и разверните Worker:
+Затем примените миграции и разверните Worker:
 
 ```powershell
 npm run db:migrate:remote
 npm run worker:deploy -- --env=""
 ```
 
-3. Откройте `https://bonaqu.github.io/nte-meta/admin`, выберите регистрацию и заполните логин, пароль и код первого owner.
-4. После создания аккаунта следующий зарегистрированный пользователь всегда получит роль `user`. Код bootstrap больше не принимается, пока в базе есть активные пользователи.
-5. Для аварийного восстановления храните bootstrap-код в менеджере паролей или замените его новым через `npx wrangler secret put OWNER_BOOTSTRAP_TOKEN`.
+Откройте `https://bonaqu.github.io/nte-meta/#/profile`, переключитесь на регистрацию и введите bootstrap-код первого owner. После появления активных пользователей bootstrap больше не выдаёт owner.
 
-Пароль должен содержать не меньше 10 символов. Worker никогда не возвращает хеш, соль, pepper или session token клиенту.
+## Production Deploy
 
-## Production deploy
-
-### Worker и D1
+Перед remote D1 migration сделайте backup:
 
 ```powershell
-Set-Location "D:\Projects\nte-hub"
+New-Item -ItemType Directory -Force ".\backups"
+npx wrangler d1 export nte-meta-db --remote --output ".\backups\nte-meta-db-before-migrate.sql"
 npm run db:migrate:remote
 npm run worker:deploy -- --env=""
 ```
 
-`wrangler deploy` сохраняет Cloudflare secrets; они не находятся в `wrangler.jsonc`.
-
-### GitHub Pages
-
-Push в ветку `bonaqu_projects` запускает `.github/workflows/pages.yml`. Workflow выполняет типизацию, lint, Playwright, production build, prerender и публикацию `dist`.
-
-Repository variable:
+Push в ветку `bonaqu_projects` запускает `.github/workflows/pages.yml`. GitHub Actions variable:
 
 ```text
 VITE_API_BASE_URL=https://nte-meta-api.bonaqu.workers.dev
 ```
 
-Для ручного workflow Worker нужны GitHub secrets:
-
-```text
-CLOUDFLARE_API_TOKEN
-CLOUDFLARE_ACCOUNT_ID
-```
-
-Токену достаточно прав `Workers Scripts: Edit` и `D1: Edit` на нужном аккаунте.
-
 ## Роли
 
-| Роль        | Возможности                                                            |
-| ----------- | ---------------------------------------------------------------------- |
-| `owner`     | Полный доступ, роли, статусы и удаление пользователей, настройки       |
-| `admin`     | Контент, источники, новости/сливы, модерация, editor/moderator         |
-| `editor`    | Только разрешённые админом разделы и действия; имеет один из 4 грейдов |
-| `moderator` | Комментарии, скрытие, удаление и предупреждения                        |
-| `user`      | Профиль, комментарии и реакции                                         |
+| Роль | Возможности |
+| --- | --- |
+| `owner` | Полный доступ, пользователи, роли, настройки и удаление пользователей |
+| `admin` | Пользователи, права редакторов, sources, настройки, модерация, статус системы |
+| `editor` | Inline-создание/редактирование только разрешённых разделов; один из 4 грейдов |
+| `moderator` | Комментарии, предупреждения, базовая модерация, системная админка |
+| `user` | Профиль, комментарии, реакции и треды |
 
-Иерархия и права проверяются Worker для каждого защищенного endpoint. Скрытие кнопки в интерфейсе не считается защитой.
+Worker проверяет роли и точечные права для каждого защищенного endpoint. Скрытие кнопки в UI не считается защитой.
 
 ## API
 
-Основные группы маршрутов:
-
-- `/api/auth/*` — конфигурация регистрации, регистрация, сессия, профиль, пароль и предупреждения;
-- `/api/users/*` — роли, точечные права редакторов, статус аккаунта, предупреждения и мягкое удаление;
-- `/api/characters`, `/api/guides`, `/api/guide-sections`, `/api/rotations`;
-- `/api/teams`, `/api/tierlists`, `/api/news`, `/api/leaks`;
-- `/api/comments`, `/api/reactions`;
-- `/api/sources`, `/api/settings`, `/api/audit-log`.
-
-API отвечает в едином формате `{ "data": ... }` или `{ "error": { "code", "message" } }`. Отряды привязаны к гайду и принимают вложенные `members` и `rotationSteps`; тир-листы принимают `items`, а гайд может сразу создаваться с массивом секций.
+- `/api/auth/*` — регистрация, сессия, профиль, пароль и предупреждения.
+- `/api/users/*` — роли, точечные права редакторов, статус аккаунта, предупреждения и мягкое удаление.
+- `/api/characters`, `/api/guides`, `/api/guide-sections`.
+- `/api/teams`, `/api/rotations` — внутренние данные гайдов, не самостоятельные публичные разделы.
+- `/api/tierlists`, `/api/news`, `/api/leaks`, `/api/threads`.
+- `/api/comments`, `/api/reactions`.
+- `/api/sources`, `/api/settings`, `/api/warnings`, `/api/system/status`, `/api/audit-log`.
+- `/api/character-import/lookup` — безопасная editor-only заглушка поиска базовой информации, без автозаписи.
 
 ## SEO
 
-GitHub Pages остается бесплатным статическим хостингом, но сайт больше не зависит только от hash routing. Во время `npm run build` скрипт `scripts/prerender.mjs` получает опубликованный контент из API и создает реальные документы:
+Prerender создает реальные public/detail pages:
 
 ```text
+/nte-meta/
+/nte-meta/characters/
+/nte-meta/guides/
+/nte-meta/tierlists/
 /nte-meta/characters/<slug>/
 /nte-meta/guides/<slug>/
 /nte-meta/news/<slug>/
 /nte-meta/leaks/<slug>/
+/nte-meta/threads/<slug>/
 ```
 
-Каждый документ получает собственные `title`, description, canonical, OpenGraph и JSON-LD. Клиентская навигация после загрузки остается быстрой SPA-навигацией. Это лучший бесплатный компромисс для GitHub Pages; перенос на Cloudflare Pages не требуется для текущего объема.
+List pages `news`, `leaks`, `videos`, `teams`, `rotations` не индексируются как отдельные разделы. Если `VITE_API_BASE_URL` задан и API недоступен, prerender падает вместо тихого demo fallback.
 
 ## Следующие улучшения
 
-- Автоматический импорт Telegram/website/YouTube/X в очередь `sources` с обязательным ручным одобрением.
-- Cloudflare R2 для пользовательских артов и генерация responsive AVIF/WebP.
+- Автоимпорт Telegram/website/YouTube/X в очередь `sources` с ручным подтверждением.
+- Cloudflare R2 для пользовательских артов и responsive AVIF/WebP.
 - История ревизий материалов и сравнение тир-листов между патчами.
-- D1 FTS-поиск по гайдам, секциям, новостям и комментариям.
-- Временные mute/ban, снятие предупреждений и журнал решений модератора.
+- D1 FTS-поиск по гайдам, секциям, новостям, тредам и комментариям.
+- Расширенная модерация тредов: mute/ban, очереди жалоб, журнал решений.
 - Уникальные OpenGraph-изображения для персонажей и материалов.
-- Собственный домен и Cloudflare Web Analytics после согласования privacy-политики.

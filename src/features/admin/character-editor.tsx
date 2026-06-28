@@ -8,7 +8,12 @@ import {
   Trash2,
 } from 'lucide-react';
 import { EmptyState, StatusBanner } from '../../components/ui-state';
-import { deleteEntity, hasApiBase, saveEntity } from '../../lib/api';
+import {
+  deleteEntity,
+  hasApiBase,
+  lookupCharacterInfo,
+  saveEntity,
+} from '../../lib/api';
 import { applyMarkdownAction, MarkdownPreview } from '../../lib/markdown';
 import { resolveAssetUrl } from '../../lib/assets';
 import type {
@@ -302,6 +307,27 @@ export function AdminCharacterEditor({
     }));
   }
 
+  async function lookupBaseInfo() {
+    const lookupQuery = draft.name || draft.originalName;
+    if (!lookupQuery.trim()) {
+      setTone('danger');
+      setMessage('Укажите имя персонажа перед поиском базовой информации.');
+      return;
+    }
+
+    setPending(true);
+    setMessage('');
+    const result = await lookupCharacterInfo(lookupQuery);
+    if (result.ok) {
+      setTone(result.data.found ? 'success' : 'info');
+      setMessage(result.data.message || 'Источники не настроены. Заполните поля вручную.');
+    } else {
+      setTone('danger');
+      setMessage(result.error);
+    }
+    setPending(false);
+  }
+
   async function persist(status: 'draft' | 'published') {
     if (!hasApiBase()) {
       setTone('info');
@@ -431,6 +457,14 @@ export function AdminCharacterEditor({
             </p>
           </div>
           <div className="button-row">
+            <button
+              className="ghost-button"
+              type="button"
+              disabled={pending}
+              onClick={() => void lookupBaseInfo()}
+            >
+              Найти базовую информацию
+            </button>
             <button
               className="ghost-button"
               type="button"

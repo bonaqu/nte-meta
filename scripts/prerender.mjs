@@ -18,17 +18,6 @@ const sections = [
     'Практические гайды NTE Meta: ротации, билды, команды и ошибки.',
   ],
   ['tierlists', 'Тир-листы', 'Base C0 и Premium C6 тир-листы NTE Meta.'],
-  ['news', 'Новости', 'Новости Neverness to Everness и редакционные разборы.'],
-  [
-    'leaks',
-    'Сливы и слухи',
-    'Слухи и сливы NTE с источниками, статусами и уровнем доверия.',
-  ],
-  [
-    'videos',
-    'Видео-гайды',
-    'Видео-гайды NTE Meta с текстовыми версиями и таймкодами.',
-  ],
   ['admin', 'Админка', 'Защищённая редакционная CMS NTE Meta.'],
   [
     'profile',
@@ -111,13 +100,19 @@ async function loadCollection(name) {
     const payload = await response.json();
     return Array.isArray(payload.data) ? payload.data : [];
   } catch (error) {
-    console.warn(`Prerender: ${name} не загружен из API (${error.message}).`);
+    if (apiBase) {
+      throw new Error(
+        `Prerender: ${name} не загружен из API ${apiBase} (${error.message}).`,
+        { cause: error },
+      );
+    }
+    console.warn(`Prerender: ${name} не загружен (${error.message}).`);
     return [];
   }
 }
 
-const [characters, guides, news, leaks] = await Promise.all(
-  ['characters', 'guides', 'news', 'leaks'].map(loadCollection),
+const [characters, guides, news, leaks, threads] = await Promise.all(
+  ['characters', 'guides', 'news', 'leaks', 'threads'].map(loadCollection),
 );
 
 const pages = [
@@ -163,6 +158,14 @@ const pages = [
     date: item.updatedAt || item.date,
     article: true,
     schemaType: 'Article',
+  })),
+  ...threads.map((item) => ({
+    route: `threads/${item.slug}`,
+    title: item.title,
+    description: item.summary,
+    date: item.updatedAt || item.createdAt,
+    article: true,
+    schemaType: 'DiscussionForumPosting',
   })),
 ];
 

@@ -1,5 +1,6 @@
 import type {
   Character,
+  CommunityThread,
   Guide,
   LeakItem,
   NewsItem,
@@ -743,6 +744,24 @@ const sources: Source[] = [
   },
 ];
 
+const threads: CommunityThread[] = [
+  {
+    id: 'thread-start-builds',
+    slug: 'start-builds',
+    title: 'Кого качать на старте и где не слить ресурсы',
+    summary:
+      'Тред для коротких вопросов по первым вложениям, приоритетам прокачки и ошибкам новичков.',
+    body: 'Пишите состав, доступных персонажей и цель. Редакция и игроки помогут выбрать безопасный план без выдуманной меты.',
+    author: 'NTE Meta',
+    status: 'open',
+    tags: ['новички', 'прокачка', 'ресурсы'],
+    createdAt: '2026-06-20',
+    updatedAt: '2026-06-20',
+    commentsCount: 2,
+    score: 12,
+  },
+];
+
 export const seedData: SiteData = {
   characters: characterBase,
   guides,
@@ -773,6 +792,7 @@ export const seedData: SiteData = {
     },
   ],
   sources,
+  threads,
 };
 
 export function findCharacter(idOrSlug: string): Character | undefined {

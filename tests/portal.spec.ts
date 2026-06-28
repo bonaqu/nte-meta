@@ -21,7 +21,7 @@ test.describe('Публичный портал NTE Meta', () => {
       page.getByRole('heading', { name: 'Текущий тир-лист' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Последние обсуждения игроков' }),
+      page.getByRole('heading', { name: 'Треды и обсуждения игроков' }),
     ).toBeVisible();
     await expect(page.locator('main')).toHaveAttribute('id', 'main-content');
     expect(consoleErrors).toEqual([]);
@@ -131,25 +131,19 @@ test.describe('Публичный портал NTE Meta', () => {
       page.getByRole('heading', { name: 'NTE Meta', exact: true }),
     ).toBeVisible();
   });
-
-  test('видео-раздел показывает явный редакционный плейсхолдер', async ({
+  test('видео-route мягко ведёт к гайдам без отдельного публичного раздела', async ({
     page,
   }) => {
     await page.goto('/#/videos');
     await expect(
-      page.getByRole('heading', { name: 'Видео-гайды', exact: true }),
+      page.getByRole('heading', { name: 'Гайды NTE Meta', exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Видео-гайды готовятся' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('link', { name: 'Открыть текстовые гайды' }),
-    ).toBeVisible();
-    await expect(
-      page.getByTitle('Редакционный плейсхолдер NTE Meta'),
+      page.getByText(
+        'Только персонажные гайды. Билды, лучшие отряды и пошаговые командные ротации собраны внутри каждого материала.',
+      ),
     ).toBeVisible();
   });
-
   test('мобильное меню доступно с клавиатуры и layout не уезжает', async ({
     page,
   }) => {

@@ -6,7 +6,7 @@ export type PublishStatus =
   | 'archived'
   | 'pending_review';
 
-export type Tier = 'S+' | 'S' | 'A' | 'B' | 'C';
+export type Tier = 'S+' | 'S' | 'A' | 'B' | 'C' | 'D';
 
 export type LeakStatus = 'слух' | 'слив' | 'подтверждено' | 'опровергнуто';
 
@@ -268,10 +268,33 @@ export interface VideoGuide {
   timestamps: { label: string; time: string }[];
 }
 
+export interface CommunityThread {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  body: string;
+  author: string;
+  authorId?: string;
+  status: 'open' | 'closed' | 'hidden';
+  tags: string[];
+  createdAt: string;
+  updatedAt?: string;
+  commentsCount?: number;
+  score?: number;
+}
+
 export interface Comment {
   id: string;
   userId?: string;
-  targetType: 'guide' | 'character' | 'news' | 'leak' | 'comment' | 'site';
+  targetType:
+    | 'guide'
+    | 'character'
+    | 'news'
+    | 'leak'
+    | 'comment'
+    | 'site'
+    | 'thread';
   targetId: string;
   author: string;
   body: string;
@@ -298,9 +321,31 @@ export interface AdminUser extends User {
 
 export interface UserWarning {
   id: string;
+  userId?: string;
+  userName?: string;
   reason: string;
+  note?: string;
   moderatorName: string;
   createdAt: string;
+  status?: 'active' | 'dismissed' | 'resolved';
+}
+
+export interface SystemStatus {
+  api: 'ok';
+  d1: 'ok';
+  generatedAt: string;
+  counts: {
+    users: number;
+    characters: number;
+    guides: number;
+    news: number;
+    leaks: number;
+    threads: number;
+  };
+  migrations: {
+    latestKnown: string;
+  };
+  migrationState?: string;
 }
 
 export interface AppSettings {
@@ -347,4 +392,5 @@ export interface SiteData {
   videos: VideoGuide[];
   comments: Comment[];
   sources: Source[];
+  threads: CommunityThread[];
 }

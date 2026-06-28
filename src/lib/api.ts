@@ -4,9 +4,11 @@ import type {
   AuditLogEntry,
   AppSettings,
   Comment,
+  CommunityThread,
   EditorPermissions,
   Role,
   SiteData,
+  SystemStatus,
   User,
   UserWarning,
 } from '../types';
@@ -106,6 +108,7 @@ export async function loadSiteData(
     teams,
     news,
     leaks,
+    threads,
     comments,
     sources,
   ] = await Promise.all([
@@ -116,6 +119,7 @@ export async function loadSiteData(
     loadCollection('/api/teams', seedData.teams),
     loadCollection('/api/news', seedData.news),
     loadCollection('/api/leaks', seedData.leaks),
+    loadCollection('/api/threads', seedData.threads),
     loadCollection(
       '/api/comments?targetType=site&targetId=home',
       seedData.comments,
@@ -134,6 +138,7 @@ export async function loadSiteData(
     teams,
     news,
     leaks,
+    threads,
     comments,
     sources,
   };
@@ -312,6 +317,40 @@ export async function createUserWarning(userId: string, reason: string) {
 
 export async function loadMyWarnings() {
   return request<UserWarning[]>('/api/auth/warnings');
+}
+
+export async function loadWarnings() {
+  return request<UserWarning[]>('/api/warnings');
+}
+
+export async function updateWarningStatus(
+  id: string,
+  status: 'active' | 'dismissed' | 'resolved',
+) {
+  return request<{ success: boolean }>(`/api/warnings/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function loadSystemStatus() {
+  return request<SystemStatus>('/api/system/status');
+}
+
+export async function lookupCharacterInfo(query: string) {
+  return request<{
+    found: boolean;
+    message: string;
+    sources: Array<{ name: string; url?: string; trust: string }>;
+    fields: Record<string, string>;
+  }>('/api/character-import/lookup', {
+    method: 'POST',
+    body: JSON.stringify({ query }),
+  });
+}
+
+export async function loadThreads() {
+  return request<CommunityThread[]>('/api/threads');
 }
 
 export async function deleteUser(id: string) {

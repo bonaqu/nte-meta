@@ -630,6 +630,7 @@ function HomePage({
     'guide' | 'news' | 'leak' | 'thread' | null
   >(null);
   const [homeEditorItemId, setHomeEditorItemId] = useState('new');
+  const [homeEditorDirty, setHomeEditorDirty] = useState(false);
   const canCreateGuide = canManageContent(user, 'guides', 'create');
   const canCreateNews = canManageContent(user, 'news', 'create');
   const canCreateLeak = canManageContent(user, 'leaks', 'create');
@@ -644,6 +645,7 @@ function HomePage({
   }
 
   function openHomeEditor(kind: 'guide' | 'news' | 'leak', itemId = 'new') {
+    setHomeEditorDirty(false);
     setHomeEditorItemId(itemId);
     setHomeEditor(kind);
   }
@@ -864,7 +866,11 @@ function HomePage({
         title={homeEditorItemId === 'new' ? 'Добавить гайд' : 'Редактировать гайд'}
         eyebrow="Inline CMS"
         description="Персонажный гайд создаётся прямо из главной и сразу попадёт в раздел гайдов после публикации."
-        onClose={() => setHomeEditor(null)}
+        dirty={homeEditorDirty}
+        onClose={() => {
+          setHomeEditorDirty(false);
+          setHomeEditor(null);
+        }}
       >
         {user ? (
           <Suspense fallback={<SkeletonGrid label="Загрузка редактора гайда" />}>
@@ -873,8 +879,10 @@ function HomePage({
               setData={setData}
               user={user}
               initialGuideId={homeEditorItemId}
+              onDirtyChange={setHomeEditorDirty}
               onSaved={({ slug, status }) => {
                 if (status !== 'published' || !slug) return;
+                setHomeEditorDirty(false);
                 setHomeEditor(null);
                 window.location.hash = `#/guides/${slug}`;
               }}
@@ -887,7 +895,11 @@ function HomePage({
         open={homeEditor === 'news'}
         title={homeEditorItemId === 'new' ? 'Добавить новость' : 'Редактировать новость'}
         eyebrow="Редакция"
-        onClose={() => setHomeEditor(null)}
+        dirty={homeEditorDirty}
+        onClose={() => {
+          setHomeEditorDirty(false);
+          setHomeEditor(null);
+        }}
       >
         <Suspense fallback={<SkeletonGrid label="Загрузка редактора новости" />}>
           <AdminNewsManager
@@ -895,10 +907,12 @@ function HomePage({
             initialSelectedId={homeEditorItemId}
             access={user ? contentAccess(user, 'news') : undefined}
             onRefresh={refreshContent}
+            onDirtyChange={setHomeEditorDirty}
             onSaved={({ values, publishStatus }) => {
               if (publishStatus === 'draft') return;
               const slug = String(values.slug || '').trim();
               if (!slug) return;
+              setHomeEditorDirty(false);
               setHomeEditor(null);
               window.location.hash = `#/news/${slug}`;
             }}
@@ -910,7 +924,11 @@ function HomePage({
         open={homeEditor === 'leak'}
         title={homeEditorItemId === 'new' ? 'Добавить слив' : 'Редактировать слив'}
         eyebrow="Слухи отдельно от фактов"
-        onClose={() => setHomeEditor(null)}
+        dirty={homeEditorDirty}
+        onClose={() => {
+          setHomeEditorDirty(false);
+          setHomeEditor(null);
+        }}
       >
         <Suspense fallback={<SkeletonGrid label="Загрузка редактора слива" />}>
           <AdminLeaksManager
@@ -918,9 +936,11 @@ function HomePage({
             initialSelectedId={homeEditorItemId}
             access={user ? contentAccess(user, 'leaks') : undefined}
             onRefresh={refreshContent}
+            onDirtyChange={setHomeEditorDirty}
             onSaved={({ values }) => {
               const slug = String(values.slug || '').trim();
               if (!slug) return;
+              setHomeEditorDirty(false);
               setHomeEditor(null);
               window.location.hash = `#/leaks/${slug}`;
             }}
@@ -932,13 +952,19 @@ function HomePage({
         open={homeEditor === 'thread'}
         title="Создать тред"
         eyebrow="Комьюнити"
-        onClose={() => setHomeEditor(null)}
+        dirty={homeEditorDirty}
+        onClose={() => {
+          setHomeEditorDirty(false);
+          setHomeEditor(null);
+        }}
       >
         {user ? (
           <ThreadEditor
             user={user}
+            onDirtyChange={setHomeEditorDirty}
             onSaved={async () => {
               await refreshContent();
+              setHomeEditorDirty(false);
               setHomeEditor(null);
             }}
           />
@@ -952,10 +978,12 @@ function ThreadEditor({
   user,
   thread,
   onSaved,
+  onDirtyChange,
 }: {
   user: User;
   thread?: CommunityThread;
   onSaved: () => Promise<void> | void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const draftKey = `nte-thread-draft-${thread?.id || 'new'}`;
   const storedDraft = useMemo(() => {
@@ -974,11 +1002,33 @@ function ThreadEditor({
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const threadBaseline = useMemo(
+    () => ({
+      title: thread?.title || '',
+      slug: thread?.slug || '',
+      summary: thread?.summary || '',
+      body: thread?.body || '',
+      tags: (thread?.tags || []).join(', '),
+      status: thread?.status || 'open',
+    }),
+    [thread],
+  );
+  const isThreadDirty =
+    title !== threadBaseline.title ||
+    slug !== threadBaseline.slug ||
+    summary !== threadBaseline.summary ||
+    body !== threadBaseline.body ||
+    tags !== threadBaseline.tags ||
+    status !== threadBaseline.status;
 
   useEffect(() => {
     const draft = { title, slug, summary, body, tags: parseTags(tags), status };
     localStorage.setItem(draftKey, JSON.stringify(draft));
   }, [body, draftKey, slug, status, summary, tags, title]);
+
+  useEffect(() => {
+    onDirtyChange?.(isThreadDirty);
+  }, [isThreadDirty, onDirtyChange]);
 
   function updateTitle(value: string) {
     setTitle(value);
@@ -1120,6 +1170,7 @@ function ThreadPage({
 }) {
   const thread = data.threads.find((item) => item.slug === slug || item.id === slug);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorDirty, setEditorDirty] = useState(false);
 
   async function refreshContent() {
     setData(
@@ -1174,14 +1225,20 @@ function ThreadPage({
         open={editorOpen}
         title="Редактировать тред"
         eyebrow="Комьюнити"
-        onClose={() => setEditorOpen(false)}
+        dirty={editorDirty}
+        onClose={() => {
+          setEditorDirty(false);
+          setEditorOpen(false);
+        }}
       >
         {user ? (
           <ThreadEditor
             user={user}
             thread={thread}
+            onDirtyChange={setEditorDirty}
             onSaved={async () => {
               await refreshContent();
+              setEditorDirty(false);
               setEditorOpen(false);
             }}
           />
@@ -1458,6 +1515,7 @@ function CharactersPage({
   const [tier, setTier] = useState('Любой тир');
   const [attribute, setAttribute] = useState('Любой атрибут');
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorDirty, setEditorDirty] = useState(false);
   const indexedCharacters = useMemo(
     () =>
       data.characters.map((character) => ({
@@ -1587,7 +1645,11 @@ function CharactersPage({
         title="Добавить персонажа"
         eyebrow="База персонажей"
         description="Карточка персонажа хранит лор, профиль, способности, материалы, озвучку и косметику. Билды остаются в гайдах."
-        onClose={() => setEditorOpen(false)}
+        dirty={editorDirty}
+        onClose={() => {
+          setEditorDirty(false);
+          setEditorOpen(false);
+        }}
       >
         {user ? (
           <Suspense fallback={<SkeletonGrid label="Загрузка редактора персонажа" />}>
@@ -1596,8 +1658,10 @@ function CharactersPage({
               initialSelectedId="new"
               access={contentAccess(user, 'characters')}
               onRefresh={refreshContent}
+              onDirtyChange={setEditorDirty}
               onSaved={({ slug, status }) => {
                 if (status !== 'published' || !slug) return;
+                setEditorDirty(false);
                 setEditorOpen(false);
                 window.location.hash = `#/characters/${slug}`;
               }}
@@ -1656,6 +1720,8 @@ function CharacterDetailPage({
   const character = getCharacter(data, slug);
   const [characterEditorOpen, setCharacterEditorOpen] = useState(false);
   const [guideEditorOpen, setGuideEditorOpen] = useState(false);
+  const [characterEditorDirty, setCharacterEditorDirty] = useState(false);
+  const [guideEditorDirty, setGuideEditorDirty] = useState(false);
 
   if (!character) {
     return (
@@ -2052,7 +2118,11 @@ function CharacterDetailPage({
         title={`Редактировать: ${character.name}`}
         eyebrow="Карточка персонажа"
         description="Лор, профиль, способности, материалы, озвучка, симпатия и косметика. Команды и ротации редактируются в гайде."
-        onClose={() => setCharacterEditorOpen(false)}
+        dirty={characterEditorDirty}
+        onClose={() => {
+          setCharacterEditorDirty(false);
+          setCharacterEditorOpen(false);
+        }}
       >
         {user ? (
           <Suspense fallback={<SkeletonGrid label="Загрузка редактора персонажа" />}>
@@ -2061,8 +2131,10 @@ function CharacterDetailPage({
               initialSelectedId={character.id}
               access={contentAccess(user, 'characters')}
               onRefresh={refreshContent}
+              onDirtyChange={setCharacterEditorDirty}
               onSaved={({ slug, status }) => {
                 if (status !== 'published') return;
+                setCharacterEditorDirty(false);
                 setCharacterEditorOpen(false);
                 if (slug) {
                   window.location.hash = `#/characters/${slug}`;
@@ -2077,7 +2149,11 @@ function CharacterDetailPage({
         title={`Создать гайд: ${character.name}`}
         eyebrow="Гайд персонажа"
         description="Создайте персонажный meta-гайд. Отряды, ротации, видео и билды будут редактироваться внутри гайда."
-        onClose={() => setGuideEditorOpen(false)}
+        dirty={guideEditorDirty}
+        onClose={() => {
+          setGuideEditorDirty(false);
+          setGuideEditorOpen(false);
+        }}
       >
         {user ? (
           <Suspense fallback={<SkeletonGrid label="Загрузка редактора гайда" />}>
@@ -2086,8 +2162,10 @@ function CharacterDetailPage({
               setData={setData}
               user={user}
               initialGuideId="new"
+              onDirtyChange={setGuideEditorDirty}
               onSaved={({ slug, status }) => {
                 if (status !== 'published' || !slug) return;
+                setGuideEditorDirty(false);
                 setGuideEditorOpen(false);
                 window.location.hash = `#/guides/${slug}`;
               }}
@@ -2189,6 +2267,7 @@ function GuideDetail({
   setData: SiteDataSetter;
 }) {
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorDirty, setEditorDirty] = useState(false);
   const relatedTeams = data.teams.filter(
     (team) =>
       team.guideId === guide.id ||
@@ -2278,7 +2357,11 @@ function GuideDetail({
         title={`Редактировать гайд: ${character.name}`}
         eyebrow="Meta-гайд"
         description="Секции гайда, команды, ротации и видео редактируются здесь, без отдельного публичного раздела команд."
-        onClose={() => setEditorOpen(false)}
+        dirty={editorDirty}
+        onClose={() => {
+          setEditorDirty(false);
+          setEditorOpen(false);
+        }}
       >
         {user ? (
           <Suspense fallback={<SkeletonGrid label="Загрузка редактора гайда" />}>
@@ -2287,8 +2370,10 @@ function GuideDetail({
               setData={setData}
               user={user}
               initialGuideId={guide.id}
+              onDirtyChange={setEditorDirty}
               onSaved={({ slug, status }) => {
                 if (status !== 'published') return;
+                setEditorDirty(false);
                 setEditorOpen(false);
                 if (slug) {
                   window.location.hash = `#/guides/${slug}`;
@@ -2856,6 +2941,7 @@ function GuidesPage({
   const [tier, setTier] = useState('Любой тир');
   const [attribute, setAttribute] = useState('Любой атрибут');
   const [editorGuideId, setEditorGuideId] = useState<string | null>(null);
+  const [editorDirty, setEditorDirty] = useState(false);
   const attributes = useMemo(
     () => [
       'Любой атрибут',
@@ -2971,7 +3057,11 @@ function GuidesPage({
         title={editorGuideId === 'new' ? 'Добавить гайд' : 'Редактировать гайд'}
         eyebrow="Meta-гайды"
         description="Секции, команды, ротации и видео редактируются внутри одного персонажного гайда."
-        onClose={() => setEditorGuideId(null)}
+        dirty={editorDirty}
+        onClose={() => {
+          setEditorDirty(false);
+          setEditorGuideId(null);
+        }}
       >
         {user ? (
           <Suspense fallback={<SkeletonGrid label="Загрузка редактора гайда" />}>
@@ -2980,8 +3070,10 @@ function GuidesPage({
               setData={setData}
               user={user}
               initialGuideId={editorGuideId || undefined}
+              onDirtyChange={setEditorDirty}
               onSaved={({ slug, status }) => {
                 if (status !== 'published' || !slug) return;
+                setEditorDirty(false);
                 setEditorGuideId(null);
                 window.location.hash = `#/guides/${slug}`;
               }}
@@ -3004,6 +3096,7 @@ function TierListsPage({
 }) {
   const [kind, setKind] = useState<'base' | 'premium'>('base');
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorDirty, setEditorDirty] = useState(false);
   const { tierlist, grouped } = groupTierItems(data, kind);
 
   return (
@@ -3016,7 +3109,14 @@ function TierListsPage({
           с whale-условиями.
         </p>
         {canManageContent(user, 'tierlists', 'edit') ? (
-          <button className="primary-button" type="button" onClick={() => setEditorOpen(true)}>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => {
+              setEditorDirty(false);
+              setEditorOpen(true);
+            }}
+          >
             <Pencil aria-hidden="true" /> Редактировать тир-листы
           </button>
         ) : null}
@@ -3057,7 +3157,11 @@ function TierListsPage({
         title="Редактировать тир-лист"
         eyebrow="Base C0 / Premium C6"
         description="Перемещайте персонажей между тирами, меняйте позицию и заметки без отдельной CMS-страницы."
-        onClose={() => setEditorOpen(false)}
+        dirty={editorDirty}
+        onClose={() => {
+          setEditorDirty(false);
+          setEditorOpen(false);
+        }}
       >
         {user ? (
           <Suspense fallback={<SkeletonGrid label="Загрузка редактора тир-листа" />}>
@@ -3065,6 +3169,7 @@ function TierListsPage({
               data={data}
               setData={setData}
               canPublish={canManageContent(user, 'tierlists', 'publish')}
+              onDirtyChange={setEditorDirty}
             />
           </Suspense>
         ) : null}
@@ -3129,6 +3234,7 @@ function NewsDetailPage({
     (newsItem) => newsItem.slug === slug || newsItem.id === slug,
   );
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorDirty, setEditorDirty] = useState(false);
 
   async function refreshContent() {
     setData(
@@ -3197,7 +3303,11 @@ function NewsDetailPage({
         open={editorOpen}
         title="Редактировать новость"
         eyebrow="Редакция"
-        onClose={() => setEditorOpen(false)}
+        dirty={editorDirty}
+        onClose={() => {
+          setEditorDirty(false);
+          setEditorOpen(false);
+        }}
       >
         <Suspense fallback={<SkeletonGrid label="Загрузка редактора новости" />}>
           <AdminNewsManager
@@ -3205,9 +3315,11 @@ function NewsDetailPage({
             initialSelectedId={item.id}
             access={user ? contentAccess(user, 'news') : undefined}
             onRefresh={refreshContent}
+            onDirtyChange={setEditorDirty}
             onSaved={({ values, publishStatus }) => {
               if (publishStatus === 'draft') return;
               const nextSlug = String(values.slug || '').trim();
+              setEditorDirty(false);
               setEditorOpen(false);
               if (nextSlug && nextSlug !== slug) {
                 window.location.hash = `#/news/${nextSlug}`;
@@ -3235,6 +3347,7 @@ function LeakDetailPage({
     (leakItem) => leakItem.slug === slug || leakItem.id === slug,
   );
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorDirty, setEditorDirty] = useState(false);
 
   async function refreshContent() {
     setData(
@@ -3299,7 +3412,11 @@ function LeakDetailPage({
         open={editorOpen}
         title="Редактировать слив"
         eyebrow="Слухи и источники"
-        onClose={() => setEditorOpen(false)}
+        dirty={editorDirty}
+        onClose={() => {
+          setEditorDirty(false);
+          setEditorOpen(false);
+        }}
       >
         <Suspense fallback={<SkeletonGrid label="Загрузка редактора слива" />}>
           <AdminLeaksManager
@@ -3307,8 +3424,10 @@ function LeakDetailPage({
             initialSelectedId={item.id}
             access={user ? contentAccess(user, 'leaks') : undefined}
             onRefresh={refreshContent}
+            onDirtyChange={setEditorDirty}
             onSaved={({ values }) => {
               const nextSlug = String(values.slug || '').trim();
+              setEditorDirty(false);
               setEditorOpen(false);
               if (nextSlug && nextSlug !== slug) {
                 window.location.hash = `#/leaks/${nextSlug}`;
@@ -3987,6 +4106,7 @@ function AdminGuides({
   user,
   initialGuideId,
   onSaved,
+  onDirtyChange,
 }: {
   data: SiteData;
   setData: React.Dispatch<React.SetStateAction<SiteData>>;
@@ -3998,6 +4118,7 @@ function AdminGuides({
     status?: Guide['status'];
     action: 'created' | 'saved';
   }) => void | Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [selectedGuideId, setSelectedGuideId] = useState(
     initialGuideId || data.guides[0]?.id || 'new',
@@ -4151,6 +4272,10 @@ function AdminGuides({
     window.addEventListener('beforeunload', warnBeforeUnload);
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [isGuideDirty]);
+
+  useEffect(() => {
+    onDirtyChange?.(isGuideDirty);
+  }, [isGuideDirty, onDirtyChange]);
 
   function reorder(index: number) {
     if (dragIndex === null || dragIndex === index) {
@@ -5374,10 +5499,12 @@ function AdminTierlists({
   data,
   setData,
   canPublish,
+  onDirtyChange,
 }: {
   data: SiteData;
   setData: React.Dispatch<React.SetStateAction<SiteData>>;
   canPublish: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [kind, setKind] = useState<'base' | 'premium'>('base');
   const tierlist =
@@ -5406,6 +5533,39 @@ function AdminTierlists({
     setChangelog((tierlist?.changelog || []).join('\n'));
     setMessage('');
   }, [tierlist]);
+
+  const tierBaselineSignature = useMemo(
+    () =>
+      JSON.stringify({
+        title: tierlist?.title || '',
+        patch: tierlist?.patch || '1.0',
+        status: tierlist?.status || 'published',
+        changelog: (tierlist?.changelog || []).join('\n'),
+        items: (tierlist?.items || []).map((item) => ({
+          ...item,
+          tier: normalizeTier(item.tier),
+        })),
+      }),
+    [tierlist],
+  );
+  const tierDraftSignature = useMemo(
+    () =>
+      JSON.stringify({
+        title,
+        patch,
+        status,
+        changelog,
+        items: items.map((item) => ({
+          ...item,
+          tier: normalizeTier(item.tier),
+        })),
+      }),
+    [changelog, items, patch, status, title],
+  );
+
+  useEffect(() => {
+    onDirtyChange?.(tierDraftSignature !== tierBaselineSignature);
+  }, [onDirtyChange, tierBaselineSignature, tierDraftSignature]);
 
   const groupedItems = useMemo(() => {
     const result = Object.fromEntries(
@@ -5523,6 +5683,7 @@ function AdminTierlists({
       }));
       setMessage('Тир-лист обновлен в демо-режиме.');
     }
+    onDirtyChange?.(false);
     setPending(false);
   }
 

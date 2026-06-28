@@ -258,6 +258,7 @@ export function AdminCharacterEditor({
   access,
   onRefresh,
   onSaved,
+  onDirtyChange,
 }: {
   items: Character[];
   initialSelectedId?: string;
@@ -268,6 +269,7 @@ export function AdminCharacterEditor({
     slug?: string;
     status: 'draft' | 'published';
   }) => void | Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const initialId =
     initialSelectedId === 'new'
@@ -337,6 +339,10 @@ export function AdminCharacterEditor({
     window.addEventListener('beforeunload', warnBeforeUnload);
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [isDirty]);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   useEffect(() => {
     setMessage('');

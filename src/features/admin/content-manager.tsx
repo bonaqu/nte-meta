@@ -289,6 +289,7 @@ export function ContentManager<T extends ManagedItem>({
   initialSelectedId,
   access = fullAccess,
   onSaved,
+  onDirtyChange,
 }: {
   items: T[];
   config: ManagerConfig<T>;
@@ -301,6 +302,7 @@ export function ContentManager<T extends ManagedItem>({
     publishStatus?: 'draft' | 'published';
     item?: T;
   }) => void | Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const initialId = initialSelectedId || items[0]?.id || 'new';
   const [selectedId, setSelectedId] = useState(initialId);
@@ -369,6 +371,10 @@ export function ContentManager<T extends ManagedItem>({
     window.addEventListener('beforeunload', warnBeforeUnload);
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [isDirty]);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   useEffect(() => {
     setMessage('');
@@ -782,6 +788,7 @@ export function AdminNewsManager({
   initialSelectedId,
   access,
   onSaved,
+  onDirtyChange,
 }: {
   items: NewsItem[];
   onRefresh: () => Promise<void>;
@@ -793,6 +800,7 @@ export function AdminNewsManager({
     publishStatus?: 'draft' | 'published';
     item?: NewsItem;
   }) => void | Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const config = useMemo<ManagerConfig<NewsItem>>(
     () => ({
@@ -893,6 +901,7 @@ export function AdminNewsManager({
       initialSelectedId={initialSelectedId}
       access={access}
       onSaved={onSaved}
+      onDirtyChange={onDirtyChange}
     />
   );
 }
@@ -903,6 +912,7 @@ export function AdminLeaksManager({
   initialSelectedId,
   access,
   onSaved,
+  onDirtyChange,
 }: {
   items: LeakItem[];
   onRefresh: () => Promise<void>;
@@ -914,6 +924,7 @@ export function AdminLeaksManager({
     publishStatus?: 'draft' | 'published';
     item?: LeakItem;
   }) => void | Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const config = useMemo<ManagerConfig<LeakItem>>(
     () => ({
@@ -1015,6 +1026,7 @@ export function AdminLeaksManager({
       initialSelectedId={initialSelectedId}
       access={access}
       onSaved={onSaved}
+      onDirtyChange={onDirtyChange}
     />
   );
 }

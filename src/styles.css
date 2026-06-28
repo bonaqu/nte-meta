@@ -2045,6 +2045,20 @@
     0 14px 30px rgb(38 217 255 / 0.1);
 }
 
+.section-sorter__ghost {
+  position: fixed;
+  inset-block-start: -1000px;
+  inset-inline-start: -1000px;
+  z-index: 2147483647;
+  opacity: 0.94;
+  pointer-events: none;
+  transform: rotate(-1.5deg) scale(1.02);
+  box-shadow:
+    0 0 0 1px rgb(38 217 255 / 0.34),
+    0 22px 48px rgb(0 0 0 / 0.38),
+    0 0 38px rgb(38 217 255 / 0.18);
+}
+
 .section-sorter button:active {
   cursor: grabbing;
   transform: scale(0.995);
@@ -3174,14 +3188,48 @@
 
 .tier-drag-card.is-dragging {
   opacity: 0.48;
-  transform: scale(0.96);
+  transform: scale(0.96) rotate(-1deg);
 }
 
 .tier-drag-card.is-drop-target {
-  border-inline-start-color: var(--cyan);
+  border-color: rgb(38 217 255 / 0.66);
   box-shadow:
-    inset 4px 0 0 var(--cyan),
+    0 0 0 1px rgb(38 217 255 / 0.18),
     0 18px 36px rgb(38 217 255 / 0.14);
+}
+
+.tier-drag-card.is-drop-target::before {
+  content: '';
+  position: absolute;
+  inset-block: 8px;
+  inline-size: 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--cyan), var(--pink));
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.16),
+    0 0 22px rgb(38 217 255 / 0.5);
+}
+
+.tier-drag-card.is-drop-before::before {
+  inset-inline-start: -7px;
+}
+
+.tier-drag-card.is-drop-after::before {
+  inset-inline-end: -7px;
+}
+
+.tier-drag-card--ghost {
+  position: fixed;
+  inset-block-start: -1000px;
+  inset-inline-start: -1000px;
+  z-index: 2147483647;
+  opacity: 0.94;
+  pointer-events: none;
+  transform: rotate(-2deg) scale(1.04);
+  box-shadow:
+    0 0 0 1px rgb(38 217 255 / 0.34),
+    0 24px 52px rgb(0 0 0 / 0.42),
+    0 0 42px rgb(255 77 184 / 0.18);
 }
 
 .tier-drag-card img {

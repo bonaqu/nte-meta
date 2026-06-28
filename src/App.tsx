@@ -4151,6 +4151,7 @@ function AdminGuides({
   const createGuideDialogRef = useRef<HTMLDialogElement>(null);
   const deleteGuideDialogRef = useRef<HTMLDialogElement>(null);
   const deleteSectionDialogRef = useRef<HTMLDialogElement>(null);
+  const sectionDragPreviewRef = useRef<HTMLElement | null>(null);
   const skipNextGuideDraftSaveRef = useRef(false);
   const canCreate = canManageContent(user, 'guides', 'create');
   const canPublish = canManageContent(user, 'guides', 'publish');
@@ -4277,6 +4278,13 @@ function AdminGuides({
     onDirtyChange?.(isGuideDirty);
   }, [isGuideDirty, onDirtyChange]);
 
+  useEffect(
+    () => () => {
+      sectionDragPreviewRef.current?.remove();
+    },
+    [],
+  );
+
   function reorder(index: number) {
     if (dragIndex === null || dragIndex === index) {
       return;
@@ -4287,8 +4295,34 @@ function AdminGuides({
     setSections(
       next.map((section, position) => ({ ...section, position: position + 1 })),
     );
+    clearSectionDragState();
+  }
+
+  function clearSectionDragState() {
     setDragIndex(null);
     setDragOverSectionIndex(null);
+    sectionDragPreviewRef.current?.remove();
+    sectionDragPreviewRef.current = null;
+  }
+
+  function setSectionDragImage(
+    event: React.DragEvent<HTMLButtonElement>,
+    section: GuideSection,
+  ) {
+    const source = event.currentTarget;
+    const rect = source.getBoundingClientRect();
+    const clone = source.cloneNode(true) as HTMLElement;
+    clone.classList.add('section-sorter__ghost');
+    clone.setAttribute('aria-hidden', 'true');
+    clone.style.inlineSize = `${rect.width}px`;
+    clone.style.blockSize = `${rect.height}px`;
+
+    sectionDragPreviewRef.current?.remove();
+    document.body.append(clone);
+    sectionDragPreviewRef.current = clone;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', section.title);
+    event.dataTransfer.setDragImage(clone, rect.width / 2, rect.height / 2);
   }
 
   function moveSelectedSection(offset: number) {
@@ -4824,17 +4858,17 @@ function AdminGuides({
           >
             {sections.map((section, index) => (
               <button
-                key={section.id}
-                type="button"
-                draggable
-                onDragStart={() => setDragIndex(index)}
-                onDragEnter={() => setDragOverSectionIndex(index)}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={() => reorder(index)}
-                onDragEnd={() => {
-                  setDragIndex(null);
-                  setDragOverSectionIndex(null);
-                }}
+              key={section.id}
+              type="button"
+              draggable
+              onDragStart={(event) => {
+                setSectionDragImage(event, section);
+                setDragIndex(index);
+              }}
+              onDragEnter={() => setDragOverSectionIndex(index)}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={() => reorder(index)}
+              onDragEnd={clearSectionDragState}
                 onClick={() => selectSection(section)}
                 aria-pressed={section.id === selectedSectionId}
                 className={[
@@ -5522,7 +5556,9 @@ function AdminTierlists({
   const [dragOver, setDragOver] = useState<{
     tier: Tier;
     characterId?: string;
+    placement?: 'before' | 'after';
   } | null>(null);
+  const dragPreviewRef = useRef<HTMLElement | null>(null);
   const [characterToAdd, setCharacterToAdd] = useState('');
 
   useEffect(() => {
@@ -5567,6 +5603,13 @@ function AdminTierlists({
     onDirtyChange?.(tierDraftSignature !== tierBaselineSignature);
   }, [onDirtyChange, tierBaselineSignature, tierDraftSignature]);
 
+  useEffect(
+    () => () => {
+      dragPreviewRef.current?.remove();
+    },
+    [],
+  );
+
   const groupedItems = useMemo(() => {
     const result = Object.fromEntries(
       tierOrder.map((tier) => [tier, [] as typeof items]),
@@ -5596,7 +5639,13 @@ function AdminTierlists({
     characterId: string,
     nextTier: Tier,
     targetCharacterId?: string,
+    placement: 'before' | 'after' = 'after',
   ) {
+    if (targetCharacterId === characterId) {
+      clearTierDragState();
+      return;
+    }
+
     setItems((current) => {
       const existing = current.find((item) => item.characterId === characterId);
       const moving = existing
@@ -5613,14 +5662,18 @@ function AdminTierlists({
           .map((item) => ({ ...item, tier: normalizeTier(item.tier) }));
 
         if (tier === nextTier) {
-          const insertIndex = targetCharacterId
-            ? rowItems.findIndex((item) => item.characterId === targetCharacterId)
-            : -1;
-          if (insertIndex >= 0) {
-            rowItems.splice(insertIndex, 0, moving);
-          } else {
-            rowItems.push(moving);
-          }
+        const insertIndex = targetCharacterId
+          ? rowItems.findIndex((item) => item.characterId === targetCharacterId)
+          : -1;
+        if (insertIndex >= 0) {
+          rowItems.splice(
+            placement === 'after' ? insertIndex + 1 : insertIndex,
+            0,
+            moving,
+          );
+        } else {
+          rowItems.push(moving);
+        }
         }
 
         nextItems.push(...rowItems);
@@ -5628,8 +5681,42 @@ function AdminTierlists({
 
       return nextItems;
     });
+    clearTierDragState();
+  }
+
+  function clearTierDragState() {
     setDraggedCharacterId('');
     setDragOver(null);
+    dragPreviewRef.current?.remove();
+    dragPreviewRef.current = null;
+  }
+
+  function getTierDropPlacement(event: React.DragEvent<HTMLElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const horizontal = rect.width >= rect.height;
+    if (horizontal) {
+      return event.clientX > rect.left + rect.width / 2 ? 'after' : 'before';
+    }
+    return event.clientY > rect.top + rect.height / 2 ? 'after' : 'before';
+  }
+
+  function setTierDragImage(
+    event: React.DragEvent<HTMLButtonElement>,
+    character: Character,
+  ) {
+    const source = event.currentTarget;
+    const rect = source.getBoundingClientRect();
+    const clone = source.cloneNode(true) as HTMLElement;
+    clone.classList.add('tier-drag-card--ghost');
+    clone.setAttribute('aria-hidden', 'true');
+    clone.style.inlineSize = `${rect.width}px`;
+    clone.style.blockSize = `${rect.height}px`;
+
+    dragPreviewRef.current?.remove();
+    document.body.append(clone);
+    dragPreviewRef.current = clone;
+    event.dataTransfer.setDragImage(clone, rect.width / 2, rect.height / 2);
+    event.dataTransfer.setData('application/x-nte-character-name', character.name);
   }
 
   const availableCharacters = data.characters.filter(
@@ -5801,48 +5888,68 @@ function AdminTierlists({
                   const character = getCharacter(data, item.characterId);
                   if (!character) return null;
                   const isDragging = draggedCharacterId === item.characterId;
-                  const isDropTarget =
-                    dragOver?.tier === tier &&
-                    dragOver.characterId === item.characterId;
+                const isDropTarget =
+                  dragOver?.tier === tier &&
+                  dragOver.characterId === item.characterId;
+                const dropPlacement = isDropTarget
+                  ? dragOver?.placement || 'before'
+                  : null;
                   return (
                     <button
                       type="button"
                       draggable
                       key={item.characterId}
-                      className={`tier-drag-card ${
-                        isDragging ? 'is-dragging' : ''
-                      } ${isDropTarget ? 'is-drop-target' : ''}`}
-                      title={`${character.name}: перетащить или переставить в строке ${tier}`}
-                      aria-label={`${character.name}, ${tier}, позиция ${index + 1}`}
-                      onDragStart={(event) => {
-                        event.dataTransfer.effectAllowed = 'move';
-                        event.dataTransfer.setData('text/plain', item.characterId);
-                        setDraggedCharacterId(item.characterId);
-                      }}
-                      onDragEnter={() =>
-                        setDragOver({ tier, characterId: item.characterId })
+                    className={`tier-drag-card ${
+                      isDragging ? 'is-dragging' : ''
+                    } ${isDropTarget ? 'is-drop-target' : ''} ${
+                      dropPlacement ? `is-drop-${dropPlacement}` : ''
+                    }`}
+                    title={`${character.name}: перетащить или переставить в строке ${tier}`}
+                    aria-label={`${character.name}, ${tier}, позиция ${index + 1}`}
+                    data-drop-placement={dropPlacement || undefined}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', item.characterId);
+                      setTierDragImage(event, character);
+                      setDraggedCharacterId(item.characterId);
+                    }}
+                    onDragEnter={(event) => {
+                      if (draggedCharacterId && draggedCharacterId !== item.characterId) {
+                        setDragOver({
+                          tier,
+                          characterId: item.characterId,
+                          placement: getTierDropPlacement(event),
+                        });
                       }
-                      onDragOver={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        if (
-                          dragOver?.tier !== tier ||
-                          dragOver.characterId !== item.characterId
-                        ) {
-                          setDragOver({ tier, characterId: item.characterId });
-                        }
-                      }}
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (!draggedCharacterId || draggedCharacterId === item.characterId) {
+                        return;
+                      }
+                      const placement = getTierDropPlacement(event);
+                      if (
+                        dragOver?.tier !== tier ||
+                        dragOver.characterId !== item.characterId ||
+                        dragOver.placement !== placement
+                      ) {
+                        setDragOver({ tier, characterId: item.characterId, placement });
+                      }
+                    }}
                       onDrop={(event) => {
                         event.preventDefault();
-                        event.stopPropagation();
-                        if (draggedCharacterId) {
-                          moveCharacter(draggedCharacterId, tier, item.characterId);
-                        }
-                      }}
-                      onDragEnd={() => {
-                        setDraggedCharacterId('');
-                        setDragOver(null);
-                      }}
+                      event.stopPropagation();
+                      if (draggedCharacterId) {
+                        moveCharacter(
+                          draggedCharacterId,
+                          tier,
+                          item.characterId,
+                          dragOver?.placement || getTierDropPlacement(event),
+                        );
+                      }
+                    }}
+                    onDragEnd={clearTierDragState}
                     >
                       <span className="tier-card-rank">{index + 1}</span>
                       <img

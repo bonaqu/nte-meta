@@ -730,11 +730,36 @@ test.describe('NTE Meta Worker API', () => {
     await expect(
       page.getByRole('heading', { name: 'Редактировать тир-лист', level: 1 }),
     ).toBeVisible();
-    await expect(page.locator('.tier-drag-card').first()).toHaveAttribute(
-      'draggable',
-      'true',
-    );
-    await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.tier-drag-card').first()).toHaveAttribute(
+    'draggable',
+    'true',
+  );
+  await expect(page.locator('.tier-drag-card').nth(1)).toBeVisible();
+  const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+  await page.locator('.tier-drag-card').first().dispatchEvent('dragstart', {
+    dataTransfer,
+  });
+  await expect(page.locator('.tier-drag-card').first()).toHaveClass(
+    /is-dragging/,
+  );
+  const dropTargetBox = await page.locator('.tier-drag-card').nth(1).boundingBox();
+  if (!dropTargetBox) {
+    throw new Error('Не удалось получить координаты карточки тир-листа.');
+  }
+  await page.locator('.tier-drag-card').nth(1).dispatchEvent('dragover', {
+    dataTransfer,
+    clientX: dropTargetBox.x + dropTargetBox.width - 2,
+    clientY: dropTargetBox.y + dropTargetBox.height / 2,
+  });
+  await expect(page.locator('.tier-drag-card').nth(1)).toHaveAttribute(
+    'data-drop-placement',
+    'after',
+  );
+  await page.locator('.tier-drag-card').first().dispatchEvent('dragend', {
+    dataTransfer,
+  });
+  await dataTransfer.dispose();
+  await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Закрыть редактор' }).click();
   await page.locator('a.profile-chip').click();
     await expect(

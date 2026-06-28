@@ -2414,7 +2414,7 @@ function VideoEmbed({
         src={embedUrl}
         title={title}
         loading="lazy"
-        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
       />
       {transcript ? (

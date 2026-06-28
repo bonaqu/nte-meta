@@ -148,7 +148,7 @@ export function MarkdownPreview({ value }: { value: string }) {
             src={embedUrl}
             title="YouTube video guide"
             loading="lazy"
-            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />,
         );

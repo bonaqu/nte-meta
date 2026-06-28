@@ -18,6 +18,7 @@ import {
   Gamepad2,
   GripVertical,
   Home,
+  ImageIcon,
   ListFilter,
   LockKeyhole,
   LogOut,
@@ -4015,6 +4016,8 @@ function AdminGuides({
   );
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
+  const [sectionImageUrl, setSectionImageUrl] = useState('');
+  const [sectionImageAlt, setSectionImageAlt] = useState('');
   const [guideMeta, setGuideMeta] = useState({
     title: guide?.title || '',
     summary: guide?.summary || '',
@@ -4249,6 +4252,39 @@ function AdminGuides({
       action,
     );
     updateSelectedMarkdown(next);
+  }
+
+  function insertSectionImage() {
+    const rawUrl = sectionImageUrl.trim();
+    if (!rawUrl) {
+      setMessage('Укажите URL изображения для текущей секции.');
+      return;
+    }
+    const isAllowedUrl =
+      /^https?:\/\//i.test(rawUrl) ||
+      rawUrl.startsWith('/') ||
+      rawUrl.startsWith('assets/');
+    if (!isAllowedUrl) {
+      setMessage('Изображение должно быть http(s)-URL, /путь или assets/путь.');
+      return;
+    }
+    const altText = (sectionImageAlt.trim() || 'Изображение гайда')
+      .replaceAll('[', '')
+      .replaceAll(']', '');
+    const snippet = `![${altText}](${rawUrl})`;
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      updateSelectedMarkdown(`${markdown}\n\n${snippet}`);
+    } else {
+      const before = markdown.slice(0, textarea.selectionStart);
+      const after = markdown.slice(textarea.selectionEnd);
+      const needsLead = before.trim().length ? '\n\n' : '';
+      const needsTail = after.trim().length ? '\n\n' : '';
+      updateSelectedMarkdown(`${before}${needsLead}${snippet}${needsTail}${after}`);
+    }
+    setSectionImageUrl('');
+    setSectionImageAlt('');
+    setMessage('Изображение добавлено в текущую секцию. Сохраните раздел.');
   }
 
   async function createGuide(event: React.FormEvent<HTMLFormElement>) {
@@ -4785,6 +4821,31 @@ function AdminGuides({
                 {label}
               </button>
             ))}
+          </div>
+          <div className="guide-image-insert" aria-label="Вставка изображения в секцию">
+            <label htmlFor="guide-section-image-url">
+              Image URL для секции
+              <input
+                id="guide-section-image-url"
+                type="url"
+                inputMode="url"
+                value={sectionImageUrl}
+                onChange={(event) => setSectionImageUrl(event.target.value)}
+                placeholder="https://... или assets/..."
+              />
+            </label>
+            <label htmlFor="guide-section-image-alt">
+              Подпись / alt
+              <input
+                id="guide-section-image-alt"
+                value={sectionImageAlt}
+                onChange={(event) => setSectionImageAlt(event.target.value)}
+                placeholder="Например: схема ротации Хотори"
+              />
+            </label>
+            <button className="ghost-button" type="button" onClick={insertSectionImage}>
+              <ImageIcon aria-hidden="true" /> Вставить изображение
+            </button>
           </div>
           <label htmlFor="markdown-editor">Текст раздела</label>
           <textarea

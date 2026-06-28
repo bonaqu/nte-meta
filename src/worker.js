@@ -2004,7 +2004,7 @@ async function handleSystemStatus(request, env) {
       d1: 'ok',
       generatedAt: new Date().toISOString(),
       counts,
-      migrations: { latestKnown: '0007_inline_editing_threads_tiers.sql' },
+      migrations: { latestKnown: '0008_character_tier_d.sql' },
     },
   });
 }
@@ -2483,13 +2483,13 @@ function validateEntityRecord(entity, record, isCreate) {
   }
   if (
     record.tier !== undefined &&
-    !['S+', 'S', 'A', 'B', 'C'].includes(record.tier)
+    !['S+', 'S', 'A', 'B', 'C', 'D'].includes(record.tier)
   ) {
     throwHttp('Неизвестный тир', 400);
   }
   if (
     record.premium_tier !== undefined &&
-    !['S+', 'S', 'A', 'B', 'C'].includes(record.premium_tier)
+    !['S+', 'S', 'A', 'B', 'C', 'D'].includes(record.premium_tier)
   ) {
     throwHttp('Неизвестный premium-тир', 400);
   }

@@ -44,6 +44,32 @@ function replaceMeta(html, selector, value) {
   return html.replace(expression, `$1${escaped}$2`);
 }
 
+function stripMarkdown(value, max = 900) {
+  return String(value || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/@youtube\([^)]+\)/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[#>*_`|:-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max);
+}
+
+function renderStaticSection(section) {
+  const body = stripMarkdown(section.body || section.content || '');
+  if (!section.title || !body) return '';
+  return `<section><h2>${escapeHtml(section.title)}</h2><p>${escapeHtml(body)}</p></section>`;
+}
+
+function renderStaticRoot(page) {
+  const sections = (page.staticSections || [])
+    .map(renderStaticSection)
+    .filter(Boolean)
+    .join('');
+  return `<div id="root"><main><article><h1>${escapeHtml(page.title)}</h1><p>${escapeHtml(page.description)}</p>${sections}</article></main></div>`;
+}
+
 function renderDocument(page) {
   const canonical = `${siteUrl}/${page.route ? `${page.route}/` : ''}`;
   const title = `${page.title} | NTE Meta`;
@@ -87,7 +113,7 @@ function renderDocument(page) {
   );
   html = html.replace(
     '<div id="root"></div>',
-    `<div id="root"><main><article><h1>${escapeHtml(page.title)}</h1><p>${escapeHtml(description)}</p></article></main></div>`,
+    renderStaticRoot(page),
   );
   return html;
 }
@@ -133,6 +159,30 @@ const pages = [
     description: item.profile?.biographyShort || item.shortDescription,
     image: item.splashUrl,
     article: true,
+    staticSections: [
+      {
+        title: 'Профиль',
+        body: `${item.rarity || ''} · ${item.attribute || ''} · ${item.role || ''} · ${item.profile?.faction || 'Фракция уточняется'}`,
+      },
+      {
+        title: 'Биография',
+        body: item.profile?.biography || item.summary || item.shortDescription,
+      },
+      {
+        title: 'Способности',
+        body: (item.profile?.abilities || [])
+          .slice(0, 5)
+          .map((ability) => `${ability.name}: ${ability.description}`)
+          .join(' '),
+      },
+      {
+        title: 'Материалы',
+        body: (item.profile?.materials || [])
+          .slice(0, 8)
+          .map((material) => `${material.name}: ${material.amount} (${material.source})`)
+          .join(' '),
+      },
+    ],
   })),
   ...guides.map((item) => ({
     route: `guides/${item.slug}`,
@@ -141,6 +191,17 @@ const pages = [
     date: item.updatedAt,
     article: true,
     schemaType: 'TechArticle',
+    staticSections: [
+      { title: 'Краткий вывод', body: item.summary },
+      ...(item.sections || [])
+        .slice()
+        .sort((a, b) => Number(a.position || 0) - Number(b.position || 0))
+        .slice(0, 6)
+        .map((section) => ({
+          title: section.title,
+          body: section.content,
+        })),
+    ],
   })),
   ...news.map((item) => ({
     route: `news/${item.slug}`,
@@ -150,6 +211,7 @@ const pages = [
     date: item.updatedAt || item.date,
     article: true,
     schemaType: 'NewsArticle',
+    staticSections: [{ title: 'Материал', body: item.body || item.bodyMarkdown }],
   })),
   ...leaks.map((item) => ({
     route: `leaks/${item.slug}`,
@@ -158,6 +220,13 @@ const pages = [
     date: item.updatedAt || item.date,
     article: true,
     schemaType: 'Article',
+    staticSections: [
+      {
+        title: 'Статус и источник',
+        body: `${item.status || 'слух'} · доверие: ${item.trustLevel || 'средний'} · источник: ${item.sourceName || 'не указан'}`,
+      },
+      { title: 'Материал', body: item.body || item.bodyMarkdown },
+    ],
   })),
   ...threads.map((item) => ({
     route: `threads/${item.slug}`,

@@ -177,8 +177,8 @@ test.describe('NTE Meta Worker API', () => {
       role: 'Главный DPS',
       type: 'DPS',
       attribute: 'Электро',
-      tier: 'A',
-      premiumTier: 'S',
+    tier: 'D',
+    premiumTier: 'D',
       tierRank: 20,
       imageUrl: '/assets/characters/hotori.webp',
       shortDescription: 'Персонаж для API-регрессии.',
@@ -352,7 +352,7 @@ test.describe('NTE Meta Worker API', () => {
         patchVersion: 'test',
         status: 'published',
         changelogJson: ['Создан автотестом'],
-        items: [{ characterId, tier: 'A', note: 'Контрольная позиция' }],
+      items: [{ characterId, tier: 'D', note: 'Контрольная позиция' }],
       },
     });
     expect(tierlist.status()).toBe(201);
@@ -584,11 +584,23 @@ test.describe('NTE Meta Worker API', () => {
       data: {
         reason: 'Повторная публикация непомеченного сюжетного спойлера.',
       },
-    });
-    expect(warning.status()).toBe(201);
-    const warnings = await moderatedUser.get('/api/auth/warnings');
-    expect((await warnings.json()).data).toHaveLength(1);
-    expect(
+  });
+  expect(warning.status()).toBe(201);
+  const warningId = (await warning.json()).data.id;
+  const warnings = await moderatedUser.get('/api/auth/warnings');
+  expect((await warnings.json()).data).toHaveLength(1);
+  const adminWarnings = await member.get('/api/warnings');
+  expect(adminWarnings.ok()).toBeTruthy();
+  expect(
+    (await adminWarnings.json()).data.some(
+      (item: { id: string }) => item.id === warningId,
+    ),
+  ).toBeTruthy();
+  const dismissedWarning = await member.patch(`/api/warnings/${warningId}`, {
+    data: { status: 'dismissed' },
+  });
+  expect(dismissedWarning.ok()).toBeTruthy();
+  expect(
       (
         await member.post(`/api/users/${ownerId}/warnings`, {
           data: { reason: 'Недопустимая попытка.' },

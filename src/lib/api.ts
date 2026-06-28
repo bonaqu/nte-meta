@@ -88,9 +88,17 @@ async function request<T>(
   }
 }
 
-async function loadCollection<T>(path: string, fallback: T): Promise<T> {
+async function loadCollection<T>(
+  path: string,
+  fallback: T,
+  options: { optional?: boolean } = {},
+): Promise<T> {
   const result = await request<T>(path);
-  return result.ok ? result.data : fallback;
+  if (result.ok) return result.data;
+  if (API_BASE && !options.optional) {
+    throw new Error(`${path}: ${result.error}`);
+  }
+  return fallback;
 }
 
 export async function loadSiteData(
@@ -125,7 +133,7 @@ export async function loadSiteData(
       seedData.comments,
     ),
     options.includePrivate
-      ? loadCollection('/api/sources', seedData.sources)
+      ? loadCollection('/api/sources', seedData.sources, { optional: true })
       : Promise.resolve([]),
   ]);
 
@@ -325,7 +333,7 @@ export async function loadWarnings() {
 
 export async function updateWarningStatus(
   id: string,
-  status: 'active' | 'dismissed' | 'resolved',
+  status: 'active' | 'dismissed',
 ) {
   return request<{ success: boolean }>(`/api/warnings/${id}`, {
     method: 'PATCH',

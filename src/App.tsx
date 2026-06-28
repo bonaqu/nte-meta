@@ -1636,7 +1636,7 @@ function CharacterDetailPage({
     return (
       <EmptyState
         title="Персонаж не найден"
-        text="Проверьте slug или создайте карточку в админке."
+        text="Проверьте slug или создайте карточку прямо в разделе персонажей."
       />
     );
   }
@@ -5806,14 +5806,14 @@ function AdminWarnings() {
     };
   }, []);
 
-  async function updateStatus(warning: UserWarning, status: 'active' | 'resolved') {
+  async function updateStatus(warning: UserWarning, status: 'active' | 'dismissed') {
     setActionId(warning.id);
     const result = await updateWarningStatus(warning.id, status);
     if (result.ok) {
       setWarnings((current) =>
         current.map((item) => (item.id === warning.id ? { ...item, status } : item)),
       );
-      setMessage(status === 'resolved' ? 'Предупреждение закрыто.' : 'Предупреждение снова активно.');
+      setMessage(status === 'dismissed' ? 'Предупреждение закрыто.' : 'Предупреждение снова активно.');
     } else {
       setMessage(result.error);
     }
@@ -5851,7 +5851,7 @@ function AdminWarnings() {
                   onClick={() =>
                     updateStatus(
                       warning,
-                      (warning.status || 'active') === 'active' ? 'resolved' : 'active',
+                        (warning.status || 'active') === 'active' ? 'dismissed' : 'active',
                     )
                   }
                 >
@@ -6471,16 +6471,14 @@ function Footer() {
       <div>
         <strong>NTE Meta</strong>
         <p>
-          Русскоязычный meta-hub по Neverness to Everness. Новости и сливы
-          разделены, гайды редактируются через D1 CMS.
+          Русскоязычный meta-hub по Neverness to Everness. Новости, сливы и
+          комьюнити живут на главной, а контент редактируется прямо в разделах.
         </p>
       </div>
       <div>
         <a href="#/characters">Персонажи</a>
         <a href="#/guides">Гайды</a>
         <a href="#/tierlists">Тир-листы</a>
-        <a href="#/">Новости и сливы</a>
-        <a href="#/">Комьюнити</a>
       </div>
     </footer>
   );

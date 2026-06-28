@@ -327,7 +327,7 @@ export interface UserWarning {
   note?: string;
   moderatorName: string;
   createdAt: string;
-  status?: 'active' | 'dismissed' | 'resolved';
+  status?: 'active' | 'dismissed';
 }
 
 export interface SystemStatus {

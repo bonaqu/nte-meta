@@ -288,19 +288,27 @@ export function ContentManager<T extends ManagedItem>({
   onRefresh,
   initialSelectedId,
   access = fullAccess,
+  onSaved,
 }: {
   items: T[];
   config: ManagerConfig<T>;
   onRefresh: () => Promise<void>;
   initialSelectedId?: string;
   access?: ManagerAccess;
+  onSaved?: (context: {
+    id?: string;
+    values: EditorValues;
+    publishStatus?: 'draft' | 'published';
+    item?: T;
+  }) => void | Promise<void>;
 }) {
-  const [selectedId, setSelectedId] = useState(
-    initialSelectedId || items[0]?.id || 'new',
-  );
-  const [values, setValues] = useState<EditorValues>(() =>
-    items[0] ? config.fromItem(items[0]) : config.empty(),
-  );
+  const initialId = initialSelectedId || items[0]?.id || 'new';
+  const [selectedId, setSelectedId] = useState(initialId);
+  const [values, setValues] = useState<EditorValues>(() => {
+    if (initialId === 'new') return config.empty();
+    const item = items.find((candidate) => candidate.id === initialId) || items[0];
+    return item ? config.fromItem(item) : config.empty();
+  });
   const [query, setQuery] = useState('');
   const [message, setMessage] = useState('');
   const [messageTone, setMessageTone] = useState<'info' | 'danger' | 'success'>(
@@ -407,9 +415,16 @@ export function ContentManager<T extends ManagedItem>({
     );
 
     if (result.ok) {
-      if (result.data.id) setSelectedId(result.data.id);
+      const savedId = result.data.id || selectedItem?.id;
+      if (savedId) setSelectedId(savedId);
       localStorage.removeItem(draftKey);
       await onRefresh();
+      await onSaved?.({
+        id: savedId,
+        values,
+        publishStatus,
+        item: selectedItem,
+      });
       setMessageTone('success');
       setMessage(
         publishStatus === 'draft'
@@ -608,7 +623,7 @@ export function ContentManager<T extends ManagedItem>({
 }
 
 const publishStatuses = options(['draft', 'published', 'archived']);
-const tiers = options(['S+', 'S', 'A', 'B', 'C']);
+const tiers = options(['S', 'A', 'B', 'C', 'D']);
 
 export function AdminCharactersManager({
   items,
@@ -766,11 +781,18 @@ export function AdminNewsManager({
   onRefresh,
   initialSelectedId,
   access,
+  onSaved,
 }: {
   items: NewsItem[];
   onRefresh: () => Promise<void>;
   initialSelectedId?: string;
   access?: ManagerAccess;
+  onSaved?: (context: {
+    id?: string;
+    values: EditorValues;
+    publishStatus?: 'draft' | 'published';
+    item?: NewsItem;
+  }) => void | Promise<void>;
 }) {
   const config = useMemo<ManagerConfig<NewsItem>>(
     () => ({
@@ -870,6 +892,7 @@ export function AdminNewsManager({
       onRefresh={onRefresh}
       initialSelectedId={initialSelectedId}
       access={access}
+      onSaved={onSaved}
     />
   );
 }
@@ -879,11 +902,18 @@ export function AdminLeaksManager({
   onRefresh,
   initialSelectedId,
   access,
+  onSaved,
 }: {
   items: LeakItem[];
   onRefresh: () => Promise<void>;
   initialSelectedId?: string;
   access?: ManagerAccess;
+  onSaved?: (context: {
+    id?: string;
+    values: EditorValues;
+    publishStatus?: 'draft' | 'published';
+    item?: LeakItem;
+  }) => void | Promise<void>;
 }) {
   const config = useMemo<ManagerConfig<LeakItem>>(
     () => ({
@@ -984,6 +1014,7 @@ export function AdminLeaksManager({
       onRefresh={onRefresh}
       initialSelectedId={initialSelectedId}
       access={access}
+      onSaved={onSaved}
     />
   );
 }

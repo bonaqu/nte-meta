@@ -6,7 +6,7 @@ export type PublishStatus =
   | 'archived'
   | 'pending_review';
 
-export type Tier = 'S+' | 'S' | 'A' | 'B' | 'C' | 'D';
+export type Tier = 'S' | 'A' | 'B' | 'C' | 'D';
 
 export type LeakStatus = 'слух' | 'слив' | 'подтверждено' | 'опровергнуто';
 

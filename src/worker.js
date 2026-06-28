@@ -2004,7 +2004,7 @@ async function handleSystemStatus(request, env) {
       d1: 'ok',
       generatedAt: new Date().toISOString(),
       counts,
-      migrations: { latestKnown: '0009_restore_public_guide_seed.sql' },
+      migrations: { latestKnown: '0010_remove_s_plus_tier.sql' },
     },
   });
 }
@@ -2483,13 +2483,13 @@ function validateEntityRecord(entity, record, isCreate) {
   }
   if (
     record.tier !== undefined &&
-    !['S+', 'S', 'A', 'B', 'C', 'D'].includes(record.tier)
+    !['S', 'A', 'B', 'C', 'D'].includes(record.tier)
   ) {
     throwHttp('Неизвестный тир', 400);
   }
   if (
     record.premium_tier !== undefined &&
-    !['S+', 'S', 'A', 'B', 'C', 'D'].includes(record.premium_tier)
+    !['S', 'A', 'B', 'C', 'D'].includes(record.premium_tier)
   ) {
     throwHttp('Неизвестный premium-тир', 400);
   }
@@ -2778,7 +2778,7 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
         ),
       );
     body.items.forEach((item, index) => {
-      if (!['S+', 'S', 'A', 'B', 'C', 'D'].includes(item.tier))
+      if (!['S', 'A', 'B', 'C', 'D'].includes(item.tier))
         throwHttp('Неизвестный тир в позиции', 400);
       statements.push(
         env.DB.prepare(

@@ -93,11 +93,13 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(page.locator('a[href="#/teams"]')).toHaveCount(0);
     await expect(page.locator('a[href="#/rotations"]')).toHaveCount(0);
 
-    await page.goto('/#/tierlists');
-    await expect(page.getByText('Base C0 тир-лист')).toBeVisible();
-    await page.getByRole('button', { name: 'Premium C6' }).click();
-    await expect(page.getByText('Premium C6 тир-лист')).toBeVisible();
-  });
+  await page.goto('/#/tierlists');
+  await expect(page.getByText('Base C0 тир-лист')).toBeVisible();
+  await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Premium C6' }).click();
+  await expect(page.getByText('Premium C6 тир-лист')).toBeVisible();
+  await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
+});
 
   test('авторизация отделена от CMS, отдельного пустого комьюнити-раздела нет', async ({
     page,

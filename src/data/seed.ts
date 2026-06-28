@@ -21,8 +21,8 @@ const characterBase: Character[] = [
     role: 'Burst DPS',
     type: 'DPS',
     attribute: 'Хаос',
-    tier: 'S+',
-    premiumTier: 'S+',
+    tier: 'S',
+    premiumTier: 'S',
     imageUrl: 'assets/characters/Hotori.webp',
     splashUrl: 'assets/characters/Hotori.webp',
     shortDescription: 'Взрывной керри для быстрого окна урона и босс-файтов.',
@@ -41,7 +41,7 @@ const characterBase: Character[] = [
     type: 'Debuffer',
     attribute: 'Лакшана',
     tier: 'S',
-    premiumTier: 'S+',
+    premiumTier: 'S',
     imageUrl: 'assets/characters/Lacrimosa.webp',
     splashUrl: 'assets/characters/Lacrimosa.webp',
     shortDescription:
@@ -101,7 +101,7 @@ const characterBase: Character[] = [
     type: 'DPS',
     attribute: 'Анима',
     tier: 'S',
-    premiumTier: 'S+',
+    premiumTier: 'S',
     imageUrl: 'assets/characters/Sakiri.webp',
     splashUrl: 'assets/characters/Sakiri.webp',
     shortDescription:

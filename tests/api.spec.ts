@@ -330,10 +330,10 @@ test.describe('NTE Meta Worker API', () => {
       ],
     });
 
-    const duplicateTier = await owner.post('/api/tierlists', {
-      data: {
-        slug: `duplicate-tier-${runId}`,
-        title: 'Тир-лист с дублем',
+  const duplicateTier = await owner.post('/api/tierlists', {
+    data: {
+      slug: `duplicate-tier-${runId}`,
+      title: 'Тир-лист с дублем',
         tierlistType: 'base',
         patchVersion: 'test',
         items: [
@@ -341,10 +341,21 @@ test.describe('NTE Meta Worker API', () => {
           { characterId, tier: 'B' },
         ],
       },
-    });
-    expect(duplicateTier.status()).toBe(400);
+  });
+  expect(duplicateTier.status()).toBe(400);
 
-    const tierlist = await owner.post('/api/tierlists', {
+  const legacyTier = await owner.post('/api/tierlists', {
+    data: {
+      slug: `legacy-tier-${runId}`,
+      title: 'Тир-лист с legacy-рангом',
+      tierlistType: 'base',
+      patchVersion: 'test',
+      items: [{ characterId, tier: 'S+' }],
+    },
+  });
+  expect(legacyTier.status()).toBe(400);
+
+  const tierlist = await owner.post('/api/tierlists', {
       data: {
         slug: `test-tier-${runId}`,
         title: 'Тестовый C0 тир-лист',
@@ -708,10 +719,24 @@ test.describe('NTE Meta Worker API', () => {
       page.getByRole('heading', { name: 'Добавить гайд', level: 1 }),
     ).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Создать гайд' })).toBeVisible();
-    await expect(page.getByLabel('Slug')).toBeVisible();
-    await expect(page.getByLabel('Краткое описание')).toBeVisible();
-    await page.getByRole('button', { name: 'Закрыть редактор' }).click();
-    await page.locator('a.profile-chip').click();
+  await expect(page.getByLabel('Slug')).toBeVisible();
+  await expect(page.getByLabel('Краткое описание')).toBeVisible();
+  await page.getByRole('button', { name: 'Закрыть редактор' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Тир-листы', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Редактировать тир-листы' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Редактировать тир-лист', level: 1 }),
+  ).toBeVisible();
+  await expect(page.locator('.tier-drag-card').first()).toHaveAttribute(
+    'draggable',
+    'true',
+  );
+  await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Закрыть редактор' }).click();
+  await page.locator('a.profile-chip').click();
     await expect(
       page.getByRole('heading', { name: 'Профиль', level: 1 }),
     ).toBeVisible();

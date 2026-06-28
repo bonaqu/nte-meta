@@ -87,6 +87,7 @@ import {
   getCharacterSearchText,
   getGuideCharacter,
   groupTierItems,
+  normalizeTier,
   normalizeSearchText,
   tierOrder,
 } from './lib/site-data';
@@ -871,6 +872,11 @@ function HomePage({
               setData={setData}
               user={user}
               initialGuideId={homeEditorItemId}
+              onSaved={({ slug, status }) => {
+                if (status !== 'published' || !slug) return;
+                setHomeEditor(null);
+                window.location.hash = `#/guides/${slug}`;
+              }}
             />
           </Suspense>
         ) : null}
@@ -888,6 +894,13 @@ function HomePage({
             initialSelectedId={homeEditorItemId}
             access={user ? contentAccess(user, 'news') : undefined}
             onRefresh={refreshContent}
+            onSaved={({ values, publishStatus }) => {
+              if (publishStatus === 'draft') return;
+              const slug = String(values.slug || '').trim();
+              if (!slug) return;
+              setHomeEditor(null);
+              window.location.hash = `#/news/${slug}`;
+            }}
           />
         </Suspense>
       </EditorShell>
@@ -904,6 +917,12 @@ function HomePage({
             initialSelectedId={homeEditorItemId}
             access={user ? contentAccess(user, 'leaks') : undefined}
             onRefresh={refreshContent}
+            onSaved={({ values }) => {
+              const slug = String(values.slug || '').trim();
+              if (!slug) return;
+              setHomeEditor(null);
+              window.location.hash = `#/leaks/${slug}`;
+            }}
           />
         </Suspense>
       </EditorShell>
@@ -1576,6 +1595,11 @@ function CharactersPage({
               initialSelectedId="new"
               access={contentAccess(user, 'characters')}
               onRefresh={refreshContent}
+              onSaved={({ slug, status }) => {
+                if (status !== 'published' || !slug) return;
+                setEditorOpen(false);
+                window.location.hash = `#/characters/${slug}`;
+              }}
             />
           </Suspense>
         ) : null}
@@ -2036,6 +2060,13 @@ function CharacterDetailPage({
               initialSelectedId={character.id}
               access={contentAccess(user, 'characters')}
               onRefresh={refreshContent}
+              onSaved={({ slug, status }) => {
+                if (status !== 'published') return;
+                setCharacterEditorOpen(false);
+                if (slug) {
+                  window.location.hash = `#/characters/${slug}`;
+                }
+              }}
             />
           </Suspense>
         ) : null}
@@ -2049,7 +2080,17 @@ function CharacterDetailPage({
       >
         {user ? (
           <Suspense fallback={<SkeletonGrid label="Загрузка редактора гайда" />}>
-            <AdminGuides data={data} setData={setData} user={user} initialGuideId="new" />
+            <AdminGuides
+              data={data}
+              setData={setData}
+              user={user}
+              initialGuideId="new"
+              onSaved={({ slug, status }) => {
+                if (status !== 'published' || !slug) return;
+                setGuideEditorOpen(false);
+                window.location.hash = `#/guides/${slug}`;
+              }}
+            />
           </Suspense>
         ) : null}
       </EditorShell>
@@ -2245,6 +2286,13 @@ function GuideDetail({
               setData={setData}
               user={user}
               initialGuideId={guide.id}
+              onSaved={({ slug, status }) => {
+                if (status !== 'published') return;
+                setEditorOpen(false);
+                if (slug) {
+                  window.location.hash = `#/guides/${slug}`;
+                }
+              }}
             />
           </Suspense>
         ) : null}
@@ -2931,6 +2979,11 @@ function GuidesPage({
               setData={setData}
               user={user}
               initialGuideId={editorGuideId || undefined}
+              onSaved={({ slug, status }) => {
+                if (status !== 'published' || !slug) return;
+                setEditorGuideId(null);
+                window.location.hash = `#/guides/${slug}`;
+              }}
             />
           </Suspense>
         ) : null}
@@ -2955,7 +3008,7 @@ function TierListsPage({
   return (
     <div className="page-stack">
       <section className="page-hero compact">
-        <p className="eyebrow">S+ · S · A · B · C · D</p>
+        <p className="eyebrow">S · A · B · C · D</p>
         <h1>Тир-листы</h1>
         <p>
           Отдельно для base C0 и premium C6, чтобы F2P-игроки не сравнивали себя
@@ -3151,6 +3204,14 @@ function NewsDetailPage({
             initialSelectedId={item.id}
             access={user ? contentAccess(user, 'news') : undefined}
             onRefresh={refreshContent}
+            onSaved={({ values, publishStatus }) => {
+              if (publishStatus === 'draft') return;
+              const nextSlug = String(values.slug || '').trim();
+              setEditorOpen(false);
+              if (nextSlug && nextSlug !== slug) {
+                window.location.hash = `#/news/${nextSlug}`;
+              }
+            }}
           />
         </Suspense>
       </EditorShell>
@@ -3245,6 +3306,13 @@ function LeakDetailPage({
             initialSelectedId={item.id}
             access={user ? contentAccess(user, 'leaks') : undefined}
             onRefresh={refreshContent}
+            onSaved={({ values }) => {
+              const nextSlug = String(values.slug || '').trim();
+              setEditorOpen(false);
+              if (nextSlug && nextSlug !== slug) {
+                window.location.hash = `#/leaks/${nextSlug}`;
+              }
+            }}
           />
         </Suspense>
       </EditorShell>
@@ -3917,11 +3985,18 @@ function AdminGuides({
   setData,
   user,
   initialGuideId,
+  onSaved,
 }: {
   data: SiteData;
   setData: React.Dispatch<React.SetStateAction<SiteData>>;
   user: User;
   initialGuideId?: string;
+  onSaved?: (context: {
+    id: string;
+    slug?: string;
+    status?: Guide['status'];
+    action: 'created' | 'saved';
+  }) => void | Promise<void>;
 }) {
   const [selectedGuideId, setSelectedGuideId] = useState(
     initialGuideId || data.guides[0]?.id || 'new',
@@ -3935,6 +4010,9 @@ function AdminGuides({
     sections[0]?.id || '',
   );
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverSectionIndex, setDragOverSectionIndex] = useState<number | null>(
+    null,
+  );
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const [guideMeta, setGuideMeta] = useState({
@@ -4082,6 +4160,7 @@ function AdminGuides({
       next.map((section, position) => ({ ...section, position: position + 1 })),
     );
     setDragIndex(null);
+    setDragOverSectionIndex(null);
   }
 
   function moveSelectedSection(offset: number) {
@@ -4179,17 +4258,18 @@ function AdminGuides({
       createGuideDialogRef.current?.close();
       return;
     }
-    setPending(true);
-    const form = new FormData(event.currentTarget);
-    const result = await saveEntity<{ id: string }>(
-      '/api/guides',
-      {
-        characterId: String(form.get('characterId') || ''),
-        title: String(form.get('title') || ''),
-        slug: String(form.get('slug') || ''),
-        summary: String(form.get('summary') || ''),
-        patchVersion: String(form.get('patch') || '1.0'),
-        status: 'draft',
+  setPending(true);
+  const form = new FormData(event.currentTarget);
+  const slug = String(form.get('slug') || '').trim();
+  const result = await saveEntity<{ id: string }>(
+  '/api/guides',
+  {
+  characterId: String(form.get('characterId') || ''),
+  title: String(form.get('title') || ''),
+  slug,
+  summary: String(form.get('summary') || ''),
+  patchVersion: String(form.get('patch') || '1.0'),
+  status: 'draft',
         sections: [
           {
             title: 'Обзор персонажа',
@@ -4199,14 +4279,22 @@ function AdminGuides({
         ],
       },
       'POST',
-    );
-    if (result.ok) {
-      setSelectedGuideId(result.data.id);
-      setData(await loadSiteData({ includePrivate: true }));
-      setMessage('Новый гайд создан как черновик.');
-      event.currentTarget.reset();
-      createGuideDialogRef.current?.close();
-    } else {
+  );
+  if (result.ok) {
+  setSelectedGuideId(result.data.id);
+  const nextData = await loadSiteData({ includePrivate: true });
+  setData(nextData);
+  const createdGuide = nextData.guides.find((item) => item.id === result.data.id);
+  setMessage('Новый гайд создан как черновик.');
+  event.currentTarget.reset();
+  createGuideDialogRef.current?.close();
+  await onSaved?.({
+  id: result.data.id,
+  slug: createdGuide?.slug || slug,
+  status: createdGuide?.status || 'draft',
+  action: 'created',
+  });
+  } else {
       setMessage(result.error);
     }
     setPending(false);
@@ -4236,11 +4324,19 @@ function AdminGuides({
       },
       'PATCH',
     );
-    if (result.ok) {
-      setData(await loadSiteData({ includePrivate: true }));
-      localStorage.removeItem(guideDraftKey);
-      setMessage('Метаданные гайда сохранены.');
-    } else {
+  if (result.ok) {
+  const nextData = await loadSiteData({ includePrivate: true });
+  setData(nextData);
+  const savedGuide = nextData.guides.find((item) => item.id === activeGuide.id);
+  localStorage.removeItem(guideDraftKey);
+  setMessage('Метаданные гайда сохранены.');
+  await onSaved?.({
+  id: activeGuide.id,
+  slug: savedGuide?.slug || activeGuide.slug,
+  status: savedGuide?.status || guideMeta.status,
+  action: 'saved',
+  });
+  } else {
       setMessage(result.error);
     }
     setPending(false);
@@ -4571,11 +4667,24 @@ function AdminGuides({
                 type="button"
                 draggable
                 onDragStart={() => setDragIndex(index)}
+                onDragEnter={() => setDragOverSectionIndex(index)}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={() => reorder(index)}
+                onDragEnd={() => {
+                  setDragIndex(null);
+                  setDragOverSectionIndex(null);
+                }}
                 onClick={() => selectSection(section)}
                 aria-pressed={section.id === selectedSectionId}
-                className={section.id === selectedSectionId ? 'active' : ''}
+                className={[
+                  section.id === selectedSectionId ? 'active' : '',
+                  dragIndex === index ? 'is-dragging' : '',
+                  dragOverSectionIndex === index && dragIndex !== index
+                    ? 'is-drop-target'
+                    : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
               >
                 <GripVertical aria-hidden="true" />
                 <span>{section.title}</span>
@@ -5222,6 +5331,10 @@ function AdminTierlists({
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
   const [draggedCharacterId, setDraggedCharacterId] = useState('');
+  const [dragOver, setDragOver] = useState<{
+    tier: Tier;
+    characterId?: string;
+  } | null>(null);
   const [characterToAdd, setCharacterToAdd] = useState('');
 
   useEffect(() => {
@@ -5233,13 +5346,16 @@ function AdminTierlists({
     setMessage('');
   }, [tierlist]);
 
-  const grouped = useMemo(() => {
+  const groupedItems = useMemo(() => {
     const result = Object.fromEntries(
-      tierOrder.map((tier) => [tier, [] as Character[]]),
-    ) as Record<Tier, Character[]>;
+      tierOrder.map((tier) => [tier, [] as typeof items]),
+    ) as Record<Tier, typeof items>;
     items.forEach((item) => {
       const character = getCharacter(data, item.characterId);
-      if (character) result[item.tier].push(character);
+      if (character) {
+        const tier = normalizeTier(item.tier);
+        result[tier].push({ ...item, tier });
+      }
     });
     return result;
   }, [data, items]);
@@ -5255,17 +5371,44 @@ function AdminTierlists({
     );
   }
 
-  function moveCharacter(characterId: string, nextTier: Tier) {
+  function moveCharacter(
+    characterId: string,
+    nextTier: Tier,
+    targetCharacterId?: string,
+  ) {
     setItems((current) => {
       const existing = current.find((item) => item.characterId === characterId);
-      if (existing) {
-        return current.map((item) =>
-          item.characterId === characterId ? { ...item, tier: nextTier } : item,
-        );
+      const moving = existing
+        ? { ...existing, tier: nextTier }
+        : { characterId, tier: nextTier, note: '' };
+      const withoutMoving = current.filter(
+        (item) => item.characterId !== characterId,
+      );
+      const nextItems: typeof current = [];
+
+      for (const tier of tierOrder) {
+        const rowItems = withoutMoving
+          .filter((item) => normalizeTier(item.tier) === tier)
+          .map((item) => ({ ...item, tier: normalizeTier(item.tier) }));
+
+        if (tier === nextTier) {
+          const insertIndex = targetCharacterId
+            ? rowItems.findIndex((item) => item.characterId === targetCharacterId)
+            : -1;
+          if (insertIndex >= 0) {
+            rowItems.splice(insertIndex, 0, moving);
+          } else {
+            rowItems.push(moving);
+          }
+        }
+
+        nextItems.push(...rowItems);
       }
-      return [...current, { characterId, tier: nextTier, note: '' }];
+
+      return nextItems;
     });
     setDraggedCharacterId('');
+    setDragOver(null);
   }
 
   const availableCharacters = data.characters.filter(
@@ -5409,34 +5552,88 @@ function AdminTierlists({
         >
           {tierOrder.map((tier) => (
             <section
-              className={`tier-drop-row tier-${tier.replace('+', 'plus')}`}
+              className={`tier-drop-row tier-${tier.toLowerCase()} ${
+                dragOver?.tier === tier && !dragOver.characterId ? 'is-over' : ''
+              }`}
               key={tier}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => {
+              onDragEnter={() => setDragOver({ tier })}
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (dragOver?.tier !== tier || dragOver.characterId) {
+                  setDragOver({ tier });
+                }
+              }}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                  setDragOver(null);
+                }
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
                 if (draggedCharacterId) moveCharacter(draggedCharacterId, tier);
               }}
             >
               <strong>{tier}</strong>
               <div>
-                {grouped[tier].map((character) => (
-                  <button
-                    type="button"
-                    draggable
-                    key={character.id}
-                    title={`${character.name}: перетащить в другой тир`}
-                    onDragStart={() => setDraggedCharacterId(character.id)}
-                    onDragEnd={() => setDraggedCharacterId('')}
-                  >
-                    <img
-                      src={resolveAssetUrl(character.imageUrl)}
-                      alt=""
-                      width="62"
-                      height="62"
-                      loading="lazy"
-                    />
-                    <span>{character.name}</span>
-                  </button>
-                ))}
+                {groupedItems[tier].map((item, index) => {
+                  const character = getCharacter(data, item.characterId);
+                  if (!character) return null;
+                  const isDragging = draggedCharacterId === item.characterId;
+                  const isDropTarget =
+                    dragOver?.tier === tier &&
+                    dragOver.characterId === item.characterId;
+                  return (
+                    <button
+                      type="button"
+                      draggable
+                      key={item.characterId}
+                      className={`tier-drag-card ${
+                        isDragging ? 'is-dragging' : ''
+                      } ${isDropTarget ? 'is-drop-target' : ''}`}
+                      title={`${character.name}: перетащить или переставить в строке ${tier}`}
+                      aria-label={`${character.name}, ${tier}, позиция ${index + 1}`}
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', item.characterId);
+                        setDraggedCharacterId(item.characterId);
+                      }}
+                      onDragEnter={() =>
+                        setDragOver({ tier, characterId: item.characterId })
+                      }
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (
+                          dragOver?.tier !== tier ||
+                          dragOver.characterId !== item.characterId
+                        ) {
+                          setDragOver({ tier, characterId: item.characterId });
+                        }
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (draggedCharacterId) {
+                          moveCharacter(draggedCharacterId, tier, item.characterId);
+                        }
+                      }}
+                      onDragEnd={() => {
+                        setDraggedCharacterId('');
+                        setDragOver(null);
+                      }}
+                    >
+                      <span className="tier-card-rank">{index + 1}</span>
+                      <img
+                        src={resolveAssetUrl(character.imageUrl)}
+                        alt=""
+                        width="62"
+                        height="62"
+                        loading="lazy"
+                      />
+                      <span>{character.name}</span>
+                    </button>
+                  );
+                })}
               </div>
             </section>
           ))}
@@ -5491,9 +5688,9 @@ function AdminTierlists({
                   <select
                     value={item.tier}
                     onChange={(event) =>
-                      updateItem(item.characterId, {
-                        tier: event.target.value as Tier,
-                      })
+                    updateItem(item.characterId, {
+                      tier: normalizeTier(event.target.value),
+                    })
                     }
                   >
                     {tierOrder.map((tier) => (

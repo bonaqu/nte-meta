@@ -60,18 +60,30 @@ test.describe('Качество интерфейса NTE Meta', () => {
     await page.goto('/characters/hotori/');
     const images = page.locator('main img');
     await expect(images.first()).toBeVisible();
-    expect(
-      await page
-        .locator('main img:not([width]), main img:not([height])')
-        .count(),
-    ).toBe(0);
-    for (let index = 0; index < (await images.count()); index += 1) {
-      await images.nth(index).scrollIntoViewIfNeeded();
+  expect(
+    await page
+      .locator('main img:not([width]), main img:not([height])')
+      .count(),
+  ).toBe(0);
+  await page.evaluate(async () => {
+    const imageNodes = Array.from(
+      document.querySelectorAll<HTMLImageElement>('main img'),
+    );
+    for (const image of imageNodes) {
+      image.scrollIntoView({ block: 'center', inline: 'nearest' });
+      if (!image.complete) {
+        await new Promise<void>((resolve) => {
+          const settle = () => resolve();
+          image.addEventListener('load', settle, { once: true });
+          image.addEventListener('error', settle, { once: true });
+          window.setTimeout(settle, 2_000);
+        });
+      }
     }
-    await page.waitForTimeout(200);
-    expect(
-      await images.evaluateAll(
-        (nodes) =>
+  });
+  expect(
+    await images.evaluateAll(
+      (nodes) =>
           nodes.filter((node) => {
             const image = node as HTMLImageElement;
             return !image.complete || image.naturalWidth === 0;

@@ -1,6 +1,10 @@
 import type { Character, Guide, SiteData, Tier } from '../types';
 
-export const tierOrder: Tier[] = ['S+', 'S', 'A', 'B', 'C', 'D'];
+export const tierOrder: Tier[] = ['S', 'A', 'B', 'C', 'D'];
+
+export function normalizeTier(value: string): Tier {
+  return tierOrder.includes(value as Tier) ? (value as Tier) : 'S';
+}
 
 export function formatDate(date: string) {
   return new Intl.DateTimeFormat('ru-RU', {
@@ -30,7 +34,7 @@ export function groupTierItems(data: SiteData, kind: 'base' | 'premium') {
   tierlist?.items.forEach((item) => {
     const character = getCharacter(data, item.characterId);
     if (character) {
-      grouped[item.tier].push(character);
+      grouped[normalizeTier(item.tier)].push(character);
     }
   });
 

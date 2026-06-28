@@ -50,7 +50,7 @@ const voiceLanguages = [
   'Корейский',
   'Китайский',
 ] as const;
-const tiers: Tier[] = ['S+', 'S', 'A', 'B', 'C', 'D'];
+const tiers: Tier[] = ['S', 'A', 'B', 'C', 'D'];
 
 function readCharacterDraft(key: string) {
   try {
@@ -257,11 +257,17 @@ export function AdminCharacterEditor({
   initialSelectedId,
   access,
   onRefresh,
+  onSaved,
 }: {
   items: Character[];
   initialSelectedId?: string;
   access: EditorAccess;
   onRefresh: () => Promise<void>;
+  onSaved?: (context: {
+    id?: string;
+    slug?: string;
+    status: 'draft' | 'published';
+  }) => void | Promise<void>;
 }) {
   const initialId =
     initialSelectedId === 'new'
@@ -391,9 +397,15 @@ export function AdminCharacterEditor({
       selected ? 'PATCH' : 'POST',
     );
     if (result.ok) {
-      if (result.data.id) setSelectedId(result.data.id);
+      const savedId = result.data.id || selected?.id;
+      if (savedId) setSelectedId(savedId);
       localStorage.removeItem(draftKey);
       await onRefresh();
+      await onSaved?.({
+        id: savedId,
+        slug: draft.slug.trim(),
+        status,
+      });
       setTone('success');
       setMessage(
         status === 'published'

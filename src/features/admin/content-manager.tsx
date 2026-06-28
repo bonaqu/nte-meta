@@ -53,6 +53,19 @@ const fullAccess: ManagerAccess = {
   canDelete: true,
 };
 
+function readDraft<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function stableStringify(value: unknown) {
+  return JSON.stringify(value);
+}
+
 type ManagerConfig<T extends ManagedItem> = {
   endpoint: string;
   title: string;
@@ -296,8 +309,18 @@ export function ContentManager<T extends ManagedItem>({
   const [pending, setPending] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
+  const configRef = useRef(config);
+  const skipNextDraftSaveRef = useRef(false);
+  configRef.current = config;
 
   const selectedItem = items.find((item) => item.id === selectedId);
+  const draftKey = `nte-cms-draft:${config.endpoint}:${selectedId}`;
+  const baselineValues = useMemo(
+    () => (selectedItem ? config.fromItem(selectedItem) : config.empty()),
+    [config, selectedItem],
+  );
+  const isDirty =
+    stableStringify(values) !== stableStringify(baselineValues);
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('ru-RU');
     if (!normalized) return items;
@@ -310,9 +333,34 @@ export function ContentManager<T extends ManagedItem>({
 
   useEffect(() => {
     const item = items.find((candidate) => candidate.id === selectedId);
-    setValues(item ? config.fromItem(item) : config.empty());
+    const currentConfig = configRef.current;
+    const nextValues = item ? currentConfig.fromItem(item) : currentConfig.empty();
+    skipNextDraftSaveRef.current = true;
+    setValues(readDraft<EditorValues>(draftKey) || nextValues);
     setPreviewOpen(false);
-  }, [items, selectedId]);
+  }, [draftKey, items, selectedId]);
+
+  useEffect(() => {
+    if (skipNextDraftSaveRef.current) {
+      skipNextDraftSaveRef.current = false;
+      return;
+    }
+    if (isDirty) {
+      localStorage.setItem(draftKey, JSON.stringify(values));
+    } else {
+      localStorage.removeItem(draftKey);
+    }
+  }, [draftKey, isDirty, values]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [isDirty]);
 
   useEffect(() => {
     setMessage('');
@@ -360,6 +408,7 @@ export function ContentManager<T extends ManagedItem>({
 
     if (result.ok) {
       if (result.data.id) setSelectedId(result.data.id);
+      localStorage.removeItem(draftKey);
       await onRefresh();
       setMessageTone('success');
       setMessage(
@@ -383,6 +432,7 @@ export function ContentManager<T extends ManagedItem>({
     );
     if (result.ok) {
       setSelectedId('new');
+      localStorage.removeItem(draftKey);
       await onRefresh();
       setMessageTone('success');
       setMessage(`${config.singular} удален.`);

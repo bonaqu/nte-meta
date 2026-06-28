@@ -50,7 +50,16 @@ const voiceLanguages = [
   'Корейский',
   'Китайский',
 ] as const;
-const tiers: Tier[] = ['S+', 'S', 'A', 'B', 'C'];
+const tiers: Tier[] = ['S+', 'S', 'A', 'B', 'C', 'D'];
+
+function readCharacterDraft(key: string) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as CharacterDraft) : null;
+  } catch {
+    return null;
+  }
+}
 
 function rowId() {
   return crypto.randomUUID();
@@ -270,7 +279,14 @@ export function AdminCharacterEditor({
   const [tone, setTone] = useState<'info' | 'danger' | 'success'>('info');
   const [pending, setPending] = useState(false);
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
+  const skipNextDraftSaveRef = useRef(false);
   const selected = items.find((item) => item.id === selectedId);
+  const draftKey = `nte-character-draft:${selectedId}`;
+  const baselineDraft = useMemo(
+    () => (selected ? toDraft(selected) : emptyDraft()),
+    [selected],
+  );
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(baselineDraft);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('ru-RU');
@@ -289,8 +305,32 @@ export function AdminCharacterEditor({
 
   useEffect(() => {
     const character = items.find((item) => item.id === selectedId);
-    setDraft(character ? toDraft(character) : emptyDraft());
-  }, [items, selectedId]);
+    const nextDraft = character ? toDraft(character) : emptyDraft();
+    skipNextDraftSaveRef.current = true;
+    setDraft(readCharacterDraft(draftKey) || nextDraft);
+  }, [draftKey, items, selectedId]);
+
+  useEffect(() => {
+    if (skipNextDraftSaveRef.current) {
+      skipNextDraftSaveRef.current = false;
+      return;
+    }
+    if (isDirty) {
+      localStorage.setItem(draftKey, JSON.stringify(draft));
+    } else {
+      localStorage.removeItem(draftKey);
+    }
+  }, [draft, draftKey, isDirty]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [isDirty]);
 
   useEffect(() => {
     setMessage('');
@@ -352,6 +392,7 @@ export function AdminCharacterEditor({
     );
     if (result.ok) {
       if (result.data.id) setSelectedId(result.data.id);
+      localStorage.removeItem(draftKey);
       await onRefresh();
       setTone('success');
       setMessage(
@@ -373,6 +414,7 @@ export function AdminCharacterEditor({
     const result = await deleteEntity(`/api/characters/${selected.id}`);
     if (result.ok) {
       setSelectedId('new');
+      localStorage.removeItem(draftKey);
       await onRefresh();
       setTone('success');
       setMessage('Страница персонажа удалена.');

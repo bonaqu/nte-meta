@@ -3856,6 +3856,28 @@ const BUILD_SECTION_TEMPLATE = `## Рекомендуемый билд
 ### Что менять без сигнатурки
 Опишите практическую замену и поправку ротации.`;
 
+type GuideEditorDraft = {
+  guideMeta: {
+    title: string;
+    summary: string;
+    patch: string;
+    videoUrl: string;
+    status: Guide['status'];
+  };
+  sections: GuideSection[];
+  selectedSectionId: string;
+  markdown: string;
+};
+
+function readGuideEditorDraft(key: string) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as GuideEditorDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
 function GuideCreateFields({ characters }: { characters: Character[] }) {
   return (
     <>
@@ -3927,6 +3949,7 @@ function AdminGuides({
   const createGuideDialogRef = useRef<HTMLDialogElement>(null);
   const deleteGuideDialogRef = useRef<HTMLDialogElement>(null);
   const deleteSectionDialogRef = useRef<HTMLDialogElement>(null);
+  const skipNextGuideDraftSaveRef = useRef(false);
   const canCreate = canManageContent(user, 'guides', 'create');
   const canPublish = canManageContent(user, 'guides', 'publish');
   const canDelete = canManageContent(user, 'guides', 'delete');
@@ -3962,6 +3985,21 @@ function AdminGuides({
     const nextSections = [...guide.sections].sort(
       (a, b) => a.position - b.position,
     );
+    const savedDraft = readGuideEditorDraft(`nte-guide-draft:${guide.id}`);
+    skipNextGuideDraftSaveRef.current = true;
+    if (savedDraft) {
+      const selectedSection =
+        savedDraft.sections.find(
+          (section) => section.id === savedDraft.selectedSectionId,
+        ) || savedDraft.sections[0];
+
+      setSections(savedDraft.sections);
+      setSelectedSectionId(selectedSection?.id || '');
+      setMarkdown(selectedSection?.content || savedDraft.markdown || '');
+      setGuideMeta(savedDraft.guideMeta);
+      setMessage('Восстановлен локальный черновик гайда.');
+      return;
+    }
     const selectedSection =
       nextSections.find(
         (section) => section.id === selectedSectionIdRef.current,
@@ -3980,6 +4018,58 @@ function AdminGuides({
   }, [guide]);
 
   const activeGuide = guide;
+  const guideDraftKey = `nte-guide-draft:${activeGuide?.id || selectedGuideId}`;
+  const baselineGuideState = useMemo(() => {
+    if (!activeGuide) return null;
+    return {
+      guideMeta: {
+        title: activeGuide.title,
+        summary: activeGuide.summary,
+        patch: activeGuide.patch,
+        videoUrl: activeGuide.videoUrl || '',
+        status: activeGuide.status,
+      },
+      sections: [...activeGuide.sections].sort((a, b) => a.position - b.position),
+    };
+  }, [activeGuide]);
+  const isGuideDirty = Boolean(
+    baselineGuideState &&
+      JSON.stringify({ guideMeta, sections }) !== JSON.stringify(baselineGuideState),
+  );
+
+  useEffect(() => {
+    if (!activeGuide) return;
+    if (skipNextGuideDraftSaveRef.current) {
+      skipNextGuideDraftSaveRef.current = false;
+      return;
+    }
+    if (isGuideDirty) {
+      localStorage.setItem(
+        guideDraftKey,
+        JSON.stringify({ guideMeta, sections, selectedSectionId, markdown }),
+      );
+    } else {
+      localStorage.removeItem(guideDraftKey);
+    }
+  }, [
+    activeGuide,
+    guideDraftKey,
+    guideMeta,
+    isGuideDirty,
+    markdown,
+    sections,
+    selectedSectionId,
+  ]);
+
+  useEffect(() => {
+    if (!isGuideDirty) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [isGuideDirty]);
 
   function reorder(index: number) {
     if (dragIndex === null || dragIndex === index) {
@@ -4148,6 +4238,7 @@ function AdminGuides({
     );
     if (result.ok) {
       setData(await loadSiteData({ includePrivate: true }));
+      localStorage.removeItem(guideDraftKey);
       setMessage('Метаданные гайда сохранены.');
     } else {
       setMessage(result.error);
@@ -4275,6 +4366,7 @@ function AdminGuides({
       ),
     }));
     setSections(persistedSections);
+    localStorage.removeItem(guideDraftKey);
     const nextSelectedSectionId =
       idMap.get(selectedSectionId) ||
       selectedSectionId ||

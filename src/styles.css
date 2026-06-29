@@ -2740,6 +2740,15 @@
     scroll-margin-block-start: 150px;
   }
 
+  .character-info-subsection {
+    display: grid;
+    gap: 12px;
+  }
+
+  .character-info-subsection h3 {
+    margin: 0;
+  }
+
   .voice-actor-grid,
   .character-stat-grid {
     display: grid;

@@ -1838,16 +1838,24 @@ function CharacterDetailPage({
           text="История персонажа без мета-билдов и боевых ротаций."
         />
         <MarkdownPreview value={profile.biography || character.summary} />
-        {profile.voiceActors.length ? (
-          <dl className="voice-actor-grid">
-            {profile.voiceActors.map((actor) => (
-              <div key={`${actor.language}-${actor.name}`}>
-                <dt>{actor.language}</dt>
-                <dd>{actor.name}</dd>
-              </div>
-            ))}
-          </dl>
-        ) : null}
+        <div className="character-info-subsection">
+          <h3>Актёры озвучки</h3>
+          {profile.voiceActors.length ? (
+            <dl className="voice-actor-grid">
+              {profile.voiceActors.map((actor) => (
+                <div key={`${actor.language}-${actor.name}`}>
+                  <dt>{actor.language}</dt>
+                  <dd>{actor.name}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <EmptyState
+              title="Актёры озвучки не указаны"
+              text="Редакция добавит сейю и актёров дубляжа только после проверки источников."
+            />
+          )}
+        </div>
       </section>
 
       <section className="character-detail-section" id="character-abilities">

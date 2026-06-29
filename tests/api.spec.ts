@@ -59,12 +59,16 @@ test.describe('NTE Meta Worker API', () => {
       'leaks',
       'threads',
     ]) {
-      const response = await guest.get(`/api/${collection}`);
-      expect(response.ok(), collection).toBeTruthy();
-      expect(response.headers()['x-content-type-options']).toBe('nosniff');
-      expect(response.headers()['cache-control']).toContain('public');
-      expect(Array.isArray((await response.json()).data)).toBeTruthy();
+    const response = await guest.get(`/api/${collection}`);
+    expect(response.ok(), collection).toBeTruthy();
+    expect(response.headers()['x-content-type-options']).toBe('nosniff');
+    expect(response.headers()['cache-control']).toContain('public');
+    const payload = await response.json();
+    expect(Array.isArray(payload.data)).toBeTruthy();
+    if (collection === 'characters' || collection === 'guides') {
+      expect(payload.data.length, collection).toBeGreaterThan(0);
     }
+  }
 
     const rejectedOrigin = await guest.post('/api/auth/login', {
       headers: { Origin: 'https://attacker.example' },

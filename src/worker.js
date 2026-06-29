@@ -1991,7 +1991,7 @@ async function handleSystemStatus(request, env) {
       d1: 'ok',
       generatedAt: new Date().toISOString(),
       counts,
-      migrations: { latestKnown: '0011_clean_editorial_placeholder_copy.sql' },
+      migrations: { latestKnown: '0012_backfill_public_hotori_guide.sql' },
     },
   });
 }

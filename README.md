@@ -44,7 +44,12 @@ Production:
 │  ├─ 0004_security_and_content_cleanup.sql
 │  ├─ 0005_moderation_warnings.sql
 │  ├─ 0006_editorial_architecture.sql
-│  └─ 0007_inline_editing_threads_tiers.sql
+│  ├─ 0007_inline_editing_threads_tiers.sql
+│  ├─ 0008_character_tier_d.sql
+│  ├─ 0009_restore_public_guide_seed.sql
+│  ├─ 0010_remove_s_plus_tier.sql
+│  ├─ 0011_clean_editorial_placeholder_copy.sql
+│  └─ 0012_backfill_public_hotori_guide.sql
 ├─ scripts/
 │  ├─ prepare-test-db.mjs
 │  └─ prerender.mjs

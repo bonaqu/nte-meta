@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   CheckCircle2,
   Eye,
@@ -120,7 +127,8 @@ function FieldControl({
   setValue: (name: string, value: unknown) => void;
   disabled?: boolean;
 }) {
-  const id = `cms-${field.name}`;
+  const idPrefix = useId().replace(/:/g, '');
+  const id = `${idPrefix}-cms-${field.name}`;
   const describedBy = field.help ? `${id}-help` : undefined;
 
   if (field.kind === 'checkbox') {

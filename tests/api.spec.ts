@@ -906,12 +906,68 @@ test.describe('NTE Meta Worker API', () => {
   await page.locator('a.profile-chip').click();
   await expect(
     page.getByRole('heading', { name: 'Профиль', level: 1 }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Открыть админку' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Выйти' }).click();
+  await expect(page.getByRole('heading', { name: 'Вход в NTE Meta' })).toBeVisible();
+});
+
+  test('owner публикует слив inline и открывает созданную страницу', async ({
+    page,
+  }) => {
+    const uiLeakSlug = `ui-leak-${runId}`;
+    await page.goto('/#/profile');
+    await page.getByLabel('Логин').fill(ownerUsername);
+    await page.getByLabel('Пароль').fill(ownerPassword);
+    await page.getByRole('button', { name: 'Войти' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Профиль', level: 1 }),
+    ).toBeVisible();
+
+    await page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .getByRole('link', { name: 'Главная', exact: true })
+      .click();
+    await expect(page.getByRole('heading', { name: 'NTE Meta' })).toBeVisible();
+    await page.getByRole('button', { name: 'Добавить слив' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Добавить слив', level: 1 }),
+    ).toBeVisible();
+
+    const leakDialog = page.locator('dialog[open]').filter({
+      has: page.getByRole('heading', { name: 'Добавить слив', level: 1 }),
+    });
+    const leakForm = leakDialog.locator('.cms-editor');
+    await leakForm
+      .getByLabel('Редактируемый заголовок')
+      .fill(`UI слив ${runId}`);
+    await leakForm.getByLabel('Slug URL').fill(uiLeakSlug);
+    await leakForm
+      .getByLabel('Краткое описание')
+      .fill('Проверка inline публикации слива.');
+    await leakForm
+      .getByLabel('Полный текст / репост Markdown')
+      .fill('## Проверка\nСлив должен открыть отдельную страницу после сохранения.');
+    await leakForm.getByLabel('Оригинальный источник').fill('Редакционный тест');
+    await leakForm.getByLabel('Ссылка на источник').fill('https://example.com/source');
+    await leakForm.getByLabel('Уровень доверия').selectOption('средний');
+    await leakForm.getByLabel('Статус информации').selectOption('слив');
+    await leakForm.getByLabel('Одобрено для публичной выдачи').check();
+    await leakForm.getByLabel('Теги через запятую').fill('ui, слив');
+    await leakForm.getByRole('button', { name: 'Сохранить' }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/#/leaks/${uiLeakSlug}$`));
+    await expect(
+      page.getByRole('heading', { name: `UI слив ${runId}` }),
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Открыть админку' }),
+      page.locator('.editorial-body').getByText(
+        'Слив должен открыть отдельную страницу после сохранения.',
+        { exact: true },
+      ),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Выйти' }).click();
-    await expect(page.getByRole('heading', { name: 'Вход в NTE Meta' })).toBeVisible();
   });
 
   test('смена пароля отзывает сессии, login и logout работают', async () => {

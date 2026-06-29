@@ -2164,6 +2164,7 @@ function CharacterDetailPage({
               setData={setData}
               user={user}
               initialGuideId="new"
+              initialCharacterId={character.id}
               onDirtyChange={setGuideEditorDirty}
               onSaved={({ slug, status }) => {
                 if (status !== 'published' || !slug) return;
@@ -4070,11 +4071,30 @@ function readGuideEditorDraft(key: string) {
   }
 }
 
-function GuideCreateFields({ characters }: { characters: Character[] }) {
+function GuideCreateFields({
+  characters,
+  initialCharacterId,
+}: {
+  characters: Character[];
+  initialCharacterId?: string;
+}) {
   const fieldId = useId();
-  const [title, setTitle] = useState('');
-  const [slug, setSlug] = useState('');
+  const initialCharacter =
+    characters.find((character) => character.id === initialCharacterId) || null;
+  const initialTitle = initialCharacter ? `Гайд: ${initialCharacter.name}` : '';
+  const [characterId, setCharacterId] = useState(initialCharacter?.id || '');
+  const [title, setTitle] = useState(initialTitle);
+  const [slug, setSlug] = useState(initialTitle ? makeSlug(initialTitle) : '');
   const [slugTouched, setSlugTouched] = useState(false);
+
+  useEffect(() => {
+    if (!initialCharacter) return;
+    const nextTitle = `Гайд: ${initialCharacter.name}`;
+    setCharacterId(initialCharacter.id);
+    setTitle(nextTitle);
+    setSlug(makeSlug(nextTitle));
+    setSlugTouched(false);
+  }, [initialCharacter]);
 
   function updateTitle(value: string) {
     setTitle(value);
@@ -4092,7 +4112,13 @@ function GuideCreateFields({ characters }: { characters: Character[] }) {
     <>
       <label htmlFor={`${fieldId}-character`}>
         Персонаж
-        <select id={`${fieldId}-character`} name="characterId" required>
+        <select
+          id={`${fieldId}-character`}
+          name="characterId"
+          value={characterId}
+          onChange={(event) => setCharacterId(event.target.value)}
+          required
+        >
           <option value="">Выберите персонажа</option>
           {characters.map((character) => (
             <option key={character.id} value={character.id}>
@@ -4138,6 +4164,7 @@ function AdminGuides({
   setData,
   user,
   initialGuideId,
+  initialCharacterId,
   onSaved,
   onDirtyChange,
 }: {
@@ -4145,6 +4172,7 @@ function AdminGuides({
   setData: React.Dispatch<React.SetStateAction<SiteData>>;
   user: User;
   initialGuideId?: string;
+  initialCharacterId?: string;
   onSaved?: (context: {
     id: string;
     slug?: string;
@@ -4733,7 +4761,10 @@ function AdminGuides({
           После создания появятся разделы, билд, отряды, командные ротации,
           видео и предпросмотр.
         </p>
-        <GuideCreateFields characters={availableGuideCharacters} />
+        <GuideCreateFields
+          characters={availableGuideCharacters}
+          initialCharacterId={initialCharacterId}
+        />
         <button
           className="primary-button"
           type="submit"
@@ -5073,7 +5104,10 @@ function AdminGuides({
       <dialog className="confirm-dialog" ref={createGuideDialogRef}>
         <form method="dialog" onSubmit={createGuide}>
           <h2>Создать гайд</h2>
-          <GuideCreateFields characters={availableGuideCharacters} />
+          <GuideCreateFields
+            characters={availableGuideCharacters}
+            initialCharacterId={initialCharacterId}
+          />
           <div className="button-row">
             <button className="ghost-button" value="cancel">
               Отменить

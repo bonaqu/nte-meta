@@ -919,6 +919,7 @@ test.describe('NTE Meta Worker API', () => {
   }) => {
     const uiCharacterSlug = `ui-character-${runId}`;
     const uiCharacterName = `UI персонаж ${runId}`;
+    const uiCharacterGuideSlug = `ui-character-guide-${runId}`;
     await page.goto('/#/profile');
     await page.getByLabel('Логин').fill(ownerUsername);
     await page.getByLabel('Пароль').fill(ownerPassword);
@@ -972,6 +973,40 @@ test.describe('NTE Meta Worker API', () => {
       page.getByRole('heading', { name: uiCharacterName, level: 1 }),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Создать гайд' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Создать гайд' }).click();
+    const guideDialog = page.locator('dialog[open]').filter({
+      has: page.getByRole('heading', {
+        name: `Создать гайд: ${uiCharacterName}`,
+        level: 1,
+      }),
+    });
+    const guideCreateForm = guideDialog.locator('form.entity-form');
+    await expect(guideCreateForm.getByLabel('Персонаж')).not.toHaveValue('');
+    await expect(guideCreateForm.getByLabel('Заголовок')).toHaveValue(
+      `Гайд: ${uiCharacterName}`,
+    );
+    await guideCreateForm.getByLabel('Slug').fill(uiCharacterGuideSlug);
+    await guideCreateForm
+      .getByLabel('Краткое описание')
+      .fill('Гайд создан со страницы персонажа и должен открыть detail-страницу.');
+    await guideCreateForm.getByLabel('Патч').fill('ui-test');
+    await guideCreateForm.getByRole('button', { name: 'Создать черновик' }).click();
+    await expect(
+      guideDialog.getByRole('heading', { name: `Гайд: ${uiCharacterName}` }),
+    ).toBeVisible();
+    await guideDialog
+      .locator('.guide-meta-fields')
+      .getByLabel('Статус')
+      .selectOption('published');
+    await guideDialog
+      .getByRole('button', { name: 'Сохранить параметры гайда' })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`/#/guides/${uiCharacterGuideSlug}$`));
+    await expect(
+      page.getByRole('heading', { name: uiCharacterName, level: 1 }),
+    ).toBeVisible();
+    await expect(page.getByRole('link', { name: /О персонаже/ })).toBeVisible();
   });
 
   test('owner публикует слив inline и открывает созданную страницу', async ({

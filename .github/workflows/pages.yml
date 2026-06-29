@@ -39,6 +39,10 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Test frontend and API
         run: npm run test:ui
+      - name: Verify production API
+        run: |
+          test -n "$VITE_API_BASE_URL"
+          curl --fail --silent --show-error "$VITE_API_BASE_URL/api/characters" > /dev/null
       - name: Build
         run: npm run build
         env:

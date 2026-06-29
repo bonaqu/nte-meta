@@ -84,11 +84,23 @@ test.describe('Качество интерфейса NTE Meta', () => {
   expect(
     await images.evaluateAll(
       (nodes) =>
-          nodes.filter((node) => {
-            const image = node as HTMLImageElement;
-            return !image.complete || image.naturalWidth === 0;
-          }).length,
-      ),
-    ).toBe(0);
-  });
+        nodes.filter((node) => {
+          const image = node as HTMLImageElement;
+          return !image.complete || image.naturalWidth === 0;
+        }).length,
+    ),
+  ).toBe(0);
+});
+
+test('встроенные видео резервируют место до загрузки', async ({ page }) => {
+  await page.goto('/#/guides/hotori-burst-guide');
+  await page.locator('main').waitFor();
+  const frames = page.locator('main iframe');
+  await expect(frames.first()).toBeVisible();
+  expect(
+    await page
+      .locator('main iframe:not([width]), main iframe:not([height])')
+      .count(),
+  ).toBe(0);
+});
 });

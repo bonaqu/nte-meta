@@ -2548,6 +2548,8 @@ function VideoEmbed({
         className="video-frame"
         src={embedUrl}
         title={title}
+        width="1280"
+        height="720"
         loading="lazy"
         allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen

@@ -691,6 +691,31 @@ test.describe('NTE Meta Worker API', () => {
   test('owner проходит UI-вход и открывает inline-редактор гайда', async ({
     page,
   }) => {
+    const uiGuideCharacterSlug = `ui-guide-character-${runId}`;
+    const uiGuideCharacterName = `UI персонаж ${runId}`;
+    const uiGuideSlug = `ui-guide-${runId}`;
+    const uiCharacter = await owner.post('/api/characters', {
+      data: {
+        slug: uiGuideCharacterSlug,
+        name: uiGuideCharacterName,
+        originalName: 'UI Guide Character',
+        rarity: 'S',
+        role: 'DPS',
+        type: 'DPS',
+        attribute: 'Тест',
+        tier: 'D',
+        premiumTier: 'D',
+        imageUrl: '/assets/characters/Hotori.webp',
+        splashUrl: '/assets/characters/Hotori.webp',
+        shortDescription: 'Персонаж для UI-публикации гайда.',
+        summary: 'Проверяет создание и публикацию гайда из публичного раздела.',
+        tagsJson: ['ui', 'guide'],
+        status: 'published',
+        patchVersion: 'test',
+      },
+    });
+    expect(uiCharacter.status()).toBe(201);
+
     await page.goto('/#/admin');
     await page.getByLabel('Логин').fill(ownerUsername);
     await page.getByLabel('Пароль').fill(ownerPassword);
@@ -715,15 +740,52 @@ test.describe('NTE Meta Worker API', () => {
       page.getByRole('heading', { name: 'Гайды NTE Meta', exact: true }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Создать гайд' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Добавить гайд', level: 1 }),
-    ).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Создать гайд' })).toBeVisible();
-    await expect(page.getByLabel('Slug')).toBeVisible();
-    await expect(page.getByLabel('Краткое описание')).toBeVisible();
-    await page.getByRole('button', { name: 'Закрыть редактор' }).click();
-    await page
-      .getByRole('navigation', { name: 'Основная навигация' })
+  await expect(
+    page.getByRole('heading', { name: 'Добавить гайд', level: 1 }),
+  ).toBeVisible();
+  const guideDialog = page.locator('dialog[open]');
+  const guideCreateForm = guideDialog.locator('form.entity-form');
+  await expect(guideCreateForm.getByRole('heading', { name: 'Создать гайд' })).toBeVisible();
+  await guideCreateForm.getByLabel('Персонаж').selectOption({ label: uiGuideCharacterName });
+  await guideCreateForm.getByLabel('Заголовок').fill(`Гайд ${uiGuideCharacterName}`);
+  await guideCreateForm.getByLabel('Slug').fill(uiGuideSlug);
+  await expect(guideCreateForm.getByLabel('Slug')).toHaveValue(uiGuideSlug);
+  await guideCreateForm
+    .getByLabel('Краткое описание')
+    .fill('Гайд создан из публичного раздела и должен открыть detail-страницу.');
+  await guideCreateForm.getByLabel('Патч').fill('ui-test');
+  await expect(guideCreateForm.getByLabel('Slug')).toHaveValue(uiGuideSlug);
+  const guideCreateRequest = page.waitForRequest(
+    (request) =>
+      request.method() === 'POST' && request.url().endsWith('/api/guides'),
+  );
+  await guideCreateForm.getByRole('button', { name: 'Создать черновик' }).click();
+  const guideCreatePayload = JSON.parse((await guideCreateRequest).postData() || '{}') as {
+    slug?: string;
+  };
+  expect(guideCreatePayload.slug).toBe(uiGuideSlug);
+  await expect(
+    guideDialog.getByRole('heading', { name: `Гайд ${uiGuideCharacterName}` }),
+  ).toBeVisible();
+  await guideDialog
+    .locator('.guide-meta-fields')
+    .getByLabel('Статус')
+    .selectOption('published');
+  await guideDialog
+    .getByRole('button', { name: 'Сохранить параметры гайда' })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/#/guides/${uiGuideSlug}$`));
+  await expect(
+    page.getByRole('heading', { name: uiGuideCharacterName, level: 1 }),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: /О персонаже/ })).toBeVisible();
+
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Гайды', exact: true })
+    .click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
       .getByRole('link', { name: 'Тир-листы', exact: true })
       .click();
     await page.getByRole('button', { name: 'Редактировать тир-листы' }).click();

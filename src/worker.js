@@ -948,7 +948,7 @@ async function handleEntity(request, env, parts, ctx) {
       body,
       config.role,
     );
-    const record = normalizeRecord(config, body);
+    const record = normalizeRecord(config, body, { deriveSlug: true });
     record.id = record.id || crypto.randomUUID();
     if (entity === 'guides') {
       record.author_id = actor.id;
@@ -986,7 +986,7 @@ async function handleEntity(request, env, parts, ctx) {
       body,
       config.role,
     );
-    const record = normalizeRecord(config, body);
+    const record = normalizeRecord(config, body, { deriveSlug: false });
     if (entity === 'leaks' && record.approved) {
       record.approved_by = actor.id;
       record.approved_at = new Date().toISOString();
@@ -2383,7 +2383,7 @@ function serializeSource(row) {
   };
 }
 
-function normalizeRecord(config, body) {
+function normalizeRecord(config, body, options = {}) {
   const record = {};
   for (const field of config.writable) {
     const value = body[field] ?? body[toCamel(field)];
@@ -2398,7 +2398,7 @@ function normalizeRecord(config, body) {
       record[field] = value;
     }
   }
-  if (!record.slug && (body.title || body.name) && config.slug) {
+  if (options.deriveSlug !== false && !record.slug && (body.title || body.name) && config.slug) {
     record.slug = slugify(String(body.title || body.name));
   }
   return record;

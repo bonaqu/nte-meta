@@ -3,6 +3,7 @@ import React, {
   Suspense,
   useDeferredValue,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -4067,11 +4068,28 @@ function readGuideEditorDraft(key: string) {
 }
 
 function GuideCreateFields({ characters }: { characters: Character[] }) {
+  const fieldId = useId();
+  const [title, setTitle] = useState('');
+  const [slug, setSlug] = useState('');
+  const [slugTouched, setSlugTouched] = useState(false);
+
+  function updateTitle(value: string) {
+    setTitle(value);
+    if (!slugTouched) {
+      setSlug(makeSlug(value));
+    }
+  }
+
+  function updateSlug(value: string) {
+    setSlugTouched(true);
+    setSlug(makeSlug(value));
+  }
+
   return (
     <>
-      <label>
+      <label htmlFor={`${fieldId}-character`}>
         Персонаж
-        <select name="characterId" required>
+        <select id={`${fieldId}-character`} name="characterId" required>
           <option value="">Выберите персонажа</option>
           {characters.map((character) => (
             <option key={character.id} value={character.id}>
@@ -4080,21 +4098,33 @@ function GuideCreateFields({ characters }: { characters: Character[] }) {
           ))}
         </select>
       </label>
-      <label>
+      <label htmlFor={`${fieldId}-title`}>
         Заголовок
-        <input name="title" required />
+        <input
+          id={`${fieldId}-title`}
+          name="title"
+          value={title}
+          onChange={(event) => updateTitle(event.target.value)}
+          required
+        />
       </label>
-      <label>
+      <label htmlFor={`${fieldId}-slug`}>
         Slug
-        <input name="slug" required />
+        <input
+          id={`${fieldId}-slug`}
+          name="slug"
+          value={slug}
+          onChange={(event) => updateSlug(event.target.value)}
+          required
+        />
       </label>
-      <label>
+      <label htmlFor={`${fieldId}-summary`}>
         Краткое описание
-        <textarea name="summary" rows={4} required />
+        <textarea id={`${fieldId}-summary`} name="summary" rows={4} required />
       </label>
-      <label>
+      <label htmlFor={`${fieldId}-patch`}>
         Патч
-        <input name="patch" defaultValue="1.0" required />
+        <input id={`${fieldId}-patch`} name="patch" defaultValue="1.0" required />
       </label>
     </>
   );
@@ -4453,17 +4483,31 @@ function AdminGuides({
       createGuideDialogRef.current?.close();
       return;
     }
-  setPending(true);
-  const form = new FormData(event.currentTarget);
-  const slug = String(form.get('slug') || '').trim();
-  const result = await saveEntity<{ id: string }>(
-  '/api/guides',
-  {
-  characterId: String(form.get('characterId') || ''),
-  title: String(form.get('title') || ''),
-  slug,
-  summary: String(form.get('summary') || ''),
-  patchVersion: String(form.get('patch') || '1.0'),
+    setPending(true);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const getFormString = (name: string) => {
+      const fromData = String(form.get(name) || '').trim();
+      if (fromData) return fromData;
+      const field = formElement.elements.namedItem(name);
+      if (
+        field instanceof HTMLInputElement ||
+        field instanceof HTMLTextAreaElement ||
+        field instanceof HTMLSelectElement
+      ) {
+        return field.value.trim();
+      }
+      return '';
+    };
+    const slug = getFormString('slug');
+    const result = await saveEntity<{ id: string }>(
+      '/api/guides',
+      {
+        characterId: getFormString('characterId'),
+        title: getFormString('title'),
+        slug,
+        summary: getFormString('summary'),
+        patchVersion: getFormString('patch') || '1.0',
   status: 'draft',
         sections: [
           {
@@ -4474,20 +4518,24 @@ function AdminGuides({
         ],
       },
       'POST',
-  );
-  if (result.ok) {
-  setSelectedGuideId(result.data.id);
-  const nextData = await loadSiteData({ includePrivate: true });
-  setData(nextData);
-  const createdGuide = nextData.guides.find((item) => item.id === result.data.id);
-  setMessage('Новый гайд создан как черновик.');
-  event.currentTarget.reset();
-  createGuideDialogRef.current?.close();
-  await onSaved?.({
-  id: result.data.id,
-  slug: createdGuide?.slug || slug,
-  status: createdGuide?.status || 'draft',
-  action: 'created',
+    );
+    if (result.ok) {
+      const nextData = await loadSiteData({ includePrivate: true });
+      const createdGuide =
+        nextData.guides.find((item) => item.id === result.data.id) ||
+        nextData.guides.find((item) => item.slug === slug);
+      setData(nextData);
+      if (createdGuide) {
+        setSelectedGuideId(createdGuide.id);
+      }
+      setMessage('Новый гайд создан как черновик.');
+      formElement.reset();
+      createGuideDialogRef.current?.close();
+      await onSaved?.({
+        id: createdGuide?.id || result.data.id,
+        slug: createdGuide?.slug || slug,
+        status: createdGuide?.status || 'draft',
+        action: 'created',
   });
   } else {
       setMessage(result.error);

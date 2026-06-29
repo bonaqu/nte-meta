@@ -573,14 +573,44 @@ test.describe('NTE Meta Worker API', () => {
     expect((await member.delete(`/api/news/${editorNewsId}`)).status()).toBe(
       403,
     );
+    const deletePermission = await owner.patch(
+      `/api/users/${memberId}/editor-permissions`,
+      {
+        data: {
+          grade: 'lead',
+          scopes: ['news'],
+          canCreate: true,
+          canEdit: true,
+          canPublish: true,
+          canDelete: true,
+        },
+      },
+    );
+    expect(deletePermission.status()).toBe(200);
+    const deletableNews = await member.post('/api/news', {
+      data: {
+        slug: `editor-deletable-news-${runId}`,
+        title: 'Новость редактора для удаления',
+        summary: 'Проверка индивидуального права удаления.',
+        bodyMarkdown: '## Текст\nМатериал должен удаляться только после выдачи права.',
+        category: 'Прочее',
+        imageUrl: 'assets/news/patch.webp',
+        status: 'draft',
+      },
+    });
+    expect(deletableNews.status()).toBe(201);
+    const deletableNewsId = (await deletableNews.json()).data.id;
+    expect((await member.delete(`/api/news/${deletableNewsId}`)).status()).toBe(
+      200,
+    );
     const usersWithPermissions = await owner.get('/api/users');
     const editorSnapshot = (await usersWithPermissions.json()).data.find(
       (user: { id: string }) => user.id === memberId,
     );
     expect(editorSnapshot.editorPermissions).toMatchObject({
-      grade: 'senior',
+      grade: 'lead',
       scopes: ['news'],
-      canDelete: false,
+      canDelete: true,
     });
 
     await owner.patch(`/api/users/${memberId}/role`, {

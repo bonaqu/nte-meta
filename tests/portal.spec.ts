@@ -60,6 +60,28 @@ test.describe('Публичный портал NTE Meta', () => {
   test('новости и сливы разделены и имеют отдельные detail-страницы', async ({
     page,
   }) => {
+    await page.goto('/#/news');
+    await expect(page.getByRole('heading', { name: 'NTE Meta' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Свежие новости' }),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Основная навигация' })
+        .getByRole('link', { name: 'Новости', exact: true }),
+    ).toHaveCount(0);
+
+    await page.goto('/#/leaks');
+    await expect(page.getByRole('heading', { name: 'NTE Meta' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Сливы / слухи' }),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Основная навигация' })
+        .getByRole('link', { name: 'Сливы', exact: true }),
+    ).toHaveCount(0);
+
     await page.goto('/#/news/patch-10-first-meta-notes');
     await expect(
       page.getByRole('heading', { name: 'Патч 1.0: первые заметки по мете' }),
@@ -83,6 +105,16 @@ test.describe('Публичный портал NTE Meta', () => {
   test('отряды и ротации находятся внутри гайда, тир-листы переключаются', async ({
     page,
   }) => {
+    await page.goto('/#/teams');
+    await expect(
+      page.getByRole('heading', { name: 'Гайды NTE Meta', exact: true }),
+    ).toBeVisible();
+
+    await page.goto('/#/rotations');
+    await expect(
+      page.getByRole('heading', { name: 'Гайды NTE Meta', exact: true }),
+    ).toBeVisible();
+
     await page.goto('/#/guides/hotori-burst-guide');
     await expect(
       page.getByRole('heading', {
@@ -93,13 +125,13 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(page.locator('a[href="#/teams"]')).toHaveCount(0);
     await expect(page.locator('a[href="#/rotations"]')).toHaveCount(0);
 
-  await page.goto('/#/tierlists');
-  await expect(page.getByText('Base C0 тир-лист')).toBeVisible();
-  await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Premium C6' }).click();
-  await expect(page.getByText('Premium C6 тир-лист')).toBeVisible();
-  await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
-});
+    await page.goto('/#/tierlists');
+    await expect(page.getByText('Base C0 тир-лист')).toBeVisible();
+    await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Premium C6' }).click();
+    await expect(page.getByText('Premium C6 тир-лист')).toBeVisible();
+    await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
+  });
 
   test('авторизация отделена от CMS, отдельного пустого комьюнити-раздела нет', async ({
     page,
@@ -140,6 +172,11 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(
       page.getByRole('heading', { name: 'Гайды NTE Meta', exact: true }),
     ).toBeVisible();
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Основная навигация' })
+        .getByRole('link', { name: 'Видео-гайды', exact: true }),
+    ).toHaveCount(0);
     await expect(
       page.getByText(
         'Только персонажные гайды. Билды, лучшие отряды и пошаговые командные ротации собраны внутри каждого материала.',

@@ -59,16 +59,16 @@ test.describe('NTE Meta Worker API', () => {
       'leaks',
       'threads',
     ]) {
-    const response = await guest.get(`/api/${collection}`);
-    expect(response.ok(), collection).toBeTruthy();
-    expect(response.headers()['x-content-type-options']).toBe('nosniff');
-    expect(response.headers()['cache-control']).toContain('public');
-    const payload = await response.json();
-    expect(Array.isArray(payload.data)).toBeTruthy();
-    if (collection === 'characters' || collection === 'guides') {
-      expect(payload.data.length, collection).toBeGreaterThan(0);
+      const response = await guest.get(`/api/${collection}`);
+      expect(response.ok(), collection).toBeTruthy();
+      expect(response.headers()['x-content-type-options']).toBe('nosniff');
+      expect(response.headers()['cache-control']).toContain('public');
+      const payload = await response.json();
+      expect(Array.isArray(payload.data)).toBeTruthy();
+      if (collection === 'characters' || collection === 'guides') {
+        expect(payload.data.length, collection).toBeGreaterThan(0);
+      }
     }
-  }
 
     const rejectedOrigin = await guest.post('/api/auth/login', {
       headers: { Origin: 'https://attacker.example' },
@@ -181,8 +181,8 @@ test.describe('NTE Meta Worker API', () => {
       role: 'Главный DPS',
       type: 'DPS',
       attribute: 'Электро',
-    tier: 'D',
-    premiumTier: 'D',
+      tier: 'D',
+      premiumTier: 'D',
       tierRank: 20,
       imageUrl: '/assets/characters/hotori.webp',
       shortDescription: 'Персонаж для API-регрессии.',
@@ -334,10 +334,10 @@ test.describe('NTE Meta Worker API', () => {
       ],
     });
 
-  const duplicateTier = await owner.post('/api/tierlists', {
-    data: {
-      slug: `duplicate-tier-${runId}`,
-      title: 'Тир-лист с дублем',
+    const duplicateTier = await owner.post('/api/tierlists', {
+      data: {
+        slug: `duplicate-tier-${runId}`,
+        title: 'Тир-лист с дублем',
         tierlistType: 'base',
         patchVersion: 'test',
         items: [
@@ -345,21 +345,21 @@ test.describe('NTE Meta Worker API', () => {
           { characterId, tier: 'B' },
         ],
       },
-  });
-  expect(duplicateTier.status()).toBe(400);
+    });
+    expect(duplicateTier.status()).toBe(400);
 
-  const legacyTier = await owner.post('/api/tierlists', {
-    data: {
-      slug: `legacy-tier-${runId}`,
-      title: 'Тир-лист с legacy-рангом',
-      tierlistType: 'base',
-      patchVersion: 'test',
-      items: [{ characterId, tier: 'S+' }],
-    },
-  });
-  expect(legacyTier.status()).toBe(400);
+    const legacyTier = await owner.post('/api/tierlists', {
+      data: {
+        slug: `legacy-tier-${runId}`,
+        title: 'Тир-лист с legacy-рангом',
+        tierlistType: 'base',
+        patchVersion: 'test',
+        items: [{ characterId, tier: 'S+' }],
+      },
+    });
+    expect(legacyTier.status()).toBe(400);
 
-  const tierlist = await owner.post('/api/tierlists', {
+    const tierlist = await owner.post('/api/tierlists', {
       data: {
         slug: `test-tier-${runId}`,
         title: 'Тестовый C0 тир-лист',
@@ -367,7 +367,7 @@ test.describe('NTE Meta Worker API', () => {
         patchVersion: 'test',
         status: 'published',
         changelogJson: ['Создан автотестом'],
-      items: [{ characterId, tier: 'D', note: 'Контрольная позиция' }],
+        items: [{ characterId, tier: 'D', note: 'Контрольная позиция' }],
       },
     });
     expect(tierlist.status()).toBe(201);
@@ -592,7 +592,8 @@ test.describe('NTE Meta Worker API', () => {
         slug: `editor-deletable-news-${runId}`,
         title: 'Новость редактора для удаления',
         summary: 'Проверка индивидуального права удаления.',
-        bodyMarkdown: '## Текст\nМатериал должен удаляться только после выдачи права.',
+        bodyMarkdown:
+          '## Текст\nМатериал должен удаляться только после выдачи права.',
         category: 'Прочее',
         imageUrl: 'assets/news/patch.webp',
         status: 'draft',
@@ -644,23 +645,23 @@ test.describe('NTE Meta Worker API', () => {
       data: {
         reason: 'Повторная публикация непомеченного сюжетного спойлера.',
       },
-  });
-  expect(warning.status()).toBe(201);
-  const warningId = (await warning.json()).data.id;
-  const warnings = await moderatedUser.get('/api/auth/warnings');
-  expect((await warnings.json()).data).toHaveLength(1);
-  const adminWarnings = await member.get('/api/warnings');
-  expect(adminWarnings.ok()).toBeTruthy();
-  expect(
-    (await adminWarnings.json()).data.some(
-      (item: { id: string }) => item.id === warningId,
-    ),
-  ).toBeTruthy();
-  const dismissedWarning = await member.patch(`/api/warnings/${warningId}`, {
-    data: { status: 'dismissed' },
-  });
-  expect(dismissedWarning.ok()).toBeTruthy();
-  expect(
+    });
+    expect(warning.status()).toBe(201);
+    const warningId = (await warning.json()).data.id;
+    const warnings = await moderatedUser.get('/api/auth/warnings');
+    expect((await warnings.json()).data).toHaveLength(1);
+    const adminWarnings = await member.get('/api/warnings');
+    expect(adminWarnings.ok()).toBeTruthy();
+    expect(
+      (await adminWarnings.json()).data.some(
+        (item: { id: string }) => item.id === warningId,
+      ),
+    ).toBeTruthy();
+    const dismissedWarning = await member.patch(`/api/warnings/${warningId}`, {
+      data: { status: 'dismissed' },
+    });
+    expect(dismissedWarning.ok()).toBeTruthy();
+    expect(
       (
         await member.post(`/api/users/${ownerId}/warnings`, {
           data: { reason: 'Недопустимая попытка.' },
@@ -775,9 +776,15 @@ test.describe('NTE Meta Worker API', () => {
     const sidebar = page.getByRole('complementary', {
       name: 'Разделы админки',
     });
-    await expect(sidebar.getByRole('link', { name: 'Гайды', exact: true })).toHaveCount(0);
-    await expect(sidebar.getByRole('link', { name: 'Персонажи', exact: true })).toHaveCount(0);
-    await expect(sidebar.getByRole('link', { name: 'Видео-гайды', exact: true })).toHaveCount(0);
+    await expect(
+      sidebar.getByRole('link', { name: 'Гайды', exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      sidebar.getByRole('link', { name: 'Персонажи', exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      sidebar.getByRole('link', { name: 'Видео-гайды', exact: true }),
+    ).toHaveCount(0);
     await expect(sidebar.getByRole('link', { name: 'Команды' })).toHaveCount(0);
     await expect(sidebar.getByRole('link', { name: 'Ротации' })).toHaveCount(0);
 
@@ -789,160 +796,198 @@ test.describe('NTE Meta Worker API', () => {
       page.getByRole('heading', { name: 'Гайды NTE Meta', exact: true }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Создать гайд' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Добавить гайд', level: 1 }),
-  ).toBeVisible();
-  const guideDialog = page.locator('dialog[open]');
-  const guideCreateForm = guideDialog.locator('form.entity-form');
-  await expect(guideCreateForm.getByRole('heading', { name: 'Создать гайд' })).toBeVisible();
-  await guideCreateForm.getByLabel('Персонаж').selectOption({ label: uiGuideCharacterName });
-  await guideCreateForm.getByLabel('Заголовок').fill(`Гайд ${uiGuideCharacterName}`);
-  await guideCreateForm.getByLabel('Slug').fill(uiGuideSlug);
-  await expect(guideCreateForm.getByLabel('Slug')).toHaveValue(uiGuideSlug);
-  await guideCreateForm
-    .getByLabel('Краткое описание')
-    .fill('Гайд создан из публичного раздела и должен открыть detail-страницу.');
-  await guideCreateForm.getByLabel('Патч').fill('ui-test');
-  await expect(guideCreateForm.getByLabel('Slug')).toHaveValue(uiGuideSlug);
-  const guideCreateRequest = page.waitForRequest(
-    (request) =>
-      request.method() === 'POST' && request.url().endsWith('/api/guides'),
-  );
-  await guideCreateForm.getByRole('button', { name: 'Создать черновик' }).click();
-  const guideCreatePayload = JSON.parse((await guideCreateRequest).postData() || '{}') as {
-    slug?: string;
-  };
-  expect(guideCreatePayload.slug).toBe(uiGuideSlug);
-  await expect(
-    guideDialog.getByRole('heading', { name: `Гайд ${uiGuideCharacterName}` }),
-  ).toBeVisible();
-  await guideDialog
-    .locator('.guide-meta-fields')
-    .getByLabel('Статус')
-    .selectOption('published');
-  await guideDialog
-    .getByRole('button', { name: 'Сохранить параметры гайда' })
-    .click();
-  await expect(page).toHaveURL(new RegExp(`/#/guides/${uiGuideSlug}$`));
-  await expect(
-    page.getByRole('heading', { name: uiGuideCharacterName, level: 1 }),
-  ).toBeVisible();
-  await expect(page.getByRole('link', { name: /О персонаже/ })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Добавить гайд', level: 1 }),
+    ).toBeVisible();
+    const guideDialog = page.locator('dialog[open]');
+    const guideCreateForm = guideDialog.locator('form.entity-form');
+    await expect(
+      guideCreateForm.getByRole('heading', { name: 'Создать гайд' }),
+    ).toBeVisible();
+    await guideCreateForm
+      .getByLabel('Персонаж')
+      .selectOption({ label: uiGuideCharacterName });
+    await guideCreateForm
+      .getByLabel('Заголовок')
+      .fill(`Гайд ${uiGuideCharacterName}`);
+    await guideCreateForm.getByLabel('Slug').fill(uiGuideSlug);
+    await expect(guideCreateForm.getByLabel('Slug')).toHaveValue(uiGuideSlug);
+    await guideCreateForm
+      .getByLabel('Краткое описание')
+      .fill(
+        'Гайд создан из публичного раздела и должен открыть detail-страницу.',
+      );
+    await guideCreateForm.getByLabel('Патч').fill('ui-test');
+    await expect(guideCreateForm.getByLabel('Slug')).toHaveValue(uiGuideSlug);
+    const guideCreateRequest = page.waitForRequest(
+      (request) =>
+        request.method() === 'POST' && request.url().endsWith('/api/guides'),
+    );
+    await guideCreateForm
+      .getByRole('button', { name: 'Создать черновик' })
+      .click();
+    const guideCreatePayload = JSON.parse(
+      (await guideCreateRequest).postData() || '{}',
+    ) as {
+      slug?: string;
+    };
+    expect(guideCreatePayload.slug).toBe(uiGuideSlug);
+    await expect(
+      guideDialog.getByRole('heading', {
+        name: `Гайд ${uiGuideCharacterName}`,
+      }),
+    ).toBeVisible();
+    await guideDialog
+      .locator('.guide-meta-fields')
+      .getByLabel('Статус')
+      .selectOption('published');
+    await guideDialog
+      .getByRole('button', { name: 'Сохранить параметры гайда' })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`/#/guides/${uiGuideSlug}$`));
+    await expect(
+      page.getByRole('heading', { name: uiGuideCharacterName, level: 1 }),
+    ).toBeVisible();
+    await expect(page.getByRole('link', { name: /О персонаже/ })).toBeVisible();
 
-  await page
-    .getByRole('navigation', { name: 'Основная навигация' })
-    .getByRole('link', { name: 'Гайды', exact: true })
-    .click();
-  await page
-    .getByRole('navigation', { name: 'Основная навигация' })
+    await page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .getByRole('link', { name: 'Гайды', exact: true })
+      .click();
+    await page
+      .getByRole('navigation', { name: 'Основная навигация' })
       .getByRole('link', { name: 'Тир-листы', exact: true })
       .click();
     await page.getByRole('button', { name: 'Редактировать тир-листы' }).click();
     await expect(
       page.getByRole('heading', { name: 'Редактировать тир-лист', level: 1 }),
     ).toBeVisible();
-  await expect(page.locator('.tier-drag-card').first()).toHaveAttribute(
-    'draggable',
-    'true',
-  );
-  await expect(page.locator('.tier-drag-card').nth(1)).toBeVisible();
-  const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
-  await page.locator('.tier-drag-card').first().dispatchEvent('dragstart', {
-    dataTransfer,
-  });
-  await expect(page.locator('.tier-drag-card').first()).toHaveClass(
-    /is-dragging/,
-  );
-  const dropTargetBox = await page.locator('.tier-drag-card').nth(1).boundingBox();
-  if (!dropTargetBox) {
-    throw new Error('Не удалось получить координаты карточки тир-листа.');
-  }
-  await page.locator('.tier-drag-card').nth(1).dispatchEvent('dragover', {
-    dataTransfer,
-    clientX: dropTargetBox.x + dropTargetBox.width - 2,
-    clientY: dropTargetBox.y + dropTargetBox.height / 2,
-  });
-  await expect(page.locator('.tier-drag-card').nth(1)).toHaveAttribute(
-    'data-drop-placement',
-    'after',
-  );
-  await page.locator('.tier-drag-card').first().dispatchEvent('dragend', {
-    dataTransfer,
-  });
-  await dataTransfer.dispose();
-  await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Закрыть редактор' }).click();
+    const tierRow = page.locator('.tier-drop-row.tier-s');
+    const tierCards = tierRow.locator('.tier-drag-card');
+    await expect(tierCards.first()).toHaveAttribute('draggable', 'true');
+    await expect(tierCards.nth(1)).toBeVisible();
+    const firstCardName = (await tierCards.nth(0).getAttribute('aria-label'))
+      ?.split(',')
+      .at(0);
+    const secondCardName = (await tierCards.nth(1).getAttribute('aria-label'))
+      ?.split(',')
+      .at(0);
+    expect(firstCardName).toBeTruthy();
+    expect(secondCardName).toBeTruthy();
+    const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+    await tierCards.nth(0).dispatchEvent('dragstart', {
+      dataTransfer,
+    });
+    await expect(tierCards.nth(0)).toHaveClass(/is-dragging/);
+    const dropTargetBox = await tierCards.nth(1).boundingBox();
+    if (!dropTargetBox) {
+      throw new Error('Не удалось получить координаты карточки тир-листа.');
+    }
+    await tierCards.nth(1).dispatchEvent('dragover', {
+      dataTransfer,
+      clientX: dropTargetBox.x + dropTargetBox.width - 2,
+      clientY: dropTargetBox.y + dropTargetBox.height / 2,
+    });
+    await expect(tierCards.nth(1)).toHaveAttribute(
+      'data-drop-placement',
+      'after',
+    );
+    await tierCards.nth(1).dispatchEvent('drop', {
+      dataTransfer,
+      clientX: dropTargetBox.x + dropTargetBox.width - 2,
+      clientY: dropTargetBox.y + dropTargetBox.height / 2,
+    });
+    await expect(tierCards.nth(0)).toContainText(secondCardName || '');
+    await expect(tierCards.nth(1)).toContainText(firstCardName || '');
+    await tierCards.nth(1).dispatchEvent('dragend', { dataTransfer });
+    await dataTransfer.dispose();
+    await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
+    page.once('dialog', (dialog) => {
+      expect(dialog.message()).toContain('Закрыть редактор');
+      void dialog.accept();
+    });
+    await page.getByRole('button', { name: 'Закрыть редактор' }).click();
 
-  const uiNewsSlug = `ui-news-${runId}`;
-  await page.getByRole('navigation', { name: 'Основная навигация' })
-    .getByRole('link', { name: 'Главная', exact: true })
-    .click();
-  await expect(page.getByRole('heading', { name: 'NTE Meta' })).toBeVisible();
-  await page.getByRole('button', { name: 'Добавить новость' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Добавить новость', level: 1 }),
-  ).toBeVisible();
-  const newsDialog = page.locator('dialog[open]');
-  const newsForm = newsDialog.locator('.cms-editor');
-  await newsForm.getByLabel('Заголовок').fill(`UI публикация ${runId}`);
-  await newsForm.getByLabel('Slug URL').fill(uiNewsSlug);
-  await newsForm
-    .getByLabel('Краткое описание')
-    .fill('Проверка inline публикации новости.');
-  await newsForm
-    .getByLabel('Полный текст Markdown')
-    .fill('## Проверка\nНовая страница должна открыться сразу после публикации.');
-  await newsForm.getByLabel('URL изображения').fill('/assets/news/city-update.webp');
-  await newsForm.getByLabel('Теги через запятую').fill('ui, публикация');
-  await newsForm.getByRole('button', { name: 'Опубликовать' }).click();
-  await expect(page).toHaveURL(new RegExp(`/#/news/${uiNewsSlug}$`));
-  await expect(
-    page.getByRole('heading', { name: `UI публикация ${runId}` }),
-  ).toBeVisible();
-  await expect(
-    page.locator('.editorial-body').getByText(
-      'Новая страница должна открыться сразу после публикации.',
-      { exact: true },
-    ),
-  ).toBeVisible();
+    const uiNewsSlug = `ui-news-${runId}`;
+    await page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .getByRole('link', { name: 'Главная', exact: true })
+      .click();
+    await expect(page.getByRole('heading', { name: 'NTE Meta' })).toBeVisible();
+    await page.getByRole('button', { name: 'Добавить новость' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Добавить новость', level: 1 }),
+    ).toBeVisible();
+    const newsDialog = page.locator('dialog[open]');
+    const newsForm = newsDialog.locator('.cms-editor');
+    await newsForm.getByLabel('Заголовок').fill(`UI публикация ${runId}`);
+    await newsForm.getByLabel('Slug URL').fill(uiNewsSlug);
+    await newsForm
+      .getByLabel('Краткое описание')
+      .fill('Проверка inline публикации новости.');
+    await newsForm
+      .getByLabel('Полный текст Markdown')
+      .fill(
+        '## Проверка\nНовая страница должна открыться сразу после публикации.',
+      );
+    await newsForm
+      .getByLabel('URL изображения')
+      .fill('/assets/news/city-update.webp');
+    await newsForm.getByLabel('Теги через запятую').fill('ui, публикация');
+    await newsForm.getByRole('button', { name: 'Опубликовать' }).click();
+    await expect(page).toHaveURL(new RegExp(`/#/news/${uiNewsSlug}$`));
+    await expect(
+      page.getByRole('heading', { name: `UI публикация ${runId}` }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator('.editorial-body')
+        .getByText('Новая страница должна открыться сразу после публикации.', {
+          exact: true,
+        }),
+    ).toBeVisible();
 
-  const uiThreadSlug = `ui-thread-${runId}`;
-  await page
-    .getByRole('navigation', { name: 'Основная навигация' })
-    .getByRole('link', { name: 'Главная', exact: true })
-    .click();
-  await page.getByRole('button', { name: 'Создать тред' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Создать тред', level: 1 }),
-  ).toBeVisible();
-  const threadDialog = page.locator('dialog[open]');
-  const threadForm = threadDialog.locator('form.thread-editor');
-  await threadForm.getByLabel('Заголовок').fill(`UI тред ${runId}`);
-  await threadForm.getByLabel('Slug').fill(uiThreadSlug);
-  await threadForm
-    .getByLabel('Краткое описание')
-    .fill('Проверка публикации комьюнити-треда.');
-  await threadForm
-    .getByLabel('Текст треда')
-    .fill('## Обсуждение\nТред должен открыть отдельную страницу после публикации.');
-  await threadForm.getByLabel('Теги').fill('ui, тред');
-  await threadForm.getByRole('button', { name: 'Опубликовать тред' }).click();
-  await expect(page).toHaveURL(new RegExp(`/#/threads/${uiThreadSlug}$`));
-  await expect(
-    page.getByRole('heading', { name: `UI тред ${runId}` }),
-  ).toBeVisible();
-  await expect(page.getByText('Комментарии и обсуждения')).toBeVisible();
+    const uiThreadSlug = `ui-thread-${runId}`;
+    await page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .getByRole('link', { name: 'Главная', exact: true })
+      .click();
+    await page.getByRole('button', { name: 'Создать тред' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Создать тред', level: 1 }),
+    ).toBeVisible();
+    const threadDialog = page.locator('dialog[open]');
+    const threadForm = threadDialog.locator('form.thread-editor');
+    await threadForm.getByLabel('Заголовок').fill(`UI тред ${runId}`);
+    await threadForm.getByLabel('Slug').fill(uiThreadSlug);
+    await threadForm
+      .getByLabel('Краткое описание')
+      .fill('Проверка публикации комьюнити-треда.');
+    await threadForm
+      .getByLabel('Текст треда')
+      .fill(
+        '## Обсуждение\nТред должен открыть отдельную страницу после публикации.',
+      );
+    await threadForm.getByLabel('Теги').fill('ui, тред');
+    await threadForm.getByRole('button', { name: 'Опубликовать тред' }).click();
+    await expect(page).toHaveURL(new RegExp(`/#/threads/${uiThreadSlug}$`));
+    await expect(
+      page.getByRole('heading', { name: `UI тред ${runId}` }),
+    ).toBeVisible();
+    await expect(page.getByText('Комментарии и обсуждения')).toBeVisible();
 
-  await page.locator('a.profile-chip').click();
-  await expect(
-    page.getByRole('heading', { name: 'Профиль', level: 1 }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('link', { name: 'Открыть админку' }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Выйти' }).click();
-  await expect(page.getByRole('heading', { name: 'Вход в NTE Meta' })).toBeVisible();
-});
+    await page.locator('a.profile-chip').click();
+    await expect(
+      page.getByRole('heading', { name: 'Профиль', level: 1 }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Открыть админку' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Выйти' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Вход в NTE Meta' }),
+    ).toBeVisible();
+  });
 
   test('owner создаёт персонажа inline и открывает созданную страницу', async ({
     page,
@@ -985,7 +1030,9 @@ test.describe('NTE Meta Worker API', () => {
     await mainInfo.getByLabel('Роли в отряде, через запятую').fill('DD, тест');
     await mainInfo.getByLabel('Base C0 тир').selectOption('D');
     await mainInfo.getByLabel('Premium C6 тир').selectOption('D');
-    await mainInfo.getByLabel('URL иконки').fill('/assets/characters/Hotori.webp');
+    await mainInfo
+      .getByLabel('URL иконки')
+      .fill('/assets/characters/Hotori.webp');
     await mainInfo
       .getByLabel('URL splash art')
       .fill('/assets/characters/Hotori.webp');
@@ -994,15 +1041,21 @@ test.describe('NTE Meta Worker API', () => {
       .fill('Тестовая lore-страница персонажа для inline публикации.');
     await characterDialog
       .getByRole('textbox', { name: 'Подробная биография' })
-      .fill('## Биография\nПерсонаж создан автотестом без выдуманной игровой меты.');
+      .fill(
+        '## Биография\nПерсонаж создан автотестом без выдуманной игровой меты.',
+      );
     await mainInfo.getByLabel('Теги, через запятую').fill('ui, персонаж');
     await characterDialog.getByRole('button', { name: 'Опубликовать' }).click();
 
-    await expect(page).toHaveURL(new RegExp(`/#/characters/${uiCharacterSlug}$`));
+    await expect(page).toHaveURL(
+      new RegExp(`/#/characters/${uiCharacterSlug}$`),
+    );
     await expect(
       page.getByRole('heading', { name: uiCharacterName, level: 1 }),
     ).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Создать гайд' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Создать гайд' }),
+    ).toBeVisible();
 
     await page.getByRole('button', { name: 'Создать гайд' }).click();
     const guideDialog = page.locator('dialog[open]').filter({
@@ -1019,9 +1072,13 @@ test.describe('NTE Meta Worker API', () => {
     await guideCreateForm.getByLabel('Slug').fill(uiCharacterGuideSlug);
     await guideCreateForm
       .getByLabel('Краткое описание')
-      .fill('Гайд создан со страницы персонажа и должен открыть detail-страницу.');
+      .fill(
+        'Гайд создан со страницы персонажа и должен открыть detail-страницу.',
+      );
     await guideCreateForm.getByLabel('Патч').fill('ui-test');
-    await guideCreateForm.getByRole('button', { name: 'Создать черновик' }).click();
+    await guideCreateForm
+      .getByRole('button', { name: 'Создать черновик' })
+      .click();
     await expect(
       guideDialog.getByRole('heading', { name: `Гайд: ${uiCharacterName}` }),
     ).toBeVisible();
@@ -1032,7 +1089,9 @@ test.describe('NTE Meta Worker API', () => {
     await guideDialog
       .getByRole('button', { name: 'Сохранить параметры гайда' })
       .click();
-    await expect(page).toHaveURL(new RegExp(`/#/guides/${uiCharacterGuideSlug}$`));
+    await expect(page).toHaveURL(
+      new RegExp(`/#/guides/${uiCharacterGuideSlug}$`),
+    );
     await expect(
       page.getByRole('heading', { name: uiCharacterName, level: 1 }),
     ).toBeVisible();
@@ -1074,9 +1133,15 @@ test.describe('NTE Meta Worker API', () => {
       .fill('Проверка inline публикации слива.');
     await leakForm
       .getByLabel('Полный текст / репост Markdown')
-      .fill('## Проверка\nСлив должен открыть отдельную страницу после сохранения.');
-    await leakForm.getByLabel('Оригинальный источник').fill('Редакционный тест');
-    await leakForm.getByLabel('Ссылка на источник').fill('https://example.com/source');
+      .fill(
+        '## Проверка\nСлив должен открыть отдельную страницу после сохранения.',
+      );
+    await leakForm
+      .getByLabel('Оригинальный источник')
+      .fill('Редакционный тест');
+    await leakForm
+      .getByLabel('Ссылка на источник')
+      .fill('https://example.com/source');
     await leakForm.getByLabel('Уровень доверия').selectOption('средний');
     await leakForm.getByLabel('Статус информации').selectOption('слив');
     await leakForm.getByLabel('Одобрено для публичной выдачи').check();
@@ -1088,10 +1153,11 @@ test.describe('NTE Meta Worker API', () => {
       page.getByRole('heading', { name: `UI слив ${runId}` }),
     ).toBeVisible();
     await expect(
-      page.locator('.editorial-body').getByText(
-        'Слив должен открыть отдельную страницу после сохранения.',
-        { exact: true },
-      ),
+      page
+        .locator('.editorial-body')
+        .getByText('Слив должен открыть отдельную страницу после сохранения.', {
+          exact: true,
+        }),
     ).toBeVisible();
   });
 

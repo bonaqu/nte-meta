@@ -6,7 +6,7 @@ const template = await readFile(path.join(distDir, 'index.html'), 'utf8');
 const siteUrl = 'https://bonaqu.github.io/nte-meta';
 const apiBase = String(process.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
-const sections = [
+const publicSections = [
   [
     'characters',
     'Персонажи',
@@ -18,6 +18,9 @@ const sections = [
     'Практические гайды NTE Meta: ротации, билды, команды и ошибки.',
   ],
   ['tierlists', 'Тир-листы', 'Base C0 и Premium C6 тир-листы NTE Meta.'],
+];
+
+const utilityPages = [
   ['admin', 'Админка', 'Защищённая редакционная CMS NTE Meta.'],
   [
     'profile',
@@ -107,6 +110,12 @@ function renderDocument(page) {
   );
   html = replaceMeta(html, 'name="twitter:title"', page.title);
   html = replaceMeta(html, 'name="twitter:description"', description);
+  if (page.noindex) {
+    html = html.replace(
+      /<meta name="robots" content="[^"]*"\s*\/?>/i,
+      '<meta name="robots" content="noindex,nofollow" />',
+    );
+  }
   html = html.replace(
     /<script type="application\/ld\+json">.*?<\/script>/s,
     `<script type="application/ld+json">${JSON.stringify(schema)}</script>`,
@@ -148,10 +157,16 @@ const pages = [
     description:
       'NTE Meta - русскоязычный meta-hub: тир-листы, глубокие персонажные гайды, новости, сливы и обсуждения под материалами.',
   },
-  ...sections.map(([route, title, description]) => ({
+  ...publicSections.map(([route, title, description]) => ({
     route,
     title,
     description,
+  })),
+  ...utilityPages.map(([route, title, description]) => ({
+    route,
+    title,
+    description,
+    noindex: true,
   })),
   ...characters.map((item) => ({
     route: `characters/${item.slug}`,
@@ -247,7 +262,7 @@ for (const page of pages) {
 const sitemap = [
   '<?xml version="1.0" encoding="UTF-8"?>',
   '<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">',
-  ...pages.map(
+  ...pages.filter((page) => !page.noindex).map(
     (page) =>
       `  <url><loc>${siteUrl}/${page.route ? `${page.route}/` : ''}</loc>${page.date ? `<lastmod>${String(page.date).slice(0, 10)}</lastmod>` : ''}</url>`,
   ),
@@ -256,4 +271,6 @@ const sitemap = [
 
 await writeFile(path.join(distDir, 'sitemap.xml'), sitemap);
 await writeFile(path.join(distDir, '404.html'), renderDocument(pages[0]));
-console.log(`Prerender: создано ${pages.length} индексируемых страниц.`);
+console.log(
+  `Prerender: создано ${pages.filter((page) => !page.noindex).length} индексируемых страниц.`,
+);

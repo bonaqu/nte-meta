@@ -25,7 +25,6 @@ const CONTENT_SCOPES = new Set([
   'tierlists',
   'news',
   'leaks',
-  'videos',
 ]);
 const DEFAULT_EDITOR_PERMISSIONS = {
   grade: 'junior',
@@ -1035,19 +1034,9 @@ async function handleEntity(request, env, parts, ctx) {
   return json({ error: 'Метод не поддерживается' }, 405);
 }
 
-function entityPermissionScope(entity, body = {}) {
+function entityPermissionScope(entity) {
   if (entity === 'teams' || entity === 'rotations') return 'guides';
-  if (entity === 'guides') {
-    const keys = Object.keys(body).map((key) =>
-      key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase()),
-    );
-    const videoOnly =
-      keys.length > 0 &&
-      keys.every((key) =>
-        ['videoUrl', 'transcriptMarkdown', 'status'].includes(key),
-      );
-    return videoOnly ? 'videos' : 'guides';
-  }
+  if (entity === 'guides') return 'guides';
   return entity;
 }
 
@@ -1059,7 +1048,7 @@ async function authorizeEntityMutation(
   body,
   fallbackRole,
 ) {
-  const scope = entityPermissionScope(entity, body);
+  const scope = entityPermissionScope(entity);
   if (!CONTENT_SCOPES.has(scope)) {
     return requireRole(request, env, fallbackRole);
   }
@@ -1077,9 +1066,7 @@ async function authorizeEntityMutation(
 async function readEntity(env, entity, idOrSlug, request) {
   const user = await getAuthUser(request, env);
   const scope = entityPermissionScope(entity);
-  const includeDrafts =
-    userHasContentPermission(user, scope, 'edit') ||
-    (entity === 'guides' && userHasContentPermission(user, 'videos', 'edit'));
+  const includeDrafts = userHasContentPermission(user, scope, 'edit');
   let data;
 
   if (entity === 'characters') {

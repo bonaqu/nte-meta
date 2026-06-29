@@ -6347,7 +6347,6 @@ const editorScopeLabels: Record<ContentScope, string> = {
   tierlists: 'Тир-листы',
   news: 'Новости',
   leaks: 'Сливы',
-  videos: 'Видео-гайды',
 };
 const defaultEditorPermissions: EditorPermissions = {
   grade: 'junior',

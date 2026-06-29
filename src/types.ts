@@ -18,8 +18,7 @@ export type ContentScope =
   | 'guides'
   | 'tierlists'
   | 'news'
-  | 'leaks'
-  | 'videos';
+  | 'leaks';
 export type ContentAction = 'create' | 'edit' | 'publish' | 'delete';
 
 export interface EditorPermissions {

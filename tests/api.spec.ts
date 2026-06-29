@@ -524,6 +524,21 @@ test.describe('NTE Meta Worker API', () => {
     ).toBe(403);
     expect((await member.get('/api/audit-log')).status()).toBe(403);
 
+    const invalidVideoScope = await owner.patch(
+      `/api/users/${memberId}/editor-permissions`,
+      {
+        data: {
+          grade: 'senior',
+          scopes: ['videos'],
+          canCreate: true,
+          canEdit: true,
+          canPublish: true,
+          canDelete: false,
+        },
+      },
+    );
+    expect(invalidVideoScope.status()).toBe(400);
+
     const permissions = await owner.patch(
       `/api/users/${memberId}/editor-permissions`,
       {

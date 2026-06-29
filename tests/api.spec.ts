@@ -785,12 +785,76 @@ test.describe('NTE Meta Worker API', () => {
     await expect(
       sidebar.getByRole('link', { name: 'Видео-гайды', exact: true }),
     ).toHaveCount(0);
-    await expect(sidebar.getByRole('link', { name: 'Команды' })).toHaveCount(0);
-    await expect(sidebar.getByRole('link', { name: 'Ротации' })).toHaveCount(0);
+  await expect(sidebar.getByRole('link', { name: 'Команды' })).toHaveCount(0);
+  await expect(sidebar.getByRole('link', { name: 'Ротации' })).toHaveCount(0);
 
-    await page
-      .getByRole('navigation', { name: 'Основная навигация' })
-      .getByRole('link', { name: 'Гайды', exact: true })
+  await page.goto('/#/guides/hotori-burst-guide');
+  await page.getByRole('button', { name: 'Редактировать гайд' }).click();
+  const existingGuideDialog = page.locator('dialog[open]');
+  await expect(
+    existingGuideDialog.getByRole('heading', {
+      name: 'Редактировать гайд: Хотори',
+      level: 1,
+    }),
+  ).toBeVisible();
+  const sectionButtons = existingGuideDialog.locator(
+    '.section-sorter button[draggable="true"]',
+  );
+  await expect(sectionButtons.nth(1)).toBeVisible();
+  const firstSectionName = (
+    await sectionButtons.nth(0).locator('span').textContent()
+  )?.trim();
+  const secondSectionName = (
+    await sectionButtons.nth(1).locator('span').textContent()
+  )?.trim();
+  expect(firstSectionName).toBeTruthy();
+  expect(secondSectionName).toBeTruthy();
+  const sectionTransfer = await page.evaluateHandle(() => new DataTransfer());
+  await sectionButtons.nth(0).dispatchEvent('dragstart', {
+    dataTransfer: sectionTransfer,
+  });
+  await expect(sectionButtons.nth(0)).toHaveClass(/is-dragging/);
+  const sectionTargetBox = await sectionButtons.nth(1).boundingBox();
+  if (!sectionTargetBox) {
+    throw new Error('Не удалось получить координаты секции гайда.');
+  }
+  await sectionButtons.nth(1).dispatchEvent('dragover', {
+    dataTransfer: sectionTransfer,
+    clientX: sectionTargetBox.x + sectionTargetBox.width / 2,
+    clientY: sectionTargetBox.y + sectionTargetBox.height - 2,
+  });
+  await expect(sectionButtons.nth(1)).toHaveAttribute(
+    'data-drop-placement',
+    'after',
+  );
+  await sectionButtons.nth(1).dispatchEvent('drop', {
+    dataTransfer: sectionTransfer,
+    clientX: sectionTargetBox.x + sectionTargetBox.width / 2,
+    clientY: sectionTargetBox.y + sectionTargetBox.height - 2,
+  });
+  await expect(sectionButtons.nth(0).locator('span')).toHaveText(
+    secondSectionName || '',
+  );
+  await expect(sectionButtons.nth(1).locator('span')).toHaveText(
+    firstSectionName || '',
+  );
+  await sectionButtons.nth(1).dispatchEvent('dragend', {
+    dataTransfer: sectionTransfer,
+  });
+  await sectionTransfer.dispose();
+  await existingGuideDialog
+    .getByRole('button', { name: 'Сохранить секции' })
+    .click();
+  await expect(
+    existingGuideDialog.getByText('Секции гайда сохранены в D1.'),
+  ).toBeVisible();
+  await existingGuideDialog
+    .getByRole('button', { name: 'Закрыть редактор' })
+    .click();
+
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Гайды', exact: true })
       .click();
     await expect(
       page.getByRole('heading', { name: 'Гайды NTE Meta', exact: true }),

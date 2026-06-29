@@ -4196,6 +4196,9 @@ function AdminGuides({
   const [dragOverSectionIndex, setDragOverSectionIndex] = useState<number | null>(
     null,
   );
+  const [dragOverSectionPlacement, setDragOverSectionPlacement] = useState<
+    'before' | 'after'
+  >('before');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const [sectionImageUrl, setSectionImageUrl] = useState('');
@@ -4346,13 +4349,22 @@ function AdminGuides({
     [],
   );
 
-  function reorder(index: number) {
-    if (dragIndex === null || dragIndex === index) {
+  function reorder(index: number, placement: 'before' | 'after' = 'before') {
+    if (dragIndex === null) {
+      return;
+    }
+    if (dragIndex === index) {
+      clearSectionDragState();
       return;
     }
     const next = [...sections];
     const [moved] = next.splice(dragIndex, 1);
-    next.splice(index, 0, moved);
+    let targetIndex = index;
+    if (dragIndex < index) {
+      targetIndex -= 1;
+    }
+    const insertIndex = placement === 'after' ? targetIndex + 1 : targetIndex;
+    next.splice(Math.max(0, Math.min(insertIndex, next.length)), 0, moved);
     setSections(
       next.map((section, position) => ({ ...section, position: position + 1 })),
     );
@@ -4362,8 +4374,14 @@ function AdminGuides({
   function clearSectionDragState() {
     setDragIndex(null);
     setDragOverSectionIndex(null);
+    setDragOverSectionPlacement('before');
     sectionDragPreviewRef.current?.remove();
     sectionDragPreviewRef.current = null;
+  }
+
+  function getSectionDropPlacement(event: React.DragEvent<HTMLButtonElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientY > rect.top + rect.height / 2 ? 'after' : 'before';
   }
 
   function setSectionDragImage(
@@ -4947,22 +4965,44 @@ function AdminGuides({
                 setSectionDragImage(event, section);
                 setDragIndex(index);
               }}
-              onDragEnter={() => setDragOverSectionIndex(index)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => reorder(index)}
+              onDragEnter={(event) => {
+                if (dragIndex !== null && dragIndex !== index) {
+                  setDragOverSectionIndex(index);
+                  setDragOverSectionPlacement(getSectionDropPlacement(event));
+                }
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (dragIndex !== null && dragIndex !== index) {
+                  setDragOverSectionIndex(index);
+                  setDragOverSectionPlacement(getSectionDropPlacement(event));
+                }
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                reorder(index, getSectionDropPlacement(event));
+              }}
               onDragEnd={clearSectionDragState}
-                onClick={() => selectSection(section)}
-                aria-pressed={section.id === selectedSectionId}
+              onClick={() => selectSection(section)}
+              aria-pressed={section.id === selectedSectionId}
                 className={[
                   section.id === selectedSectionId ? 'active' : '',
                   dragIndex === index ? 'is-dragging' : '',
-                  dragOverSectionIndex === index && dragIndex !== index
-                    ? 'is-drop-target'
-                    : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
+                dragOverSectionIndex === index && dragIndex !== index
+                  ? 'is-drop-target'
+                  : '',
+                dragOverSectionIndex === index && dragIndex !== index
+                  ? `is-drop-${dragOverSectionPlacement}`
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              data-drop-placement={
+                dragOverSectionIndex === index && dragIndex !== index
+                  ? dragOverSectionPlacement
+                  : undefined
+              }
+            >
                 <GripVertical aria-hidden="true" />
                 <span>{section.title}</span>
                 <small>{section.type}</small>

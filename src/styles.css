@@ -2004,9 +2004,10 @@
     gap: 8px;
   }
 
-  .section-sorter button {
-    display: grid;
-    grid-template-columns: 22px 1fr auto;
+.section-sorter button {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
     gap: 8px;
     align-items: center;
     min-block-size: 48px;
@@ -2040,9 +2041,27 @@
   background:
     linear-gradient(90deg, rgb(38 217 255 / 0.16), transparent),
     rgb(0 0 0 / 0.24);
+  box-shadow: 0 14px 30px rgb(38 217 255 / 0.1);
+}
+
+.section-sorter button.is-drop-target::before {
+  content: '';
+  position: absolute;
+  inset-inline: 10px;
+  block-size: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--cyan), var(--pink));
   box-shadow:
-    inset 4px 0 0 var(--cyan),
-    0 14px 30px rgb(38 217 255 / 0.1);
+    0 0 0 1px rgb(255 255 255 / 0.14),
+    0 0 18px rgb(38 217 255 / 0.38);
+}
+
+.section-sorter button.is-drop-before::before {
+  inset-block-start: -7px;
+}
+
+.section-sorter button.is-drop-after::before {
+  inset-block-end: -7px;
 }
 
 .section-sorter__ghost {

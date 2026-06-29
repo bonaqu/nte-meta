@@ -137,7 +137,11 @@ test.describe('Публичный портал NTE Meta', () => {
         name: 'Лучшие отряды и ротации для Хотори',
       }),
     ).toBeVisible();
-    await expect(page.getByText('Командная ротация')).toBeVisible();
+    await expect(
+      page.getByText(
+        'У каждого состава своя последовательность переключений персонажей и навыков.',
+      ),
+    ).toBeVisible();
     await expect(page.locator('a[href="#/teams"]')).toHaveCount(0);
     await expect(page.locator('a[href="#/rotations"]')).toHaveCount(0);
 

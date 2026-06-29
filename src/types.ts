@@ -256,17 +256,6 @@ export interface LeakItem {
   updatedAt?: string;
 }
 
-export interface VideoGuide {
-  id: string;
-  title: string;
-  youtubeUrl: string;
-  description: string;
-  publishedAt: string;
-  characterIds: string[];
-  teamIds: string[];
-  timestamps: { label: string; time: string }[];
-}
-
 export interface CommunityThread {
   id: string;
   slug: string;
@@ -388,7 +377,6 @@ export interface SiteData {
   teams: Team[];
   news: NewsItem[];
   leaks: LeakItem[];
-  videos: VideoGuide[];
   comments: Comment[];
   sources: Source[];
   threads: CommunityThread[];

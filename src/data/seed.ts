@@ -8,7 +8,6 @@ import type {
   Source,
   Team,
   TierList,
-  VideoGuide,
 } from '../types';
 
 const characterBase: Character[] = [
@@ -722,8 +721,6 @@ const leaks: LeakItem[] = [
   },
 ];
 
-const videos: VideoGuide[] = [];
-
 const sources: Source[] = [
   {
     id: 'source-manual',
@@ -769,7 +766,6 @@ export const seedData: SiteData = {
   teams,
   news,
   leaks,
-  videos,
   comments: [
     {
       id: 'comment-1',

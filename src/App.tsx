@@ -963,10 +963,11 @@ function HomePage({
           <ThreadEditor
             user={user}
             onDirtyChange={setHomeEditorDirty}
-            onSaved={async () => {
+            onSaved={async (savedThread) => {
               await refreshContent();
               setHomeEditorDirty(false);
               setHomeEditor(null);
+              window.location.hash = `#/threads/${savedThread.slug}`;
             }}
           />
         ) : null}
@@ -983,7 +984,7 @@ function ThreadEditor({
 }: {
   user: User;
   thread?: CommunityThread;
-  onSaved: () => Promise<void> | void;
+  onSaved: (savedThread: CommunityThread) => Promise<void> | void;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const draftKey = `nte-thread-draft-${thread?.id || 'new'}`;
@@ -1061,7 +1062,7 @@ function ThreadEditor({
     if (result.ok) {
       localStorage.removeItem(draftKey);
       setMessage(thread ? 'Тред обновлен.' : 'Тред опубликован.');
-      await onSaved();
+      await onSaved(result.data);
     } else {
       setMessage(result.error);
     }

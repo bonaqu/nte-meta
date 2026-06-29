@@ -876,6 +876,33 @@ test.describe('NTE Meta Worker API', () => {
     ),
   ).toBeVisible();
 
+  const uiThreadSlug = `ui-thread-${runId}`;
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Главная', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Создать тред' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Создать тред', level: 1 }),
+  ).toBeVisible();
+  const threadDialog = page.locator('dialog[open]');
+  const threadForm = threadDialog.locator('form.thread-editor');
+  await threadForm.getByLabel('Заголовок').fill(`UI тред ${runId}`);
+  await threadForm.getByLabel('Slug').fill(uiThreadSlug);
+  await threadForm
+    .getByLabel('Краткое описание')
+    .fill('Проверка публикации комьюнити-треда.');
+  await threadForm
+    .getByLabel('Текст треда')
+    .fill('## Обсуждение\nТред должен открыть отдельную страницу после публикации.');
+  await threadForm.getByLabel('Теги').fill('ui, тред');
+  await threadForm.getByRole('button', { name: 'Опубликовать тред' }).click();
+  await expect(page).toHaveURL(new RegExp(`/#/threads/${uiThreadSlug}$`));
+  await expect(
+    page.getByRole('heading', { name: `UI тред ${runId}` }),
+  ).toBeVisible();
+  await expect(page.getByText('Комментарии и обсуждения')).toBeVisible();
+
   await page.locator('a.profile-chip').click();
   await expect(
     page.getByRole('heading', { name: 'Профиль', level: 1 }),

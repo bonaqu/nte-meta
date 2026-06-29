@@ -914,6 +914,66 @@ test.describe('NTE Meta Worker API', () => {
   await expect(page.getByRole('heading', { name: 'Вход в NTE Meta' })).toBeVisible();
 });
 
+  test('owner создаёт персонажа inline и открывает созданную страницу', async ({
+    page,
+  }) => {
+    const uiCharacterSlug = `ui-character-${runId}`;
+    const uiCharacterName = `UI персонаж ${runId}`;
+    await page.goto('/#/profile');
+    await page.getByLabel('Логин').fill(ownerUsername);
+    await page.getByLabel('Пароль').fill(ownerPassword);
+    await page.getByRole('button', { name: 'Войти' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Профиль', level: 1 }),
+    ).toBeVisible();
+
+    await page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .getByRole('link', { name: 'Персонажи', exact: true })
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Персонажи Neverness to Everness' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Добавить персонажа' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Добавить персонажа', level: 1 }),
+    ).toBeVisible();
+
+    const characterDialog = page.locator('dialog[open]').filter({
+      has: page.getByRole('heading', { name: 'Добавить персонажа', level: 1 }),
+    });
+    const mainInfo = characterDialog.locator('details.editor-section').filter({
+      hasText: 'Основная информация',
+    });
+    await mainInfo.getByLabel('Имя на русском').fill(uiCharacterName);
+    await mainInfo.getByLabel('Оригинальное имя').fill('UI Character');
+    await mainInfo.getByLabel('Адрес страницы (slug)').fill(uiCharacterSlug);
+    await mainInfo.getByLabel('Фракция').fill('Редакционный тест');
+    await mainInfo.getByLabel('Атрибут').fill('Тест');
+    await mainInfo.getByLabel('Основная роль').fill('DD');
+    await mainInfo.getByLabel('Роли в отряде, через запятую').fill('DD, тест');
+    await mainInfo.getByLabel('Base C0 тир').selectOption('D');
+    await mainInfo.getByLabel('Premium C6 тир').selectOption('D');
+    await mainInfo.getByLabel('URL иконки').fill('/assets/characters/Hotori.webp');
+    await mainInfo
+      .getByLabel('URL splash art')
+      .fill('/assets/characters/Hotori.webp');
+    await mainInfo
+      .getByLabel('Краткая биография')
+      .fill('Тестовая lore-страница персонажа для inline публикации.');
+    await characterDialog
+      .getByRole('textbox', { name: 'Подробная биография' })
+      .fill('## Биография\nПерсонаж создан автотестом без выдуманной игровой меты.');
+    await mainInfo.getByLabel('Теги, через запятую').fill('ui, персонаж');
+    await characterDialog.getByRole('button', { name: 'Опубликовать' }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/#/characters/${uiCharacterSlug}$`));
+    await expect(
+      page.getByRole('heading', { name: uiCharacterName, level: 1 }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Создать гайд' })).toBeVisible();
+  });
+
   test('owner публикует слив inline и открывает созданную страницу', async ({
     page,
   }) => {

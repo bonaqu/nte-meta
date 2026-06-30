@@ -1185,6 +1185,70 @@ test.describe('NTE Meta Worker API', () => {
     await expect(page.getByRole('link', { name: /О персонаже/ })).toBeVisible();
   });
 
+  test('owner публикует новость inline и открывает созданную страницу', async ({
+    page,
+  }) => {
+    const uiNewsSlug = `ui-news-detail-${runId}`;
+    await page.goto('/#/profile');
+    await page.getByLabel('Логин').fill(ownerUsername);
+    await page.getByLabel('Пароль').fill(ownerPassword);
+    await page.getByRole('button', { name: 'Войти' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Профиль', level: 1 }),
+    ).toBeVisible();
+
+    await page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .getByRole('link', { name: 'Главная', exact: true })
+      .click();
+    await expect(page.getByRole('heading', { name: 'NTE Meta' })).toBeVisible();
+    await page.getByRole('button', { name: 'Добавить новость' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Добавить новость', level: 1 }),
+    ).toBeVisible();
+
+    const newsDialog = page.locator('dialog[open]').filter({
+      has: page.getByRole('heading', { name: 'Добавить новость', level: 1 }),
+    });
+    const newsForm = newsDialog.locator('.cms-editor');
+    await newsForm.getByLabel('Заголовок').fill(`UI новость detail ${runId}`);
+    await newsForm.getByLabel('Slug URL').fill(uiNewsSlug);
+    await newsForm
+      .getByLabel('Краткое описание')
+      .fill('Проверка inline публикации новости.');
+    await newsForm
+      .getByLabel('Полный текст Markdown')
+      .fill(
+        '## Проверка\nНовость должна открыть отдельную страницу после сохранения.',
+      );
+    await newsForm.getByLabel('Автор').fill('NTE Meta');
+    await newsForm.getByLabel('Название источника').fill('Редакционный тест');
+    await newsForm
+      .getByLabel('Ссылка на источник')
+      .fill('https://example.com/news');
+    await newsForm
+      .getByLabel('URL изображения')
+      .fill('/assets/characters/Hotori.webp');
+    await newsForm.getByLabel('Теги через запятую').fill('ui, новость');
+    await newsForm.getByLabel('Статус').selectOption('published');
+    await newsForm.getByRole('button', { name: 'Опубликовать' }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/#/news/${uiNewsSlug}$`));
+    await expect(
+      page.getByRole('heading', { name: `UI новость detail ${runId}` }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator('.editorial-body')
+        .getByText(
+          'Новость должна открыть отдельную страницу после сохранения.',
+          {
+            exact: true,
+          },
+        ),
+    ).toBeVisible();
+  });
+
   test('owner публикует слив inline и открывает созданную страницу', async ({
     page,
   }) => {

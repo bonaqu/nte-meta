@@ -24,9 +24,18 @@ export function getGuideCharacter(data: SiteData, guide: Guide) {
   return getCharacter(data, guide.characterId);
 }
 
-export function groupTierItems(data: SiteData, kind: 'base' | 'premium') {
-  const tierlist =
-    data.tierlists.find((item) => item.kind === kind) || data.tierlists[0];
+export function getUnifiedTierList(data: SiteData) {
+  return (
+    data.tierlists.find(
+      (item) => item.kind === 'base' && item.status !== 'archived',
+    ) ||
+    data.tierlists.find((item) => item.status !== 'archived') ||
+    data.tierlists[0]
+  );
+}
+
+export function groupTierItems(data: SiteData) {
+  const tierlist = getUnifiedTierList(data);
   const grouped = Object.fromEntries(
     tierOrder.map((tier) => [tier, [] as Character[]]),
   ) as Record<Tier, Character[]>;

@@ -91,6 +91,7 @@ import {
   getCharacter,
   getCharacterSearchText,
   getGuideCharacter,
+  getUnifiedTierList,
   groupTierItems,
   normalizeTier,
   normalizeSearchText,
@@ -629,7 +630,7 @@ function HomePage({
   const latestGuides = data.guides.slice(0, 3);
   const latestNews = data.news.slice(0, 2);
   const latestLeaks = data.leaks.filter((leak) => leak.approved).slice(0, 2);
-  const { grouped } = groupTierItems(data, 'base');
+  const { grouped } = groupTierItems(data);
   const popularCharacters = data.characters.slice(0, 6);
   const [homeEditor, setHomeEditor] = useState<
     'guide' | 'news' | 'leak' | 'thread' | null
@@ -3220,7 +3221,7 @@ function TierListsPage({
 }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorDirty, setEditorDirty] = useState(false);
-  const { tierlist, grouped } = groupTierItems(data, 'base');
+  const { tierlist, grouped } = groupTierItems(data);
 
   return (
     <div className="page-stack">
@@ -5998,8 +5999,7 @@ function AdminTierlists({
   canPublish: boolean;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
-  const tierlist =
-    data.tierlists.find((item) => item.kind === 'base') || data.tierlists[0];
+  const tierlist = getUnifiedTierList(data);
   const [items, setItems] = useState(tierlist?.items || []);
   const [title, setTitle] = useState(tierlist?.title || '');
   const [patch, setPatch] = useState(tierlist?.patch || '1.0');

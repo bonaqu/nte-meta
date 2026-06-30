@@ -83,6 +83,8 @@ export interface CharacterVoiceLine {
   title: string;
   language: 'Английский' | 'Японский' | 'Корейский' | 'Китайский';
   audioUrl: string;
+  sourceUrl?: string;
+  description?: string;
 }
 
 export interface CharacterAwakening {

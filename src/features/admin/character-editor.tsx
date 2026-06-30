@@ -519,9 +519,11 @@ export function AdminCharacterEditor({
         next.profile.trivia = mergeText(next.profile.trivia, String(parsed));
       } else if (suggestion.field === 'profile.roleTags' && Array.isArray(parsed)) {
         next.profile.roleTags = parsed.map(String).filter(Boolean);
-      } else if (suggestion.field === 'profile.voiceActors' && Array.isArray(parsed)) {
-        next.profile.voiceActors = parsed as CharacterVoiceActor[];
-      } else if (suggestion.field === 'profile.materials' && Array.isArray(parsed)) {
+    } else if (suggestion.field === 'profile.voiceActors' && Array.isArray(parsed)) {
+      next.profile.voiceActors = parsed as CharacterVoiceActor[];
+    } else if (suggestion.field === 'profile.voiceLines' && Array.isArray(parsed)) {
+      next.profile.voiceLines = parsed as CharacterVoiceLine[];
+    } else if (suggestion.field === 'profile.materials' && Array.isArray(parsed)) {
         next.profile.materials = parsed as CharacterMaterial[];
       } else if (suggestion.field === 'profile.baseStats' && Array.isArray(parsed)) {
         next.profile.baseStats = parsed as CharacterStat[];
@@ -1448,6 +1450,8 @@ export function AdminCharacterEditor({
               title: '',
               language: 'Японский',
               audioUrl: '',
+              sourceUrl: '',
+              description: '',
             })}
             onChange={(voiceLines) => patchProfile({ voiceLines })}
             render={(item, _index, update) => (
@@ -1479,7 +1483,7 @@ export function AdminCharacterEditor({
                   </select>
                 </label>
                 <label className="wide-field">
-                  URL аудио
+                  URL аудио-файла
                   <input
                     type="url"
                     value={item.audioUrl}
@@ -1488,13 +1492,43 @@ export function AdminCharacterEditor({
                     }
                   />
                 </label>
-                {item.audioUrl ? (
+                <label className="wide-field">
+                  Источник записи или видео
+                  <input
+                    type="url"
+                    value={item.sourceUrl || ''}
+                    onChange={(event) =>
+                      update({ ...item, sourceUrl: event.target.value })
+                    }
+                  />
+                </label>
+                <label className="wide-field">
+                  Заметка для редакции
+                  <textarea
+                    rows={2}
+                    value={item.description || ''}
+                    onChange={(event) =>
+                      update({ ...item, description: event.target.value })
+                    }
+                  />
+                </label>
+                {item.audioUrl &&
+                !/youtube\.com|youtu\.be|vimeo\.com/i.test(item.audioUrl) ? (
                   <audio controls preload="none" src={item.audioUrl}>
                     Ваш браузер не поддерживает аудио.
                   </audio>
+                ) : item.sourceUrl ? (
+                  <a
+                    className="ghost-button"
+                    href={item.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <Headphones aria-hidden="true" /> Открыть источник записи
+                  </a>
                 ) : (
                   <span className="audio-placeholder">
-                    <Headphones aria-hidden="true" /> Добавьте URL аудио
+                    <Headphones aria-hidden="true" /> Добавьте URL аудио или источник
                   </span>
                 )}
               </>

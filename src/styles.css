@@ -2979,26 +2979,41 @@
     object-fit: cover;
   }
 
-  .voice-line-list article {
-    display: grid;
-    grid-template-columns: minmax(180px, 0.45fr) minmax(260px, 1fr);
-    gap: 16px;
-    align-items: center;
+.voice-line-list article {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.45fr) minmax(260px, 1fr);
+  gap: 16px;
+  align-items: center;
     padding: 12px 0;
     border-block-end: 1px solid var(--border);
   }
 
-  .voice-line-list article > div {
-    display: grid;
-  }
+.voice-line-list article > div {
+  display: grid;
+}
 
-  .voice-line-list span {
-    color: var(--muted);
-  }
+.voice-line-media {
+  gap: 10px;
+}
 
-  .voice-line-list audio {
-    inline-size: 100%;
-  }
+.voice-line-list span {
+  color: var(--muted);
+}
+
+.voice-line-list p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.voice-line-list .ghost-button,
+.voice-line-list .audio-placeholder {
+  justify-self: start;
+}
+
+.voice-line-list audio {
+  inline-size: 100%;
+}
 
   .character-editor-workspace {
     display: grid;

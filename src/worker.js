@@ -2156,6 +2156,178 @@ function characterImportSources(slug) {
   ];
 }
 
+function buildKnownVoiceActorSource(character) {
+  const knownActors = new Map([
+    [
+      'hotori',
+      [
+        { language: 'Английский', name: 'Lindsay Sheppard' },
+        { language: 'Японский', name: 'Shizuka Itō (伊藤 静)' },
+        { language: 'Китайский', name: 'Du Qingqing (杜晴晴)' },
+        { language: 'Корейский', name: 'Lee Ji-hyeon (이지현)' },
+      ],
+    ],
+    [
+      'nanally',
+      [
+        { language: 'Английский', name: 'Brittany Lauda' },
+        { language: 'Японский', name: 'Ayana Taketatsu (竹達彩奈)' },
+        { language: 'Китайский', name: 'Song Yuanyuan (宋媛媛)' },
+        { language: 'Корейский', name: 'Kang Saebom (강새봄)' },
+      ],
+    ],
+    [
+      'sakiri',
+      [
+        { language: 'Английский', name: 'Brianna Knickerbocker' },
+        { language: 'Японский', name: 'Miku Ito (伊藤美来)' },
+        { language: 'Китайский', name: 'Cai Shujin (蔡书瑾)' },
+        { language: 'Корейский', name: 'Kim Nayul (김나율)' },
+      ],
+    ],
+    [
+      'adler',
+      [
+        { language: 'Английский', name: 'Jacob Craner' },
+        { language: 'Японский', name: 'Toshiyuki Morikawa (森川智之)' },
+        { language: 'Китайский', name: 'Wang Yuhang (王宇航)' },
+        { language: 'Корейский', name: 'Shim Gyuhyeok (심규혁)' },
+      ],
+    ],
+    [
+      'edgar',
+      [
+        { language: 'Английский', name: 'Casey Mongillo' },
+        { language: 'Японский', name: 'Yūko Sanpei (三瓶由布子)' },
+        { language: 'Китайский', name: 'Sibai (四白)' },
+        { language: 'Корейский', name: 'Jang Chaeyeon (장채연)' },
+      ],
+    ],
+    [
+      'daffodill',
+      [
+        { language: 'Английский', name: 'Natalie Van Sistine' },
+        { language: 'Японский', name: 'Sayaka Ohara (大原さやか)' },
+        { language: 'Китайский', name: 'Chen Yanyi (陈彦亦)' },
+        { language: 'Корейский', name: 'Lee Myeongho (이명호)' },
+      ],
+    ],
+    [
+      'daffodil',
+      [
+        { language: 'Английский', name: 'Natalie Van Sistine' },
+        { language: 'Японский', name: 'Sayaka Ohara (大原さやか)' },
+        { language: 'Китайский', name: 'Chen Yanyi (陈彦亦)' },
+        { language: 'Корейский', name: 'Lee Myeongho (이명호)' },
+      ],
+    ],
+    [
+      'hathor',
+      [
+        { language: 'Английский', name: 'Allegra Clark' },
+        { language: 'Японский', name: 'Kana Ichinose (市ノ瀬加那)' },
+        { language: 'Китайский', name: 'Hong Haitian (洪海天)' },
+        { language: 'Корейский', name: 'Lee Daeun (이다은)' },
+      ],
+    ],
+    [
+      'haniel',
+      [
+        { language: 'Английский', name: 'Alexis Tipton' },
+        { language: 'Японский', name: 'Manaka Iwami (石見舞菜香)' },
+        { language: 'Китайский', name: 'Su Ziwu (苏子芜)' },
+        { language: 'Корейский', name: 'Kim Garyeong (김가령)' },
+      ],
+    ],
+    [
+      'jiuyuan',
+      [
+        { language: 'Английский', name: 'Baraka May' },
+        { language: 'Японский', name: 'Rie Tanaka (田中理恵)' },
+        { language: 'Китайский', name: 'Zhang Anqi (张安琪)' },
+        { language: 'Корейский', name: 'Bang Siu (방시우)' },
+      ],
+    ],
+    [
+      'mint',
+      [
+        { language: 'Английский', name: 'Brianna Knickerbocker' },
+        { language: 'Японский', name: 'Akari Kito (鬼頭明里)' },
+        { language: 'Китайский', name: 'Chen Yu (陈雨)' },
+        { language: 'Корейский', name: 'Seong Yewon (성예원)' },
+      ],
+    ],
+    [
+      'fadia',
+      [
+        { language: 'Английский', name: 'Amber Lee Connors' },
+        { language: 'Японский', name: 'Kei Shindo (真堂圭)' },
+        { language: 'Китайский', name: 'Pei Zhiying (裴致莹)' },
+        { language: 'Корейский', name: 'Jo Hyeonjeong (조현정)' },
+      ],
+    ],
+    [
+      'baicang',
+      [
+        { language: 'Английский', name: 'Griffith Burns' },
+        { language: 'Японский', name: 'Yuichi Nakamura (中村悠一)' },
+        { language: 'Китайский', name: 'Sang Yuze (桑毓泽)' },
+        { language: 'Корейский', name: 'Shim Gyuhyeok (심규혁)' },
+      ],
+    ],
+    [
+      'skia',
+      [
+        { language: 'Английский', name: 'Bill Butts' },
+        { language: 'Японский', name: 'Tomokazu Sugita (杉田智和)' },
+        { language: 'Китайский', name: 'Liu Yuxuan (刘雨轩)' },
+        { language: 'Корейский', name: 'Lee Donghun (이동훈)' },
+      ],
+    ],
+    [
+      'chiz',
+      [
+        { language: 'Английский', name: 'Alice Himora' },
+        { language: 'Японский', name: 'Konomi Kohara (小原好美)' },
+        { language: 'Китайский', name: 'Zeling (则灵)' },
+        { language: 'Корейский', name: 'Kwon Daye (권다예)' },
+      ],
+    ],
+    [
+      'aurelia',
+      [
+        { language: 'Английский', name: 'Kira Buckland' },
+        { language: 'Японский', name: 'Karin Takahashi (高橋花林)' },
+        { language: 'Китайский', name: 'Ge Zirui (葛子瑞)' },
+        { language: 'Корейский', name: 'Jeong Haeun (정해은)' },
+      ],
+    ],
+  ]);
+  const actors = characterNameCandidates(character)
+    .map((candidate) => knownActors.get(candidate))
+    .find(Boolean);
+  if (!actors) return null;
+  const source = {
+    id: 'known-voice-actors',
+    name: 'Опубликованный voice cast NTE',
+    trust: 'medium',
+    url: 'https://neverness.gg/nte-voice-actors-cast/',
+  };
+  return {
+    ...source,
+    status: 'ok',
+    suggestions: [
+      makeImportSuggestion(
+        'profile.voiceActors',
+        'Актёры озвучки из опубликованного voice cast; проверьте написание и подтвердите строки.',
+        actors,
+        source,
+        'medium',
+      ),
+    ],
+  };
+}
+
 async function fetchImportSource(source, character) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), IMPORT_SOURCE_TIMEOUT_MS);
@@ -2616,6 +2788,12 @@ async function handleCharacterImportLookup(request, env) {
       }),
     ),
   );
+  const voiceActorSource = buildKnownVoiceActorSource({
+    name: character.name || query,
+    originalName: character.original_name || query,
+    slug,
+  });
+  if (voiceActorSource) sourceResults.push(voiceActorSource);
   const voiceMediaSource = buildKnownVoiceMediaSource({
     name: character.name || query,
     originalName: character.original_name || query,

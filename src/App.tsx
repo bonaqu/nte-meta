@@ -18,6 +18,7 @@ import {
   ClipboardList,
   Gamepad2,
   GripVertical,
+  Headphones,
   Home,
   ImageIcon,
   ListFilter,
@@ -1816,6 +1817,9 @@ function CharacterDetailPage({
   };
   const guide = data.guides.find((item) => item.characterId === character.id);
 
+  const canPlayVoiceAudio = (url: string) =>
+    Boolean(url) && !/youtube\.com|youtu\.be|vimeo\.com/i.test(url);
+
   async function refreshContent() {
     setData(
       await loadSiteData({
@@ -2160,15 +2164,33 @@ function CharacterDetailPage({
           <div className="voice-line-list">
             {profile.voiceLines.map((line) => (
               <article key={line.id}>
-                <div>
-                  <strong>{line.title}</strong>
-                  <span>{line.language}</span>
-                </div>
-                <audio controls preload="none" src={line.audioUrl}>
-                  Ваш браузер не поддерживает аудио.
-                </audio>
-              </article>
-            ))}
+              <div>
+                <strong>{line.title}</strong>
+                <span>{line.language}</span>
+              </div>
+              <div className="voice-line-media">
+                {line.description ? <p>{line.description}</p> : null}
+                {canPlayVoiceAudio(line.audioUrl) ? (
+                  <audio controls preload="none" src={line.audioUrl}>
+                    Ваш браузер не поддерживает аудио.
+                  </audio>
+                ) : line.sourceUrl ? (
+                  <a
+                    className="ghost-button"
+                    href={line.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <Headphones aria-hidden="true" /> Открыть источник записи
+                  </a>
+                ) : (
+                  <span className="audio-placeholder">
+                    <Headphones aria-hidden="true" /> Прямой аудиофайл не добавлен
+                  </span>
+                )}
+              </div>
+            </article>
+          ))}
           </div>
         ) : (
           <EmptyState

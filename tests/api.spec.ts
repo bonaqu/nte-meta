@@ -475,6 +475,24 @@ test.describe('NTE Meta Worker API', () => {
         })
       ).status(),
     ).toBe(403);
+    expect(
+      (
+        await member.post('/api/character-import/lookup', {
+          data: { query: 'Хотори' },
+        })
+      ).status(),
+    ).toBe(403);
+
+    const ownerLookup = await owner.post('/api/character-import/lookup', {
+      data: { query: 'Хотори' },
+    });
+    expect(ownerLookup.ok()).toBeTruthy();
+    await expect(ownerLookup.json()).resolves.toMatchObject({
+      data: {
+        found: false,
+        fields: {},
+      },
+    });
 
     await owner.patch(`/api/users/${memberId}/role`, {
       data: { role: 'editor' },
@@ -1082,6 +1100,11 @@ test.describe('NTE Meta Worker API', () => {
     const characterDialog = page.locator('dialog[open]').filter({
       has: page.getByRole('heading', { name: 'Добавить персонажа', level: 1 }),
     });
+    await expect(
+      characterDialog.getByRole('button', {
+        name: 'Найти базовую информацию',
+      }),
+    ).toBeVisible();
     const mainInfo = characterDialog.locator('details.editor-section').filter({
       hasText: 'Основная информация',
     });

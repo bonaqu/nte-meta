@@ -2098,6 +2098,20 @@ function characterImportSources(slug) {
       parser: parseNteWikiImport,
     },
     {
+      id: 'ntewiki-characters-index',
+      name: 'NTE Wiki RU: персонажи',
+      trust: 'high',
+      url: 'https://ntewiki.org/ru/characters/',
+      referenceOnly: true,
+    },
+    {
+      id: 'ntewiki-arcs-ru',
+      name: 'NTE Wiki RU: дуги',
+      trust: 'high',
+      url: 'https://ntewiki.org/ru/arcs/',
+      referenceOnly: true,
+    },
+    {
       id: 'genshin-builds-ru',
       name: 'GenshinBuilds NTE RU',
       trust: 'high',
@@ -2124,6 +2138,34 @@ function characterImportSources(slug) {
       trust: 'medium',
       url: 'https://gamewith.ai/nte/ru/character',
       parser: parseGameWithCharacterImport,
+    },
+    {
+      id: 'gamewith-home-ru',
+      name: 'GameWith NTE RU: база',
+      trust: 'medium',
+      url: 'https://gamewith.ai/nte/ru',
+      referenceOnly: true,
+    },
+    {
+      id: 'neverness-gg-characters',
+      name: 'Neverness.gg characters',
+      trust: 'medium',
+      url: 'https://neverness.gg/neverness-to-everness-characters/',
+      referenceOnly: true,
+    },
+    {
+      id: 'neverness-gg-materials',
+      name: 'Neverness.gg materials',
+      trust: 'medium',
+      url: 'https://neverness.gg/materials/',
+      referenceOnly: true,
+    },
+    {
+      id: 'fandom-ru-characters',
+      name: 'Fandom RU: персонажи',
+      trust: 'low',
+      url: 'https://neverness-to-everness.fandom.com/ru/wiki/%D0%9F%D0%B5%D1%80%D1%81%D0%BE%D0%BD%D0%B0%D0%B6%D0%B8',
+      referenceOnly: true,
     },
     {
       id: 'btva-en',
@@ -2329,6 +2371,16 @@ function buildKnownVoiceActorSource(character) {
 }
 
 async function fetchImportSource(source, character) {
+  if (source.referenceOnly) {
+    return {
+      ...source,
+      status: 'partial',
+      message:
+        'Справочный источник подключен для ручной проверки; структурированный авторазбор пока не включен.',
+      suggestions: [],
+    };
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), IMPORT_SOURCE_TIMEOUT_MS);
   try {

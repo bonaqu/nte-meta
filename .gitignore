@@ -5,7 +5,7 @@ dist
 test-results
 playwright-report
 backups
-.env
-.env.local
-.dev.vars
+.env*
+.dev.vars*
+!.env.example
 *.log

@@ -1945,24 +1945,37 @@ function CharacterDetailPage({
           </dl>
         ) : null}
         {profile.abilities.length ? (
-          <div className="ability-list">
-            {profile.abilities.map((ability) => (
-              <article key={ability.id}>
-                {ability.iconUrl ? (
-                  <img
-                    src={resolveAssetUrl(ability.iconUrl)}
-                    alt=""
-                    width="64"
-                    height="64"
-                    loading="lazy"
-                  />
-                ) : null}
-                <div>
-                  <p className="eyebrow">{ability.type}</p>
-                  <h3>{ability.name}</h3>
+          <div className="ability-list ability-list--profile">
+            {profile.abilities.map((ability, index) => (
+              <details
+                className="ability-card"
+                key={ability.id}
+                open={index < 2}
+              >
+                <summary tabIndex={0}>
+                  <span className="ability-card__icon" aria-hidden="true">
+                    {ability.iconUrl ? (
+                      <img
+                        src={resolveAssetUrl(ability.iconUrl)}
+                        alt=""
+                        width="64"
+                        height="64"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <BookOpen aria-hidden="true" />
+                    )}
+                  </span>
+                  <span className="ability-card__meta">
+                    <span className="eyebrow">{ability.type || 'Навык'}</span>
+                    <strong>{ability.name || 'Без названия'}</strong>
+                  </span>
+                  <ChevronDown aria-hidden="true" />
+                </summary>
+                <div className="ability-card__body">
                   <MarkdownPreview value={ability.description} />
                 </div>
-              </article>
+              </details>
             ))}
           </div>
         ) : (

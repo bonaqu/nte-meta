@@ -1292,17 +1292,13 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
   const pendingLeaks = data.leaks.filter((leak) => !leak.approved).length;
   const sourceCount = data.sources.length;
   const recentThread = data.threads[0];
+  const leadHref = updatedGuide ? `#/guides/${updatedGuide.slug}` : '#/guides';
+  const leadTitle = updatedGuide ? updatedGuide.title : 'Нужен первый глубокий гайд';
+  const leadText = updatedGuide
+    ? `${updatedGuide.patch} · обновлено ${formatDate(updatedGuide.updatedAt)}`
+    : 'Создайте персонажный гайд и добавьте команды, ротации, видео и проверенные источники.';
 
   const focusItems = [
-    {
-      title: 'Приоритет редакции',
-      value: updatedGuide ? updatedGuide.title : 'Нужен первый гайд',
-      text: updatedGuide
-        ? `Последнее обновление гайда: ${formatDate(updatedGuide.updatedAt)}`
-        : 'Создайте персонажный гайд и добавьте команды, ротации и видео.',
-      href: updatedGuide ? `#/guides/${updatedGuide.slug}` : '#/guides',
-      icon: BookOpen,
-    },
     {
       title: 'Проверка источников',
       value: `${sourceCount} источников`,
@@ -1329,18 +1325,31 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
   ];
 
   return (
-    <section className="home-focus-panel" aria-label="Фокус NTE Meta">
-      {focusItems.map((item) => {
-        const Icon = item.icon;
-        return (
-          <a href={item.href} key={item.title}>
-            <Icon aria-hidden="true" />
-            <span>{item.title}</span>
-            <strong>{item.value}</strong>
-            <small>{item.text}</small>
-          </a>
-        );
-      })}
+    <section className="home-focus-panel" aria-label="Редакционный пульс">
+      <a className="home-focus-lead" href={leadHref}>
+        <span className="home-focus-lead__icon">
+          <BookOpen aria-hidden="true" />
+        </span>
+        <span>
+          <small>Приоритет редакции</small>
+          <strong>{leadTitle}</strong>
+          <em>{leadText}</em>
+        </span>
+        <ChevronRight aria-hidden="true" />
+      </a>
+      <div className="home-focus-stack">
+        {focusItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <a className="home-focus-card" href={item.href} key={item.title}>
+              <Icon aria-hidden="true" />
+              <span>{item.title}</span>
+              <strong>{item.value}</strong>
+              <small>{item.text}</small>
+            </a>
+          );
+        })}
+      </div>
     </section>
   );
 }

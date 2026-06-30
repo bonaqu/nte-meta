@@ -6,6 +6,7 @@ import {
   Plus,
   Search,
   Trash2,
+  XCircle,
 } from 'lucide-react';
 import { EmptyState, StatusBanner } from '../../components/ui-state';
 import {
@@ -23,6 +24,7 @@ import type {
   CharacterConsole,
   CharacterFriendshipLevel,
   CharacterGift,
+  CharacterImportSuggestion,
   CharacterMaterial,
   CharacterProfile,
   CharacterSkin,
@@ -68,6 +70,7 @@ function rowId() {
 function emptyProfile(): CharacterProfile {
   return {
     faction: '',
+    arcType: '',
     birthday: '',
     biographyShort: '',
     biography: '',
@@ -186,6 +189,103 @@ function MarkdownField({
   );
 }
 
+function ImportSuggestionList({
+  suggestions,
+  decisions,
+  onAccept,
+  onReject,
+}: {
+  suggestions: CharacterImportSuggestion[];
+  decisions: Record<string, 'accepted' | 'rejected'>;
+  onAccept: (suggestion: CharacterImportSuggestion) => void;
+  onReject: (suggestion: CharacterImportSuggestion) => void;
+}) {
+  if (!suggestions.length) return null;
+
+  return (
+    <section className="import-review-panel" aria-label="Предложения автоимпорта">
+      <div>
+        <p className="eyebrow">Автоимпорт</p>
+        <h3>Подтвердите найденные строки</h3>
+        <p>
+          Данные не сохраняются автоматически. Примите только те поля, которые
+          сверены с источником.
+        </p>
+      </div>
+      <div className="import-suggestion-list">
+        {suggestions.map((suggestion) => {
+          const decision = decisions[suggestion.id];
+          return (
+            <article
+              className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
+              key={suggestion.id}
+            >
+              <div>
+                <strong>{suggestion.label}</strong>
+                <span>{suggestion.field}</span>
+              </div>
+              <p>{summarizeSuggestionValue(suggestion.value)}</p>
+              <small>
+                {suggestion.sourceName} · уверенность: {suggestion.confidence}
+                {suggestion.note ? ` · ${suggestion.note}` : ''}
+              </small>
+              <div className="import-suggestion-actions">
+                <a href={suggestion.sourceUrl} target="_blank" rel="noreferrer">
+                  Источник
+                </a>
+                <button
+                  className="icon-button success"
+                  type="button"
+                  aria-label={`Принять: ${suggestion.label}`}
+                  disabled={decision === 'accepted'}
+                  onClick={() => onAccept(suggestion)}
+                >
+                  <CheckCircle2 aria-hidden="true" />
+                </button>
+                <button
+                  className="icon-button danger"
+                  type="button"
+                  aria-label={`Отклонить: ${suggestion.label}`}
+                  disabled={decision === 'rejected'}
+                  onClick={() => onReject(suggestion)}
+                >
+                  <XCircle aria-hidden="true" />
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function summarizeSuggestionValue(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (Array.isArray(parsed)) return `${parsed.length} записей`;
+  } catch {
+    // plain text suggestion
+  }
+  return value.length > 260 ? `${value.slice(0, 260)}...` : value;
+}
+
+function parseImportValue(value: string) {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
+}
+
+function mergeText(current: string, addition: string) {
+  const cleanAddition = addition.trim();
+  if (!cleanAddition) return current;
+  if (!current.trim()) return cleanAddition;
+  if (current.includes(cleanAddition)) return current;
+  return `${current.trim()}\n\n${cleanAddition}`;
+}
+
 function Collection<T>({
   title,
   description,
@@ -286,6 +386,12 @@ export function AdminCharacterEditor({
   const [message, setMessage] = useState('');
   const [tone, setTone] = useState<'info' | 'danger' | 'success'>('info');
   const [pending, setPending] = useState(false);
+  const [importSuggestions, setImportSuggestions] = useState<
+    CharacterImportSuggestion[]
+  >([]);
+  const [importDecisions, setImportDecisions] = useState<
+    Record<string, 'accepted' | 'rejected'>
+  >({});
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const skipNextDraftSaveRef = useRef(false);
   const selected = items.find((item) => item.id === selectedId);
@@ -346,6 +452,8 @@ export function AdminCharacterEditor({
 
   useEffect(() => {
     setMessage('');
+    setImportSuggestions([]);
+    setImportDecisions({});
   }, [selectedId]);
 
   function patch(patchValue: Partial<CharacterDraft>) {
@@ -373,11 +481,68 @@ export function AdminCharacterEditor({
     if (result.ok) {
       setTone(result.data.found ? 'success' : 'info');
       setMessage(result.data.message || 'Источники не настроены. Заполните поля вручную.');
+      setImportSuggestions(result.data.suggestions || []);
+      setImportDecisions({});
     } else {
       setTone('danger');
       setMessage(result.error);
     }
     setPending(false);
+  }
+
+  function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
+    const parsed = parseImportValue(suggestion.value);
+    setDraft((current) => {
+      const next: CharacterDraft = {
+        ...current,
+        profile: { ...current.profile },
+      };
+      if (suggestion.field === 'name') next.name = String(parsed);
+      else if (suggestion.field === 'originalName') next.originalName = String(parsed);
+      else if (suggestion.field === 'rarity' && ['S', 'A', 'Нулевой'].includes(String(parsed))) {
+        next.rarity = String(parsed) as Character['rarity'];
+      } else if (suggestion.field === 'attribute') next.attribute = String(parsed);
+      else if (suggestion.field === 'tier' && tiers.includes(String(parsed) as Tier)) {
+        next.tier = String(parsed) as Tier;
+        next.premiumTier = String(parsed) as Tier;
+      } else if (suggestion.field === 'profile.faction') {
+        next.profile.faction = String(parsed);
+      } else if (suggestion.field === 'profile.arcType') {
+        next.profile.arcType = String(parsed);
+      } else if (suggestion.field === 'profile.birthday') {
+        next.profile.birthday = String(parsed);
+      } else if (suggestion.field === 'profile.biographyShort') {
+        next.profile.biographyShort = String(parsed);
+      } else if (suggestion.field === 'profile.biography') {
+        next.profile.biography = String(parsed);
+      } else if (suggestion.field === 'profile.trivia') {
+        next.profile.trivia = mergeText(next.profile.trivia, String(parsed));
+      } else if (suggestion.field === 'profile.roleTags' && Array.isArray(parsed)) {
+        next.profile.roleTags = parsed.map(String).filter(Boolean);
+      } else if (suggestion.field === 'profile.voiceActors' && Array.isArray(parsed)) {
+        next.profile.voiceActors = parsed as CharacterVoiceActor[];
+      } else if (suggestion.field === 'profile.materials' && Array.isArray(parsed)) {
+        next.profile.materials = parsed as CharacterMaterial[];
+      } else if (suggestion.field === 'profile.baseStats' && Array.isArray(parsed)) {
+        next.profile.baseStats = parsed as CharacterStat[];
+      } else if (suggestion.field === 'profile.abilities' && Array.isArray(parsed)) {
+        next.profile.abilities = parsed as CharacterAbility[];
+      } else if (suggestion.field === 'profile.awakenings' && Array.isArray(parsed)) {
+        next.profile.awakenings = parsed as CharacterAwakening[];
+      } else if (suggestion.field.startsWith('guide.')) {
+        next.profile.trivia = mergeText(
+          next.profile.trivia,
+          `Импорт для гайда (${suggestion.label}): ${String(parsed)}`,
+        );
+      }
+      return next;
+    });
+    setImportDecisions((current) => ({
+      ...current,
+      [suggestion.id]: 'accepted',
+    }));
+    setTone('success');
+    setMessage(`Поле «${suggestion.label}» добавлено в черновик. Проверьте и сохраните персонажа.`);
   }
 
   async function persist(status: 'draft' | 'published') {
@@ -556,9 +721,20 @@ export function AdminCharacterEditor({
           </div>
         </header>
 
-        {message ? <StatusBanner tone={tone} text={message} /> : null}
+      {message ? <StatusBanner tone={tone} text={message} /> : null}
+      <ImportSuggestionList
+        suggestions={importSuggestions}
+        decisions={importDecisions}
+        onAccept={applyImportSuggestion}
+        onReject={(suggestion) =>
+          setImportDecisions((current) => ({
+            ...current,
+            [suggestion.id]: 'rejected',
+          }))
+        }
+      />
 
-        <details className="editor-section" open>
+      <details className="editor-section" open>
           <summary>Основная информация</summary>
           <div className="editor-field-grid">
             <label>
@@ -587,17 +763,27 @@ export function AdminCharacterEditor({
                 onChange={(event) => patch({ slug: event.target.value })}
               />
             </label>
-            <label>
-              Фракция
-              <input
-                value={profile.faction}
-                onChange={(event) =>
-                  patchProfile({ faction: event.target.value })
-                }
-              />
-            </label>
-            <label>
-              День рождения
+        <label>
+          Фракция
+          <input
+            value={profile.faction}
+            onChange={(event) =>
+              patchProfile({ faction: event.target.value })
+            }
+          />
+        </label>
+        <label>
+          Тип дуги
+          <input
+            value={profile.arcType}
+            placeholder="Твёрдое, Газ, Жидкость..."
+            onChange={(event) =>
+              patchProfile({ arcType: event.target.value })
+            }
+          />
+        </label>
+        <label>
+          День рождения
               <input
                 value={profile.birthday}
                 placeholder="Например, 21 июня"
@@ -654,26 +840,16 @@ export function AdminCharacterEditor({
               />
             </label>
             <label>
-              Base C0 тир
-              <select
-                value={draft.tier}
-                onChange={(event) =>
-                  patch({ tier: event.target.value as Tier })
-                }
-              >
-                {tiers.map((tier) => (
-                  <option key={tier}>{tier}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Premium C6 тир
-              <select
-                value={draft.premiumTier}
-                onChange={(event) =>
-                  patch({ premiumTier: event.target.value as Tier })
-                }
-              >
+              Тир
+          <select
+            value={draft.tier}
+            onChange={(event) =>
+              patch({
+                tier: event.target.value as Tier,
+                premiumTier: event.target.value as Tier,
+              })
+            }
+          >
                 {tiers.map((tier) => (
                   <option key={tier}>{tier}</option>
                 ))}

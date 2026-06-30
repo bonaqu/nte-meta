@@ -25,6 +25,7 @@ import {
   LogOut,
   Menu,
   MessageCircle,
+  MessageSquare,
   Newspaper,
   PanelLeft,
   Pencil,
@@ -68,6 +69,7 @@ import {
   loadUsers,
   loadWarnings,
   login,
+  lookupGuideInfo,
   logout,
   me,
   register,
@@ -102,6 +104,7 @@ import type {
   AuditLogEntry,
   AppSettings,
   Character,
+  CharacterImportSuggestion,
   Comment,
   CommunityThread,
   ContentScope,
@@ -409,7 +412,7 @@ function App() {
       ],
       tierlists: [
         'Тир-листы',
-        'Base C0 и Premium C6 тир-листы NTE Meta.',
+      'Единый тир-лист NTE Meta с ручной редакционной оценкой.',
         '/tierlists/',
       ],
       admin: ['Админка', 'Защищённая редакционная CMS NTE Meta.', '/admin/'],
@@ -700,6 +703,7 @@ function HomePage({
       </section>
 
       <MetricsStrip data={data} />
+      <HomeFocusPanel data={data} user={user} />
 
       {loading && latestGuides.length === 0 ? <SkeletonGrid /> : null}
 
@@ -799,7 +803,7 @@ function HomePage({
         <SectionHeader
           eyebrow="Патч 1.0"
           title="Текущий тир-лист"
-          text="Preview base C0. Premium C6 находится на отдельной странице."
+          text="Единый preview актуального редакционного тир-листа."
         />
         <TierPreview grouped={grouped} />
       </section>
@@ -1282,6 +1286,64 @@ function MetricsStrip({ data }: { data: SiteData }) {
   );
 }
 
+function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
+  const updatedGuide = data.guides[0];
+  const pendingLeaks = data.leaks.filter((leak) => !leak.approved).length;
+  const sourceCount = data.sources.length;
+  const recentThread = data.threads[0];
+
+  const focusItems = [
+    {
+      title: 'Приоритет редакции',
+      value: updatedGuide ? updatedGuide.title : 'Нужен первый гайд',
+      text: updatedGuide
+        ? `Последнее обновление гайда: ${formatDate(updatedGuide.updatedAt)}`
+        : 'Создайте персонажный гайд и добавьте команды, ротации и видео.',
+      href: updatedGuide ? `#/guides/${updatedGuide.slug}` : '#/guides',
+      icon: BookOpen,
+    },
+    {
+      title: 'Проверка источников',
+      value: `${sourceCount} источников`,
+      text: 'Автоимпорт предлагает строки только с ссылкой на источник и ручным подтверждением.',
+      href: canAccessAdmin(user) ? '#/admin/sources' : '#/guides',
+      icon: Search,
+    },
+    {
+      title: 'Сливы на модерации',
+      value: `${pendingLeaks}`,
+      text: 'Неподтверждённые слухи должны быть явно помечены и не смешиваться с новостями.',
+      href: '#/',
+      icon: CircleAlert,
+    },
+    {
+      title: 'Комьюнити',
+      value: recentThread ? recentThread.title : 'Создайте первый тред',
+      text: recentThread
+        ? `${recentThread.commentsCount || 0} комментариев`
+        : 'Вопросы игроков лучше жить в тредах и комментариях рядом с контекстом.',
+      href: recentThread ? `#/threads/${recentThread.slug}` : '#/',
+      icon: MessageSquare,
+    },
+  ];
+
+  return (
+    <section className="home-focus-panel" aria-label="Фокус NTE Meta">
+      {focusItems.map((item) => {
+        const Icon = item.icon;
+        return (
+          <a href={item.href} key={item.title}>
+            <Icon aria-hidden="true" />
+            <span>{item.title}</span>
+            <strong>{item.value}</strong>
+            <small>{item.text}</small>
+          </a>
+        );
+      })}
+    </section>
+  );
+}
+
 function CharacterCard({ character }: { character: Character }) {
   return (
     <article className="character-card">
@@ -1735,6 +1797,7 @@ function CharacterDetailPage({
   }
   const profile = character.profile || {
     faction: '',
+    arcType: '',
     birthday: '',
     biographyShort: character.shortDescription,
     biography: character.summary,
@@ -1782,11 +1845,15 @@ function CharacterDetailPage({
               <dt>День рождения</dt>
               <dd>{profile.birthday || 'Не указан'}</dd>
             </div>
-            <div>
-              <dt>Атрибут</dt>
-              <dd>{character.attribute}</dd>
-            </div>
-            <div>
+        <div>
+          <dt>Атрибут</dt>
+          <dd>{character.attribute}</dd>
+        </div>
+        <div>
+          <dt>Тип дуги</dt>
+          <dd>{profile.arcType || 'Не указан'}</dd>
+        </div>
+        <div>
               <dt>Редкость</dt>
               <dd>{character.rarity}</dd>
             </div>
@@ -3107,10 +3174,9 @@ function TierListsPage({
   user: User | null;
   setData: SiteDataSetter;
 }) {
-  const [kind, setKind] = useState<'base' | 'premium'>('base');
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorDirty, setEditorDirty] = useState(false);
-  const { tierlist, grouped } = groupTierItems(data, kind);
+  const { tierlist, grouped } = groupTierItems(data, 'base');
 
   return (
     <div className="page-stack">
@@ -3118,8 +3184,9 @@ function TierListsPage({
         <p className="eyebrow">S · A · B · C · D</p>
         <h1>Тир-листы</h1>
         <p>
-          Отдельно для base C0 и premium C6, чтобы F2P-игроки не сравнивали себя
-          с whale-условиями.
+          Единый редакционный список без разделения на C0/C6. Позиции отражают
+          практическую ценность персонажа для большинства игроков и требуют
+          ручного подтверждения редакцией.
         </p>
         {canManageContent(user, 'tierlists', 'edit') ? (
           <button
@@ -3130,27 +3197,11 @@ function TierListsPage({
               setEditorOpen(true);
             }}
           >
-            <Pencil aria-hidden="true" /> Редактировать тир-листы
-          </button>
-        ) : null}
-      </section>
-      <section className="segmented-control" aria-label="Тип тир-листа">
-        <button
-          className={kind === 'base' ? 'active' : ''}
-          type="button"
-          onClick={() => setKind('base')}
-        >
-          Base C0
+          <Pencil aria-hidden="true" /> Редактировать тир-лист
         </button>
-        <button
-          className={kind === 'premium' ? 'active' : ''}
-          type="button"
-          onClick={() => setKind('premium')}
-        >
-          Premium C6
-        </button>
-      </section>
-      <section className="content-band">
+      ) : null}
+    </section>
+    <section className="content-band">
         <SectionHeader
           eyebrow={`Патч ${tierlist?.patch || '1.0'} · обновлено ${tierlist ? formatDate(tierlist.updatedAt) : ''}`}
           title={tierlist?.title || 'Тир-лист'}
@@ -3168,7 +3219,7 @@ function TierListsPage({
       <EditorShell
         open={editorOpen}
         title="Редактировать тир-лист"
-        eyebrow="Base C0 / Premium C6"
+        eyebrow="Единый S · A · B · C · D"
         description="Перемещайте персонажей между тирами, меняйте позицию и заметки без отдельной CMS-страницы."
         dirty={editorDirty}
         onClose={() => {
@@ -4079,6 +4130,34 @@ function readGuideEditorDraft(key: string) {
   }
 }
 
+function formatGuideImportValue(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((item) => {
+          if (typeof item === 'string') return `- ${item}`;
+          if (item && typeof item === 'object') {
+            const record = item as Record<string, unknown>;
+            const title = record.name || record.title || record.label || 'Пункт';
+            const details = record.description || record.value || record.effect || '';
+            return `- **${String(title)}**${details ? ` — ${String(details)}` : ''}`;
+          }
+          return `- ${String(item)}`;
+        })
+        .join('\n');
+    }
+    if (parsed && typeof parsed === 'object') {
+      return Object.entries(parsed as Record<string, unknown>)
+        .map(([key, item]) => `- **${key}**: ${String(item)}`)
+        .join('\n');
+    }
+    return String(parsed);
+  } catch {
+    return value;
+  }
+}
+
 function GuideCreateFields({
   characters,
   initialCharacterId,
@@ -4211,6 +4290,12 @@ function AdminGuides({
   const [message, setMessage] = useState('');
   const [sectionImageUrl, setSectionImageUrl] = useState('');
   const [sectionImageAlt, setSectionImageAlt] = useState('');
+  const [guideImportSuggestions, setGuideImportSuggestions] = useState<
+    CharacterImportSuggestion[]
+  >([]);
+  const [guideImportDecisions, setGuideImportDecisions] = useState<
+    Record<string, 'accepted' | 'rejected'>
+  >({});
   const [guideMeta, setGuideMeta] = useState({
     title: guide?.title || '',
     summary: guide?.summary || '',
@@ -4531,6 +4616,88 @@ function AdminGuides({
     setSectionImageUrl('');
     setSectionImageAlt('');
     setMessage('Изображение добавлено в текущую секцию. Сохраните раздел.');
+  }
+
+  async function lookupGuideSources() {
+    if (!activeGuide) return;
+    setPending(true);
+    setMessage('');
+    const character = getGuideCharacter(data, activeGuide);
+    const result = await lookupGuideInfo({
+      guideId: activeGuide.id,
+      query: character?.name || activeGuide.title,
+    });
+    if (result.ok) {
+      setGuideImportSuggestions(result.data.suggestions || []);
+      setGuideImportDecisions({});
+      setMessage(result.data.message);
+    } else {
+      setMessage(result.error);
+    }
+    setPending(false);
+  }
+
+  function rejectGuideImportSuggestion(suggestion: CharacterImportSuggestion) {
+    setGuideImportDecisions((current) => ({
+      ...current,
+      [suggestion.id]: 'rejected',
+    }));
+  }
+
+  function applyGuideImportSuggestion(suggestion: CharacterImportSuggestion) {
+    const sectionTitle =
+      suggestion.field === 'guide.bestArcs'
+        ? 'Лучшие дуги'
+        : suggestion.field === 'tier'
+          ? 'TL;DR / короткий вывод'
+          : 'Импортированные заметки';
+    const sectionType =
+      suggestion.field === 'guide.bestArcs'
+        ? 'arcs'
+        : suggestion.field === 'tier'
+          ? 'summary'
+          : 'import';
+    const importMarkdown = [
+      `### ${suggestion.label}`,
+      formatGuideImportValue(suggestion.value),
+      '',
+      `Источник: [${suggestion.sourceName}](${suggestion.sourceUrl})`,
+      suggestion.note ? `Примечание: ${suggestion.note}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    setSections((current) => {
+      const existingIndex = current.findIndex(
+        (section) => section.type === sectionType || section.title === sectionTitle,
+      );
+      if (existingIndex >= 0) {
+        const next = [...current];
+        const existing = next[existingIndex];
+        next[existingIndex] = {
+          ...existing,
+          content: `${existing.content.trim()}\n\n${importMarkdown}`.trim(),
+        };
+        setSelectedSectionId(existing.id);
+        setMarkdown(next[existingIndex].content);
+        return next;
+      }
+      const nextSection: GuideSection = {
+        id: `custom-import-${Date.now()}`,
+        title: sectionTitle,
+        type: sectionType,
+        content: importMarkdown,
+        position: current.length + 1,
+      };
+      setSelectedSectionId(nextSection.id);
+      setMarkdown(nextSection.content);
+      return [...current, nextSection];
+    });
+    setGuideImportDecisions((current) => ({
+      ...current,
+      [suggestion.id]: 'accepted',
+    }));
+    setMessage(`Предложение «${suggestion.label}» добавлено в секции гайда.`);
   }
 
   async function createGuide(event: React.FormEvent<HTMLFormElement>) {
@@ -4928,6 +5095,69 @@ function AdminGuides({
         >
           <CheckCircle2 aria-hidden="true" /> Сохранить параметры гайда
         </button>
+      </section>
+
+      <section className="import-review-panel guide-import-panel" aria-label="Автоимпорт гайда">
+        <div>
+          <p className="eyebrow">Источники гайда</p>
+          <h3>Автозаполнение мета-блоков</h3>
+          <p>
+            Найдите внешние подсказки по дугам, тиру и заметкам гайда. Каждая строка
+            добавляется только после ручного подтверждения.
+          </p>
+        </div>
+        <button
+          className="ghost-button"
+          type="button"
+          disabled={pending}
+          onClick={lookupGuideSources}
+        >
+          <Search aria-hidden="true" /> Найти источники гайда
+        </button>
+        {guideImportSuggestions.length ? (
+          <div className="import-suggestion-list">
+            {guideImportSuggestions.map((suggestion) => {
+              const decision = guideImportDecisions[suggestion.id];
+              return (
+                <article
+                  className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
+                  key={suggestion.id}
+                >
+                  <div>
+                    <strong>{suggestion.label}</strong>
+                    <span>{suggestion.field}</span>
+                  </div>
+                  <p>{formatGuideImportValue(suggestion.value)}</p>
+                  <small>
+                    {suggestion.sourceName} · уверенность: {suggestion.confidence}
+                    {suggestion.note ? ` · ${suggestion.note}` : ''}
+                  </small>
+                  <div className="import-suggestion-actions">
+                    <a href={suggestion.sourceUrl} target="_blank" rel="noreferrer">
+                      Источник
+                    </a>
+                    <button
+                      className="icon-button success"
+                      type="button"
+                      aria-label={`Принять ${suggestion.label}`}
+                      onClick={() => applyGuideImportSuggestion(suggestion)}
+                    >
+                      <CheckCircle2 aria-hidden="true" />
+                    </button>
+                    <button
+                      className="icon-button"
+                      type="button"
+                      aria-label={`Отклонить ${suggestion.label}`}
+                      onClick={() => rejectGuideImportSuggestion(suggestion)}
+                    >
+                      <X aria-hidden="true" />
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : null}
       </section>
 
       <GuideTeamsEditor
@@ -5673,9 +5903,8 @@ function AdminTierlists({
   canPublish: boolean;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
-  const [kind, setKind] = useState<'base' | 'premium'>('base');
   const tierlist =
-    data.tierlists.find((item) => item.kind === kind) || data.tierlists[0];
+    data.tierlists.find((item) => item.kind === 'base') || data.tierlists[0];
   const [items, setItems] = useState(tierlist?.items || []);
   const [title, setTitle] = useState(tierlist?.title || '');
   const [patch, setPatch] = useState(tierlist?.patch || '1.0');
@@ -5862,7 +6091,7 @@ function AdminTierlists({
     setMessage('');
     const payload = {
       title,
-      tierlistType: kind,
+      tierlistType: tierlist.kind,
       patchVersion: patch,
       ...(canPublish ? { status } : {}),
       changelogJson: changelog
@@ -5911,7 +6140,7 @@ function AdminTierlists({
     return (
       <EmptyState
         title="Тир-листов пока нет"
-        text="Создайте base и premium записи через API, затем наполните их персонажами."
+        text="Создайте единый опубликованный тир-лист через API, затем наполните его персонажами."
       />
     );
   }
@@ -5921,26 +6150,10 @@ function AdminTierlists({
       <section className="admin-panel tierlist-editor-header">
         <div className="panel-title-row">
           <div>
-            <p className="eyebrow">Base C0 и Premium C6</p>
-            <h2>Редактор тир-листов</h2>
-          </div>
-          <div className="segmented-control" aria-label="Тип тир-листа">
-            <button
-              className={kind === 'base' ? 'active' : ''}
-              type="button"
-              onClick={() => setKind('base')}
-            >
-              Base C0
-            </button>
-            <button
-              className={kind === 'premium' ? 'active' : ''}
-              type="button"
-              onClick={() => setKind('premium')}
-            >
-              Premium C6
-            </button>
-          </div>
-        </div>
+        <p className="eyebrow">Единый редакционный список</p>
+        <h2>Редактор тир-листа</h2>
+      </div>
+    </div>
         <div className="tierlist-meta-fields">
           <label>
             Название
@@ -6411,9 +6624,13 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
             required
           />
           <div className="button-row">
-            <button className="ghost-button" value="cancel" formMethod="dialog">
-              Отменить
-            </button>
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => warningDialogRef.current?.close()}
+        >
+          Отменить
+        </button>
             <button className="primary-button" type="submit">
               <CircleAlert aria-hidden="true" /> Выдать предупреждение
             </button>

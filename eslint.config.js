@@ -19,7 +19,11 @@ export default [
       globals: {
         Response: 'readonly',
         URL: 'readonly',
+        AbortController: 'readonly',
+        clearTimeout: 'readonly',
         crypto: 'readonly',
+        fetch: 'readonly',
+        setTimeout: 'readonly',
         TextEncoder: 'readonly',
         btoa: 'readonly',
         atob: 'readonly',

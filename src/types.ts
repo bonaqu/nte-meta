@@ -103,6 +103,7 @@ export interface CharacterConsole {
 
 export interface CharacterProfile {
   faction: string;
+  arcType: string;
   birthday: string;
   biographyShort: string;
   biography: string;
@@ -270,6 +271,34 @@ export interface CommunityThread {
   updatedAt?: string;
   commentsCount?: number;
   score?: number;
+}
+
+export interface CharacterImportSource {
+  id: string;
+  name: string;
+  url: string;
+  trust: 'official' | 'high' | 'medium' | 'low';
+  status: 'ok' | 'partial' | 'blocked' | 'failed';
+  message?: string;
+}
+
+export interface CharacterImportSuggestion {
+  id: string;
+  field: string;
+  label: string;
+  value: string;
+  sourceName: string;
+  sourceUrl: string;
+  confidence: 'high' | 'medium' | 'low';
+  note?: string;
+}
+
+export interface CharacterImportLookupResult {
+  found: boolean;
+  message: string;
+  sources: CharacterImportSource[];
+  suggestions: CharacterImportSuggestion[];
+  fields: Record<string, string>;
 }
 
 export interface Comment {

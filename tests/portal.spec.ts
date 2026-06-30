@@ -118,7 +118,7 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(page.getByText(/доверие: средний/i)).toBeVisible();
   });
 
-  test('отряды и ротации находятся внутри гайда, тир-листы переключаются', async ({
+test('отряды и ротации находятся внутри гайда, тир-лист единый', async ({
     page,
   }) => {
     await page.goto('/#/teams');
@@ -145,13 +145,15 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(page.locator('a[href="#/teams"]')).toHaveCount(0);
     await expect(page.locator('a[href="#/rotations"]')).toHaveCount(0);
 
-    await page.goto('/#/tierlists');
-    await expect(page.getByText('Base C0 тир-лист')).toBeVisible();
-    await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Premium C6' }).click();
-    await expect(page.getByText('Premium C6 тир-лист')).toBeVisible();
-    await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
-  });
+  await page.goto('/#/tierlists');
+  await expect(
+    page.getByRole('heading', { name: 'Тир-листы', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('Единый редакционный список')).toBeVisible();
+  await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Premium C6' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Base C0' })).toHaveCount(0);
+});
 
   test('авторизация отделена от CMS, отдельного пустого комьюнити-раздела нет', async ({
     page,

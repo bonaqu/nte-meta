@@ -362,7 +362,7 @@ test.describe('NTE Meta Worker API', () => {
     const tierlist = await owner.post('/api/tierlists', {
       data: {
         slug: `test-tier-${runId}`,
-        title: 'Тестовый C0 тир-лист',
+        title: 'Тестовый единый тир-лист',
         tierlistType: 'base',
         patchVersion: 'test',
         status: 'published',
@@ -475,28 +475,50 @@ test.describe('NTE Meta Worker API', () => {
         })
       ).status(),
     ).toBe(403);
-    expect(
-      (
-        await member.post('/api/character-import/lookup', {
-          data: { query: 'Хотори' },
-        })
-      ).status(),
-    ).toBe(403);
+  expect(
+    (
+      await member.post('/api/character-import/lookup', {
+        data: { query: 'Хотори' },
+      })
+    ).status(),
+  ).toBe(403);
+  expect(
+    (
+      await member.post('/api/guide-import/lookup', {
+        data: { query: 'Хотори' },
+      })
+    ).status(),
+  ).toBe(403);
 
-    const ownerLookup = await owner.post('/api/character-import/lookup', {
-      data: { query: 'Хотори' },
-    });
-    expect(ownerLookup.ok()).toBeTruthy();
-    await expect(ownerLookup.json()).resolves.toMatchObject({
-      data: {
-        found: false,
-        fields: {},
-      },
-    });
+  const ownerLookup = await owner.post('/api/character-import/lookup', {
+    data: { query: 'Хотори' },
+  });
+  expect(ownerLookup.ok()).toBeTruthy();
+  const ownerLookupJson = await ownerLookup.json();
+  expect(ownerLookupJson.data.sources.length).toBeGreaterThan(0);
+  expect(Array.isArray(ownerLookupJson.data.suggestions)).toBeTruthy();
+  expect(ownerLookupJson.data.suggestions.length).toBeGreaterThan(0);
+  expect(
+    ownerLookupJson.data.suggestions.some(
+      (suggestion: { field: string }) => suggestion.field === 'profile.voiceActors',
+    ),
+  ).toBeTruthy();
 
-    await owner.patch(`/api/users/${memberId}/role`, {
-      data: { role: 'editor' },
-    });
+  const guideLookup = await owner.post('/api/guide-import/lookup', {
+    data: { query: 'Хотори' },
+  });
+  expect(guideLookup.ok()).toBeTruthy();
+  const guideLookupJson = await guideLookup.json();
+  expect(guideLookupJson.data.sources.length).toBeGreaterThan(0);
+  expect(Array.isArray(guideLookupJson.data.suggestions)).toBeTruthy();
+  for (const suggestion of guideLookupJson.data.suggestions) {
+    expect(suggestion.field === 'tier' || suggestion.field.startsWith('guide.')).toBeTruthy();
+    expect(suggestion.sourceUrl).toContain('https://');
+  }
+
+  await owner.patch(`/api/users/${memberId}/role`, {
+    data: { role: 'editor' },
+  });
     const editorCharacter = await member.post('/api/characters', {
       data: {
         slug: `editor-character-${runId}`,
@@ -940,7 +962,7 @@ test.describe('NTE Meta Worker API', () => {
       .getByRole('navigation', { name: 'Основная навигация' })
       .getByRole('link', { name: 'Тир-листы', exact: true })
       .click();
-    await page.getByRole('button', { name: 'Редактировать тир-листы' }).click();
+    await page.getByRole('button', { name: 'Редактировать тир-лист' }).click();
     await expect(
       page.getByRole('heading', { name: 'Редактировать тир-лист', level: 1 }),
     ).toBeVisible();
@@ -1112,11 +1134,11 @@ test.describe('NTE Meta Worker API', () => {
     await mainInfo.getByLabel('Оригинальное имя').fill('UI Character');
     await mainInfo.getByLabel('Адрес страницы (slug)').fill(uiCharacterSlug);
     await mainInfo.getByLabel('Фракция').fill('Редакционный тест');
+    await mainInfo.getByLabel('Тип дуги').fill('Тестовая дуга');
     await mainInfo.getByLabel('Атрибут').fill('Тест');
     await mainInfo.getByLabel('Основная роль').fill('DD');
     await mainInfo.getByLabel('Роли в отряде, через запятую').fill('DD, тест');
-    await mainInfo.getByLabel('Base C0 тир').selectOption('D');
-    await mainInfo.getByLabel('Premium C6 тир').selectOption('D');
+    await mainInfo.getByLabel('Тир').selectOption('D');
     await mainInfo
       .getByLabel('URL иконки')
       .fill('/assets/characters/Hotori.webp');

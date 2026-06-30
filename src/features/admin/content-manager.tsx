@@ -672,10 +672,10 @@ export function AdminCharactersManager({
         { name: 'role', label: 'Роль', kind: 'text', required: true },
         { name: 'type', label: 'Тип', kind: 'text', required: true },
         { name: 'attribute', label: 'Атрибут', kind: 'text', required: true },
-        { name: 'tier', label: 'Base C0 тир', kind: 'select', options: tiers },
+        { name: 'tier', label: 'Тир', kind: 'select', options: tiers },
         {
           name: 'premiumTier',
-          label: 'Premium C6 тир',
+          label: 'Внутренний legacy-тир',
           kind: 'select',
           options: tiers,
         },

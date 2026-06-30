@@ -3,6 +3,7 @@ import type {
   AdminUser,
   AuditLogEntry,
   AppSettings,
+  CharacterImportLookupResult,
   Comment,
   CommunityThread,
   EditorPermissions,
@@ -346,14 +347,16 @@ export async function loadSystemStatus() {
 }
 
 export async function lookupCharacterInfo(query: string) {
-  return request<{
-    found: boolean;
-    message: string;
-    sources: Array<{ name: string; url?: string; trust: string }>;
-    fields: Record<string, string>;
-  }>('/api/character-import/lookup', {
+  return request<CharacterImportLookupResult>('/api/character-import/lookup', {
     method: 'POST',
     body: JSON.stringify({ query }),
+  });
+}
+
+export async function lookupGuideInfo(payload: { guideId?: string; query?: string }) {
+  return request<CharacterImportLookupResult>('/api/guide-import/lookup', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
 

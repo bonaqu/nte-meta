@@ -17,7 +17,7 @@ const publicSections = [
     'Гайды',
     'Практические гайды NTE Meta: ротации, билды, команды и ошибки.',
   ],
-  ['tierlists', 'Тир-листы', 'Base C0 и Premium C6 тир-листы NTE Meta.'],
+  ['tierlists', 'Тир-листы', 'Единый редакционный тир-лист NTE Meta: S, A, B, C, D.'],
 ];
 
 const utilityPages = [

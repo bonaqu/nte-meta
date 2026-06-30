@@ -625,7 +625,7 @@ const teams: Team[] = [
 const tierlists: TierList[] = [
   {
     id: 'tier-base-10',
-    title: 'Base C0 тир-лист',
+    title: 'Единый тир-лист NTE Meta',
     kind: 'base',
     patch: '1.0',
     updatedAt: '2026-06-02',
@@ -640,22 +640,6 @@ const tierlists: TierList[] = [
         character.id === 'chaos'
           ? 'Нет подтвержденной меты'
           : 'Редакционная оценка NTE Meta',
-    })),
-  },
-  {
-    id: 'tier-premium-10',
-    title: 'Premium C6 тир-лист',
-    kind: 'premium',
-    patch: '1.0',
-    updatedAt: '2026-06-02',
-    changelog: [
-      'Добавлен отдельный premium view',
-      'Персонажи с сильным scaling подняты отдельно от base',
-    ],
-    items: characterBase.map((character) => ({
-      characterId: character.id,
-      tier: character.premiumTier,
-      note: 'Оценка предполагает высокий уровень вложений и оптимальные команды',
     })),
   },
 ];

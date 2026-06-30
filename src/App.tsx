@@ -4076,50 +4076,101 @@ function AuthPanel({ setUser }: { setUser: (user: User | null) => void }) {
 }
 
 function AdminDashboard({ data }: { data: SiteData }) {
+  const publishedNews = data.news.filter((item) => item.publishStatus !== 'draft');
+  const approvedLeaks = data.leaks.filter((item) => item.approved);
+  const pendingLeaks = data.leaks.filter((item) => !item.approved);
+  const dashboardMetrics = [
+    { label: 'Гайды', value: data.guides.length, detail: 'редактируются inline' },
+    { label: 'Персонажи', value: data.characters.length, detail: 'lore/profile база' },
+    { label: 'Публикации', value: publishedNews.length + approvedLeaks.length, detail: 'новости и сливы' },
+    { label: 'Очередь сливов', value: pendingLeaks.length, detail: 'требуют проверки' },
+  ];
+  const quickActions = [
+    {
+      href: '#/guides',
+      icon: <BookOpen aria-hidden="true" />,
+      title: 'Гайды',
+      text: 'Добавление, секции, команды и ротации внутри гайдов.',
+    },
+    {
+      href: '#/characters',
+      icon: <Gamepad2 aria-hidden="true" />,
+      title: 'Персонажи',
+      text: 'Лор, профиль, озвучка, материалы и способности.',
+    },
+    {
+      href: '#/tierlists',
+      icon: <Star aria-hidden="true" />,
+      title: 'Тир-лист',
+      text: 'Единый список S-D с drag-and-drop порядком.',
+    },
+    {
+      href: '#/',
+      icon: <Newspaper aria-hidden="true" />,
+      title: 'Новости и сливы',
+      text: 'Публикуются на главной и открываются detail-страницами.',
+    },
+  ];
+
   return (
-    <div className="admin-grid">
-      <MetricsStrip data={data} />
-      <div className="admin-panel">
-        <h2>Быстрые переходы к контенту</h2>
-        <div className="button-row">
-          <a className="ghost-button" href="#/guides">
-            <BookOpen aria-hidden="true" /> Гайды
-          </a>
-          <a className="ghost-button" href="#/characters">
-            <Gamepad2 aria-hidden="true" /> Персонажи
-          </a>
-          <a className="ghost-button" href="#/tierlists">
-            <Star aria-hidden="true" /> Тир-лист
-          </a>
-          <a className="ghost-button" href="#/">
-            <Newspaper aria-hidden="true" /> Новости и сливы
-          </a>
+    <div className="admin-dashboard">
+      <section className="admin-command-hero" aria-labelledby="admin-dashboard-title">
+        <div>
+          <p className="eyebrow">Системная панель</p>
+          <h2 id="admin-dashboard-title">Админка для контроля, не для контентной рутины</h2>
+          <p>
+            Контент создаётся прямо в публичных разделах, а здесь остаются
+            пользователи, роли, модерация, источники, аудит и состояние API/D1.
+          </p>
         </div>
-        <p>
-          Создание и редактирование контента теперь находится в самих публичных
-          разделах. Эта панель оставлена для модерации, пользователей, источников
-          и системных настроек.
-        </p>
-      </div>
-      <div className="admin-panel">
-        <h2>Что видят роли</h2>
-        <ul>
-          <li>user: профиль, комментарии, оценки.</li>
-          <li>
-            editor: inline-кнопки создания и редактирования разрешённого контента.
-          </li>
-          <li>
-            moderator: скрытие комментариев, предупреждения, базовая модерация.
-          </li>
-          <li>
-            admin: пользователи, роли, источники, настройки и системный статус.
-          </li>
-          <li>
-            owner: полный доступ, роли admin/owner, настройки и удаление
-            пользователей.
-          </li>
+        <div className="admin-command-status" aria-label="Ключевые зоны ответственности">
+          <span><ShieldCheck aria-hidden="true" /> Модерация</span>
+          <span><Users aria-hidden="true" /> Роли</span>
+          <span><Settings aria-hidden="true" /> Система</span>
+        </div>
+      </section>
+      <MetricsStrip data={data} />
+      <section className="admin-metric-grid" aria-label="Сводка контента">
+        {dashboardMetrics.map((metric) => (
+          <article key={metric.label}>
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+            <small>{metric.detail}</small>
+          </article>
+        ))}
+      </section>
+      <section className="admin-panel admin-action-panel">
+        <div className="panel-title-row">
+          <div>
+            <p className="eyebrow">Inline editing</p>
+            <h2>Быстрые переходы к контенту</h2>
+          </div>
+        </div>
+        <div className="admin-action-grid">
+          {quickActions.map((action) => (
+            <a className="admin-action-card" href={action.href} key={action.href}>
+              {action.icon}
+              <strong>{action.title}</strong>
+              <span>{action.text}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+      <section className="admin-panel admin-role-panel">
+        <div className="panel-title-row">
+          <div>
+            <p className="eyebrow">Права доступа</p>
+            <h2>Что видят роли</h2>
+          </div>
+        </div>
+        <ul className="admin-role-list">
+          <li><strong>User</strong><span>профиль, комментарии и оценки.</span></li>
+          <li><strong>Editor</strong><span>inline-кнопки разрешённого контента.</span></li>
+          <li><strong>Moderator</strong><span>модерация комментариев и предупреждения.</span></li>
+          <li><strong>Admin</strong><span>пользователи, роли, источники и настройки.</span></li>
+          <li><strong>Owner</strong><span>полный доступ и удаление пользователей.</span></li>
         </ul>
-      </div>
+      </section>
     </div>
   );
 }
@@ -6638,11 +6689,14 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
           </div>
         </form>
       </dialog>
-      <dialog
-        className="confirm-dialog"
-        ref={warningDialogRef}
-        onClose={() => setWarningTarget(null)}
-      >
+        <dialog
+          className="confirm-dialog"
+          ref={warningDialogRef}
+          onClose={(event) => {
+            event.currentTarget.querySelector('form')?.reset();
+            setWarningTarget(null);
+          }}
+        >
         <form onSubmit={submitWarning}>
           <h2>Предупреждение пользователю</h2>
           <p>
@@ -6666,7 +6720,11 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
         >
           Отменить
         </button>
-            <button className="primary-button" type="submit">
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={Boolean(warningTarget && actionId === warningTarget.id)}
+            >
               <CircleAlert aria-hidden="true" /> Выдать предупреждение
             </button>
           </div>

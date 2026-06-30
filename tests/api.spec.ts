@@ -1088,14 +1088,59 @@ test.describe('NTE Meta Worker API', () => {
       page.getByRole('link', { name: 'Открыть админку' }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Выйти' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Вход в NTE Meta' }),
-    ).toBeVisible();
-  });
+  await expect(
+    page.getByRole('heading', { name: 'Вход в NTE Meta' }),
+  ).toBeVisible();
+});
 
-  test('owner создаёт персонажа inline и открывает созданную страницу', async ({
-    page,
-  }) => {
+test('owner отменяет предупреждение пользователю без зависшей модалки', async ({
+  page,
+}) => {
+  const moderatedCommentBody = `Комментарий для warning cancel ${runId}`;
+  const comment = await owner.post('/api/comments', {
+    data: {
+      targetType: 'site',
+      targetId: 'community',
+      body: moderatedCommentBody,
+    },
+  });
+  expect(comment.status()).toBe(201);
+
+  await page.goto('/#/profile');
+  await page.getByLabel('Логин').fill(ownerUsername);
+  await page.getByLabel('Пароль').fill(ownerPassword);
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Профиль', level: 1 }),
+  ).toBeVisible();
+
+  await page.goto('/#/admin/comments');
+  const commentCard = page
+    .locator('.comment-card')
+    .filter({ hasText: moderatedCommentBody });
+  await expect(commentCard).toBeVisible();
+  await commentCard.getByRole('button', { name: 'Предупредить' }).click();
+  const warningDialog = page.locator('dialog[open]').filter({
+    has: page.getByRole('heading', { name: 'Предупреждение пользователю' }),
+  });
+  await expect(warningDialog).toBeVisible();
+  await warningDialog
+    .getByLabel('Причина')
+    .fill('Проверяем, что отмена предупреждения закрывает окно.');
+  await warningDialog.getByRole('button', { name: 'Отменить' }).click();
+  await expect(warningDialog).toBeHidden();
+
+  await commentCard.getByRole('button', { name: 'Предупредить' }).click();
+  const reopenedWarningDialog = page.locator('dialog[open]').filter({
+    has: page.getByRole('heading', { name: 'Предупреждение пользователю' }),
+  });
+  await expect(reopenedWarningDialog.getByLabel('Причина')).toHaveValue('');
+  await reopenedWarningDialog.getByRole('button', { name: 'Отменить' }).click();
+});
+
+test('owner создаёт персонажа inline и открывает созданную страницу', async ({
+  page,
+}) => {
     const uiCharacterSlug = `ui-character-${runId}`;
     const uiCharacterName = `UI персонаж ${runId}`;
     const uiCharacterGuideSlug = `ui-character-guide-${runId}`;

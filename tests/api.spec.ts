@@ -1180,7 +1180,7 @@ test('owner создаёт персонажа inline и открывает со�
     await mainInfo.getByLabel('Адрес страницы (slug)').fill(uiCharacterSlug);
     await mainInfo.getByLabel('Фракция').fill('Редакционный тест');
     await mainInfo.getByLabel('Тип дуги').fill('Тестовая дуга');
-    await mainInfo.getByLabel('Атрибут').fill('Тест');
+    await mainInfo.getByLabel('Тип эспера').fill('Тест');
     await mainInfo.getByLabel('Основная роль').fill('DD');
     await mainInfo.getByLabel('Роли в отряде, через запятую').fill('DD, тест');
     await mainInfo.getByLabel('Тир').selectOption('D');

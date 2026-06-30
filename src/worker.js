@@ -1181,6 +1181,7 @@ function characterProfileSelect() {
     character_profiles.faction AS profile_faction,
     character_profiles.arc_type AS profile_arc_type,
     character_profiles.birthday AS profile_birthday,
+    character_profiles.release_date AS profile_release_date,
     character_profiles.biography_short AS profile_biography_short,
     character_profiles.biography_markdown AS profile_biography_markdown,
     character_profiles.trivia_markdown AS profile_trivia_markdown,
@@ -2088,7 +2089,13 @@ function lineMatchesCharacter(line, character) {
   );
 }
 
-function characterImportSources(slug) {
+function characterImportSources(slug, character = {}) {
+  const fandomTitle = encodeURIComponent(
+    String(character.originalName || character.name || slug || '')
+      .trim()
+      .replace(/\s+/g, '_') || slug,
+  );
+
   return [
     {
       id: 'ntewiki-ru',
@@ -2096,13 +2103,14 @@ function characterImportSources(slug) {
       trust: 'high',
       url: `https://ntewiki.org/ru/characters/${slug}/`,
       parser: parseNteWikiImport,
+      extractImages: true,
     },
     {
       id: 'ntewiki-characters-index',
       name: 'NTE Wiki RU: персонажи',
       trust: 'high',
       url: 'https://ntewiki.org/ru/characters/',
-      referenceOnly: true,
+      parser: parseNteWikiCharactersIndexImport,
     },
     {
       id: 'ntewiki-arcs-ru',
@@ -2117,6 +2125,7 @@ function characterImportSources(slug) {
       trust: 'high',
       url: `https://genshin-builds.com/ru/neverness-to-everness/characters/${slug}`,
       parser: parseGenshinBuildsImport,
+      extractImages: true,
     },
     {
       id: 'icy-veins-tier',
@@ -2166,6 +2175,14 @@ function characterImportSources(slug) {
       trust: 'low',
       url: 'https://neverness-to-everness.fandom.com/ru/wiki/%D0%9F%D0%B5%D1%80%D1%81%D0%BE%D0%BD%D0%B0%D0%B6%D0%B8',
       referenceOnly: true,
+    },
+    {
+      id: 'fandom-character',
+      name: 'Fandom character profile',
+      trust: 'medium',
+      url: `https://neverness-to-everness.fandom.com/wiki/${fandomTitle}`,
+      parser: parseFandomCharacterImport,
+      extractImages: true,
     },
     {
       id: 'btva-en',
@@ -2410,7 +2427,10 @@ async function fetchImportSource(source, character) {
     }
     const html = await response.text();
     const text = htmlToPlainText(html.slice(0, IMPORT_MAX_HTML_BYTES));
-    const suggestions = source.parser(text, source, character).filter(Boolean);
+    const suggestions = [
+      ...source.parser(text, source, character).filter(Boolean),
+      ...extractImportImages(html, source),
+    ];
     return {
       ...source,
       status: suggestions.length ? 'ok' : 'partial',
@@ -2438,7 +2458,7 @@ function parseNteWikiImport(text, source) {
   const lines = compactImportLines(text);
   const suggestions = [
     makeImportSuggestion('rarity', 'Редкость', (lines.find((line) => /^Ранг\s+[SA]/i.test(line)) || '').match(/Ранг\s+([SA])/i)?.[1] || '', source, 'high'),
-    makeImportSuggestion('attribute', 'Атрибут', nextImportLine(lines, 'Элемент'), source, 'high'),
+    makeImportSuggestion('attribute', 'Тип эспера', nextImportLine(lines, 'Элемент'), source, 'high'),
     makeImportSuggestion('profile.arcType', 'Тип дуги', nextImportLine(lines, 'Арк'), source, 'high'),
     makeImportSuggestion('profile.birthday', 'День рождения', nextImportLine(lines, 'День рождения'), source, 'high'),
     makeImportSuggestion('profile.faction', 'Фракция', nextImportLine(lines, 'Фракция'), source, 'high'),
@@ -2494,6 +2514,69 @@ function parseNteWikiImport(text, source) {
   return suggestions;
 }
 
+function parseNteWikiCharactersIndexImport(text, source, character) {
+  const lines = compactImportLines(text);
+  const candidates = characterNameCandidates(character);
+  const line = lines.find((item) => {
+    const normalized = normalizeImportSearch(item);
+    return candidates.some(
+      (candidate) =>
+        normalized === candidate ||
+        normalized.startsWith(`${candidate} `) ||
+        normalized.includes(` ${candidate} `),
+    );
+  });
+  if (!line) return [];
+
+  const esperTypes = ['Хаос', 'Чары', 'Психея', 'Психика', 'Космос', 'Лакшана', 'Анима'];
+  const arcTypes = ['Твёрдое', 'Твердое', 'Жидкость', 'Бозе', 'Газ', 'Плазма', 'Гибридный', 'Конденсат'];
+  const knownRoles = [
+    'Перенаправление урона',
+    'Усиление разрушения',
+    'Урон со временем',
+    'Взрывной урон',
+    'Усиление урона',
+    'Последующая атака',
+    'Мгновенный цикл',
+    'Основной УВС',
+    'Выживание',
+    'Управление',
+    'Исцеление',
+    'Усиление',
+    'Контроль',
+    'Щит',
+    'Урон',
+  ];
+  const compactLine = line.replace(/\s+/g, ' ').trim();
+  const attribute = esperTypes.find((item) => compactLine.includes(item)) || '';
+  const arcType = arcTypes.find((item) => compactLine.includes(item)) || '';
+  let roleText = compactLine;
+  const matchedName = [character.name, character.originalName, character.slug]
+    .filter(Boolean)
+    .sort((a, b) => String(b).length - String(a).length)
+    .find((name) =>
+      normalizeImportSearch(compactLine).startsWith(normalizeImportSearch(String(name))),
+    );
+  if (matchedName) roleText = roleText.slice(String(matchedName).length).trim();
+  if (attribute) roleText = roleText.split(attribute)[0].trim();
+  const roleTags = knownRoles.filter((role) =>
+    normalizeImportSearch(roleText).includes(normalizeImportSearch(role)),
+  );
+
+  return [
+    makeImportSuggestion(
+      'profile.roleTags',
+      'Роли из индекса персонажей',
+      roleTags,
+      source,
+      'high',
+      'Индекс NTE Wiki полезен для первичного набора тегов роли; подтвердите каждую строку перед публикацией.',
+    ),
+    makeImportSuggestion('attribute', 'Тип эспера', attribute, source, 'high'),
+    makeImportSuggestion('profile.arcType', 'Тип дуги', arcType, source, 'high'),
+  ];
+}
+
 function parseGenshinBuildsImport(text, source, character) {
   const lines = compactImportLines(text);
   const suggestions = [];
@@ -2505,7 +2588,7 @@ function parseGenshinBuildsImport(text, source, character) {
   if (profileLine) {
     const parts = profileLine.split(/\s{1,}/).filter(Boolean);
     suggestions.push(
-      makeImportSuggestion('attribute', 'Атрибут', parts[0], source, 'medium'),
+    makeImportSuggestion('attribute', 'Тип эспера', parts[0], source, 'medium'),
       makeImportSuggestion('profile.faction', 'Фракция', parts.slice(2).join(' '), source, 'medium'),
       makeImportSuggestion('guide.bestArcs', 'Гайд: лучшие дуги', parts[1], source, 'low', 'Предложение для гайда, требует редакционной проверки.'),
     );
@@ -2704,6 +2787,191 @@ function parseOfficialImport(_text, source) {
   return [];
 }
 
+function translateEsperType(value) {
+  const normalized = normalizeImportSearch(value);
+  const map = [
+    ['cosmos', 'Космос'],
+    ['chaos', 'Хаос'],
+    ['psyche', 'Психика'],
+    ['anima', 'Анима'],
+    ['lakshana', 'Лакшана'],
+    ['incantation', 'Инкантация'],
+  ];
+  return map.find(([key]) => normalized.includes(key))?.[1] || '';
+}
+
+function translateArcType(value) {
+  const normalized = normalizeImportSearch(value);
+  const map = [
+    ['solid', 'Твёрдое'],
+    ['liquid', 'Жидкость'],
+    ['gas', 'Газ'],
+    ['plasma', 'Плазма'],
+    ['condensate', 'Конденсат'],
+  ];
+  return map.find(([key]) => normalized.includes(key))?.[1] || '';
+}
+
+function translateCombatRole(value) {
+  const normalized = normalizeImportSearch(value);
+  const roles = [
+    ['main dps', 'Основной ДД'],
+    ['sub dps', 'Sub DD'],
+    ['damage', 'Урон'],
+    ['dot', 'Периодический урон'],
+    ['buff', 'Баффер'],
+    ['support', 'Поддержка'],
+    ['healer', 'Хилер'],
+    ['control', 'Контроль'],
+    ['sustain', 'Sustain'],
+  ];
+  return roles
+    .filter(([key]) => normalized.includes(key))
+    .map(([, label]) => label);
+}
+
+function firstLineAfter(lines, label) {
+  const index = lines.findIndex(
+    (line) => normalizeImportSearch(line) === normalizeImportSearch(label),
+  );
+  return index >= 0 ? lines[index + 1] || '' : '';
+}
+
+function parseFandomAbilities(lines) {
+  const abilityLabels = [
+    ['Support Skill', 'Навык поддержки'],
+    ['Basic Attack', 'Базовая атака'],
+    ['Ultimate', 'Сверхспособность'],
+    ['Passive', 'Пассивный навык'],
+    ['Life Skill', 'Повседневный навык'],
+    ['Skill', 'Навык'],
+  ];
+  const abilities = [];
+
+  for (const line of lines) {
+    const normalized = normalizeImportSearch(line);
+    const label = abilityLabels.find(([sourceLabel]) =>
+      normalized.startsWith(normalizeImportSearch(sourceLabel)),
+    );
+    if (!label) continue;
+
+    const [sourceLabel, type] = label;
+    const rest = line
+      .replace(new RegExp(`^${escapeRegExp(sourceLabel)}\\s*-?\\s*`, 'i'), '')
+      .trim();
+    if (!rest || /^(type|name|description|total cost)$/i.test(rest)) continue;
+
+    const parts = rest.split(/\s{2,}/).filter(Boolean);
+    const name = parts[0] || rest.slice(0, 80);
+    const description = parts.slice(1).join(' ') || rest;
+
+    abilities.push({
+      id: crypto.randomUUID(),
+      name,
+      type,
+      iconUrl: '',
+      description,
+    });
+  }
+
+  return abilities.slice(0, 8);
+}
+
+function parseFandomCharacterImport(text, source, character) {
+  const lines = compactImportLines(text);
+  const suggestions = [];
+  const candidates = characterNameCandidates(character);
+  const joined = lines.join(' ');
+  if (!candidates.some((candidate) => normalizeImportSearch(joined).includes(candidate))) {
+    return [];
+  }
+
+  const birthday = firstLineAfter(lines, 'Birthday');
+  const releaseDate = firstLineAfter(lines, 'Release Date');
+  const profileWindow = lines
+    .slice(0, Math.min(lines.length, 120))
+    .join(' ');
+  const esperType = translateEsperType(profileWindow);
+  const arcType = translateArcType(profileWindow);
+  const roleTags = translateCombatRole(profileWindow);
+  const abilities = parseFandomAbilities(lines);
+
+  suggestions.push(
+    makeImportSuggestion('attribute', 'Тип эспера', esperType, source, 'medium'),
+    makeImportSuggestion('profile.arcType', 'Тип дуги', arcType, source, 'medium'),
+    makeImportSuggestion('profile.birthday', 'День рождения', birthday, source, 'medium'),
+    makeImportSuggestion(
+      'profile.releaseDate',
+      'Дата релиза',
+      releaseDate,
+      source,
+      'medium',
+    ),
+    makeImportSuggestion(
+      'profile.roleTags',
+      'Роли персонажа',
+      roleTags,
+      source,
+      'medium',
+    ),
+    makeImportSuggestion(
+      'profile.abilities',
+      'Навыки персонажа',
+      abilities,
+      source,
+      'medium',
+      'Проверьте названия и описания навыков по игре перед публикацией.',
+    ),
+  );
+
+  return suggestions.filter(Boolean);
+}
+
+function extractImportImages(html, source) {
+  if (!source.extractImages) return [];
+  const images = [];
+  const patterns = [
+    /<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["']/gi,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["']/gi,
+    /(https:\/\/static\.wikia\.nocookie\.net\/neverness-to-everness\/images\/[^"'<>\s)]+)/gi,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of String(html || '').matchAll(pattern)) {
+      const url = decodeHtmlEntities(match[1] || match[0])
+        .replace(/\\u0026/g, '&')
+        .replace(/&amp;/g, '&');
+      if (
+        url &&
+        !images.includes(url) &&
+        !/Icon|Logo|Fandom|App|Badge/i.test(url)
+      ) {
+        images.push(url);
+      }
+    }
+  }
+
+  const bestImage = images[0] || '';
+  return [
+    makeImportSuggestion(
+      'imageUrl',
+      'Карточка персонажа',
+      bestImage,
+      source,
+      'medium',
+      'Проверьте качество, кадрирование и права перед сохранением.',
+    ),
+    makeImportSuggestion(
+      'splashUrl',
+      'Splash персонажа',
+      bestImage,
+      source,
+      'medium',
+      'Можно использовать как временный splash, если изображение подходит.',
+    ),
+  ].filter(Boolean);
+}
+
 function buildKnownVoiceMediaSource(character) {
   const knownSources = new Map([
     [
@@ -2832,7 +3100,11 @@ async function handleCharacterImportLookup(request, env) {
     });
   }
   const sourceResults = await Promise.all(
-    characterImportSources(slug).map((source) =>
+    characterImportSources(slug, {
+      name: character.name || query,
+      originalName: character.original_name || query,
+      slug,
+    }).map((source) =>
       fetchImportSource(source, {
         name: character.name || query,
         originalName: character.original_name || query,
@@ -2937,7 +3209,7 @@ async function handleGuideImportLookup(request, env) {
     slug,
   };
   const sourceResults = await Promise.all(
-    characterImportSources(slug).map((source) =>
+    characterImportSources(slug, importCharacter).map((source) =>
       fetchImportSource(source, importCharacter),
     ),
   );
@@ -3140,6 +3412,7 @@ function serializeCharacter(row) {
       faction: row.profile_faction || '',
       arcType: row.profile_arc_type || '',
       birthday: row.profile_birthday || '',
+      releaseDate: row.profile_release_date || '',
       biographyShort:
         row.profile_biography_short || row.short_description || '',
       biography: row.profile_biography_markdown || row.summary || '',
@@ -3594,6 +3867,7 @@ function normalizeCharacterProfile(value) {
     faction: text(value.faction, 160),
     arcType: text(value.arcType, 120),
     birthday: text(value.birthday, 80),
+    releaseDate: text(value.releaseDate, 80),
     biographyShort: text(value.biographyShort, 1000),
     biography: text(value.biography, 60000),
     trivia: text(value.trivia, 60000),
@@ -3695,17 +3969,18 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
     statements.push(
       env.DB.prepare(
         `INSERT INTO character_profiles (
-          character_id, faction, arc_type, birthday, biography_short,
-          biography_markdown, trivia_markdown, role_tags_json,
-          voice_actors_json, materials_json, base_stats_json,
-          abilities_json, skins_json, friendship_json, gifts_json,
-          voice_lines_json, awakenings_json, consoles_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(character_id) DO UPDATE SET
+        character_id, faction, arc_type, birthday, release_date, biography_short,
+        biography_markdown, trivia_markdown, role_tags_json,
+        voice_actors_json, materials_json, base_stats_json,
+        abilities_json, skins_json, friendship_json, gifts_json,
+        voice_lines_json, awakenings_json, consoles_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(character_id) DO UPDATE SET
         faction = excluded.faction,
         arc_type = excluded.arc_type,
         birthday = excluded.birthday,
-           biography_short = excluded.biography_short,
+        release_date = excluded.release_date,
+        biography_short = excluded.biography_short,
            biography_markdown = excluded.biography_markdown,
            trivia_markdown = excluded.trivia_markdown,
            role_tags_json = excluded.role_tags_json,
@@ -3725,6 +4000,7 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
         profile.faction,
         profile.arcType,
         profile.birthday,
+        profile.releaseDate,
         profile.biographyShort,
         profile.biography,
         profile.trivia,

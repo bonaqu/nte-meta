@@ -49,7 +49,7 @@ import {
   SkeletonGrid,
   StatusBanner,
 } from './components/ui-state';
-import { seedData } from './data/seed';
+import { emptySiteData, seedData } from './data/seed';
 import {
   changePassword,
   createComment,
@@ -240,7 +240,10 @@ function useHashRoute() {
 
 function App() {
   const route = useHashRoute();
-  const [data, setData] = useState<SiteData>(seedData);
+  const hasRemoteApi = hasApiBase();
+  const [data, setData] = useState<SiteData>(() =>
+    hasRemoteApi ? emptySiteData : seedData,
+  );
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -404,7 +407,7 @@ function App() {
     const sectionTitles: Record<string, [string, string, string]> = {
       characters: [
         'Персонажи',
-        'Персонажи Neverness to Everness: роли, атрибуты, тиры и подробные гайды.',
+        'Персонажи Neverness to Everness: роли, типы эспера, тиры и подробные гайды.',
         '/characters/',
       ],
       guides: [
@@ -437,11 +440,16 @@ function App() {
   }, [data, route]);
 
   const [section, slug] = route.split('/');
-  let page = (
-    <HomePage data={data} loading={loading} user={user} setData={setData} />
-  );
+  let page =
+    hasRemoteApi && loading ? (
+      <RouteLoadingState route={route} />
+    ) : (
+      <HomePage data={data} loading={loading} user={user} setData={setData} />
+    );
 
-  if (section === 'characters') {
+  if (hasRemoteApi && loading) {
+    page = <RouteLoadingState route={route} />;
+  } else if (section === 'characters') {
     page = slug ? (
       <CharacterDetailPage data={data} slug={slug} user={user} setData={setData} />
     ) : (
@@ -534,6 +542,33 @@ function App() {
       </main>
       <Footer />
     </>
+  );
+}
+
+function RouteLoadingState({ route }: { route: string }) {
+  const [section] = route.split('/');
+  const sectionLabels: Record<string, string> = {
+    characters: 'персонажей',
+    guides: 'гайдов',
+    tierlists: 'тир-листа',
+    news: 'новостей',
+    leaks: 'сливов',
+    threads: 'тредов',
+    admin: 'админки',
+    profile: 'профиля',
+  };
+  const label = sectionLabels[section || 'home'] || 'портала';
+
+  return (
+    <section className="route-loading-panel" aria-busy="true">
+      <p className="eyebrow">NTE Meta API</p>
+      <h1>Синхронизируем данные {label}</h1>
+      <p>
+        Показываем страницу только после ответа Worker/D1, чтобы не мигали
+        устаревшие демо-карточки.
+      </p>
+      <SkeletonGrid label={`Загрузка ${label}`} />
+    </section>
   );
 }
 
@@ -822,10 +857,9 @@ function HomePage({
         </div>
       </section>
 
-      <section className="community-band">
-        <div>
-          <p className="eyebrow">Комьюнити</p>
-          <h2>Треды и обсуждения игроков</h2>
+    <section className="community-band">
+      <div>
+        <h2>Треды и обсуждения игроков</h2>
           <p>
             Создавайте треды с вопросами по отрядам, ротациям, ресурсам и
             патчам. Комментарии под материалами остаются там же, где контекст.
@@ -958,7 +992,7 @@ function HomePage({
       <EditorShell
         open={homeEditor === 'thread'}
         title="Создать тред"
-        eyebrow="Комьюнити"
+        eyebrow="Обсуждения"
         dirty={homeEditorDirty}
         onClose={() => {
           setHomeEditorDirty(false);
@@ -1315,7 +1349,7 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
       icon: CircleAlert,
     },
     {
-      title: 'Комьюнити',
+      title: 'Свежий тред',
       value: recentThread ? recentThread.title : 'Создайте первый тред',
       text: recentThread
         ? `${recentThread.commentsCount || 0} комментариев`
@@ -1592,7 +1626,7 @@ function CharactersPage({
   const [type, setType] = useState('Все типы');
   const [rarity, setRarity] = useState('Любая редкость');
   const [tier, setTier] = useState('Любой тир');
-  const [attribute, setAttribute] = useState('Любой атрибут');
+  const [attribute, setAttribute] = useState('Любой тип эспера');
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorDirty, setEditorDirty] = useState(false);
   const indexedCharacters = useMemo(
@@ -1606,7 +1640,7 @@ function CharactersPage({
 
   const attributes = useMemo(
     () => [
-      'Любой атрибут',
+      'Любой тип эспера',
       ...Array.from(
         new Set(data.characters.map((character) => character.attribute)),
       ),
@@ -1629,7 +1663,7 @@ function CharactersPage({
           (type === 'Все типы' || character.type === type) &&
           (rarity === 'Любая редкость' || character.rarity === rarity) &&
           (tier === 'Любой тир' || character.tier === tier) &&
-          (attribute === 'Любой атрибут' || character.attribute === attribute)
+          (attribute === 'Любой тип эспера' || character.attribute === attribute)
         );
       })
       .map(({ character }) => character);
@@ -1688,7 +1722,7 @@ function CharactersPage({
           options={typeOptions}
         />
         <SelectFilter
-          label="Атрибут"
+          label="Тип эспера"
           value={attribute}
           setValue={setAttribute}
           options={attributes}
@@ -1814,6 +1848,7 @@ function CharacterDetailPage({
     faction: '',
     arcType: '',
     birthday: '',
+    releaseDate: '',
     biographyShort: character.shortDescription,
     biography: character.summary,
     trivia: '',
@@ -1859,14 +1894,18 @@ function CharacterDetailPage({
           <h1>{character.name}</h1>
           <p>{profile.biographyShort || character.shortDescription}</p>
           <dl className="guide-facts character-profile-facts">
-            <div>
-              <dt>День рождения</dt>
-              <dd>{profile.birthday || 'Не указан'}</dd>
-            </div>
-        <div>
-          <dt>Атрибут</dt>
-          <dd>{character.attribute}</dd>
-        </div>
+          <div>
+            <dt>День рождения</dt>
+            <dd>{profile.birthday || 'Не указан'}</dd>
+          </div>
+          <div>
+            <dt>Дата релиза</dt>
+            <dd>{profile.releaseDate || 'Не указана'}</dd>
+          </div>
+          <div>
+            <dt>Тип эспера</dt>
+            <dd>{character.attribute}</dd>
+          </div>
         <div>
           <dt>Тип дуги</dt>
           <dd>{profile.arcType || 'Не указан'}</dd>
@@ -3068,12 +3107,12 @@ function GuidesPage({
   const [type, setType] = useState('Все типы');
   const [rarity, setRarity] = useState('Любая редкость');
   const [tier, setTier] = useState('Любой тир');
-  const [attribute, setAttribute] = useState('Любой атрибут');
+  const [attribute, setAttribute] = useState('Любой тип эспера');
   const [editorGuideId, setEditorGuideId] = useState<string | null>(null);
   const [editorDirty, setEditorDirty] = useState(false);
   const attributes = useMemo(
     () => [
-      'Любой атрибут',
+      'Любой тип эспера',
       ...new Set(data.characters.map((character) => character.attribute)),
     ],
     [data.characters],
@@ -3094,7 +3133,7 @@ function GuidesPage({
         (type === 'Все типы' || character.type === type) &&
         (rarity === 'Любая редкость' || character.rarity === rarity) &&
         (tier === 'Любой тир' || character.tier === tier) &&
-        (attribute === 'Любой атрибут' || character.attribute === attribute)
+        (attribute === 'Любой тип эспера' || character.attribute === attribute)
       );
     });
   }, [attribute, data, deferredQuery, rarity, role, tier, type]);
@@ -3145,7 +3184,7 @@ function GuidesPage({
           options={typeOptions}
         />
         <SelectFilter
-          label="Атрибут"
+          label="Тип эспера"
           value={attribute}
           setValue={setAttribute}
           options={attributes}

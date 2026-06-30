@@ -401,13 +401,46 @@
     color: #ffd8dc;
   }
 
-  .status-banner.success {
-    border-color: rgb(168 255 106 / 0.44);
-    color: #e6ffd7;
-  }
+.status-banner.success {
+  border-color: rgb(168 255 106 / 0.44);
+  color: #e6ffd7;
+}
 
-  .eyebrow {
-    color: var(--cyan);
+.route-loading-panel {
+  display: grid;
+  gap: 14px;
+  min-block-size: min(58vh, 560px);
+  align-content: center;
+  padding: clamp(24px, 6vw, 64px);
+  border: 1px solid color-mix(in srgb, var(--cyan) 22%, var(--border));
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle at 14% 12%, rgb(38 217 255 / 0.13), transparent 34%),
+    radial-gradient(circle at 88% 18%, rgb(255 75 192 / 0.1), transparent 30%),
+    color-mix(in srgb, var(--panel) 88%, #070d16);
+}
+
+.route-loading-panel h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 4rem);
+  line-height: 1.05;
+}
+
+.route-loading-panel > p:not(.eyebrow) {
+  max-inline-size: 62ch;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.route-loading-panel .content-band {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.eyebrow {
+  color: var(--cyan);
     font-size: 0.78rem;
     font-weight: 800;
     text-transform: uppercase;
@@ -900,11 +933,14 @@
     text-align: start;
   }
 
-  .character-card img {
-    inline-size: 100%;
-    aspect-ratio: 4 / 5;
-    object-fit: cover;
-  }
+.character-card img {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  object-position: top center;
+  background: color-mix(in srgb, var(--surface) 86%, #080d17);
+}
 
   .character-card > a > div {
     display: grid;
@@ -3230,9 +3266,14 @@
       background 160ms ease;
   }
 
-  .ability-card[open] {
-    grid-column: span 2;
-  }
+.ability-card[open] {
+  grid-column: span 2;
+  border-color: color-mix(in srgb, var(--cyan) 26%, var(--border));
+  background:
+    radial-gradient(circle at 8% 0%, rgb(38 217 255 / 0.12), transparent 34%),
+    linear-gradient(135deg, rgb(255 77 184 / 0.07), transparent 52%),
+    color-mix(in srgb, var(--surface) 92%, #121c2d);
+}
 
   .ability-card:hover,
   .ability-card:has(summary:focus-visible) {
@@ -3318,10 +3359,11 @@
     max-inline-size: 92ch;
   }
 
-  .ability-card__body .markdown-preview :where(p, li) {
-    color: color-mix(in srgb, var(--text) 84%, var(--muted));
-    line-height: 1.68;
-  }
+.ability-card__body .markdown-preview :where(p, li) {
+  color: color-mix(in srgb, var(--text) 84%, var(--muted));
+  line-height: 1.68;
+  overflow-wrap: anywhere;
+}
 
   .ability-list p {
     max-inline-size: 88ch;

@@ -107,6 +107,7 @@ export interface CharacterProfile {
   faction: string;
   arcType: string;
   birthday: string;
+  releaseDate: string;
   biographyShort: string;
   biography: string;
   trivia: string;

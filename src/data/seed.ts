@@ -774,6 +774,19 @@ export const seedData: SiteData = {
   threads,
 };
 
+export const emptySiteData: SiteData = {
+  characters: [],
+  guides: [],
+  rotations: [],
+  tierlists: [],
+  teams: [],
+  news: [],
+  leaks: [],
+  comments: [],
+  sources: [],
+  threads: [],
+};
+
 export function findCharacter(idOrSlug: string): Character | undefined {
   return seedData.characters.find(
     (character) => character.id === idOrSlug || character.slug === idOrSlug,

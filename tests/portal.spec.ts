@@ -27,6 +27,58 @@ test.describe('Публичный портал NTE Meta', () => {
     expect(consoleErrors).toEqual([]);
   });
 
+  test('персонажи не показывают устаревшие seed-карточки до ответа API', async ({
+    page,
+  }) => {
+    let releaseCharacters: () => void = () => undefined;
+    const charactersGate = new Promise<void>((resolve) => {
+      releaseCharacters = resolve;
+    });
+
+    await page.route('**/api/characters', async (route) => {
+      await charactersGate;
+      await route.fulfill({
+        contentType: 'application/json',
+        json: {
+          data: [
+            {
+              id: 'actual-character-a',
+              slug: 'actual-character-a',
+              name: 'Актуальная карточка А',
+              originalName: 'Actual A',
+              rarity: 'S',
+              role: 'Основной ДД',
+              type: 'Урон',
+              attribute: 'Тип эспера тест',
+              tier: 'S',
+              premiumTier: 'S',
+              imageUrl: '/assets/characters/Hotori.webp',
+              splashUrl: '/assets/characters/Hotori.webp',
+              shortDescription: 'Карточка пришла из API, а не из seedData.',
+              summary: 'Тестовая карточка для проверки первого рендера.',
+              tags: ['api'],
+              updatedAt: '2026-06-30',
+            },
+          ],
+        },
+      });
+    });
+
+    await page.goto('/#/characters', { waitUntil: 'domcontentloaded' });
+    await expect(
+      page.getByRole('heading', { name: /Синхронизируем данные персонажей/ }),
+    ).toBeVisible();
+    await expect(page.getByText('Хотори')).toHaveCount(0);
+    await expect(page.getByText('Лакримоза')).toHaveCount(0);
+
+    releaseCharacters();
+
+    await expect(
+      page.getByRole('heading', { name: 'Персонажи Neverness to Everness' }),
+    ).toBeVisible();
+    await expect(page.getByText('Актуальная карточка А')).toBeVisible();
+  });
+
   test('поиск персонажей ведёт в lore-профиль, а мета остаётся в гайдах', async ({
     page,
   }) => {
@@ -59,7 +111,7 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(
       page.getByRole('heading', { name: 'Актёры озвучки', exact: true }),
     ).toBeVisible();
-    await expect(page.getByText('Актёры озвучки не указаны')).toBeVisible();
+    await expect(page.locator('.voice-actor-grid')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Прокачка и симпатия' }),
     ).toBeVisible();
@@ -68,7 +120,7 @@ test.describe('Публичный портал NTE Meta', () => {
     ).toBeVisible();
     await expect(page.getByText('Консоль пока не выбрана')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Озвучка' })).toBeVisible();
-    await expect(page.getByText('Аудио пока не загружено')).toBeVisible();
+    await expect(page.locator('.voice-line-list article').first()).toBeVisible();
     await expect(page.locator('.guide-section-card')).toHaveCount(0);
     await expect(page.getByText('Комментарии и обсуждения')).toBeVisible();
   });

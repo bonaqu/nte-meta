@@ -72,6 +72,7 @@ function emptyProfile(): CharacterProfile {
     faction: '',
     arcType: '',
     birthday: '',
+    releaseDate: '',
     biographyShort: '',
     biography: '',
     trivia: '',
@@ -511,6 +512,8 @@ export function AdminCharacterEditor({
         next.profile.arcType = String(parsed);
       } else if (suggestion.field === 'profile.birthday') {
         next.profile.birthday = String(parsed);
+      } else if (suggestion.field === 'profile.releaseDate') {
+        next.profile.releaseDate = String(parsed);
       } else if (suggestion.field === 'profile.biographyShort') {
         next.profile.biographyShort = String(parsed);
       } else if (suggestion.field === 'profile.biography') {
@@ -531,6 +534,10 @@ export function AdminCharacterEditor({
         next.profile.abilities = parsed as CharacterAbility[];
       } else if (suggestion.field === 'profile.awakenings' && Array.isArray(parsed)) {
         next.profile.awakenings = parsed as CharacterAwakening[];
+      } else if (suggestion.field === 'imageUrl') {
+        next.imageUrl = String(parsed);
+      } else if (suggestion.field === 'splashUrl') {
+        next.splashUrl = String(parsed);
       } else if (suggestion.field.startsWith('guide.')) {
         next.profile.trivia = mergeText(
           next.profile.trivia,
@@ -786,19 +793,29 @@ export function AdminCharacterEditor({
         </label>
         <label>
           День рождения
-              <input
-                value={profile.birthday}
-                placeholder="Например, 21 июня"
+          <input
+            value={profile.birthday}
+            placeholder="Например, 21 июня"
                 onChange={(event) =>
                   patchProfile({ birthday: event.target.value })
-                }
-              />
-            </label>
-            <label>
-              Атрибут
-              <input
-                required
-                value={draft.attribute}
+            }
+          />
+        </label>
+        <label>
+          Дата релиза
+          <input
+            value={profile.releaseDate}
+            placeholder="Например, 03 июня 2026"
+            onChange={(event) =>
+              patchProfile({ releaseDate: event.target.value })
+            }
+          />
+        </label>
+        <label>
+          Тип эспера
+          <input
+            required
+            value={draft.attribute}
                 onChange={(event) => patch({ attribute: event.target.value })}
               />
             </label>

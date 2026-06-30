@@ -2480,6 +2480,92 @@ function parseOfficialImport(_text, source) {
   return [];
 }
 
+function buildKnownVoiceMediaSource(character) {
+  const knownSources = new Map([
+    [
+      'hotori',
+      {
+        url: 'https://www.youtube.com/watch?v=3kVJaEinOG0',
+        title: 'Hotori Voice Records / Profile Voice Lines',
+      },
+    ],
+    [
+      'chiz',
+      {
+        url: 'https://www.youtube.com/watch?v=y94feRER9KI',
+        title: 'Chiz Voice Records / Profile Voice Lines',
+      },
+    ],
+    [
+      'skia',
+      {
+        url: 'https://www.youtube.com/watch?v=Qo3o25KqARM',
+        title: 'Skia Voice Records / Profile Voice Lines',
+      },
+    ],
+    [
+      'hathor',
+      {
+        url: 'https://www.youtube.com/watch?v=Ywp_xIiIVHY',
+        title: 'Hathor Voice Records / Profile Voice Lines',
+      },
+    ],
+    [
+      'lacrimosa',
+      {
+        url: 'https://www.youtube.com/watch?v=uLoAq4DvAOs',
+        title: 'Lacrimosa Voice Records / Profile Voice Lines',
+      },
+    ],
+    [
+      'daffodill',
+      {
+        url: 'https://www.youtube.com/watch?v=wD0MX3GU3NM',
+        title: 'Daffodill Voice Records / Profile Voice Lines',
+      },
+    ],
+  ]);
+  const sourceInfo = characterNameCandidates(character)
+    .map((candidate) => knownSources.get(candidate))
+    .find(Boolean);
+  if (!sourceInfo) return null;
+
+  const source = {
+    id: 'youtube-voice-records',
+    name: 'YouTube Voice Records',
+    trust: 'medium',
+    url: sourceInfo.url,
+  };
+  const voiceLines = ['Английский', 'Японский', 'Корейский', 'Китайский'].map(
+    (language) => ({
+      id: crypto.randomUUID(),
+      title: `${sourceInfo.title} — ${language}`,
+      language,
+      audioUrl: '',
+      sourceUrl: sourceInfo.url,
+      description:
+        'Видео-источник для ручной проверки реплик. Прямой аудиофайл редактор добавляет отдельно.',
+    }),
+  );
+
+  return {
+    ...source,
+    status: 'partial',
+    message:
+      'Найден внешний источник записей. Это не прямой audio URL; требуется ручная проверка редактором.',
+    suggestions: [
+      makeImportSuggestion(
+        'profile.voiceLines',
+        'Источники реплик',
+        voiceLines,
+        source,
+        'low',
+        'Видео нельзя автоматически использовать как аудиофайл; добавьте прямые файлы только после проверки прав и качества.',
+      ),
+    ],
+  };
+}
+
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -2530,6 +2616,12 @@ async function handleCharacterImportLookup(request, env) {
       }),
     ),
   );
+  const voiceMediaSource = buildKnownVoiceMediaSource({
+    name: character.name || query,
+    originalName: character.original_name || query,
+    slug,
+  });
+  if (voiceMediaSource) sourceResults.push(voiceMediaSource);
   const suggestions = dedupeImportSuggestions(
     sourceResults.flatMap((source) => source.suggestions),
   );
@@ -2674,7 +2766,7 @@ async function handleSystemStatus(request, env) {
       d1: 'ok',
       generatedAt: new Date().toISOString(),
       counts,
-        migrations: { latestKnown: '0014_unified_tierlist.sql' },
+        migrations: { latestKnown: '0015_hotori_arc_voice_sources.sql' },
     },
   });
 }
@@ -3319,6 +3411,8 @@ function normalizeCharacterProfile(value) {
       title: text(item.title, 160),
       language: text(item.language, 40),
       audioUrl: url(item.audioUrl),
+      sourceUrl: url(item.sourceUrl),
+      description: text(item.description, 1000),
     })),
     awakenings,
     consoles: collection('consoles', 20, (item) => ({

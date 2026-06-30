@@ -8,4 +8,4 @@ backups
 .env*
 .dev.vars*
 !.env.example
-*.log
+*.log.idea/

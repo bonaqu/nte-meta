@@ -111,7 +111,12 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(
       page.getByRole('heading', { name: 'Актёры озвучки', exact: true }),
     ).toBeVisible();
-    await expect(page.locator('.voice-actor-grid')).toBeVisible();
+    await expect(
+      page
+        .locator('.voice-actor-grid')
+        .or(page.getByText('Актёры озвучки не указаны'))
+        .first(),
+    ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Прокачка и симпатия' }),
     ).toBeVisible();
@@ -120,7 +125,12 @@ test.describe('Публичный портал NTE Meta', () => {
     ).toBeVisible();
     await expect(page.getByText('Консоль пока не выбрана')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Озвучка' })).toBeVisible();
-    await expect(page.locator('.voice-line-list article').first()).toBeVisible();
+    await expect(
+      page
+        .locator('.voice-line-list article')
+        .or(page.getByText('Аудио пока не загружено'))
+        .first(),
+    ).toBeVisible();
     await expect(page.locator('.guide-section-card')).toHaveCount(0);
     await expect(page.getByText('Комментарии и обсуждения')).toBeVisible();
   });

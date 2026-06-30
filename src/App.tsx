@@ -1356,6 +1356,10 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
 }
 
 function CharacterCard({ character }: { character: Character }) {
+  const cardTags = character.profile?.arcType
+    ? [`Дуга: ${character.profile.arcType}`, ...character.tags]
+    : character.tags;
+
   return (
     <article className="character-card">
       <a
@@ -1376,7 +1380,7 @@ function CharacterCard({ character }: { character: Character }) {
             {character.role} · {character.attribute} · {character.rarity}
           </p>
           <span>{character.shortDescription}</span>
-          <Tags tags={character.tags} />
+          <Tags tags={cardTags} />
         </div>
       </a>
     </article>
@@ -1854,7 +1858,7 @@ function CharacterDetailPage({
           </p>
           <h1>{character.name}</h1>
           <p>{profile.biographyShort || character.shortDescription}</p>
-          <dl className="guide-facts">
+          <dl className="guide-facts character-profile-facts">
             <div>
               <dt>День рождения</dt>
               <dd>{profile.birthday || 'Не указан'}</dd>

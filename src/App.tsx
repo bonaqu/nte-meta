@@ -6636,6 +6636,11 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
     deleteDialogRef.current?.showModal();
   }
 
+  function closeWarningDialog() {
+    setActionId('');
+    warningDialogRef.current?.close('cancel');
+  }
+
   async function submitWarning(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!warningTarget?.userId) return;
@@ -6778,13 +6783,14 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
             required
           />
           <div className="button-row">
-        <button
-          className="ghost-button"
-          type="button"
-          onClick={() => warningDialogRef.current?.close()}
-        >
-          Отменить
-        </button>
+            <button
+              className="ghost-button"
+              type="button"
+              formNoValidate
+              onClick={closeWarningDialog}
+            >
+              Отменить
+            </button>
             <button
               className="primary-button"
               type="submit"

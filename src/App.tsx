@@ -1980,7 +1980,7 @@ function CharacterDetailPage({
               <details
                 className="ability-card"
                 key={ability.id}
-                open={index < 2}
+                  open={index === 0}
               >
                 <summary tabIndex={0}>
                   <span className="ability-card__icon" aria-hidden="true">

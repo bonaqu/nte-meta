@@ -2142,6 +2142,7 @@ function characterImportSources(slug, character = {}) {
       url: `https://gamewith.ai/nte/ru/character/${slug}`,
       parser: parseGameWithCharacterDetailImport,
       extractImages: true,
+      raw: true,
     },
     {
       id: 'ntewiki-ru',
@@ -2403,7 +2404,7 @@ function buildKnownVoiceActorSource(character) {
     [
       'baicang',
       [
-        { language: 'Английский', name: 'Griffith Burns' },
+        { language: 'Английский', name: 'Griffin Burns' },
         { language: 'Японский', name: 'Yuichi Nakamura (中村悠一)' },
         { language: 'Китайский', name: 'Sang Yuze (桑毓泽)' },
         { language: 'Корейский', name: 'Shim Gyuhyeok (심규혁)' },
@@ -2926,9 +2927,257 @@ function parseBtvaImport(text, source, character) {
   return parseVoiceTableImport(text, source, character, 'BTVA');
 }
 
+function gameWithLocaleText(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value !== 'object') return String(value).trim();
+  return String(value.ru || value.en || value.ja || value.cn || value.ko || '').trim();
+}
+
+function formatGameWithRuDate(value, options = {}) {
+  const raw = gameWithLocaleText(value);
+  const match = raw.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+  if (!match) return formatRuImportDate(raw) || raw;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!month || !day) return raw;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    ...(options.withoutYear ? {} : { year: 'numeric' }),
+  }).format(date);
+}
+
+function translateGameWithElement(value) {
+  const raw = gameWithLocaleText(value) || String(value || '');
+  const normalized = normalizeImportSearch(raw);
+  const direct = [
+    ['呪', 'Чары'],
+    ['混沌', 'Хаос'],
+    ['精神', 'Психика'],
+    ['魂', 'Анима'],
+    ['相', 'Лакшана'],
+  ].find(([key]) => raw.includes(key));
+  if (direct) return direct[1];
+  const ru = ['Чары', 'Хаос', 'Психика', 'Анима', 'Космос', 'Лакшана'].find((item) =>
+    normalized.includes(normalizeImportSearch(item)),
+  );
+  return ru || translateEsperType(raw) || raw;
+}
+
+function translateGameWithArcType(value) {
+  const raw = gameWithLocaleText(value) || String(value || '');
+  const normalized = normalizeImportSearch(raw);
+  const direct = [
+    ['重合', 'Гибридный'],
+    ['固', 'Твёрдый'],
+    ['液', 'Жидкий'],
+    ['気', 'Газовый'],
+    ['プラズマ', 'Плазменный'],
+    ['凝縮', 'Конденсат'],
+  ].find(([key]) => raw.includes(key));
+  if (direct) return direct[1];
+  const ru = [
+    'Гибридный',
+    'Твёрдый',
+    'Жидкий',
+    'Газовый',
+    'Плазменный',
+    'Конденсат',
+  ].find((item) => normalized.includes(normalizeImportSearch(item)));
+  return ru || translateArcType(raw) || raw;
+}
+
+function translateGameWithRoleTags(value) {
+  const raw = gameWithLocaleText(value) || String(value || '');
+  const normalized = normalizeImportSearch(raw);
+  const roles = [];
+  if (/ダメージ|damage|урон/i.test(raw) || normalized.includes('урон')) roles.push('Урон');
+  if (/main dps|основн/i.test(normalized)) roles.push('Основной ДД');
+  if (/dot|periodic|период/i.test(normalized)) roles.push('Периодический урон');
+  if (/support|поддерж/i.test(normalized)) roles.push('Поддержка');
+  if (/heal|исцел|леч/i.test(normalized)) roles.push('Healer');
+  if (/buff|усилен|бафф/i.test(normalized)) roles.push('Buffer');
+  return Array.from(new Set(roles));
+}
+
+function parseEscapedGameWithJsonObject(text, key) {
+  const marker = '\\"' + key + '\\":';
+  const start = String(text || '').indexOf(marker);
+  if (start < 0) return null;
+  const objectStart = text.indexOf('{', start + marker.length);
+  if (objectStart < 0) return null;
+  let depth = 0;
+  for (let index = objectStart; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '{') depth += 1;
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        const raw = text.slice(objectStart, index + 1);
+        const normalized = raw
+          .replace(/\\"/g, '"')
+          .replace(/\\u0026/g, '&')
+          .replace(/\\n/g, '\\n');
+        try {
+          return JSON.parse(normalized);
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function gameWithSkillDescription(entry) {
+  const effect = gameWithLocaleText(entry?.effect);
+  const initialStat = gameWithLocaleText(entry?.initialStat);
+  return [effect, initialStat ? 'Базовые значения:\n' + initialStat : '']
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+}
+
+function gameWithAbility(entry, type) {
+  const name = gameWithLocaleText(entry?.name);
+  if (!name) return null;
+  return {
+    id: crypto.randomUUID(),
+    name,
+    type,
+    iconUrl: normalizeExternalImageUrl(entry?.iconUrl || ''),
+    description: gameWithSkillDescription(entry) || 'Описание требует проверки в игре.',
+  };
+}
+
+function firstGameWithEntry(section) {
+  if (Array.isArray(section?.entries)) return section.entries[0];
+  if (Array.isArray(section)) return section[0];
+  return section;
+}
+
+function parseGameWithStructuredAbilities(item) {
+  const skills = item?.skills || {};
+  const supportEntries = Array.isArray(skills.support) ? skills.support : [];
+  const citySkills = Array.isArray(item?.citySkills) ? item.citySkills : [];
+  const abilities = [
+    gameWithAbility(firstGameWithEntry(skills.normalAttack), 'Базовая атака'),
+    gameWithAbility(firstGameWithEntry(skills.bilane), 'Навык'),
+    gameWithAbility(firstGameWithEntry(skills.exRail), 'Сверхспособность'),
+    gameWithAbility(supportEntries[0], 'Навык поддержки'),
+    gameWithAbility(supportEntries[1], 'Пассивный навык'),
+    gameWithAbility(supportEntries[2], 'Пассивный навык'),
+    gameWithAbility(citySkills[0], 'Повседневный навык'),
+  ].filter(Boolean);
+
+  if (abilities.filter((ability) => ability.type === 'Повседневный навык').length < 2) {
+    abilities.push({
+      id: crypto.randomUUID(),
+      name: 'Не введено',
+      type: 'Повседневный навык',
+      iconUrl: '',
+      description: 'В проверенных источниках не найден второй повседневный навык.',
+    });
+  }
+
+  return abilities.slice(0, 8);
+}
+
+function parseGameWithStructuredAwakenings(item) {
+  const effects = Array.isArray(item?.awakeningEffects) ? item.awakeningEffects : [];
+  return effects
+    .map((awakening) => ({
+      level: Number(awakening.level || 0),
+      name: gameWithLocaleText(awakening.name),
+      iconUrl: normalizeExternalImageUrl(awakening.iconUrl || ''),
+      description: gameWithLocaleText(awakening.effect),
+    }))
+    .filter((awakening) => awakening.level >= 1 && awakening.level <= 6 && awakening.name);
+}
+
+function parseGameWithStructuredCharacterImport(text, source, character) {
+  const item = parseEscapedGameWithJsonObject(text, 'item');
+  if (!item) return [];
+  const characterNames = characterNameCandidates(character);
+  const importedNames = [item.slug, gameWithLocaleText(item.name), item.reading]
+    .map((value) => normalizeImportSearch(value))
+    .filter(Boolean);
+  if (
+    characterNames.length &&
+    !characterNames.some((candidate) => importedNames.some((name) => name.includes(candidate)))
+  ) {
+    return [];
+  }
+
+  const stats = [
+    ['АТК', item.stats?.attack],
+    ['ЗАЩ', item.stats?.defense],
+    ['ОЗ', item.stats?.hp],
+    ['Шанс крит.', item.stats?.critRate ? item.stats.critRate + '%' : ''],
+    ['Урон крит.', item.stats?.critDamage ? item.stats.critDamage + '%' : ''],
+    ['Усиление урона', item.stats?.damageBonus ? item.stats.damageBonus + '%' : '0%'],
+  ]
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([label, value]) => ({ id: crypto.randomUUID(), label, value: String(value) }));
+
+  const abilities = parseGameWithStructuredAbilities(item);
+  const awakenings = parseGameWithStructuredAwakenings(item);
+  const gifts = (Array.isArray(item.favoriteGifts) ? item.favoriteGifts : [])
+    .map((gift) => gameWithLocaleText(gift))
+    .filter(Boolean)
+    .slice(0, 12)
+    .map((name) => ({
+      id: crypto.randomUUID(),
+      name,
+      iconUrl: '',
+      effect: 'Любимый подарок для повышения симпатии; значение подтверждено источником GameWith.',
+    }));
+
+  return [
+    makeImportSuggestion('rarity', 'Редкость', String(item.rarity || '').match(/[SA]/)?.[0] || '', source, 'high'),
+    makeImportSuggestion('attribute', 'Тип эспера', translateGameWithElement(item.element), source, 'high'),
+    makeImportSuggestion('profile.arcType', 'Тип дуги', translateGameWithArcType(item.arcType), source, 'high'),
+    makeImportSuggestion('profile.faction', 'Фракция', gameWithLocaleText(item.profile?.faction), source, 'high'),
+    makeImportSuggestion('profile.birthday', 'День рождения', formatGameWithRuDate(item.profile?.birthday, { withoutYear: true }), source, 'medium'),
+    makeImportSuggestion('profile.biographyShort', 'Краткая биография', gameWithLocaleText(item.profileText), source, 'high'),
+    makeImportSuggestion('profile.roleTags', 'Роли персонажа', translateGameWithRoleTags(item.role), source, 'medium'),
+    makeImportSuggestion('profile.baseStats', 'Начальные показатели', stats, source, 'high'),
+    makeImportSuggestion(
+      'profile.abilities',
+      'Способности',
+      abilities,
+      source,
+      'high',
+      'Навыки взяты из структурированных данных GameWith. Если название отличается от русской версии в игре, отклоните строку и заполните вручную.',
+    ),
+    makeImportSuggestion(
+      'profile.awakenings',
+      'Пробуждения',
+      awakenings,
+      source,
+      'high',
+      'Иконки пробуждений источник не отдаёт; их можно добавить вручную.',
+    ),
+    makeImportSuggestion(
+      'profile.gifts',
+      'Любимые подарки',
+      gifts,
+      source,
+      'high',
+      'GameWith отдаёт названия подарков без иконок; иконки можно добавить вручную.',
+    ),
+    makeImportSuggestion('imageUrl', 'Иконка персонажа', normalizeExternalImageUrl(item.iconUrl || ''), source, 'medium'),
+  ].filter(Boolean);
+}
+
 function parseGameWithCharacterDetailImport(text, source, character) {
-  const lines = compactImportLines(text);
+  const plainText = /<\/?[a-z][\s\S]*>/i.test(text) ? htmlToPlainText(text) : text;
+  const lines = compactImportLines(plainText);
   if (!lines.some((line) => lineMatchesCharacter(line, character))) return [];
+  const structuredSuggestions = parseGameWithStructuredCharacterImport(text, source, character);
 
   const nextAfter = (label) => {
     const index = lines.findIndex(
@@ -2963,38 +3212,23 @@ function parseGameWithCharacterDetailImport(text, source, character) {
   const stopWords = [
     'Базовые значения',
     'Материалы улучшения навыков',
+    'Пассивные эффекты',
     'Эффекты резонанса',
-    'Lv.',
-    'Lv',
-    'Ур',
-    'Материалы',
+    'Городские навыки',
+    'Любимые подарки',
+    'Сообщество',
+    'Meta Tier',
   ];
-  const resonanceNames = [
-    ...(lines
-      .find((line) => /Повышает уровень навыков/i.test(line))
-      ?.matchAll(/«([^»]+)»/g) || []),
-  ].map((match) => match[1]);
-  const nameOverrides = {
-    'Базовая атака': resonanceNames[0],
-    Навык: resonanceNames[1],
-    Сверхспособность: resonanceNames[2],
-  };
   const abilities = [];
-
+  const majorHeadings = abilityHeadings.map(([heading]) => heading);
   for (const [heading, type] of abilityHeadings) {
-    const index = lines.findIndex((line) =>
-      normalizeImportSearch(line).startsWith(normalizeImportSearch(heading)),
-    );
+    const index = lines.findIndex((line) => normalizeImportSearch(line).startsWith(normalizeImportSearch(heading)));
     if (index < 0) continue;
-    const name =
-      nameOverrides[type] ||
-      (type === 'Пассивный навык'
-        ? heading
-        : lines[index + 1]?.replace(/^[:：]\s*/, '').trim() || heading);
+    const name = lines[index + 1] || heading;
     const nextMajor = lines.findIndex(
       (line, lineIndex) =>
         lineIndex > index &&
-        abilityHeadings.some(([candidate]) =>
+        majorHeadings.some((candidate) =>
           normalizeImportSearch(line).startsWith(normalizeImportSearch(candidate)),
         ),
     );
@@ -3046,11 +3280,12 @@ function parseGameWithCharacterDetailImport(text, source, character) {
       : [];
 
   return [
+    ...structuredSuggestions,
     makeImportSuggestion('rarity', 'Редкость', nextAfter('Редкость').match(/[SA]/)?.[0] || '', source, 'high'),
     makeImportSuggestion('attribute', 'Тип эспера', nextAfter('Стихия'), source, 'high'),
     makeImportSuggestion('profile.arcType', 'Тип дуги', nextAfter('Тип арки'), source, 'high'),
     makeImportSuggestion('profile.baseStats', 'Начальные показатели', stats, source, 'high'),
-    makeImportSuggestion('profile.abilities', 'Способности', abilities.slice(0, 8), source, 'high'),
+    makeImportSuggestion('profile.abilities', 'Способности', abilities.slice(0, 8), source, 'medium'),
     makeImportSuggestion('profile.gifts', 'Любимые подарки', gifts, source, 'medium'),
   ].filter(Boolean);
 }

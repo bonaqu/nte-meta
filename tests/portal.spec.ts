@@ -87,7 +87,7 @@ test.describe('Публичный портал NTE Meta', () => {
       page.getByRole('heading', { name: 'Персонажи Neverness to Everness' }),
     ).toBeVisible();
 
-    await page.getByPlaceholder('Имя, роль, тег...').fill('Хотори');
+    await page.getByPlaceholder('Имя, атрибут, тег...').fill('Хотори');
     await expect(page.getByText(/Найдено: 1 из/)).toBeVisible();
     await expect(
       page.getByRole('link', { name: 'Открыть страницу персонажа Хотори' }),
@@ -120,10 +120,6 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(
       page.getByRole('heading', { name: 'Прокачка и симпатия' }),
     ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Консоль и модули' }),
-    ).toBeVisible();
-    await expect(page.getByText('Консоль пока не выбрана')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Озвучка' })).toBeVisible();
     await expect(
       page

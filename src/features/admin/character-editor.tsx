@@ -279,7 +279,32 @@ function ImportSuggestionList({
 function summarizeSuggestionValue(value: string) {
   try {
     const parsed = JSON.parse(value) as unknown;
-    if (Array.isArray(parsed)) return `${parsed.length} записей`;
+    if (Array.isArray(parsed)) {
+      const names = parsed
+        .map((item) => {
+          if (!item || typeof item !== 'object') return '';
+          const record = item as Record<string, unknown>;
+          const prefix =
+            typeof record.level === 'number'
+              ? `C${record.level} `
+              : typeof record.language === 'string'
+                ? `${record.language}: `
+                : '';
+          const label =
+            record.name ||
+            record.title ||
+            record.label ||
+            record.rewardName ||
+            record.value;
+          return label ? `${prefix}${String(label)}` : '';
+        })
+        .filter(Boolean);
+      if (names.length) {
+        const suffix = names.length > 4 ? '...' : '';
+        return `${parsed.length} записей: ${names.slice(0, 4).join(', ')}${suffix}`;
+      }
+      return `${parsed.length} записей`;
+    }
   } catch {
     // plain text suggestion
   }

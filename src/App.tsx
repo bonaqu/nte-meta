@@ -4769,6 +4769,7 @@ function AdminGuides({
         'guide.alternativeArcs': { title: 'Альтернативные дуги', type: 'arcs' },
         'guide.rotations': { title: 'Ротации', type: 'rotation' },
         'guide.tips': { title: 'Советы и механики', type: 'tips' },
+        'guide.materials': { title: 'Материалы прокачки', type: 'progression' },
         'guide.teams': { title: 'Лучшие команды', type: 'teams' },
         'guide.videoUrl': { title: 'Видео-гайд', type: 'video' },
         'guide.awakenings': { title: 'Пробуждения и резонансы', type: 'awakening' },

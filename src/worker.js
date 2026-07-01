@@ -2279,6 +2279,7 @@ function guideImportSources(slug, character = {}) {
       url: `https://gamewith.ai/nte/ru/character/${slug}`,
       parser: parseGameWithGuideImport,
       extractImages: true,
+      raw: true,
     },
     {
       id: 'ntewiki-guide-ru',
@@ -2877,18 +2878,105 @@ function parseGenshinBuildsGuideImport(text, source, character) {
 }
 
 function parseGameWithGuideImport(text, source, character) {
-  const lines = compactImportLines(text);
+  const structured = parseGameWithStructuredGuideImport(text, source, character);
+  const plainText = /<\/?[a-z][\s\S]*>/i.test(text) ? htmlToPlainText(text) : text;
+  const lines = compactImportLines(plainText);
   if (!lines.some((line) => lineMatchesCharacter(line, character))) return [];
   const awakenings = collectGuideLines(lines, 'Эффекты резонанса', ['Любимые подарки'], 12)
     .join(' ')
     .match(/C\d\s+[^C]+/g);
   return [
+    ...structured,
     makeImportSuggestion(
       'guide.awakenings',
       'Пробуждения и резонансы',
       awakenings || [],
       source,
       'medium',
+    ),
+  ].filter(Boolean);
+}
+
+function parseGameWithStructuredGuideImport(text, source, character) {
+  const item = parseEscapedGameWithJsonObject(text, 'item');
+  if (!item) return [];
+  const characterNames = characterNameCandidates(character);
+  const importedNames = [item.slug, gameWithLocaleText(item.name), item.reading]
+    .map((value) => normalizeImportSearch(value))
+    .filter(Boolean);
+  if (
+    characterNames.length &&
+    !characterNames.some((candidate) =>
+      importedNames.some((name) => name.includes(candidate)),
+    )
+  ) {
+    return [];
+  }
+
+  const signatureArcName = gameWithLocaleText(item.signatureArc?.name);
+  const signatureArcIcon = normalizeExternalImageUrl(item.signatureArc?.iconUrl || '');
+  const bestArcs = signatureArcName
+    ? [
+        {
+          name: signatureArcName,
+          imageUrl: signatureArcIcon,
+          description:
+            'GameWith указывает эту дугу как связанную/сигнатурную. Финальную оценку BiS подтверждает редактор гайда.',
+        },
+      ]
+    : [];
+  const mechanics = parseGameWithStructuredAbilities(item)
+    .filter((ability) => ability.name && ability.name !== 'Не введено')
+    .slice(0, 8)
+    .map((ability) => ({
+      title: `${ability.type}: ${ability.name}`,
+      description: ability.description,
+      iconUrl: ability.iconUrl,
+    }));
+  const awakenings = parseGameWithStructuredAwakenings(item).map((awakening) => ({
+    title: `C${awakening.level}: ${awakening.name}`,
+    description: awakening.description,
+    iconUrl: awakening.iconUrl,
+  }));
+  const materials = collectGameWithStructuredMaterials(item)
+    .slice(0, 24)
+    .map((material) => ({
+      name: material.name,
+      value: `${material.source}: ${material.amount}`,
+      iconUrl: material.iconUrl,
+    }));
+
+  return [
+    makeImportSuggestion(
+      'guide.bestArcs',
+      'Сигнатурная дуга из источника',
+      bestArcs,
+      source,
+      'medium',
+      'Это не автоматический BiS-рейтинг: проверьте дугу и итоговую рекомендацию вручную.',
+    ),
+    makeImportSuggestion(
+      'guide.tips',
+      'Ключевые механики и навыки',
+      mechanics,
+      source,
+      'medium',
+      'Описание навыков можно использовать как черновик раздела механик; редактор должен добавить практические выводы.',
+    ),
+    makeImportSuggestion(
+      'guide.awakenings',
+      'Пробуждения',
+      awakenings,
+      source,
+      'medium',
+    ),
+    makeImportSuggestion(
+      'guide.materials',
+      'Материалы прокачки',
+      materials,
+      source,
+      'medium',
+      'Материалы относятся к прогрессии персонажа и полезны как справочный блок в гайде.',
     ),
   ].filter(Boolean);
 }

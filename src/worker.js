@@ -2650,10 +2650,20 @@ function parseFandomRuImagesImport(text, source, character) {
       ownImages.find((image) => /спл[эе]ш|splash/i.test(image.title)) ||
       ownImages.find((image) => image.height > image.width) ||
       card;
+    const imageMap = Object.fromEntries(
+      images.map((image) => {
+        const cleanTitle = image.title
+          .replace(/^Файл:/i, '')
+          .replace(/\.(png|webp|jpe?g|gif)$/i, '')
+          .trim();
+        return [cleanTitle, image.url];
+      }),
+    );
 
     return [
       makeImportSuggestion('imageUrl', 'Карточка персонажа', card?.url || '', source, 'high'),
       makeImportSuggestion('splashUrl', 'Splash персонажа', splash?.url || '', source, 'high'),
+      makeImportSuggestion('__imageMap', 'Индекс изображений', imageMap, source, 'low'),
     ].filter(Boolean);
   } catch {
     return [];
@@ -3098,6 +3108,51 @@ function parseGameWithStructuredAwakenings(item) {
     .filter((awakening) => awakening.level >= 1 && awakening.level <= 6 && awakening.name);
 }
 
+
+function formatGameWithMaterialCount(value) {
+  if (value === undefined || value === null || value === '') return '';
+  return '×' + String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+
+function collectGameWithMaterialRows(groups, sourceLabel) {
+  if (!Array.isArray(groups)) return [];
+  const grouped = new Map();
+  for (const group of groups) {
+    const levelLabel = group?.level ? 'Ур. ' + group.level : sourceLabel;
+    const items = Array.isArray(group?.items) ? group.items : [];
+    for (const item of items) {
+      const name = gameWithLocaleText(item?.name);
+      if (!name) continue;
+      const key = sourceLabel + ':' + name;
+      const current = grouped.get(key) || {
+        id: crypto.randomUUID(),
+        name,
+        iconUrl: '',
+        amountParts: [],
+        source: sourceLabel,
+      };
+      const count = formatGameWithMaterialCount(item?.count);
+      current.amountParts.push(count ? levelLabel + ': ' + count : levelLabel);
+      grouped.set(key, current);
+    }
+  }
+  return Array.from(grouped.values()).map((item) => ({
+    id: item.id,
+    name: item.name,
+    iconUrl: '',
+    amount: item.amountParts.slice(0, 8).join('; '),
+    source: item.source,
+  }));
+}
+
+function collectGameWithStructuredMaterials(item) {
+  return [
+    ...collectGameWithMaterialRows(item?.breakthroughMaterials, 'Материалы прорыва'),
+    ...collectGameWithMaterialRows(item?.skillUpgradeMaterials, 'Материалы навыков'),
+    ...collectGameWithMaterialRows(item?.supportSkillMaterials, 'Материалы навыков поддержки'),
+  ].slice(0, 80);
+}
+
 function parseGameWithStructuredCharacterImport(text, source, character) {
   const item = parseEscapedGameWithJsonObject(text, 'item');
   if (!item) return [];
@@ -3135,6 +3190,8 @@ function parseGameWithStructuredCharacterImport(text, source, character) {
       iconUrl: '',
       effect: 'Любимый подарок для повышения симпатии; значение подтверждено источником GameWith.',
     }));
+  const materials = collectGameWithStructuredMaterials(item);
+
 
   return [
     makeImportSuggestion('rarity', 'Редкость', String(item.rarity || '').match(/[SA]/)?.[0] || '', source, 'high'),
@@ -3145,6 +3202,14 @@ function parseGameWithStructuredCharacterImport(text, source, character) {
     makeImportSuggestion('profile.biographyShort', 'Краткая биография', gameWithLocaleText(item.profileText), source, 'high'),
     makeImportSuggestion('profile.roleTags', 'Роли персонажа', translateGameWithRoleTags(item.role), source, 'medium'),
     makeImportSuggestion('profile.baseStats', 'Начальные показатели', stats, source, 'high'),
+    makeImportSuggestion(
+      'profile.materials',
+      'Материалы прокачки',
+      materials,
+      source,
+      'high',
+      'Материалы собраны из структурированных данных GameWith; иконки сопоставляются по Fandom RU, когда файл найден.',
+    ),
     makeImportSuggestion(
       'profile.abilities',
       'Способности',
@@ -3684,6 +3749,90 @@ function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+
+function parseImportSuggestionJson(item) {
+  try {
+    return JSON.parse(item.value);
+  } catch {
+    return null;
+  }
+}
+
+function importImageMapFromSuggestions(items) {
+  const map = new Map();
+  for (const item of items) {
+    if (!item || item.field !== '__imageMap') continue;
+    const parsed = parseImportSuggestionJson(item);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+    for (const [name, url] of Object.entries(parsed)) {
+      const normalizedName = normalizeImportSearch(name);
+      if (normalizedName && typeof url === 'string') {
+        map.set(normalizedName, normalizeExternalImageUrl(url));
+      }
+    }
+  }
+  return map;
+}
+
+function findImportImageByName(imageMap, name) {
+  const normalizedName = normalizeImportSearch(name);
+  if (!normalizedName) return '';
+  return imageMap.get(normalizedName) || '';
+}
+
+function enrichArraySuggestionMedia(item, imageMap) {
+  if (
+    !imageMap.size ||
+    !item ||
+    ![
+      'profile.materials',
+      'profile.gifts',
+      'profile.abilities',
+      'profile.awakenings',
+      'profile.skins',
+    ].includes(item.field)
+  ) {
+    return item;
+  }
+  const parsed = parseImportSuggestionJson(item);
+  if (!Array.isArray(parsed)) return item;
+  let changed = false;
+  const nextValue = parsed.map((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+    const record = entry;
+    const displayName = record.name || record.rewardName || record.title || record.label;
+    const imageUrl = findImportImageByName(imageMap, displayName);
+    if (!imageUrl) return entry;
+    if ('imageUrl' in record && !record.imageUrl) {
+      changed = true;
+      return { ...record, imageUrl };
+    }
+    if ('rewardIconUrl' in record && !record.rewardIconUrl) {
+      changed = true;
+      return { ...record, rewardIconUrl: imageUrl };
+    }
+    if ('iconUrl' in record && !record.iconUrl) {
+      changed = true;
+      return { ...record, iconUrl: imageUrl };
+    }
+    return entry;
+  });
+  if (!changed) return item;
+  const cleanValue = JSON.stringify(nextValue);
+  const mediaNote = 'Иконки сопоставлены по точному русскому названию файла из Fandom RU.';
+  return {
+    ...item,
+    id: item.id + ':media:' + hashText(cleanValue).slice(0, 8),
+    value: cleanValue,
+    note: item.note ? item.note + ' ' + mediaNote : mediaNote,
+  };
+}
+
+function enrichCharacterImportSuggestions(items) {
+  const imageMap = importImageMapFromSuggestions(items);
+  return items.map((item) => enrichArraySuggestionMedia(item, imageMap));
+}
+
 function dedupeImportSuggestions(items) {
   const scalarFields = new Set([
     'name',
@@ -3728,7 +3877,7 @@ function dedupeImportSuggestions(items) {
   const result = [];
 
   for (const item of items) {
-    if (!item) continue;
+    if (!item || item.field.startsWith('__')) continue;
     const key = `${item.field}:${item.value}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -3814,7 +3963,7 @@ async function handleCharacterImportLookup(request, env) {
   });
   if (voiceMediaSource) sourceResults.push(voiceMediaSource);
   const suggestions = dedupeImportSuggestions(
-    sourceResults.flatMap((source) => source.suggestions),
+    enrichCharacterImportSuggestions(sourceResults.flatMap((source) => source.suggestions)),
   );
   return json({
     data: {

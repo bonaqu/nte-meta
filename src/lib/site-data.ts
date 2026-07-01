@@ -50,6 +50,32 @@ export function groupTierItems(data: SiteData) {
   return { tierlist, grouped };
 }
 
+export function getCharacterTierPlacement(data: SiteData, characterId: string) {
+  const tierlist = getUnifiedTierList(data);
+  const itemIndex = tierlist?.items.findIndex(
+    (item) => item.characterId === characterId,
+  );
+
+  if (!tierlist || itemIndex === undefined || itemIndex < 0) {
+    return null;
+  }
+
+  const item = tierlist.items[itemIndex];
+  const tier = normalizeTier(item.tier);
+  const position =
+    tierlist.items
+      .slice(0, itemIndex + 1)
+      .filter((candidate) => normalizeTier(candidate.tier) === tier).length || 1;
+
+  return {
+    tier,
+    position,
+    note: item.note,
+    patch: tierlist.patch,
+    updatedAt: tierlist.updatedAt,
+  };
+}
+
 export function normalizeSearchText(value: string) {
   return value.trim().toLocaleLowerCase('ru-RU');
 }

@@ -8,7 +8,7 @@ const publicBase = viteBase.endsWith('/') ? viteBase : `${viteBase}/`;
  * GitHub Pages, так и в локальной разработке или на будущем домене.
  */
 export function resolveAssetUrl(value?: string | null) {
-  const url = String(value || '').trim();
+  const url = normalizeExternalAssetUrl(value);
   if (!url) return '';
   if (/^(?:https?:|data:|blob:)/i.test(url)) return url;
   if (url.startsWith(publicBase) || url.startsWith('/nte-meta/')) return url;
@@ -18,5 +18,16 @@ export function resolveAssetUrl(value?: string | null) {
   if (url.startsWith('assets/')) {
     return `${publicBase}${url}`;
   }
+  return url;
+}
+
+export function normalizeExternalAssetUrl(value?: string | null) {
+  const url = String(value || '').trim().replace(/&amp;/g, '&');
+  if (!url) return '';
+
+  if (/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) {
+    return url.replace(/\/revision\/latest(?:\/[^?]*)?(?:\?.*)?$/i, '');
+  }
+
   return url;
 }

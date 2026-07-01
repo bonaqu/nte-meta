@@ -85,11 +85,12 @@ import {
   updateWarningStatus,
 } from './lib/api';
 import { applyMarkdownAction, MarkdownPreview } from './lib/markdown';
-import { resolveAssetUrl } from './lib/assets';
+import { normalizeExternalAssetUrl, resolveAssetUrl } from './lib/assets';
 import {
   formatDate,
   getCharacter,
   getCharacterSearchText,
+  getCharacterTierPlacement,
   getGuideCharacter,
   getUnifiedTierList,
   groupTierItems,
@@ -166,37 +167,7 @@ function canAccessAdmin(user: User | null) {
 }
 
 type SiteDataSetter = React.Dispatch<React.SetStateAction<SiteData>>;
-const roleOptions = [
-  'Все роли',
-  'DD',
-  'Sub DD',
-  'Damage Booster',
-  'Burst DPS',
-  'Sustain DPS',
-  'AoE DPS',
-  'Sub DPS',
-  'Support',
-  'Buffer',
-  'Debuffer',
-  'Healer',
-  'Tank',
-  'Control',
-  'Flex',
-];
-const typeOptions = [
-  'Все типы',
-  'DPS',
-  'Sub DPS',
-  'Damage Booster',
-  'Support',
-  'Buffer',
-  'Debuffer',
-  'Healer',
-  'Tank',
-  'Control',
-  'Flex',
-];
-const rarityOptions = ['Любая редкость', 'S', 'A', 'Нулевой'];
+const rarityOptions = ['Любая редкость', 'S', 'A'];
 const tierOptions = ['Любой тир', ...tierOrder];
 
 function makeSlug(value: string) {
@@ -230,7 +201,10 @@ function useHashRoute() {
   const [route, setRoute] = useState(() => getRoute());
 
   useEffect(() => {
-    const onHashChange = () => setRoute(getRoute());
+    const onHashChange = () =>
+      setRoute((currentRoute) =>
+        window.location.hash.startsWith('#/') ? getRoute() : currentRoute,
+      );
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
@@ -1622,8 +1596,6 @@ function CharactersPage({
 }) {
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
-  const [role, setRole] = useState('Все роли');
-  const [type, setType] = useState('Все типы');
   const [rarity, setRarity] = useState('Любая редкость');
   const [tier, setTier] = useState('Любой тир');
   const [attribute, setAttribute] = useState('Любой тип эспера');
@@ -1656,18 +1628,14 @@ function CharactersPage({
         const queryMatch =
           !normalizedQuery || searchText.includes(normalizedQuery);
         return (
-          queryMatch &&
-          (role === 'Все роли' ||
-            character.role === role ||
-            character.profile?.roleTags.includes(role)) &&
-          (type === 'Все типы' || character.type === type) &&
-          (rarity === 'Любая редкость' || character.rarity === rarity) &&
+            queryMatch &&
+            (rarity === 'Любая редкость' || character.rarity === rarity) &&
           (tier === 'Любой тир' || character.tier === tier) &&
           (attribute === 'Любой тип эспера' || character.attribute === attribute)
         );
       })
       .map(({ character }) => character);
-  }, [attribute, deferredQuery, indexedCharacters, rarity, role, tier, type]);
+  }, [attribute, deferredQuery, indexedCharacters, rarity, tier]);
 
   async function refreshContent() {
     setData(
@@ -1699,7 +1667,7 @@ function CharactersPage({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Имя, роль, тег..."
+          placeholder="Имя, атрибут, тег..."
             aria-describedby="character-results-count"
           />
         </label>
@@ -1708,18 +1676,6 @@ function CharactersPage({
           value={tier}
           setValue={setTier}
           options={tierOptions}
-        />
-        <SelectFilter
-          label="Роль"
-          value={role}
-          setValue={setRole}
-          options={roleOptions}
-        />
-        <SelectFilter
-          label="Тип"
-          value={type}
-          setValue={setType}
-          options={typeOptions}
         />
         <SelectFilter
           label="Тип эспера"
@@ -1862,9 +1818,9 @@ function CharacterDetailPage({
     gifts: [],
     voiceLines: [],
     awakenings: [],
-    consoles: [],
   };
   const guide = data.guides.find((item) => item.characterId === character.id);
+  const tierPlacement = getCharacterTierPlacement(data, character.id);
 
   const canPlayVoiceAudio = (url: string) =>
     Boolean(url) && !/youtube\.com|youtu\.be|vimeo\.com/i.test(url);
@@ -1911,11 +1867,19 @@ function CharacterDetailPage({
           <dd>{profile.arcType || 'Не указан'}</dd>
         </div>
         <div>
-              <dt>Редкость</dt>
-              <dd>{character.rarity}</dd>
-            </div>
-            <div>
-              <dt>Фракция</dt>
+          <dt>Редкость</dt>
+          <dd>{character.rarity}</dd>
+        </div>
+        <div>
+          <dt>Тир-лист</dt>
+          <dd>
+            {tierPlacement
+              ? `${tierPlacement.tier} · место ${tierPlacement.position}`
+              : 'Не задан'}
+          </dd>
+        </div>
+        <div>
+          <dt>Фракция</dt>
               <dd>{profile.faction || 'Не указана'}</dd>
             </div>
           </dl>
@@ -1948,12 +1912,25 @@ function CharacterDetailPage({
       </section>
 
       <nav className="character-section-nav" aria-label="Разделы персонажа">
-        <a href="#character-biography">Биография</a>
-        <a href="#character-abilities">Способности</a>
-        <a href="#character-awakenings">Пробуждения</a>
-        <a href="#character-consoles">Консоль</a>
-        <a href="#character-progression">Прокачка</a>
-        <a href="#character-voice">Озвучка</a>
+        {[
+          ['character-biography', 'Биография'],
+          ['character-abilities', 'Способности'],
+          ['character-awakenings', 'Пробуждения'],
+          ['character-progression', 'Прокачка'],
+          ['character-voice', 'Озвучка'],
+        ].map(([id, label]) => (
+          <button
+            type="button"
+            key={id}
+            onClick={() =>
+              document
+                .getElementById(id)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+          >
+            {label}
+          </button>
+        ))}
       </nav>
 
       <section className="character-detail-section" id="character-biography">
@@ -2073,51 +2050,6 @@ function CharacterDetailPage({
           <EmptyState
             title="Пробуждения не добавлены"
             text="Для C0 персонаж используется без дополнительных пробуждений."
-          />
-        )}
-      </section>
-
-      <section className="character-detail-section" id="character-consoles">
-        <SectionHeader
-          title="Консоль и модули"
-          text="Рекомендуемые консоли, их особенности и подходящие модули."
-        />
-        {profile.consoles.length ? (
-          <div className="console-list">
-            {profile.consoles.map((consoleItem) => (
-              <article key={consoleItem.id}>
-                <div className="console-gallery">
-                  {consoleItem.imageUrls.map((imageUrl) => (
-                    <img
-                      key={imageUrl}
-                      src={resolveAssetUrl(imageUrl)}
-                      alt={consoleItem.name}
-                      width="260"
-                      height="180"
-                      loading="lazy"
-                    />
-                  ))}
-                </div>
-                <h3>{consoleItem.name}</h3>
-                <MarkdownPreview value={consoleItem.description} />
-                <ul>
-                  {consoleItem.features.map((feature) => (
-                    <li key={feature}>{feature}</li>
-                  ))}
-                </ul>
-                {consoleItem.recommendedModules ? (
-                  <>
-                    <h4>Рекомендуемые модули</h4>
-                    <MarkdownPreview value={consoleItem.recommendedModules} />
-                  </>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            title="Консоль пока не выбрана"
-            text="Раздел появится после редакционной проверки модулей и эффектов."
           />
         )}
       </section>
@@ -2379,7 +2311,13 @@ function GuidePage({
   );
 }
 
-function CharacterHero({ character }: { character: Character }) {
+function CharacterHero({
+  character,
+  tierPlacement,
+}: {
+  character: Character;
+  tierPlacement: ReturnType<typeof getCharacterTierPlacement>;
+}) {
   return (
     <section className="guide-hero">
       <img
@@ -2408,10 +2346,14 @@ function CharacterHero({ character }: { character: Character }) {
             <dt>Редкость</dt>
             <dd>{character.rarity}</dd>
           </div>
-          <div>
-            <dt>Тир</dt>
-            <dd>{character.tier}</dd>
-          </div>
+        <div>
+          <dt>Тир</dt>
+          <dd>
+            {tierPlacement
+              ? `${tierPlacement.tier} · место ${tierPlacement.position}`
+              : 'Не задан'}
+          </dd>
+        </div>
         </dl>
         <Tags tags={character.tags} />
       </div>
@@ -2439,13 +2381,14 @@ function GuideDetail({
       team.guideId === guide.id ||
       team.members.some((member) => member.characterId === character.id),
   );
+  const tierPlacement = getCharacterTierPlacement(data, character.id);
   const orderedSections = [...guide.sections].sort(
     (a, b) => a.position - b.position,
   );
 
   return (
     <div className="page-stack">
-      <CharacterHero character={character} />
+      <CharacterHero character={character} tierPlacement={tierPlacement} />
       <section className="guide-toolbar">
         <div>
           <p>Гайд · патч {guide.patch}</p>
@@ -3103,8 +3046,6 @@ function GuidesPage({
 }) {
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
-  const [role, setRole] = useState('Все роли');
-  const [type, setType] = useState('Все типы');
   const [rarity, setRarity] = useState('Любая редкость');
   const [tier, setTier] = useState('Любой тир');
   const [attribute, setAttribute] = useState('Любой тип эспера');
@@ -3125,18 +3066,14 @@ function GuidesPage({
       const searchText = normalizeSearchText(
         `${guide.title} ${guide.summary} ${getCharacterSearchText(character)}`,
       );
-      return (
-        (!needle || searchText.includes(needle)) &&
-        (role === 'Все роли' ||
-          character.role === role ||
-          character.profile?.roleTags.includes(role)) &&
-        (type === 'Все типы' || character.type === type) &&
-        (rarity === 'Любая редкость' || character.rarity === rarity) &&
-        (tier === 'Любой тир' || character.tier === tier) &&
-        (attribute === 'Любой тип эспера' || character.attribute === attribute)
-      );
-    });
-  }, [attribute, data, deferredQuery, rarity, role, tier, type]);
+          return (
+            (!needle || searchText.includes(needle)) &&
+            (rarity === 'Любая редкость' || character.rarity === rarity) &&
+            (tier === 'Любой тир' || character.tier === tier) &&
+            (attribute === 'Любой тип эспера' || character.attribute === attribute)
+          );
+        });
+  }, [attribute, data, deferredQuery, rarity, tier]);
 
   return (
     <div className="page-stack">
@@ -3161,7 +3098,7 @@ function GuidesPage({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Имя, роль, тег..."
+              placeholder="Имя, атрибут, тег..."
             aria-describedby="guide-results-count"
           />
         </label>
@@ -3170,18 +3107,6 @@ function GuidesPage({
           value={tier}
           setValue={setTier}
           options={tierOptions}
-        />
-        <SelectFilter
-          label="Роль"
-          value={role}
-          setValue={setRole}
-          options={roleOptions}
-        />
-        <SelectFilter
-          label="Тип"
-          value={type}
-          setValue={setType}
-          options={typeOptions}
         />
         <SelectFilter
           label="Тип эспера"
@@ -4297,6 +4222,49 @@ function formatGuideImportValue(value: string) {
   }
 }
 
+function getYoutubeThumbnailUrl(url: string) {
+  const match = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/,
+  );
+  return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : '';
+}
+
+function getGuideImportPreviewUrl(suggestion: CharacterImportSuggestion) {
+  try {
+    const parsed = JSON.parse(suggestion.value) as unknown;
+    if (typeof parsed === 'string') {
+      return (
+        getYoutubeThumbnailUrl(parsed) ||
+        (/(?:image|splash|icon)url/i.test(suggestion.field)
+          ? normalizeExternalAssetUrl(parsed)
+          : '')
+      );
+    }
+    if (Array.isArray(parsed)) {
+      const mediaValue = parsed
+        .flatMap((item) =>
+          item && typeof item === 'object' ? Object.values(item) : [item],
+        )
+        .find(
+          (value) =>
+            typeof value === 'string' &&
+            (/^https?:/i.test(value) || value.startsWith('assets/')),
+        );
+      return typeof mediaValue === 'string'
+        ? getYoutubeThumbnailUrl(mediaValue) || normalizeExternalAssetUrl(mediaValue)
+        : '';
+    }
+  } catch {
+    return (
+      getYoutubeThumbnailUrl(suggestion.value) ||
+      (/(?:image|splash|icon)url/i.test(suggestion.field)
+        ? normalizeExternalAssetUrl(suggestion.value)
+        : '')
+    );
+  }
+  return '';
+}
+
 function GuideCreateFields({
   characters,
   initialCharacterId,
@@ -4784,18 +4752,33 @@ function AdminGuides({
   }
 
   function applyGuideImportSuggestion(suggestion: CharacterImportSuggestion) {
-    const sectionTitle =
-      suggestion.field === 'guide.bestArcs'
-        ? 'Лучшие дуги'
-        : suggestion.field === 'tier'
-          ? 'TL;DR / короткий вывод'
-          : 'Импортированные заметки';
-    const sectionType =
-      suggestion.field === 'guide.bestArcs'
-        ? 'arcs'
-        : suggestion.field === 'tier'
-          ? 'summary'
-          : 'import';
+    if (suggestion.field === 'guide.videoUrl') {
+      setGuideMeta((current) => ({ ...current, videoUrl: suggestion.value }));
+      setGuideImportDecisions((current) => ({
+        ...current,
+        [suggestion.id]: 'accepted',
+      }));
+      setMessage('YouTube-ссылка добавлена в параметры гайда. Проверьте превью и сохраните.');
+      return;
+    }
+
+    const guideImportSections: Record<string, { title: string; type: string }> =
+      {
+        'guide.bestArcs': { title: 'Лучшие дуги', type: 'arcs' },
+        'guide.alternativeArcs': { title: 'Альтернативные дуги', type: 'arcs' },
+        'guide.rotations': { title: 'Ротации', type: 'rotation' },
+        'guide.tips': { title: 'Советы и механики', type: 'tips' },
+        'guide.teams': { title: 'Лучшие команды', type: 'teams' },
+        'guide.videoUrl': { title: 'Видео-гайд', type: 'video' },
+        'guide.awakenings': { title: 'Пробуждения и резонансы', type: 'awakening' },
+        tier: { title: 'TL;DR / короткий вывод', type: 'summary' },
+      };
+    const sectionConfig = guideImportSections[suggestion.field] || {
+      title: 'Импортированные заметки',
+      type: 'import',
+    };
+    const sectionTitle = sectionConfig.title;
+    const sectionType = sectionConfig.type;
     const importMarkdown = [
       `### ${suggestion.label}`,
       formatGuideImportValue(suggestion.value),
@@ -5254,20 +5237,35 @@ function AdminGuides({
           <Search aria-hidden="true" /> Найти источники гайда
         </button>
         {guideImportSuggestions.length ? (
-          <div className="import-suggestion-list">
-            {guideImportSuggestions.map((suggestion) => {
-              const decision = guideImportDecisions[suggestion.id];
-              return (
-                <article
-                  className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
-                  key={suggestion.id}
-                >
-                  <div>
-                    <strong>{suggestion.label}</strong>
-                    <span>{suggestion.field}</span>
-                  </div>
-                  <p>{formatGuideImportValue(suggestion.value)}</p>
-                  <small>
+            <div className="import-suggestion-list">
+              {guideImportSuggestions.map((suggestion) => {
+                const decision = guideImportDecisions[suggestion.id];
+                const previewUrl = getGuideImportPreviewUrl(suggestion);
+                return (
+                  <article
+                    className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
+                    key={suggestion.id}
+                  >
+                    <div>
+                      <strong>{suggestion.label}</strong>
+                      <span>Секция гайда</span>
+                    </div>
+                    <div className="import-suggestion-value">
+                      {previewUrl ? (
+                        <img
+                          src={resolveAssetUrl(previewUrl)}
+                          alt=""
+                          width="92"
+                          height="92"
+                          loading="lazy"
+                          onError={(event) => {
+                            event.currentTarget.hidden = true;
+                          }}
+                        />
+                      ) : null}
+                      <p>{formatGuideImportValue(suggestion.value)}</p>
+                    </div>
+                    <small>
                     {suggestion.sourceName} · уверенность: {suggestion.confidence}
                     {suggestion.note ? ` · ${suggestion.note}` : ''}
                   </small>

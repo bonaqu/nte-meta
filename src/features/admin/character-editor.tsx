@@ -16,12 +16,11 @@ import {
   saveEntity,
 } from '../../lib/api';
 import { applyMarkdownAction, MarkdownPreview } from '../../lib/markdown';
-import { resolveAssetUrl } from '../../lib/assets';
+import { normalizeExternalAssetUrl, resolveAssetUrl } from '../../lib/assets';
 import type {
   Character,
   CharacterAbility,
   CharacterAwakening,
-  CharacterConsole,
   CharacterFriendshipLevel,
   CharacterGift,
   CharacterImportSuggestion,
@@ -216,6 +215,8 @@ function ImportSuggestionList({
       <div className="import-suggestion-list">
         {suggestions.map((suggestion) => {
           const decision = decisions[suggestion.id];
+          const previewUrl = getSuggestionPreviewUrl(suggestion);
+          const fieldLabel = getSuggestionFieldLabel(suggestion);
           return (
             <article
               className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
@@ -223,9 +224,23 @@ function ImportSuggestionList({
             >
               <div>
                 <strong>{suggestion.label}</strong>
-                <span>{suggestion.field}</span>
+                <span>{fieldLabel}</span>
               </div>
-              <p>{summarizeSuggestionValue(suggestion.value)}</p>
+              <div className="import-suggestion-value">
+                {previewUrl ? (
+                  <img
+                    src={resolveAssetUrl(previewUrl)}
+                    alt=""
+                    width="92"
+                    height="92"
+                    loading="lazy"
+                    onError={(event) => {
+                      event.currentTarget.hidden = true;
+                    }}
+                  />
+                ) : null}
+                <p>{summarizeSuggestionValue(suggestion.value)}</p>
+              </div>
               <small>
                 {suggestion.sourceName} · уверенность: {suggestion.confidence}
                 {suggestion.note ? ` · ${suggestion.note}` : ''}
@@ -277,6 +292,109 @@ function parseImportValue(value: string) {
   } catch {
     return value;
   }
+}
+
+function getSuggestionPreviewUrl(suggestion: CharacterImportSuggestion) {
+  const parsed = parseImportValue(suggestion.value);
+  if (typeof parsed === 'string' && /(?:image|splash|icon)url/i.test(suggestion.field)) {
+    return normalizeExternalAssetUrl(parsed);
+  }
+
+  if (Array.isArray(parsed)) {
+    const firstImage = parsed
+      .flatMap((item) =>
+        item && typeof item === 'object' ? Object.values(item) : [],
+      )
+      .find((value) => typeof value === 'string' && /^https?:|^assets\//i.test(value));
+    return typeof firstImage === 'string'
+      ? normalizeExternalAssetUrl(firstImage)
+      : '';
+  }
+
+  return '';
+}
+
+function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {
+  const labels: Record<string, string> = {
+    name: 'Имя',
+    originalName: 'Оригинальное имя',
+    rarity: 'Редкость',
+    attribute: 'Тип эспера',
+    tier: 'Тир',
+    imageUrl: 'Карточка персонажа',
+    splashUrl: 'Splash персонажа',
+    'profile.arcType': 'Тип дуги',
+    'profile.birthday': 'День рождения',
+    'profile.releaseDate': 'Дата релиза',
+    'profile.faction': 'Фракция',
+    'profile.biographyShort': 'Краткая биография',
+    'profile.biography': 'Подробная биография',
+    'profile.trivia': 'Интересные факты',
+    'profile.roleTags': 'Роли в отряде',
+    'profile.voiceActors': 'Актёры озвучки',
+    'profile.voiceLines': 'Реплики',
+    'profile.materials': 'Материалы прокачки',
+    'profile.baseStats': 'Начальные показатели',
+    'profile.abilities': 'Способности',
+    'profile.awakenings': 'Пробуждения',
+    'profile.friendship': 'Симпатия',
+    'profile.gifts': 'Любимые подарки',
+    'profile.skins': 'Гардероб',
+  };
+  return labels[suggestion.field] || suggestion.label;
+}
+
+function formatEditorError(error: string) {
+  const text = error || 'Не удалось сохранить изменения.';
+  if (/profile\.awakenings.+не больше 7 записей/i.test(text)) {
+    return 'В пробуждениях можно сохранить не больше 7 строк. Оставьте C0-C6 или удалите лишние записи.';
+  }
+  if (/profile\.abilities.+не больше/i.test(text)) {
+    return 'В способностях слишком много строк. Оставьте основные навыки персонажа и удалите лишнее.';
+  }
+  if (/profile\./i.test(text)) {
+    return text
+      .replace(/profile\.awakenings/g, 'Пробуждения')
+      .replace(/profile\.abilities/g, 'Способности')
+      .replace(/profile\.voiceActors/g, 'Актёры озвучки')
+      .replace(/profile\.voiceLines/g, 'Реплики')
+      .replace(/profile\.baseStats/g, 'Начальные показатели')
+      .replace(/profile\.materials/g, 'Материалы')
+      .replace(/Поле\s+/g, '');
+  }
+  return text;
+}
+
+function readSmallIconFile(file: File) {
+  const allowedTypes = new Set(['image/png', 'image/webp', 'image/jpeg']);
+  const maxBytes = 250 * 1024;
+  const maxSide = 512;
+
+  if (!allowedTypes.has(file.type)) {
+    throw new Error('Поддерживаются только PNG, WebP или JPEG.');
+  }
+  if (file.size > maxBytes) {
+    throw new Error('Иконка должна весить не больше 250 KB.');
+  }
+
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Не удалось прочитать файл.'));
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      const image = new Image();
+      image.onerror = () => reject(new Error('Не удалось проверить изображение.'));
+      image.onload = () => {
+        if (image.naturalWidth > maxSide || image.naturalHeight > maxSide) {
+          reject(new Error('Размер иконки должен быть не больше 512×512 px.'));
+          return;
+        }
+        resolve(dataUrl);
+      };
+      image.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function mergeText(current: string, addition: string) {
@@ -486,7 +604,7 @@ export function AdminCharacterEditor({
       setImportDecisions({});
     } else {
       setTone('danger');
-      setMessage(result.error);
+      setMessage(formatEditorError(result.error));
     }
     setPending(false);
   }
@@ -500,7 +618,7 @@ export function AdminCharacterEditor({
       };
       if (suggestion.field === 'name') next.name = String(parsed);
       else if (suggestion.field === 'originalName') next.originalName = String(parsed);
-      else if (suggestion.field === 'rarity' && ['S', 'A', 'Нулевой'].includes(String(parsed))) {
+      else if (suggestion.field === 'rarity' && ['S', 'A'].includes(String(parsed))) {
         next.rarity = String(parsed) as Character['rarity'];
       } else if (suggestion.field === 'attribute') next.attribute = String(parsed);
       else if (suggestion.field === 'tier' && tiers.includes(String(parsed) as Tier)) {
@@ -535,14 +653,9 @@ export function AdminCharacterEditor({
       } else if (suggestion.field === 'profile.awakenings' && Array.isArray(parsed)) {
         next.profile.awakenings = parsed as CharacterAwakening[];
       } else if (suggestion.field === 'imageUrl') {
-        next.imageUrl = String(parsed);
+        next.imageUrl = normalizeExternalAssetUrl(String(parsed));
       } else if (suggestion.field === 'splashUrl') {
-        next.splashUrl = String(parsed);
-      } else if (suggestion.field.startsWith('guide.')) {
-        next.profile.trivia = mergeText(
-          next.profile.trivia,
-          `Импорт для гайда (${suggestion.label}): ${String(parsed)}`,
-        );
+        next.splashUrl = normalizeExternalAssetUrl(String(parsed));
       }
       return next;
     });
@@ -550,8 +663,24 @@ export function AdminCharacterEditor({
       ...current,
       [suggestion.id]: 'accepted',
     }));
-    setTone('success');
-    setMessage(`Поле «${suggestion.label}» добавлено в черновик. Проверьте и сохраните персонажа.`);
+  setTone('success');
+  setMessage(`Поле «${suggestion.label}» добавлено в черновик. Проверьте и сохраните персонажа.`);
+  }
+
+  async function uploadInlineIcon(
+    file: File | undefined,
+    onReady: (dataUrl: string) => void,
+  ) {
+    if (!file) return;
+    try {
+      const dataUrl = await readSmallIconFile(file);
+      onReady(dataUrl);
+      setTone('success');
+      setMessage('Иконка загружена в черновик. Проверьте предпросмотр и сохраните персонажа.');
+    } catch (error) {
+      setTone('danger');
+      setMessage(error instanceof Error ? error.message : 'Не удалось загрузить иконку.');
+    }
   }
 
   async function persist(status: 'draft' | 'published') {
@@ -594,7 +723,7 @@ export function AdminCharacterEditor({
       );
     } else {
       setTone('danger');
-      setMessage(result.error);
+      setMessage(formatEditorError(result.error));
     }
     setPending(false);
   }
@@ -612,7 +741,7 @@ export function AdminCharacterEditor({
       setMessage('Страница персонажа удалена.');
     } else {
       setTone('danger');
-      setMessage(result.error);
+      setMessage(formatEditorError(result.error));
     }
     setPending(false);
   }
@@ -829,9 +958,8 @@ export function AdminCharacterEditor({
               >
                 <option value="S">S</option>
                 <option value="A">A</option>
-                <option value="Нулевой">Нулевой</option>
-              </select>
-            </label>
+                </select>
+              </label>
             <label>
               Основная роль
               <input
@@ -1042,7 +1170,7 @@ export function AdminCharacterEditor({
             createItem={() => ({
               id: rowId(),
               name: '',
-              type: 'Активный навык',
+              type: 'Базовая атака',
               iconUrl: '',
               description: '',
             })}
@@ -1060,12 +1188,25 @@ export function AdminCharacterEditor({
                 </label>
                 <label>
                   Тип
-                  <input
+                  <select
                     value={item.type}
                     onChange={(event) =>
                       update({ ...item, type: event.target.value })
                     }
-                  />
+                  >
+                    {[
+                      'Базовая атака',
+                      'Навык',
+                      'Сверхспособность',
+                      'Навык поддержки',
+                      'Пассивный навык',
+                      'Повседневный навык',
+                    ].map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label>
                   URL иконки
@@ -1078,6 +1219,28 @@ export function AdminCharacterEditor({
                     }
                   />
                 </label>
+                <label>
+                  Загрузить иконку
+                  <input
+                    type="file"
+                    accept="image/png,image/webp,image/jpeg"
+                    onChange={(event) =>
+                      void uploadInlineIcon(event.target.files?.[0], (iconUrl) =>
+                        update({ ...item, iconUrl }),
+                      )
+                    }
+                  />
+                </label>
+                {item.iconUrl ? (
+                  <img
+                    className="editor-icon-preview"
+                    src={resolveAssetUrl(item.iconUrl)}
+                    alt=""
+                    width="54"
+                    height="54"
+                    loading="lazy"
+                  />
+                ) : null}
                 <label className="wide-field">
                   Описание
                   <textarea
@@ -1140,6 +1303,28 @@ export function AdminCharacterEditor({
                     }
                   />
                 </label>
+                <label>
+                  Загрузить иконку
+                  <input
+                    type="file"
+                    accept="image/png,image/webp,image/jpeg"
+                    onChange={(event) =>
+                      void uploadInlineIcon(event.target.files?.[0], (iconUrl) =>
+                        update({ ...item, iconUrl }),
+                      )
+                    }
+                  />
+                </label>
+                {item.iconUrl ? (
+                  <img
+                    className="editor-icon-preview"
+                    src={resolveAssetUrl(item.iconUrl)}
+                    alt=""
+                    width="54"
+                    height="54"
+                    loading="lazy"
+                  />
+                ) : null}
                 <label className="wide-field">
                   Описание
                   <textarea
@@ -1360,93 +1545,6 @@ export function AdminCharacterEditor({
                     value={item.description}
                     onChange={(event) =>
                       update({ ...item, description: event.target.value })
-                    }
-                  />
-                </label>
-              </>
-            )}
-          />
-        </details>
-
-        <details className="editor-section">
-          <summary>Консоли и модули</summary>
-          <Collection<CharacterConsole>
-            title="Рекомендуемые консоли"
-            description="Изображения, особенности консоли и рекомендуемые модули."
-            items={profile.consoles}
-            addLabel="Добавить консоль"
-            createItem={() => ({
-              id: rowId(),
-              name: '',
-              imageUrls: [],
-              description: '',
-              features: [],
-              recommendedModules: '',
-            })}
-            onChange={(consoles) => patchProfile({ consoles })}
-            render={(item, _index, update) => (
-              <>
-                <label>
-                  Название
-                  <input
-                    value={item.name}
-                    onChange={(event) =>
-                      update({ ...item, name: event.target.value })
-                    }
-                  />
-                </label>
-                <label className="wide-field">
-                  URL изображений, по одному на строку
-                  <textarea
-                    rows={3}
-                    value={item.imageUrls.join('\n')}
-                    onChange={(event) =>
-                      update({
-                        ...item,
-                        imageUrls: event.target.value
-                          .split('\n')
-                          .map((line) => line.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                  />
-                </label>
-                <label className="wide-field">
-                  Описание
-                  <textarea
-                    rows={5}
-                    value={item.description}
-                    onChange={(event) =>
-                      update({ ...item, description: event.target.value })
-                    }
-                  />
-                </label>
-                <label className="wide-field">
-                  Особенности, по одной на строку
-                  <textarea
-                    rows={4}
-                    value={item.features.join('\n')}
-                    onChange={(event) =>
-                      update({
-                        ...item,
-                        features: event.target.value
-                          .split('\n')
-                          .map((line) => line.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                  />
-                </label>
-                <label className="wide-field">
-                  Рекомендуемые модули
-                  <textarea
-                    rows={4}
-                    value={item.recommendedModules}
-                    onChange={(event) =>
-                      update({
-                        ...item,
-                        recommendedModules: event.target.value,
-                      })
                     }
                   />
                 </label>

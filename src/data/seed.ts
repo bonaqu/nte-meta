@@ -330,7 +330,7 @@ const characterBase: Character[] = [
     slug: 'esper-zero',
     name: 'Нулевой эспер',
     originalName: 'Esper Zero',
-    rarity: 'Нулевой',
+    rarity: 'S',
     role: 'Flex',
     type: 'Flex',
     attribute: 'Космос',

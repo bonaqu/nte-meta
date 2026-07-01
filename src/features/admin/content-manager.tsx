@@ -667,7 +667,7 @@ export function AdminCharactersManager({
           name: 'rarity',
           label: 'Редкость',
           kind: 'select',
-          options: options(['S', 'A', 'Нулевой']),
+          options: options(['S', 'A']),
         },
         { name: 'role', label: 'Роль', kind: 'text', required: true },
         { name: 'type', label: 'Тип', kind: 'text', required: true },

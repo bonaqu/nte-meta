@@ -129,7 +129,7 @@ export interface Character {
   slug: string;
   name: string;
   originalName: string;
-  rarity: 'S' | 'A' | 'Нулевой';
+  rarity: 'S' | 'A';
   role: string;
   type: string;
   attribute: string;

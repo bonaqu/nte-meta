@@ -92,6 +92,7 @@ import {
   getCharacterSearchText,
   getCharacterTierPlacement,
   getGuideCharacter,
+  getGuideForCharacter,
   getUnifiedTierList,
   groupTierItems,
   normalizeTier,
@@ -1819,7 +1820,7 @@ function CharacterDetailPage({
     voiceLines: [],
     awakenings: [],
   };
-  const guide = data.guides.find((item) => item.characterId === character.id);
+  const guide = getGuideForCharacter(data, character);
   const tierPlacement = getCharacterTierPlacement(data, character.id);
 
   const canPlayVoiceAudio = (url: string) =>

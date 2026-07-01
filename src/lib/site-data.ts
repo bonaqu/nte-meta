@@ -21,7 +21,41 @@ export function getCharacter(data: SiteData, id: string) {
 }
 
 export function getGuideCharacter(data: SiteData, guide: Guide) {
-  return getCharacter(data, guide.characterId);
+  const direct = getCharacter(data, guide.characterId);
+  if (direct) return direct;
+
+  const guideText = normalizeSearchText(
+    [guide.characterId, guide.slug, guide.title].join(' '),
+  );
+  return data.characters.find((character) => {
+    const candidates = [character.id, character.slug, character.name, character.originalName]
+      .map(normalizeSearchText)
+      .filter(Boolean);
+    return candidates.some((candidate) => candidate && guideText.includes(candidate));
+  });
+}
+
+export function getGuideForCharacter(data: SiteData, character: Character) {
+  const characterCandidates = [
+    character.id,
+    character.slug,
+    character.name,
+    character.originalName,
+  ]
+    .map(normalizeSearchText)
+    .filter(Boolean);
+
+  return data.guides.find((guide) => {
+    if (guide.characterId === character.id || guide.characterId === character.slug) {
+      return true;
+    }
+    const guideText = normalizeSearchText(
+      [guide.characterId, guide.slug, guide.title].join(' '),
+    );
+    return characterCandidates.some(
+      (candidate) => candidate && guideText.includes(candidate),
+    );
+  });
 }
 
 export function getUnifiedTierList(data: SiteData) {

@@ -2015,7 +2015,10 @@ function normalizeExternalImageUrl(value) {
   const url = String(value || '').trim().replace(/&amp;/g, '&');
   if (!url) return '';
   if (/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) {
-    return url.replace(/\/revision\/latest(?:\/[^?]*)?(?:\?.*)?$/i, '');
+    return url.replace(
+      /\/revision\/latest\/(?:scale-to-width-down|smart|thumbnail)\/[^?]*(\?.*)?$/i,
+      '/revision/latest$1',
+    );
   }
   if (url.startsWith('/nte/')) return `https://gamewith.ai${url}`;
   return url;
@@ -2117,6 +2120,9 @@ function characterImportSources(slug, character = {}) {
       .trim()
       .replace(/\s+/g, '_') || slug,
   );
+  const fandomRuImagePrefix = encodeURIComponent(
+    String(character.name || character.originalName || slug || '').trim() || slug,
+  );
 
   return [
     {
@@ -2133,6 +2139,14 @@ function characterImportSources(slug, character = {}) {
       trust: 'high',
       url: `https://neverness-to-everness.fandom.com/ru/api.php?action=query&generator=images&gimlimit=50&prop=imageinfo&iiprop=url|mime|size&format=json&formatversion=2&titles=${fandomRuTitle}&origin=*`,
       parser: parseFandomRuImagesImport,
+      raw: true,
+    },
+    {
+      id: 'fandom-ru-media-library',
+      name: 'Fandom RU: медиатека персонажа',
+      trust: 'high',
+      url: `https://neverness-to-everness.fandom.com/ru/api.php?action=query&list=allimages&aifrom=${fandomRuImagePrefix}&ailimit=50&aiprop=url|mime|size|dimensions&format=json&formatversion=2&origin=*`,
+      parser: parseFandomRuAllImagesImport,
       raw: true,
     },
     {
@@ -2566,12 +2580,22 @@ function cleanWikiText(value) {
     .trim();
 }
 
+function normalizeImportedRuText(value) {
+  return String(value || '')
+    .replace(/\bЦветение зените\b/g, 'Цветение в зените')
+    .trim();
+}
+
 function readWikiParam(content, key) {
   const pattern = new RegExp(
     `(?:^|\\n|\\|)\\s*${escapeRegExp(key)}\\s*=??\\s*([^\\n|{}]+)`,
     'i',
   );
-  return cleanWikiText(content.match(pattern)?.[1] || '');
+  const raw = String(content.match(pattern)?.[1] || '').replace(
+    /\s+(?:rarity|espertype|arctype|role\d*|gender|birthday|affiliation\d*|prefix\d*|obtain|releaseDate|voice[A-Z]{2}|namecard\w*|type|bagel_\w*|esperability)\s*=.*$/i,
+    '',
+  );
+  return normalizeImportedRuText(cleanWikiText(raw));
 }
 
 function formatRuImportDate(value) {
@@ -2651,19 +2675,103 @@ function parseFandomRuImagesImport(text, source, character) {
       ownImages.find((image) => /спл[эе]ш|splash/i.test(image.title)) ||
       ownImages.find((image) => image.height > image.width) ||
       card;
-    const imageMap = Object.fromEntries(
-      images.map((image) => {
-        const cleanTitle = image.title
-          .replace(/^Файл:/i, '')
-          .replace(/\.(png|webp|jpe?g|gif)$/i, '')
-          .trim();
-        return [cleanTitle, image.url];
-      }),
-    );
+    const imageMap = buildImportImageMap(images, character);
 
     return [
       makeImportSuggestion('imageUrl', 'Карточка персонажа', card?.url || '', source, 'high'),
       makeImportSuggestion('splashUrl', 'Splash персонажа', splash?.url || '', source, 'high'),
+      makeImportSuggestion('__imageMap', 'Индекс изображений', imageMap, source, 'low'),
+    ].filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function cleanImportImageTitle(title) {
+  return String(title || '')
+    .replace(/^Файл:/i, '')
+    .replace(/\.(png|webp|jpe?g|gif|svg)$/i, '')
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildImportImageMap(images, character = {}) {
+  const map = {};
+  const characterNames = characterNameCandidates(character);
+
+  for (const image of images) {
+    const title = cleanImportImageTitle(image.title);
+    if (!title || !image.url) continue;
+    const aliases = new Set([title]);
+    const normalizedTitle = normalizeImportSearch(title);
+
+    for (const characterName of characterNames) {
+      if (normalizedTitle.startsWith(characterName)) {
+        const alias = title.slice(characterName.length).trim();
+        if (alias) aliases.add(alias);
+      }
+      const prefixPattern = new RegExp(`^${escapeRegExp(characterName)}\\s+`, 'i');
+      const withoutCharacter = title.replace(prefixPattern, '').trim();
+      if (withoutCharacter && withoutCharacter !== title) aliases.add(withoutCharacter);
+    }
+
+    aliases.add(title.replace(/^(Роль|Редкость|Эспер)\s+/i, '').trim());
+    aliases.add(title.replace(/\s+(Иконка|Представление|СплэшАрт|Splash)$/i, '').trim());
+
+    for (const alias of aliases) {
+      if (alias) map[alias] = image.url;
+    }
+  }
+
+  return map;
+}
+
+function parseFandomRuAllImagesImport(text, source, character) {
+  try {
+    const payload = JSON.parse(text);
+    const images = (payload?.query?.allimages || [])
+      .map((image) => ({
+        title: String(image.name || image.title || ''),
+        url: normalizeExternalImageUrl(image.url || ''),
+        width: image.width || 0,
+        height: image.height || 0,
+        size: image.size || 0,
+      }))
+      .filter((image) => image.url);
+    const characterNames = characterNameCandidates(character);
+    const ownImages = images.filter((image) => {
+      const title = normalizeImportSearch(cleanImportImageTitle(image.title));
+      return characterNames.some((name) => title.includes(name));
+    });
+    const icon =
+      ownImages.find((image) => /(^|\s)иконка($|\s)/i.test(cleanImportImageTitle(image.title))) ||
+      ownImages.find((image) => /аватар/i.test(cleanImportImageTitle(image.title)));
+    const presentation = ownImages.find((image) =>
+      /представление|карточка/i.test(cleanImportImageTitle(image.title)),
+    );
+    const splash = ownImages.find((image) =>
+      /спл[эе]ш|splash/i.test(cleanImportImageTitle(image.title)),
+    );
+    const imageMap = buildImportImageMap(images, character);
+
+    return [
+      makeImportSuggestion(
+        'imageUrl',
+        'Иконка персонажа',
+        icon?.url || presentation?.url || '',
+        source,
+        'high',
+        'Подходит для миниатюр в списках, тир-листе и карточках.',
+      ),
+      makeImportSuggestion(
+        'splashUrl',
+        'Splash персонажа',
+        splash?.url || presentation?.url || '',
+        source,
+        'medium',
+        'Проверьте, что изображение подходит как крупный арт профиля.',
+      ),
       makeImportSuggestion('__imageMap', 'Индекс изображений', imageMap, source, 'low'),
     ].filter(Boolean);
   } catch {
@@ -3027,9 +3135,9 @@ function parseBtvaImport(text, source, character) {
 
 function gameWithLocaleText(value) {
   if (!value) return '';
-  if (typeof value === 'string') return value.trim();
-  if (typeof value !== 'object') return String(value).trim();
-  return String(value.ru || value.en || value.ja || value.cn || value.ko || '').trim();
+  if (typeof value === 'string') return normalizeImportedRuText(value);
+  if (typeof value !== 'object') return normalizeImportedRuText(value);
+  return normalizeImportedRuText(value.ru || value.en || value.ja || value.cn || value.ko || '');
 }
 
 function formatGameWithRuDate(value, options = {}) {
@@ -3863,9 +3971,19 @@ function importImageMapFromSuggestions(items) {
 }
 
 function findImportImageByName(imageMap, name) {
-  const normalizedName = normalizeImportSearch(name);
-  if (!normalizedName) return '';
-  return imageMap.get(normalizedName) || '';
+  const cleanName = cleanImportImageTitle(name);
+  const candidates = [
+    cleanName,
+    cleanName.replace(/[«»"]/g, '').trim(),
+    cleanName.replace(/^(Роль|Редкость|Эспер)\s+/i, '').trim(),
+  ]
+    .map((item) => normalizeImportSearch(item))
+    .filter(Boolean);
+  for (const candidate of candidates) {
+    const imageUrl = imageMap.get(candidate);
+    if (imageUrl) return imageUrl;
+  }
+  return '';
 }
 
 function enrichArraySuggestionMedia(item, imageMap) {
@@ -3950,6 +4068,7 @@ function dedupeImportSuggestions(items) {
   const sourceWeight = (item) => {
     const source = `${item.sourceName} ${item.sourceUrl}`.toLocaleLowerCase('ru-RU');
     if (source.includes('официаль')) return 100;
+    if (source.includes('медиатека персонажа')) return 98;
     if (source.includes('fandom ru')) return 95;
     if (source.includes('gamewith')) return 90;
     if (source.includes('nte wiki')) return 70;
@@ -3997,6 +4116,106 @@ function dedupeGuideImportSuggestions(items) {
     seen.add(key);
     return true;
   });
+}
+
+function collectImportMediaLookupNames(items) {
+  const names = [];
+  const add = (value) => {
+    const clean = normalizeImportedRuText(value);
+    if (!clean || clean === 'Не введено' || clean.length < 3 || clean.length > 80) return;
+    if (!names.some((name) => normalizeImportSearch(name) === normalizeImportSearch(clean))) {
+      names.push(clean);
+    }
+  };
+
+  for (const item of items) {
+    if (
+      !item ||
+      ![
+        'profile.abilities',
+        'profile.awakenings',
+        'profile.gifts',
+        'profile.materials',
+        'profile.skins',
+        'profile.friendship',
+      ].includes(item.field)
+    ) {
+      continue;
+    }
+    const parsed = parseImportSuggestionJson(item);
+    if (!Array.isArray(parsed)) continue;
+    for (const entry of parsed) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+      add(entry.name || entry.rewardName || entry.title || entry.label);
+    }
+  }
+
+  return names.slice(0, 12);
+}
+
+async function fetchFandomMediaLookupSource(items) {
+  const names = collectImportMediaLookupNames(items);
+  const source = {
+    id: 'fandom-ru-media-lookup',
+    name: 'Fandom RU: поиск иконок',
+    trust: 'high',
+    url: 'https://neverness-to-everness.fandom.com/ru/api.php?action=query&list=allimages',
+  };
+  if (!names.length) {
+    return {
+      ...source,
+      status: 'partial',
+      message: 'Нет названий для поиска иконок.',
+      suggestions: [],
+    };
+  }
+
+  const imageMap = {};
+  await Promise.all(
+    names.map(async (name) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), IMPORT_SOURCE_TIMEOUT_MS);
+      try {
+        const response = await fetch(
+          `${source.url}&aifrom=${encodeURIComponent(name)}&ailimit=6&aiprop=url|mime|size|dimensions&format=json&formatversion=2&origin=*`,
+          {
+            headers: {
+              accept: 'application/json',
+              'user-agent': 'NTE Meta editorial import bot; media lookup only',
+            },
+            signal: controller.signal,
+          },
+        );
+        if (!response.ok) return;
+        const payload = await response.json();
+        const normalizedName = normalizeImportSearch(name);
+        const exactImages = (payload?.query?.allimages || [])
+          .map((image) => ({
+            title: image.name || '',
+            url: normalizeExternalImageUrl(image.url || ''),
+          }))
+          .filter((image) => {
+            const title = normalizeImportSearch(cleanImportImageTitle(image.title));
+            return image.url && title.startsWith(normalizedName);
+          });
+        Object.assign(imageMap, buildImportImageMap(exactImages, {}));
+      } catch {
+        // Media lookup is best-effort; missing icons should not block text import.
+      } finally {
+        clearTimeout(timeout);
+      }
+    }),
+  );
+
+  const suggestion = makeImportSuggestion('__imageMap', 'Индекс иконок', imageMap, source, 'low');
+  return {
+    ...source,
+    status: suggestion ? 'ok' : 'partial',
+    message: suggestion
+      ? 'Найдены точные совпадения файлов для части строк.'
+      : 'Иконки навыков, пробуждений, подарков или материалов по точным названиям не найдены.',
+    suggestions: suggestion ? [suggestion] : [],
+  };
 }
 
 async function handleCharacterImportLookup(request, env) {
@@ -4050,6 +4269,8 @@ async function handleCharacterImportLookup(request, env) {
     slug,
   });
   if (voiceMediaSource) sourceResults.push(voiceMediaSource);
+  const rawSuggestions = sourceResults.flatMap((source) => source.suggestions);
+  sourceResults.push(await fetchFandomMediaLookupSource(rawSuggestions));
   const suggestions = dedupeImportSuggestions(
     enrichCharacterImportSuggestions(sourceResults.flatMap((source) => source.suggestions)),
   );

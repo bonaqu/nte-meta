@@ -2019,7 +2019,7 @@ function CharacterDetailPage({
 
       <section className="character-detail-section" id="character-awakenings">
         <SectionHeader
-          title="Пробуждения C0-C6"
+          title="Пробуждения 0-6"
           text="Каждый уровень показан отдельно, чтобы сравнение было прозрачным."
         />
         {profile.awakenings.length ? (
@@ -2038,10 +2038,14 @@ function CharacterDetailPage({
                     />
                   ) : null}
                   <div>
-                    <p className="eyebrow">C{awakening.level}</p>
-                    <h3>
-                      {awakening.name || `Пробуждение C${awakening.level}`}
-                    </h3>
+                  <p className="eyebrow">
+                    {awakening.level > 0
+                      ? `Пробуждение ${awakening.level}`
+                      : 'Без пробуждений'}
+                  </p>
+                  <h3>
+                    {awakening.name || `Пробуждение ${awakening.level}`}
+                  </h3>
                     <MarkdownPreview value={awakening.description} />
                   </div>
                 </article>
@@ -2050,7 +2054,7 @@ function CharacterDetailPage({
         ) : (
           <EmptyState
             title="Пробуждения не добавлены"
-            text="Для C0 персонаж используется без дополнительных пробуждений."
+            text="Без пробуждений персонаж используется без дополнительных эффектов."
           />
         )}
       </section>
@@ -5252,19 +5256,28 @@ function AdminGuides({
                       <strong>{suggestion.label}</strong>
                       <span>Секция гайда</span>
                     </div>
-                    <div className="import-suggestion-value">
-                      {previewUrl ? (
-                        <img
-                          src={resolveAssetUrl(previewUrl)}
-                          alt=""
-                          width="92"
-                          height="92"
-                          loading="lazy"
-                          onError={(event) => {
-                            event.currentTarget.hidden = true;
-                          }}
-                        />
-                      ) : null}
+                      <div className="import-suggestion-value">
+                        {previewUrl ? (
+                          <div className="import-image-preview">
+                            <img
+                              src={resolveAssetUrl(previewUrl)}
+                              alt=""
+                              width="92"
+                              height="92"
+                              loading="lazy"
+                              onError={(event) => {
+                                event.currentTarget.hidden = true;
+                              }}
+                            />
+                            <a
+                              href={resolveAssetUrl(previewUrl)}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Открыть изображение
+                            </a>
+                          </div>
+                        ) : null}
                       <p>{formatGuideImportValue(suggestion.value)}</p>
                     </div>
                     <small>

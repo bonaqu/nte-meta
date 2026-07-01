@@ -208,8 +208,8 @@ function ImportSuggestionList({
         <p className="eyebrow">Автоимпорт</p>
         <h3>Подтвердите найденные строки</h3>
         <p>
-          Данные не сохраняются автоматически. Примите только те поля, которые
-          сверены с источником.
+              Галочка применяет строку в черновик формы. На сайте данные появятся
+              только после сохранения или публикации.
         </p>
       </div>
       <div className="import-suggestion-list">
@@ -227,18 +227,27 @@ function ImportSuggestionList({
                 <span>{fieldLabel}</span>
               </div>
               <div className="import-suggestion-value">
-                {previewUrl ? (
-                  <img
-                    src={resolveAssetUrl(previewUrl)}
-                    alt=""
-                    width="92"
-                    height="92"
-                    loading="lazy"
-                    onError={(event) => {
-                      event.currentTarget.hidden = true;
-                    }}
-                  />
-                ) : null}
+                  {previewUrl ? (
+                    <div className="import-image-preview">
+                      <img
+                        src={resolveAssetUrl(previewUrl)}
+                        alt=""
+                        width="92"
+                        height="92"
+                        loading="lazy"
+                        onError={(event) => {
+                          event.currentTarget.hidden = true;
+                        }}
+                      />
+                      <a
+                        href={resolveAssetUrl(previewUrl)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Открыть изображение
+                      </a>
+                    </div>
+                  ) : null}
                 <p>{summarizeSuggestionValue(suggestion.value)}</p>
               </div>
               <small>
@@ -372,7 +381,7 @@ function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {
 function formatEditorError(error: string) {
   const text = error || 'Не удалось сохранить изменения.';
   if (/profile\.awakenings.+не больше 7 записей/i.test(text)) {
-    return 'В пробуждениях можно сохранить не больше 7 строк. Оставьте C0-C6 или удалите лишние записи.';
+    return 'В пробуждениях можно сохранить не больше 7 строк: пустой уровень и пробуждения 1-6. Удалите лишние записи.';
   }
   if (/profile\.abilities.+не больше/i.test(text)) {
     return 'В способностях слишком много строк. Оставьте основные навыки персонажа и удалите лишнее.';
@@ -1280,7 +1289,7 @@ export function AdminCharacterEditor({
             )}
           />
           <Collection<CharacterAwakening>
-            title="Пробуждения C0-C6"
+            title="Пробуждения 0-6"
             description="Каждое пробуждение можно добавить, изменить или удалить отдельно."
             items={profile.awakenings}
             addLabel="Добавить пробуждение"
@@ -1301,11 +1310,11 @@ export function AdminCharacterEditor({
                       update({ ...item, level: Number(event.target.value) })
                     }
                   >
-                    {[0, 1, 2, 3, 4, 5, 6].map((level) => (
-                      <option key={level} value={level}>
-                        C{level}
-                      </option>
-                    ))}
+                {[0, 1, 2, 3, 4, 5, 6].map((level) => (
+                  <option key={level} value={level}>
+                    {level === 0 ? 'Без пробуждений' : `Пробуждение ${level}`}
+                  </option>
+                ))}
                   </select>
                 </label>
                 <label>

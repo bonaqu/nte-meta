@@ -26,7 +26,10 @@ export function normalizeExternalAssetUrl(value?: string | null) {
   if (!url) return '';
 
   if (/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) {
-    return url.replace(/\/revision\/latest(?:\/[^?]*)?(?:\?.*)?$/i, '');
+    return url.replace(
+      /\/revision\/latest\/(?:scale-to-width-down|smart|thumbnail)\/[^?]*(\?.*)?$/i,
+      '/revision/latest$1',
+    );
   }
 
   return url;

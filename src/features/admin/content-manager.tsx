@@ -1098,12 +1098,34 @@ export function AdminSourcesManager({
         autoImportEnabled: booleanValue(values, 'autoImportEnabled'),
       }),
       itemTitle: (item) => item.sourceName,
-      itemMeta: (item) => `${item.sourceType} · ${item.trustLevel}`,
+      itemMeta: (item) =>
+        `${item.sourceType} · доверие: ${item.trustLevel} · ${
+          item.autoImportEnabled ? 'автоимпорт включён' : 'ручная проверка'
+        }`,
       preview: (values) => (
-        <article className="cms-article-preview">
-          <p className="eyebrow">{textValue(values, 'sourceType')}</p>
+        <article className="cms-article-preview source-preview-card">
+          <p className="eyebrow">
+            {textValue(values, 'sourceType')} · доверие:{' '}
+            {textValue(values, 'trustLevel')}
+          </p>
           <h2>{textValue(values, 'sourceName') || 'Название источника'}</h2>
-          <p>{textValue(values, 'sourceUrl')}</p>
+          {textValue(values, 'sourceUrl') ? (
+            <a
+              className="source-preview-link"
+              href={textValue(values, 'sourceUrl')}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {textValue(values, 'sourceUrl')}
+            </a>
+          ) : (
+            <p>URL появится после заполнения.</p>
+          )}
+          <span>
+            {booleanValue(values, 'autoImportEnabled')
+              ? 'Можно использовать в очереди автоимпорта после проверки.'
+              : 'Используется как ручной источник для редакции.'}
+          </span>
         </article>
       ),
     }),

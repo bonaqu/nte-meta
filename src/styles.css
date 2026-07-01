@@ -2461,7 +2461,24 @@
   overflow-wrap: anywhere;
 }
 
-  .site-footer {
+.source-preview-card {
+  gap: 10px;
+}
+
+.source-preview-card span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.source-preview-link {
+  color: var(--cyan);
+  font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.site-footer {
     display: flex;
     justify-content: space-between;
     gap: 18px;
@@ -3645,6 +3662,20 @@
   border-radius: var(--radius-sm);
   background: rgb(0 0 0 / 0.22);
   object-fit: cover;
+}
+
+.import-image-preview {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+}
+
+.import-image-preview a {
+  color: var(--cyan);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
 }
 
 .import-suggestion-value p {

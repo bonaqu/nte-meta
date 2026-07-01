@@ -103,7 +103,7 @@ test.describe('Публичный портал NTE Meta', () => {
       page.getByRole('heading', { name: 'Биография' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Пробуждения C0-C6' }),
+      page.getByRole('heading', { name: 'Пробуждения 0-6' }),
     ).toBeVisible();
     await expect(
       page.getByRole('link', { name: 'Гайд на персонажа' }),

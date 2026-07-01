@@ -20,40 +20,56 @@ export function getCharacter(data: SiteData, id: string) {
   );
 }
 
+function containsNormalizedPhrase(text: string, phrase: string) {
+  if (!phrase || phrase.length < 3) return false;
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`).test(text);
+}
+
+function isHumanNameCandidate(value: string) {
+  return (
+    value.length >= 3 &&
+    !/\d/.test(value) &&
+    !/^(ui|test|editor|тест|редактор)/i.test(value)
+  );
+}
+
 export function getGuideCharacter(data: SiteData, guide: Guide) {
   const direct = getCharacter(data, guide.characterId);
   if (direct) return direct;
 
-  const guideText = normalizeSearchText(
-    [guide.characterId, guide.slug, guide.title].join(' '),
-  );
+  const guideText = normalizeSearchText([guide.slug, guide.title].join(' '));
   return data.characters.find((character) => {
-    const candidates = [character.id, character.slug, character.name, character.originalName]
+    const nameCandidates = [character.name, character.originalName]
       .map(normalizeSearchText)
-      .filter(Boolean);
-    return candidates.some((candidate) => candidate && guideText.includes(candidate));
+      .filter(isHumanNameCandidate);
+    return nameCandidates.some((candidate) =>
+      containsNormalizedPhrase(guideText, candidate),
+    );
   });
 }
 
 export function getGuideForCharacter(data: SiteData, character: Character) {
-  const characterCandidates = [
-    character.id,
-    character.slug,
-    character.name,
-    character.originalName,
-  ]
+  const idCandidates = [character.id, character.slug].map(normalizeSearchText).filter(Boolean);
+  const nameCandidates = [character.name, character.originalName]
     .map(normalizeSearchText)
-    .filter(Boolean);
+    .filter(isHumanNameCandidate);
 
   return data.guides.find((guide) => {
     if (guide.characterId === character.id || guide.characterId === character.slug) {
       return true;
     }
-    const guideText = normalizeSearchText(
-      [guide.characterId, guide.slug, guide.title].join(' '),
-    );
-    return characterCandidates.some(
-      (candidate) => candidate && guideText.includes(candidate),
+    const guideSlug = normalizeSearchText(guide.slug);
+    if (
+      idCandidates.some((candidate) =>
+        containsNormalizedPhrase(guideSlug, candidate),
+      )
+    ) {
+      return true;
+    }
+    const guideTitle = normalizeSearchText(guide.title);
+    return nameCandidates.some((candidate) =>
+      containsNormalizedPhrase(guideTitle, candidate),
     );
   });
 }

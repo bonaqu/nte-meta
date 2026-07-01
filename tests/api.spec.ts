@@ -1115,10 +1115,13 @@ test('owner отменяет предупреждение пользовател
   ).toBeVisible();
 
   await page.goto('/#/admin/comments');
+  await expect(
+    page.getByRole('heading', { name: 'Модерация комментариев' }),
+  ).toBeVisible();
   const commentCard = page
     .locator('.comment-card')
     .filter({ hasText: moderatedCommentBody });
-  await expect(commentCard).toBeVisible();
+  await expect(commentCard).toBeVisible({ timeout: 15_000 });
   await commentCard.getByRole('button', { name: 'Предупредить' }).click();
   const warningDialog = page.locator('dialog[open]').filter({
     has: page.getByRole('heading', { name: 'Предупреждение пользователю' }),

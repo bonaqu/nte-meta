@@ -2129,7 +2129,7 @@ function characterImportSources(slug, character = {}) {
       id: 'fandom-ru-api',
       name: 'Fandom RU: профиль персонажа',
       trust: 'high',
-      url: `https://neverness-to-everness.fandom.com/ru/api.php?action=query&prop=revisions|pageimages&rvprop=content&piprop=original&format=json&formatversion=2&titles=${fandomRuTitle}&origin=*`,
+      url: `https://neverness-to-everness.fandom.com/ru/api.php?action=query&prop=revisions|pageimages|categories&rvprop=content&rvslots=main&piprop=original&cllimit=100&format=json&formatversion=2&titles=${fandomRuTitle}&origin=*`,
       parser: parseFandomRuApiImport,
       raw: true,
     },
@@ -2622,13 +2622,39 @@ function isSeoImportText(value) {
   );
 }
 
+function fandomRoleTagsFromCategories(page) {
+  const roleTags = [];
+  for (const category of page?.categories || []) {
+    const match = String(category.title || '').match(
+      /^Категория:Персонажи с ролью\s+(.+)$/i,
+    );
+    const role = cleanWikiText(match?.[1] || '');
+    if (
+      role &&
+      !roleTags.some(
+        (item) => normalizeImportSearch(item) === normalizeImportSearch(role),
+      )
+    ) {
+      roleTags.push(role);
+    }
+  }
+  return roleTags;
+}
+
 function parseFandomRuApiImport(text, source) {
-  const { content, originalImage } = parseMediaWikiApiContent(text);
+  const { page, content, originalImage } = parseMediaWikiApiContent(text);
   if (!content) return [];
 
-  const roleTags = ['role', 'role2', 'role3', 'role4']
-    .map((key) => readWikiParam(content, key))
-    .filter(Boolean);
+  const roleTags = Array.from(
+    new Set(
+      [
+        ...['role', 'role2', 'role3', 'role4'].map((key) =>
+          readWikiParam(content, key),
+        ),
+        ...fandomRoleTagsFromCategories(page),
+      ].filter(Boolean),
+    ),
+  );
   const faction = [
     readWikiParam(content, 'affiliation'),
     readWikiParam(content, 'affiliation2'),
@@ -3334,8 +3360,8 @@ function translateGameWithRoleTags(value) {
   if (/main dps|основн/i.test(normalized)) roles.push('Основной ДД');
   if (/dot|periodic|период/i.test(normalized)) roles.push('Периодический урон');
   if (/support|поддерж/i.test(normalized)) roles.push('Поддержка');
-  if (/heal|исцел|леч/i.test(normalized)) roles.push('Healer');
-  if (/buff|усилен|бафф/i.test(normalized)) roles.push('Buffer');
+  if (/heal|исцел|леч/i.test(normalized)) roles.push('Хилер');
+  if (/buff|усилен|бафф/i.test(normalized)) roles.push('Баффер');
   return Array.from(new Set(roles));
 }
 
@@ -4113,6 +4139,13 @@ function findImportImageByName(imageMap, name) {
     const imageUrl = imageMap.get(candidate);
     if (imageUrl) return imageUrl;
   }
+  for (const candidate of candidates) {
+    if (candidate.length < 4) continue;
+    const fuzzy = [...imageMap.entries()].find(([key]) =>
+      key.includes(candidate),
+    );
+    if (fuzzy?.[1]) return fuzzy[1];
+  }
   return '';
 }
 
@@ -4280,7 +4313,7 @@ function collectImportMediaLookupNames(items) {
     }
   }
 
-  return names.slice(0, 12);
+  return names.slice(0, 30);
 }
 
 async function fetchFandomMediaLookupSource(items) {
@@ -4326,7 +4359,10 @@ async function fetchFandomMediaLookupSource(items) {
           }))
           .filter((image) => {
             const title = normalizeImportSearch(cleanImportImageTitle(image.title));
-            return image.url && title.startsWith(normalizedName);
+          return (
+            image.url &&
+            (title.startsWith(normalizedName) || title.includes(normalizedName))
+          );
           });
         Object.assign(imageMap, buildImportImageMap(exactImages, {}));
       } catch {

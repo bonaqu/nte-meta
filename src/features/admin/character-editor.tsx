@@ -229,16 +229,20 @@ function ImportSuggestionList({
               <div className="import-suggestion-value">
                   {previewUrl ? (
                     <div className="import-image-preview">
-                      <img
-                        src={resolveAssetUrl(previewUrl)}
-                        alt=""
-                        width="92"
-                        height="92"
-                        loading="lazy"
-                        onError={(event) => {
-                          event.currentTarget.hidden = true;
-                        }}
-                      />
+                  <img
+                    src={resolveAssetUrl(previewUrl)}
+                    alt=""
+                    width="92"
+                    height="92"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={(event) => {
+                      event.currentTarget.hidden = true;
+                      event.currentTarget
+                        .closest('.import-image-preview')
+                        ?.setAttribute('data-broken', 'true');
+                    }}
+                  />
                       <a
                         href={resolveAssetUrl(previewUrl)}
                         target="_blank"
@@ -386,6 +390,15 @@ function formatEditorError(error: string) {
   if (/profile\.abilities.+не больше/i.test(text)) {
     return 'В способностях слишком много строк. Оставьте основные навыки персонажа и удалите лишнее.';
   }
+  if (/profile\.friendship.+не больше/i.test(text)) {
+    return 'В симпатии можно сохранить не больше 10 уровней. Оставьте уровни дружбы с 1 по 10.';
+  }
+  if (/profile\.skins.+не больше/i.test(text)) {
+    return 'В гардеробе слишком много записей. Оставьте только реальные скины персонажа.';
+  }
+  if (/profile\.gifts.+не больше/i.test(text)) {
+    return 'В любимых подарках слишком много записей. Оставьте проверенные подарки без дублей.';
+  }
   if (/profile\./i.test(text)) {
     return text
       .replace(/profile\.awakenings/g, 'Пробуждения')
@@ -394,21 +407,34 @@ function formatEditorError(error: string) {
       .replace(/profile\.voiceLines/g, 'Реплики')
       .replace(/profile\.baseStats/g, 'Начальные показатели')
       .replace(/profile\.materials/g, 'Материалы')
+      .replace(/profile\.roleTags/g, 'Роли персонажа')
+      .replace(/profile\.friendship/g, 'Симпатия')
+      .replace(/profile\.gifts/g, 'Любимые подарки')
+      .replace(/profile\.skins/g, 'Гардероб')
+      .replace(/profile\.arcType/g, 'Тип дуги')
+      .replace(/profile\.faction/g, 'Фракция')
+      .replace(/profile\.birthday/g, 'День рождения')
+      .replace(/profile\.releaseDate/g, 'Дата релиза')
       .replace(/Поле\s+/g, '');
   }
   return text;
 }
 
-function readSmallIconFile(file: File) {
+function readEditorImageFile(
+  file: File,
+  {
+    maxBytes,
+    maxSide,
+    label,
+  }: { maxBytes: number; maxSide: number; label: string },
+) {
   const allowedTypes = new Set(['image/png', 'image/webp', 'image/jpeg']);
-  const maxBytes = 250 * 1024;
-  const maxSide = 512;
 
   if (!allowedTypes.has(file.type)) {
     throw new Error('Поддерживаются только PNG, WebP или JPEG.');
   }
   if (file.size > maxBytes) {
-    throw new Error('Иконка должна весить не больше 250 KB.');
+    throw new Error(`${label} должен весить не больше ${Math.round(maxBytes / 1024)} KB.`);
   }
 
   return new Promise<string>((resolve, reject) => {
@@ -420,7 +446,7 @@ function readSmallIconFile(file: File) {
       image.onerror = () => reject(new Error('Не удалось проверить изображение.'));
       image.onload = () => {
         if (image.naturalWidth > maxSide || image.naturalHeight > maxSide) {
-          reject(new Error('Размер иконки должен быть не больше 512×512 px.'));
+          reject(new Error(`Размер файла должен быть не больше ${maxSide}×${maxSide} px.`));
           return;
         }
         resolve(dataUrl);
@@ -428,6 +454,22 @@ function readSmallIconFile(file: File) {
       image.src = dataUrl;
     };
     reader.readAsDataURL(file);
+  });
+}
+
+function readSmallIconFile(file: File) {
+  return readEditorImageFile(file, {
+    maxBytes: 250 * 1024,
+    maxSide: 512,
+    label: 'Иконка',
+  });
+}
+
+function readSkinImageFile(file: File) {
+  return readEditorImageFile(file, {
+    maxBytes: 900 * 1024,
+    maxSide: 1600,
+    label: 'Изображение',
   });
 }
 
@@ -784,6 +826,22 @@ export function AdminCharacterEditor({
     }
   }
 
+  async function uploadInlineImage(
+    file: File | undefined,
+    onReady: (dataUrl: string) => void,
+  ) {
+    if (!file) return;
+    try {
+      const dataUrl = await readSkinImageFile(file);
+      onReady(dataUrl);
+      setTone('success');
+      setMessage('Изображение загружено в черновик. Проверьте предпросмотр и сохраните персонажа.');
+    } catch (error) {
+      setTone('danger');
+      setMessage(error instanceof Error ? error.message : 'Не удалось загрузить изображение.');
+    }
+  }
+
   async function persist(status: 'draft' | 'published') {
     if (!hasApiBase()) {
       setTone('info');
@@ -886,13 +944,14 @@ export function AdminCharacterEditor({
               aria-pressed={selectedId === item.id}
               onClick={() => setSelectedId(item.id)}
             >
-              <img
-                src={resolveAssetUrl(item.imageUrl)}
-                alt=""
-                width="44"
-                height="44"
-                loading="lazy"
-              />
+                    <img
+                      src={resolveAssetUrl(item.imageUrl)}
+                      alt=""
+                      width="44"
+                      height="44"
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
               <span>
                 <strong>{item.name}</strong>
                 <small>{item.profile?.faction || item.attribute}</small>
@@ -1340,6 +1399,7 @@ export function AdminCharacterEditor({
                     width="54"
                     height="54"
                     loading="lazy"
+                    referrerPolicy="no-referrer"
                   />
                 ) : null}
                 <label className="wide-field">
@@ -1424,6 +1484,7 @@ export function AdminCharacterEditor({
                     width="54"
                     height="54"
                     loading="lazy"
+                    referrerPolicy="no-referrer"
                   />
                 ) : null}
                 <label className="wide-field">
@@ -1628,19 +1689,42 @@ export function AdminCharacterEditor({
                     }
                   />
                 </label>
-                <label>
-                  URL изображения
-                  <input
-                    type="text"
-                    inputMode="url"
+                    <label>
+                      URL изображения
+                      <input
+                        type="text"
+                        inputMode="url"
                     value={item.imageUrl}
                     onChange={(event) =>
                       update({ ...item, imageUrl: event.target.value })
-                    }
-                  />
-                </label>
-                <label className="wide-field">
-                  Описание
+                        }
+                      />
+                    </label>
+                    <label>
+                      Загрузить изображение
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(event) =>
+                          void uploadInlineImage(event.target.files?.[0], (imageUrl) =>
+                            update({ ...item, imageUrl }),
+                          )
+                        }
+                      />
+                    </label>
+                    {item.imageUrl ? (
+                      <img
+                        className="editor-image-preview"
+                        src={resolveAssetUrl(item.imageUrl)}
+                        alt=""
+                        width="120"
+                        height="72"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : null}
+                    <label className="wide-field">
+                      Описание
                   <textarea
                     rows={3}
                     value={item.description}

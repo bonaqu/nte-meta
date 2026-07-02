@@ -2441,16 +2441,46 @@
     font-weight: 800;
   }
 
-  .guide-image-insert .ghost-button {
-    justify-content: center;
-    min-block-size: 44px;
-    white-space: nowrap;
-  }
+.guide-image-insert .ghost-button {
+  justify-content: center;
+  min-block-size: 44px;
+  white-space: nowrap;
+}
+
+.youtube-url-preview {
+  display: grid;
+  gap: 6px;
+  align-self: end;
+  inline-size: min(100%, 188px);
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 0.18);
+}
+
+.youtube-url-preview img {
+  inline-size: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: calc(var(--radius-sm) - 2px);
+  object-fit: cover;
+}
+
+.youtube-url-preview a {
+  color: var(--cyan);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
 
 .source-card {
   display: grid;
   gap: 8px;
   padding: 14px;
+  min-inline-size: 0;
+}
+
+.source-card > * {
   min-inline-size: 0;
 }
 
@@ -2463,6 +2493,15 @@
 
 .source-preview-card {
   gap: 10px;
+  min-inline-size: 0;
+  border-color: color-mix(in srgb, var(--cyan) 22%, var(--border));
+  background:
+    linear-gradient(135deg, rgb(38 217 255 / 0.08), transparent 48%),
+    color-mix(in srgb, var(--surface) 94%, #111827);
+}
+
+.source-preview-card h2 {
+  overflow-wrap: anywhere;
 }
 
 .source-preview-card span {
@@ -3123,6 +3162,15 @@
   min-block-size: 42px;
 }
 
+.guide-toolbar-actions > :is(a, button),
+.guide-toolbar-actions .rating-bar {
+  align-self: stretch;
+}
+
+.guide-toolbar-actions .rating-bar {
+  align-items: stretch;
+}
+
   .team-rotation-sequence {
     display: grid;
     gap: 10px;
@@ -3385,14 +3433,29 @@
     padding: 0 18px 18px 88px;
   }
 
-  .ability-card__body .markdown-preview {
-    max-inline-size: 92ch;
-  }
+.ability-card__body .markdown-preview {
+  max-inline-size: 92ch;
+}
+
+.ability-list--profile .ability-card[open] .markdown-preview {
+  max-inline-size: none;
+}
 
 .ability-card__body .markdown-preview :where(p, li) {
   color: color-mix(in srgb, var(--text) 84%, var(--muted));
   line-height: 1.68;
   overflow-wrap: anywhere;
+}
+
+@media (min-width: 920px) {
+  .ability-list--profile .ability-card[open] .markdown-preview {
+    column-width: 34ch;
+    column-gap: 30px;
+  }
+
+  .ability-list--profile .ability-card[open] .markdown-preview > * {
+    break-inside: avoid;
+  }
 }
 
   .ability-list p {
@@ -3670,6 +3733,23 @@
   justify-items: center;
 }
 
+.import-image-preview[data-broken='true']::before {
+  display: grid;
+  place-items: center;
+  inline-size: 92px;
+  block-size: 92px;
+  padding: 8px;
+  border: 1px dashed color-mix(in srgb, var(--danger) 55%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 9%, rgb(0 0 0 / 0.24));
+  color: color-mix(in srgb, var(--text) 78%, var(--danger));
+  content: 'Превью не загрузилось';
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+}
+
 .import-image-preview a {
   color: var(--cyan);
   font-size: 0.74rem;
@@ -3685,6 +3765,16 @@
 .editor-icon-preview {
   inline-size: 54px;
   block-size: 54px;
+  align-self: end;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 0.24);
+  object-fit: cover;
+}
+
+.editor-image-preview {
+  inline-size: min(100%, 140px);
+  aspect-ratio: 5 / 3;
   align-self: end;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);

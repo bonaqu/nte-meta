@@ -706,7 +706,8 @@ function HomePage({
                 alt={character.name}
                 width="280"
                 height="360"
-                loading={index === 0 ? 'eager' : 'lazy'}
+              loading={index === 0 ? 'eager' : 'lazy'}
+              referrerPolicy="no-referrer"
               />
               <span>{character.name}</span>
             </a>
@@ -1381,6 +1382,7 @@ function CharacterCard({ character }: { character: Character }) {
           width="360"
           height="460"
           loading="lazy"
+          referrerPolicy="no-referrer"
         />
         <span className="tier-badge">{character.tier}</span>
         <div>
@@ -1414,8 +1416,9 @@ function GuideCard({
         alt={character?.name || guide.title}
         width="460"
         height="280"
-        loading="lazy"
-      />
+          loading="lazy"
+          referrerPolicy="no-referrer"
+        />
       <div>
         <p className="eyebrow">
           {character?.name || 'Гайд'} · патч {guide.patch}
@@ -1453,8 +1456,9 @@ function NewsCompactCard({ item, onEdit }: { item: NewsItem; onEdit?: () => void
         alt=""
         width="96"
         height="96"
-        loading="lazy"
-      />
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
       <div>
         <span>
           {item.category} · {formatDate(item.date)}
@@ -1843,6 +1847,7 @@ function CharacterDetailPage({
           width="520"
           height="620"
           loading="eager"
+          referrerPolicy="no-referrer"
         />
         <div>
           <p className="eyebrow">
@@ -2331,6 +2336,7 @@ function CharacterHero({
         width="520"
         height="620"
         loading="eager"
+        referrerPolicy="no-referrer"
       />
       <div>
         <p className="eyebrow">
@@ -5188,21 +5194,36 @@ function AdminGuides({
               <option value="archived">Архив</option>
             </select>
           </label>
-          <label>
-            YouTube URL
-            <input
-              type="url"
-              value={guideMeta.videoUrl}
+            <label>
+              YouTube URL
+              <input
+                type="url"
+                value={guideMeta.videoUrl}
               onChange={(event) =>
                 setGuideMeta((current) => ({
                   ...current,
                   videoUrl: event.target.value,
                 }))
-              }
-            />
-          </label>
-          <label className="wide-field">
-            Краткое описание
+                }
+              />
+            </label>
+            {getYoutubeThumbnailUrl(guideMeta.videoUrl) ? (
+              <div className="youtube-url-preview">
+                <img
+                  src={getYoutubeThumbnailUrl(guideMeta.videoUrl)}
+                  alt=""
+                  width="168"
+                  height="94"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
+                <a href={guideMeta.videoUrl} target="_blank" rel="noreferrer">
+                  Открыть видео
+                </a>
+              </div>
+            ) : null}
+            <label className="wide-field">
+              Краткое описание
             <textarea
               rows={4}
               value={guideMeta.summary}
@@ -5259,16 +5280,20 @@ function AdminGuides({
                       <div className="import-suggestion-value">
                         {previewUrl ? (
                           <div className="import-image-preview">
-                            <img
-                              src={resolveAssetUrl(previewUrl)}
-                              alt=""
-                              width="92"
-                              height="92"
-                              loading="lazy"
-                              onError={(event) => {
-                                event.currentTarget.hidden = true;
-                              }}
-                            />
+                        <img
+                          src={resolveAssetUrl(previewUrl)}
+                          alt=""
+                          width="92"
+                          height="92"
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          onError={(event) => {
+                            event.currentTarget.hidden = true;
+                            event.currentTarget
+                              .closest('.import-image-preview')
+                              ?.setAttribute('data-broken', 'true');
+                          }}
+                        />
                             <a
                               href={resolveAssetUrl(previewUrl)}
                               target="_blank"

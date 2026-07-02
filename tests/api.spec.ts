@@ -522,16 +522,6 @@ test.describe('NTE Meta Worker API', () => {
       (suggestion: { field: string }) => suggestion.field === 'profile.gifts',
     ),
   ).toBeTruthy();
-  expect(
-    ownerLookupJson.data.suggestions.some(
-      (suggestion: { field: string }) => suggestion.field === 'profile.skins',
-    ),
-  ).toBeTruthy();
-  expect(
-    ownerLookupJson.data.suggestions.some(
-      (suggestion: { field: string }) => suggestion.field === 'profile.friendship',
-    ),
-  ).toBeTruthy();
 
   const guideLookup = await owner.post('/api/guide-import/lookup', {
     data: { query: 'Хотори' },

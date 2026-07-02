@@ -3489,14 +3489,31 @@ function firstGameWithEntry(section) {
   return section;
 }
 
+function firstGameWithSkill(skills, keys) {
+  for (const key of keys) {
+    const entry = firstGameWithEntry(skills?.[key]);
+    if (entry?.name || entry?.description || entry?.effect) return entry;
+  }
+  return null;
+}
+
 function parseGameWithStructuredAbilities(item) {
   const skills = item?.skills || {};
   const supportEntries = Array.isArray(skills.support) ? skills.support : [];
   const citySkills = Array.isArray(item?.citySkills) ? item.citySkills : [];
   const abilities = [
-    gameWithAbility(firstGameWithEntry(skills.normalAttack), 'Базовая атака'),
-    gameWithAbility(firstGameWithEntry(skills.bilane), 'Навык'),
-    gameWithAbility(firstGameWithEntry(skills.exRail), 'Сверхспособность'),
+    gameWithAbility(
+      firstGameWithSkill(skills, ['normalAttack', 'basicAttack', 'attack']),
+      'Базовая атака',
+    ),
+    gameWithAbility(
+      firstGameWithSkill(skills, ['bilane', 'skill', 'activeSkill']),
+      'Навык',
+    ),
+    gameWithAbility(
+      firstGameWithSkill(skills, ['exRail', 'ultimate', 'specialSkill']),
+      'Сверхспособность',
+    ),
     gameWithAbility(supportEntries[0], 'Навык поддержки'),
     gameWithAbility(supportEntries[1], 'Пассивный навык'),
     gameWithAbility(supportEntries[2], 'Пассивный навык'),
@@ -3922,14 +3939,14 @@ function translateCombatRole(value) {
   const normalized = normalizeImportSearch(value);
   const roles = [
     ['main dps', 'Основной ДД'],
-    ['sub dps', 'Sub DD'],
+    ['sub dps', 'Второстепенный ДД'],
     ['damage', 'Урон'],
     ['dot', 'Периодический урон'],
     ['buff', 'Баффер'],
     ['support', 'Поддержка'],
     ['healer', 'Хилер'],
     ['control', 'Контроль'],
-    ['sustain', 'Sustain'],
+    ['sustain', 'Выживаемость'],
   ];
   return roles
     .filter(([key]) => normalized.includes(key))
@@ -4210,11 +4227,42 @@ function findImportImageByName(imageMap, name) {
   for (const candidate of candidates) {
     if (candidate.length < 4) continue;
     const fuzzy = [...imageMap.entries()].find(([key]) =>
-      key.includes(candidate),
+      key.includes(candidate) || candidate.includes(key),
     );
     if (fuzzy?.[1]) return fuzzy[1];
   }
   return '';
+}
+
+function importMediaLookupLabels(entry, field = '') {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+  const record = entry;
+  const labels = [];
+  const add = (value) => {
+    const clean = normalizeImportedRuText(value);
+    if (!clean || clean === 'Не введено') return;
+    if (!labels.some((label) => normalizeImportSearch(label) === normalizeImportSearch(clean))) {
+      labels.push(clean);
+    }
+  };
+
+  add(record.name || record.rewardName || record.title || record.label);
+
+  if (field === 'profile.abilities') {
+    add([record.type, record.name].filter(Boolean).join(' '));
+    add([record.name, record.type].filter(Boolean).join(' '));
+  }
+
+  if (field === 'profile.awakenings' && Number(record.level) > 0) {
+    add(`Пробуждение ${record.level}`);
+    add(`Пробуждение ${record.level} ${record.name || ''}`);
+    add(`C${record.level}`);
+    add(`C${record.level} ${record.name || ''}`);
+    add(`A${record.level}`);
+    add(`A${record.level} ${record.name || ''}`);
+  }
+
+  return labels;
 }
 
 function enrichArraySuggestionMedia(item, imageMap) {
@@ -4237,8 +4285,9 @@ function enrichArraySuggestionMedia(item, imageMap) {
   const nextValue = parsed.map((entry) => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
     const record = entry;
-    const displayName = record.name || record.rewardName || record.title || record.label;
-    const imageUrl = findImportImageByName(imageMap, displayName);
+    const imageUrl = importMediaLookupLabels(record, item.field)
+      .map((label) => findImportImageByName(imageMap, label))
+      .find(Boolean);
     if (!imageUrl) return entry;
     if ('imageUrl' in record && !record.imageUrl) {
       changed = true;
@@ -4377,7 +4426,9 @@ function collectImportMediaLookupNames(items) {
     if (!Array.isArray(parsed)) continue;
     for (const entry of parsed) {
       if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
-      add(entry.name || entry.rewardName || entry.title || entry.label);
+      for (const label of importMediaLookupLabels(entry, item.field)) {
+        add(label);
+      }
     }
   }
 

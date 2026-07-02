@@ -3932,6 +3932,16 @@
     color: var(--soft);
   }
 
+  .audio-placeholder--warning {
+    max-inline-size: 56ch;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--border));
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--amber) 12%, transparent);
+    color: color-mix(in srgb, var(--text) 82%, var(--amber));
+    line-height: 1.45;
+  }
+
   .embedded-team-editor {
     display: block;
   }

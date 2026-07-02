@@ -128,6 +128,13 @@ import type {
   UserWarning,
 } from './types';
 
+const directAudioPattern = /\.(mp3|m4a|ogg|oga|wav|flac|webm)(?:[?#].*)?$/i;
+
+function canPlayDirectAudio(url: string) {
+  const value = url.trim();
+  return /^https?:\/\//i.test(value) && directAudioPattern.test(value);
+}
+
 const AdminCharacterEditor = lazy(() =>
   import('./features/admin/character-editor').then((module) => ({
     default: module.AdminCharacterEditor,
@@ -1827,9 +1834,6 @@ function CharacterDetailPage({
   const guide = getGuideForCharacter(data, character);
   const tierPlacement = getCharacterTierPlacement(data, character.id);
 
-  const canPlayVoiceAudio = (url: string) =>
-    Boolean(url) && !/youtube\.com|youtu\.be|vimeo\.com/i.test(url);
-
   async function refreshContent() {
     setData(
       await loadSiteData({
@@ -2178,7 +2182,7 @@ function CharacterDetailPage({
               </div>
               <div className="voice-line-media">
                 {line.description ? <p>{line.description}</p> : null}
-                {canPlayVoiceAudio(line.audioUrl) ? (
+                {canPlayDirectAudio(line.audioUrl) ? (
                   <audio controls preload="none" src={line.audioUrl}>
                     Ваш браузер не поддерживает аудио.
                   </audio>

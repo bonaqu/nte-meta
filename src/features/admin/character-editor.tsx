@@ -52,6 +52,16 @@ const voiceLanguages = [
   'Китайский',
 ] as const;
 const tiers: Tier[] = ['S', 'A', 'B', 'C', 'D'];
+const directAudioPattern = /\.(mp3|m4a|ogg|oga|wav|flac|webm)(?:[?#].*)?$/i;
+
+function isDirectAudioUrl(url: string) {
+  const value = url.trim();
+  return /^https?:\/\//i.test(value) && directAudioPattern.test(value);
+}
+
+function isVideoSourceUrl(url: string) {
+  return /youtube\.com|youtu\.be|vimeo\.com|bilibili\.com/i.test(url);
+}
 
 function readCharacterDraft(key: string) {
   try {
@@ -1808,16 +1818,24 @@ export function AdminCharacterEditor({
                   URL аудио-файла
                   <input
                     type="url"
+                    inputMode="url"
+                    placeholder="https://example.com/voice-line.mp3"
                     value={item.audioUrl}
                     onChange={(event) =>
                       update({ ...item, audioUrl: event.target.value })
                     }
                   />
+                  <small>
+                    Для нативного плеера нужен прямой файл: mp3, m4a, ogg, wav,
+                    flac или webm. Видео и страницы добавляйте ниже как источник.
+                  </small>
                 </label>
                 <label className="wide-field">
                   Источник записи или видео
                   <input
                     type="url"
+                    inputMode="url"
+                    placeholder="YouTube, Bilibili, wiki-страница или официальный источник"
                     value={item.sourceUrl || ''}
                     onChange={(event) =>
                       update({ ...item, sourceUrl: event.target.value })
@@ -1834,11 +1852,20 @@ export function AdminCharacterEditor({
                     }
                   />
                 </label>
-                {item.audioUrl &&
-                !/youtube\.com|youtu\.be|vimeo\.com/i.test(item.audioUrl) ? (
+                {item.audioUrl && isDirectAudioUrl(item.audioUrl) ? (
                   <audio controls preload="none" src={item.audioUrl}>
                     Ваш браузер не поддерживает аудио.
                   </audio>
+                ) : item.audioUrl && isVideoSourceUrl(item.audioUrl) ? (
+                  <span className="audio-placeholder audio-placeholder--warning">
+                    <Headphones aria-hidden="true" /> Это видео-источник, а не
+                    прямой аудиофайл. Перенесите ссылку в поле источника записи.
+                  </span>
+                ) : item.audioUrl ? (
+                  <span className="audio-placeholder">
+                    <Headphones aria-hidden="true" /> Плеер появится после ссылки
+                    на прямой аудиофайл.
+                  </span>
                 ) : item.sourceUrl ? (
                   <a
                     className="ghost-button"

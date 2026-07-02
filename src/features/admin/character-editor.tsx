@@ -1233,27 +1233,83 @@ export function AdminCharacterEditor({
                 }
               />
             </label>
+          <label>
+            URL иконки
+            <input
+              type="text"
+              inputMode="url"
+              required
+              value={draft.imageUrl}
+              onChange={(event) => patch({ imageUrl: event.target.value })}
+            />
+          </label>
+          <div className="media-field-preview">
             <label>
-              URL иконки
+              Загрузить иконку/карточку
               <input
-                type="text"
-                inputMode="url"
-                required
-                value={draft.imageUrl}
-                onChange={(event) => patch({ imageUrl: event.target.value })}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(event) => {
+                  void uploadInlineImage(event.target.files?.[0], (imageUrl) =>
+                    patch({ imageUrl }),
+                  );
+                  event.currentTarget.value = '';
+                }}
               />
             </label>
+            {draft.imageUrl ? (
+              <img
+                className="editor-image-preview"
+                src={resolveAssetUrl(draft.imageUrl)}
+                alt=""
+                width="120"
+                height="120"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span>Превью появится после URL или загрузки файла.</span>
+            )}
+          </div>
+          <label>
+            URL splash art
+            <input
+              type="text"
+              inputMode="url"
+              value={draft.splashUrl}
+              onChange={(event) => patch({ splashUrl: event.target.value })}
+            />
+          </label>
+          <div className="media-field-preview">
             <label>
-              URL splash art
+              Загрузить splash art
               <input
-                type="text"
-                inputMode="url"
-                value={draft.splashUrl}
-                onChange={(event) => patch({ splashUrl: event.target.value })}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(event) => {
+                  void uploadInlineImage(event.target.files?.[0], (splashUrl) =>
+                    patch({ splashUrl }),
+                  );
+                  event.currentTarget.value = '';
+                }}
               />
             </label>
-            <label className="wide-field">
-              Краткая биография
+            {draft.splashUrl ? (
+              <img
+                className="editor-image-preview editor-image-preview--wide"
+                src={resolveAssetUrl(draft.splashUrl)}
+                alt=""
+                width="180"
+                height="112"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span>Превью появится после URL или загрузки файла.</span>
+            )}
+          </div>
+          <label className="wide-field">
+            Краткая биография
               <textarea
                 rows={4}
                 required

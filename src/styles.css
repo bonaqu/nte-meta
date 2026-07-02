@@ -3874,6 +3874,39 @@
   object-fit: cover;
 }
 
+.editor-image-preview--wide {
+  inline-size: min(100%, 220px);
+  aspect-ratio: 16 / 10;
+}
+
+.media-field-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  min-inline-size: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+  border-radius: var(--radius-sm);
+  background: rgb(255 255 255 / 0.035);
+}
+
+.media-field-preview label {
+  display: grid;
+  gap: 6px;
+  min-inline-size: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.media-field-preview span {
+  max-inline-size: 180px;
+  color: var(--soft);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 .import-suggestion-actions {
   display: flex;
   gap: 8px;

@@ -3733,6 +3733,37 @@
   justify-items: center;
 }
 
+.import-image-preview > div {
+  display: grid;
+  grid-template-columns: repeat(2, 44px);
+  gap: 6px;
+}
+
+.import-image-preview:not(.import-image-preview--grid) > div {
+  grid-template-columns: 92px;
+}
+
+.import-image-preview > div a {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+}
+
+.import-image-preview--grid img {
+  inline-size: 44px;
+  block-size: 44px;
+}
+
+.import-image-preview span {
+  max-inline-size: 120px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+}
+
 .import-image-preview[data-broken='true']::before {
   display: grid;
   place-items: center;

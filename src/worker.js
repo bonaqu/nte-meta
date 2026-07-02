@@ -1989,11 +1989,79 @@ function nextImportLine(lines, label) {
   return index >= 0 ? lines[index + 1] || '' : '';
 }
 
+function normalizeImportArcType(value) {
+  const normalized = normalizeImportSearch(value);
+  if (!normalized) return '';
+  const direct = [
+    ['重合', 'Гибридный'],
+    ['гибрид', 'Гибридный'],
+    ['hybrid', 'Гибридный'],
+    ['cluster', 'Гибридный'],
+    ['固', 'Твёрдый'],
+    ['тверд', 'Твёрдый'],
+    ['solid', 'Твёрдый'],
+    ['液', 'Жидкий'],
+    ['жидк', 'Жидкий'],
+    ['liquid', 'Жидкий'],
+    ['気', 'Газовый'],
+    ['газ', 'Газовый'],
+    ['gas', 'Газовый'],
+    ['プラズマ', 'Плазменный'],
+    ['плазм', 'Плазменный'],
+    ['plasma', 'Плазменный'],
+    ['凝縮', 'Конденсат'],
+    ['конденсат', 'Конденсат'],
+    ['condensate', 'Конденсат'],
+  ].find(([key]) => normalized.includes(key));
+  return direct?.[1] || '';
+}
+
+function normalizeImportElement(value) {
+  const normalized = normalizeImportSearch(value);
+  if (!normalized) return '';
+  const localized = [
+    ['呪', 'Чары'],
+    ['混沌', 'Хаос'],
+    ['精神', 'Психика'],
+    ['魂', 'Анима'],
+    ['相', 'Лакшана'],
+  ].find(([key]) => String(value || '').includes(key));
+  if (localized) return localized[1];
+  const direct = ['Чары', 'Хаос', 'Психика', 'Анима', 'Космос', 'Лакшана'].find(
+    (item) => normalized.includes(normalizeImportSearch(item)),
+  );
+  return direct || translateEsperType(value);
+}
+
+function normalizeImportFaction(value) {
+  const text = normalizeImportedRuText(value);
+  const normalized = normalizeImportSearch(text);
+  if (normalized.includes('тои 4') && normalized.includes('бюро')) {
+    return 'Бюро по борьбе с аномалиями, ТОИ-4';
+  }
+  return text;
+}
+
+function normalizeProfileImportValue(field, value) {
+  if (typeof value !== 'string') return value;
+  if (field === 'attribute') return normalizeImportElement(value);
+  if (field === 'profile.arcType') return normalizeImportArcType(value);
+  if (field === 'profile.faction') return normalizeImportFaction(value);
+  if (
+    (field === 'profile.biography' || field === 'profile.biographyShort') &&
+    isSeoImportText(value)
+  ) {
+    return '';
+  }
+  return normalizeImportedRuText(value);
+}
+
 function makeImportSuggestion(field, label, value, source, confidence = 'medium', note = '') {
+  const normalizedInput = normalizeProfileImportValue(field, value);
   const normalizedValue =
-    typeof value === 'string' && /(?:image|splash|icon)url/i.test(field)
-      ? normalizeExternalImageUrl(value)
-      : value;
+    typeof normalizedInput === 'string' && /(?:image|splash|icon)url/i.test(field)
+      ? normalizeExternalImageUrl(normalizedInput)
+      : normalizedInput;
   const cleanValue =
     typeof normalizedValue === 'string'
       ? normalizedValue.trim()

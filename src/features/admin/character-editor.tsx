@@ -215,7 +215,7 @@ function ImportSuggestionList({
       <div className="import-suggestion-list">
         {suggestions.map((suggestion) => {
           const decision = decisions[suggestion.id];
-          const previewUrl = getSuggestionPreviewUrl(suggestion);
+          const previewUrls = getSuggestionPreviewUrls(suggestion);
           const fieldLabel = getSuggestionFieldLabel(suggestion);
           return (
             <article
@@ -227,35 +227,45 @@ function ImportSuggestionList({
                 <span>{fieldLabel}</span>
               </div>
               <div className="import-suggestion-value">
-                  {previewUrl ? (
-                    <div className="import-image-preview">
-                  <img
-                    src={resolveAssetUrl(previewUrl)}
-                    alt=""
-                    width="92"
-                    height="92"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    onError={(event) => {
-                      event.currentTarget.hidden = true;
-                      event.currentTarget
-                        .closest('.import-image-preview')
-                        ?.setAttribute('data-broken', 'true');
-                    }}
-                  />
-                      <a
-                        href={resolveAssetUrl(previewUrl)}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Открыть изображение
-                      </a>
+                {previewUrls.length ? (
+                  <div
+                    className={`import-image-preview ${
+                      previewUrls.length > 1 ? 'import-image-preview--grid' : ''
+                    }`}
+                  >
+                    <div>
+                      {previewUrls.map((previewUrl) => (
+                        <a
+                          href={resolveAssetUrl(previewUrl)}
+                          key={previewUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label="Открыть изображение из автоимпорта"
+                        >
+                          <img
+                            src={resolveAssetUrl(previewUrl)}
+                            alt=""
+                            width="92"
+                            height="92"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            onError={(event) => {
+                              event.currentTarget.hidden = true;
+                              event.currentTarget
+                                .closest('.import-image-preview')
+                                ?.setAttribute('data-broken', 'true');
+                            }}
+                          />
+                        </a>
+                      ))}
                     </div>
-                  ) : null}
+                    <span>Нажмите на превью, чтобы открыть оригинал</span>
+                  </div>
+                ) : null}
                 <p>{summarizeSuggestionValue(suggestion.value)}</p>
               </div>
               <small>
-                {suggestion.sourceName} · уверенность: {suggestion.confidence}
+                {suggestion.sourceName} · {formatImportConfidence(suggestion.confidence)}
                 {suggestion.note ? ` · ${suggestion.note}` : ''}
               </small>
               <div className="import-suggestion-actions">
@@ -299,7 +309,7 @@ function summarizeSuggestionValue(value: string) {
           const record = item as Record<string, unknown>;
           const prefix =
             typeof record.level === 'number'
-              ? `C${record.level} `
+              ? `Уровень ${record.level}: `
               : typeof record.language === 'string'
                 ? `${record.language}: `
                 : '';
@@ -324,6 +334,12 @@ function summarizeSuggestionValue(value: string) {
   return value.length > 260 ? `${value.slice(0, 260)}...` : value;
 }
 
+function formatImportConfidence(confidence: CharacterImportSuggestion['confidence']) {
+  if (confidence === 'high') return 'Высокая уверенность';
+  if (confidence === 'medium') return 'Средняя уверенность';
+  return 'Требует ручной проверки';
+}
+
 function parseImportValue(value: string) {
   try {
     return JSON.parse(value) as unknown;
@@ -332,24 +348,30 @@ function parseImportValue(value: string) {
   }
 }
 
-function getSuggestionPreviewUrl(suggestion: CharacterImportSuggestion) {
+function getSuggestionPreviewUrls(suggestion: CharacterImportSuggestion) {
+  const urls: string[] = [];
+  const addUrl = (value: unknown) => {
+    if (typeof value !== 'string') return;
+    if (!/^https?:|^assets\//i.test(value)) return;
+    const normalized = normalizeExternalAssetUrl(value);
+    if (normalized && !urls.includes(normalized)) urls.push(normalized);
+  };
+
   const parsed = parseImportValue(suggestion.value);
   if (typeof parsed === 'string' && /(?:image|splash|icon)url/i.test(suggestion.field)) {
-    return normalizeExternalAssetUrl(parsed);
+    addUrl(parsed);
+    return urls;
   }
 
   if (Array.isArray(parsed)) {
-    const firstImage = parsed
-      .flatMap((item) =>
-        item && typeof item === 'object' ? Object.values(item) : [],
-      )
-      .find((value) => typeof value === 'string' && /^https?:|^assets\//i.test(value));
-    return typeof firstImage === 'string'
-      ? normalizeExternalAssetUrl(firstImage)
-      : '';
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') continue;
+      Object.values(item).forEach(addUrl);
+      if (urls.length >= 4) break;
+    }
   }
 
-  return '';
+  return urls;
 }
 
 function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {

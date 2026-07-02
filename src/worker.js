@@ -2159,6 +2159,14 @@ function characterImportSources(slug, character = {}) {
       raw: true,
     },
     {
+      id: 'game8-skins',
+      name: 'Game8: гардероб персонажей',
+      trust: 'medium',
+      url: 'https://game8.co/games/Neverness-to-Everness/archives/598619',
+      parser: parseGame8SkinsImport,
+      raw: true,
+    },
+    {
       id: 'ntewiki-ru',
       name: 'NTE Wiki RU',
       trust: 'high',
@@ -2777,6 +2785,128 @@ function parseFandomRuAllImagesImport(text, source, character) {
   } catch {
     return [];
   }
+}
+
+function cleanGame8Text(value) {
+  return htmlToPlainText(value)
+    .replace(/&#039;|&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function game8ImageUrl(value) {
+  const url = String(value || '').trim();
+  if (!url) return '';
+  if (url.startsWith('//')) return `https:${url}`;
+  if (url.startsWith('/')) return `https://game8.co${url}`;
+  return url;
+}
+
+function translateGame8Obtain(value, characterName) {
+  const text = cleanGame8Text(value);
+  if (!text) return 'Способ получения требует ручной проверки.';
+  if (/^Default Outfit$/i.test(text)) return 'Стандартный наряд.';
+  const bondMatch = text.match(/Achieve Bond Level\s+(\d+)\s+with\s+(.+)/i);
+  if (bondMatch) {
+    return `Открывается за ${bondMatch[1]} уровень симпатии с ${characterName}.`;
+  }
+  return text
+    .replace(/Purchased for\s+([\d,]+)\s+Fons/i, 'Покупается за $1 фонов')
+    .replace(
+      /Purchased for\s+([\d,]+)\s+Riftcrystals/i,
+      'Покупается за $1 рифт-кристаллов',
+    )
+    .replace(/\bScarborough Fair\b/g, 'Ярмарка в Скарборо')
+    .replace(/\bEpisodes\b/g, 'Эпизоды')
+    .replace(/\bSpinoffs\b/g, 'Спин-оффы');
+}
+
+function parseGame8SkinsImport(text, source, character) {
+  const characterNames = characterNameCandidates(character);
+  if (!characterNames.length) return [];
+  const chunks = String(text || '').split(
+    /(?=<td class="center">\s*<div class='imageLink)/g,
+  );
+  const skins = [];
+  const friendship = [];
+  const seen = new Set();
+  const displayCharacterName =
+    character.name || character.originalName || character.slug || 'персонажем';
+
+  for (const chunk of chunks) {
+    const imageUrl = game8ImageUrl(
+      chunk.match(/data-image-url='([^']+)'/)?.[1] ||
+        chunk.match(/data-src='([^']+)'/)?.[1] ||
+        '',
+    );
+    const skinName = cleanGame8Text(
+      chunk.match(/<b class='a-bold'>([\s\S]*?)<\/b>/i)?.[1] || '',
+    );
+    const characterFromAlt = cleanGame8Text(
+      chunk.match(/alt='([^']+)\s+Icon'/i)?.[1] || '',
+    );
+    const cells = [...chunk.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(
+      (match) => cleanGame8Text(match[1]),
+    );
+    const characterCellIndex = cells.findIndex((cell) => {
+      const normalized = normalizeImportSearch(cell);
+      return characterNames.some((name) => normalized === name || normalized.includes(name));
+    });
+    const normalizedAlt = normalizeImportSearch(characterFromAlt);
+    const matchesCharacter =
+      characterNames.some((name) => normalizedAlt === name) || characterCellIndex >= 0;
+    if (!matchesCharacter || !skinName || !imageUrl) continue;
+
+    const obtainText =
+      characterCellIndex >= 0 ? cells[characterCellIndex + 1] || '' : cells[2] || '';
+    const description = [
+      translateGame8Obtain(obtainText, displayCharacterName),
+      'Название скина взято из англоязычного источника Game8; перед публикацией проверьте перевод в русской версии игры.',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+    const key = normalizeImportSearch(skinName);
+    if (!seen.has(key)) {
+      skins.push({
+        id: crypto.randomUUID(),
+        name: skinName,
+        imageUrl,
+        description,
+      });
+      seen.add(key);
+    }
+
+    const bondMatch = obtainText.match(/Bond Level\s+(\d+)/i);
+    if (bondMatch && Number(bondMatch[1]) >= 1 && Number(bondMatch[1]) <= 10) {
+      friendship.push({
+        level: Number(bondMatch[1]),
+        rewardName: `Скин: ${skinName}`,
+        rewardIconUrl: imageUrl,
+        description,
+      });
+    }
+  }
+
+  return [
+    makeImportSuggestion(
+      'profile.skins',
+      'Гардероб',
+      skins,
+      source,
+      'medium',
+      'Скины найдены в таблице Game8. Названия требуют сверки с русской локализацией.',
+    ),
+    makeImportSuggestion(
+      'profile.friendship',
+      'Награды симпатии',
+      friendship,
+      source,
+      'medium',
+      'Добавляются только найденные уровни. Пустые уровни 1-9 не выдумываются.',
+    ),
+  ].filter(Boolean);
 }
 
 function parseNteWikiImport(text, source) {

@@ -439,6 +439,58 @@ function mergeText(current: string, addition: string) {
   return `${current.trim()}\n\n${cleanAddition}`;
 }
 
+function mergeFriendshipLevels(
+  current: CharacterFriendshipLevel[],
+  imported: CharacterFriendshipLevel[],
+) {
+  const byLevel = new Map<number, CharacterFriendshipLevel>();
+  current.forEach((item) => {
+    const level = Number(item.level);
+    if (level >= 1 && level <= 10) byLevel.set(level, item);
+  });
+  imported.forEach((item) => {
+    const level = Number(item.level);
+    if (level < 1 || level > 10) return;
+    const existing = byLevel.get(level);
+    byLevel.set(level, {
+      level,
+      rewardName: item.rewardName || existing?.rewardName || '',
+      rewardIconUrl: normalizeExternalAssetUrl(
+        item.rewardIconUrl || existing?.rewardIconUrl || '',
+      ),
+      description: item.description || existing?.description || '',
+    });
+  });
+  return [...byLevel.values()].sort((a, b) => a.level - b.level);
+}
+
+function mergeNamedRows<T extends { id?: string; name: string }>(
+  current: T[],
+  imported: T[],
+) {
+  const result = [...current];
+  const indexByName = new Map<string, number>();
+
+  result.forEach((item, index) => {
+    const key = item.name.trim().toLocaleLowerCase('ru-RU');
+    if (key) indexByName.set(key, index);
+  });
+
+  imported.forEach((item) => {
+    const key = item.name.trim().toLocaleLowerCase('ru-RU');
+    if (!key) return;
+    const index = indexByName.get(key);
+    if (index === undefined) {
+      result.push(item);
+      indexByName.set(key, result.length - 1);
+      return;
+    }
+    result[index] = { ...result[index], ...item };
+  });
+
+  return result;
+}
+
 function Collection<T>({
   title,
   description,
@@ -679,9 +731,24 @@ export function AdminCharacterEditor({
     } else if (suggestion.field === 'profile.voiceLines' && Array.isArray(parsed)) {
       next.profile.voiceLines = parsed as CharacterVoiceLine[];
     } else if (suggestion.field === 'profile.materials' && Array.isArray(parsed)) {
-        next.profile.materials = parsed as CharacterMaterial[];
-      } else if (suggestion.field === 'profile.baseStats' && Array.isArray(parsed)) {
-        next.profile.baseStats = parsed as CharacterStat[];
+      next.profile.materials = parsed as CharacterMaterial[];
+    } else if (suggestion.field === 'profile.friendship' && Array.isArray(parsed)) {
+      next.profile.friendship = mergeFriendshipLevels(
+        next.profile.friendship,
+        parsed as CharacterFriendshipLevel[],
+      );
+    } else if (suggestion.field === 'profile.gifts' && Array.isArray(parsed)) {
+      next.profile.gifts = mergeNamedRows(
+        next.profile.gifts,
+        parsed as CharacterGift[],
+      );
+    } else if (suggestion.field === 'profile.skins' && Array.isArray(parsed)) {
+      next.profile.skins = mergeNamedRows(
+        next.profile.skins,
+        parsed as CharacterSkin[],
+      );
+    } else if (suggestion.field === 'profile.baseStats' && Array.isArray(parsed)) {
+      next.profile.baseStats = parsed as CharacterStat[];
       } else if (suggestion.field === 'profile.abilities' && Array.isArray(parsed)) {
         next.profile.abilities = parsed as CharacterAbility[];
       } else if (suggestion.field === 'profile.awakenings' && Array.isArray(parsed)) {

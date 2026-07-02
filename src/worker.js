@@ -1193,9 +1193,8 @@ function characterProfileSelect() {
     character_profiles.skins_json AS profile_skins_json,
     character_profiles.friendship_json AS profile_friendship_json,
     character_profiles.gifts_json AS profile_gifts_json,
-    character_profiles.voice_lines_json AS profile_voice_lines_json,
-    character_profiles.awakenings_json AS profile_awakenings_json,
-    character_profiles.consoles_json AS profile_consoles_json
+      character_profiles.voice_lines_json AS profile_voice_lines_json,
+      character_profiles.awakenings_json AS profile_awakenings_json
   FROM characters
   LEFT JOIN character_profiles ON character_profiles.character_id = characters.id`;
 }
@@ -2047,6 +2046,24 @@ function normalizeImportArcType(value) {
 function normalizeImportElement(value) {
   const normalized = normalizeImportSearch(value);
   if (!normalized) return '';
+  if (
+    [
+      'бозе',
+      'boze',
+      'arc',
+      'arcana',
+      'арка',
+      'арк',
+      'дуга',
+      'лучшие дуги',
+      'сообщество камелии',
+      'camellia',
+      'best arc',
+      'preferred arc',
+    ].some((item) => normalized.includes(normalizeImportSearch(item)))
+  ) {
+    return '';
+  }
   const localized = [
     ['呪', 'Чары'],
     ['混沌', 'Хаос'],
@@ -2055,6 +2072,19 @@ function normalizeImportElement(value) {
     ['相', 'Лакшана'],
   ].find(([key]) => String(value || '').includes(key));
   if (localized) return localized[1];
+  const translated = [
+    ['incantation', 'Чары'],
+    ['spell', 'Чары'],
+    ['chaos', 'Хаос'],
+    ['psyche', 'Психика'],
+    ['psychic', 'Психика'],
+    ['spirit', 'Психика'],
+    ['anima', 'Анима'],
+    ['cosmos', 'Космос'],
+    ['cosmic', 'Космос'],
+    ['lakshana', 'Лакшана'],
+  ].find(([key]) => normalized.includes(key));
+  if (translated) return translated[1];
   const direct = ['Чары', 'Хаос', 'Психика', 'Анима', 'Космос', 'Лакшана'].find(
     (item) => normalized.includes(normalizeImportSearch(item)),
   );
@@ -2095,10 +2125,20 @@ function makeImportSuggestion(field, label, value, source, confidence = 'medium'
       ? normalizedValue.trim()
       : JSON.stringify(normalizedValue);
   if (!cleanValue || cleanValue === '[]' || cleanValue === '{}') return null;
+  const canonicalLabel =
+    {
+      attribute: 'Атрибут',
+      imageUrl: 'Карточка персонажа',
+      splashUrl: 'Splash персонажа',
+      'profile.arcType': 'Тип дуги',
+      'profile.voiceActors': 'Актёры озвучки',
+      'profile.voiceLines': 'Реплики озвучки',
+      'profile.roleTags': 'Роли персонажа',
+    }[field] || label;
   return {
     id: `${source.id}:${field}:${hashText(cleanValue).slice(0, 10)}`,
     field,
-    label,
+    label: canonicalLabel,
     value: cleanValue,
     sourceName: source.name,
     sourceUrl: source.url,
@@ -2111,10 +2151,12 @@ function normalizeExternalImageUrl(value) {
   const url = String(value || '').trim().replace(/&amp;/g, '&');
   if (!url) return '';
   if (/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) {
-    return url.replace(
-      /\/revision\/latest\/(?:scale-to-width-down|smart|thumbnail)\/[^?]*(\?.*)?$/i,
-      '/revision/latest$1',
+    const [base, query = ''] = url.split('?');
+    const normalized = base.replace(
+      /\/revision\/latest(?:\/(?:scale-to-width-down|smart|thumbnail|width)\/[^/?#]+|\/[^/?#]+)?$/i,
+      '/revision/latest',
     );
+    return query ? `${normalized}?${query}` : normalized;
   }
   if (url.startsWith('/nte/')) return `https://gamewith.ai${url}`;
   return url;
@@ -2626,7 +2668,7 @@ async function fetchImportSource(source, character) {
         ...source
           .parser(source.raw ? html.slice(0, IMPORT_MAX_HTML_BYTES) : text, source, character)
           .filter(Boolean),
-        ...extractImportImages(html, source),
+        ...extractImportImages(html, source, character),
       ];
     return {
       ...source,
@@ -2713,7 +2755,7 @@ function formatRuImportDate(value) {
 }
 
 function isSeoImportText(value) {
-  return /предназначена|ищет гайд|материалы .*характеристики|быстрый справочный обзор|поисковые ориентиры|long-tail/i.test(
+  return /указан[ао]? в базе|предназначена|ищет гайд|материалы .*характеристики|быстрый справочный обзор|здесь собраны|поисковые ориентиры|как использовать страницу|используйте раздел|связанные гайды|long-tail/i.test(
     String(value || ''),
   );
 }
@@ -3071,6 +3113,71 @@ function parseNteWikiImport(text, source) {
   suggestions.push(
     makeImportSuggestion('profile.baseStats', 'Начальные показатели', stats, source, 'medium'),
   );
+  const abilityStart = lines.findIndex((line) => normalizeImportSearch(line) === 'навыки');
+  const abilityEnd =
+    abilityStart >= 0
+      ? lines.findIndex(
+          (line, index) =>
+            index > abilityStart &&
+            (/^обзор\s+/i.test(line) ||
+              /^как использовать/i.test(line) ||
+              normalizeImportSearch(line) === 'пробуждение' ||
+              normalizeImportSearch(line) === 'материалы прорыва'),
+        )
+      : -1;
+  const abilityNames =
+    abilityStart >= 0
+      ? lines
+          .slice(abilityStart + 1, abilityEnd > abilityStart ? abilityEnd : abilityStart + 14)
+          .map((line) =>
+            cleanImportImageTitle(line)
+              .replace(/^#+\s*/, '')
+              .replace(/^Image:\s*/i, '')
+              .replace(/\s+Детали$/i, '')
+              .trim(),
+          )
+          .filter(
+            (line) =>
+              line &&
+              !/^#+$/.test(line) &&
+              !/^навыки$/i.test(line) &&
+              !/^пассив/i.test(line) &&
+              !/^пробуж/i.test(line) &&
+              !/^материал/i.test(line) &&
+              !/^обзор/i.test(line),
+          )
+      : [];
+  const abilityTypes = [
+    'Базовая атака',
+    'Навык',
+    'Сверхспособность',
+    'Навык поддержки',
+    'Пассивный навык',
+    'Пассивный навык',
+    'Повседневный навык',
+    'Повседневный навык',
+  ];
+  const abilities = Array.from(new Set(abilityNames))
+    .slice(0, 8)
+    .map((name, index) => ({
+      id: crypto.randomUUID(),
+      name,
+      type: abilityTypes[index] || 'Навык',
+      iconUrl: '',
+      description: 'Название найдено в NTE Wiki; описание подтягивается из других источников или заполняется вручную.',
+    }));
+  if (abilities.length) {
+    suggestions.push(
+      makeImportSuggestion(
+        'profile.abilities',
+        'Способности',
+        abilities,
+        source,
+        'medium',
+        'NTE Wiki даёт русские названия и иконки; описания нужно сверить с GameWith или игрой.',
+      ),
+    );
+  }
   const materialStart = lines.findIndex((line) => line.includes('Сводка материалов'));
   if (materialStart >= 0) {
     const materials = [];
@@ -4125,9 +4232,22 @@ function parseFandomCharacterImport(text, source, character) {
   return suggestions.filter(Boolean);
 }
 
-function extractImportImages(html, source) {
+function normalizeImportImageSrc(value, sourceUrl) {
+  const raw = decodeHtmlEntities(String(value || '').trim()).replace(/\\u0026/g, '&');
+  if (!raw) return '';
+  if (raw.startsWith('//')) return normalizeExternalImageUrl(`https:${raw}`);
+  if (/^https?:\/\//i.test(raw)) return normalizeExternalImageUrl(raw);
+  try {
+    return normalizeExternalImageUrl(new URL(raw, sourceUrl).toString());
+  } catch {
+    return normalizeExternalImageUrl(raw);
+  }
+}
+
+function extractImportImages(html, source, character = {}) {
   if (!source.extractImages) return [];
   const images = [];
+  const titledImages = [];
   const patterns = [
     /<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["']/gi,
     /<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["']/gi,
@@ -4137,9 +4257,7 @@ function extractImportImages(html, source) {
 
   for (const pattern of patterns) {
     for (const match of String(html || '').matchAll(pattern)) {
-      const url = normalizeExternalImageUrl(
-        decodeHtmlEntities(match[1] || match[0]).replace(/\\u0026/g, '&'),
-      );
+      const url = normalizeImportImageSrc(match[1] || match[0], source.url);
       if (
         url &&
         !images.includes(url) &&
@@ -4149,8 +4267,27 @@ function extractImportImages(html, source) {
       }
     }
   }
+  for (const match of String(html || '').matchAll(/<img\b[^>]*>/gi)) {
+    const tag = match[0];
+    const alt =
+      tag.match(/\balt=["']([^"']+)["']/i)?.[1] ||
+      tag.match(/\btitle=["']([^"']+)["']/i)?.[1] ||
+      '';
+    const src =
+      tag.match(/\bsrc=["']([^"']+)["']/i)?.[1] ||
+      tag.match(/\bdata-src=["']([^"']+)["']/i)?.[1] ||
+      '';
+    const title = cleanImportImageTitle(decodeHtmlEntities(alt));
+    const url = normalizeImportImageSrc(src, source.url);
+    if (!title || !url || /logo|fandom|app|badge|advert/i.test(title)) continue;
+    titledImages.push({ title, url });
+    if (!images.includes(url) && !/Icon|Logo|Fandom|App|Badge/i.test(url)) {
+      images.push(url);
+    }
+  }
 
   const bestImage = images[0] || '';
+  const imageMap = buildImportImageMap(titledImages, character);
   return [
     makeImportSuggestion(
       'imageUrl',
@@ -4168,6 +4305,7 @@ function extractImportImages(html, source) {
       'medium',
       'Можно использовать как временный splash, если изображение подходит.',
     ),
+    makeImportSuggestion('__imageMap', 'Индекс изображений', imageMap, source, 'low'),
   ].filter(Boolean);
 }
 
@@ -4389,9 +4527,79 @@ function enrichArraySuggestionMedia(item, imageMap) {
   };
 }
 
+function abilityDescriptionScore(ability) {
+  const description = String(ability?.description || '').trim();
+  if (!description || /требует проверки|не найден/i.test(description)) return 0;
+  return Math.min(description.length, 1200);
+}
+
+function mergeAbilityImportSuggestions(items) {
+  const abilityItems = items
+    .filter((item) => item?.field === 'profile.abilities')
+    .map((item) => ({ item, value: parseImportSuggestionJson(item) }))
+    .filter(({ value }) => Array.isArray(value) && value.length);
+  if (abilityItems.length < 2) return null;
+
+  const sorted = [...abilityItems].sort((a, b) => {
+    const score = (entry) =>
+      entry.value.reduce((sum, ability) => sum + abilityDescriptionScore(ability), 0);
+    return score(b) - score(a);
+  });
+  const base = sorted[0];
+  const maxLength = Math.min(
+    8,
+    Math.max(...abilityItems.map(({ value }) => value.length), base.value.length),
+  );
+  const merged = Array.from({ length: maxLength }, (_, index) => {
+    const candidates = abilityItems.map(({ value }) => value[index]).filter(Boolean);
+    const withDescription =
+      candidates.find((ability) => abilityDescriptionScore(ability) > 0) ||
+      base.value[index] ||
+      candidates[0];
+    const withCleanName =
+      candidates.find((ability) => {
+        const name = normalizeImportedRuText(ability?.name || '');
+        return (
+          name &&
+          !isImportPlaceholderText(name) &&
+          !/bilane|rail|skill|attack|ultra|support/i.test(name)
+        );
+      }) || withDescription;
+    return {
+      ...withDescription,
+      id: withDescription?.id || crypto.randomUUID(),
+      name: withCleanName?.name || withDescription?.name || 'Требует проверки',
+      type: withDescription?.type || withCleanName?.type || 'Навык',
+      iconUrl: withDescription?.iconUrl || withCleanName?.iconUrl || '',
+      description:
+        withDescription?.description ||
+        withCleanName?.description ||
+        'Описание требует проверки в игре.',
+    };
+  });
+
+  return {
+    id: `merged:profile.abilities:${hashText(JSON.stringify(merged)).slice(0, 10)}`,
+    field: 'profile.abilities',
+    label: 'Способности',
+    value: JSON.stringify(merged),
+    sourceName: 'Сводка проверенных источников',
+    sourceUrl: base.item.sourceUrl,
+    confidence: 'high',
+    note:
+      'Названия, описания и иконки объединены из нескольких источников. Подтвердите каждую строку перед сохранением.',
+  };
+}
+
 function enrichCharacterImportSuggestions(items) {
   const imageMap = importImageMapFromSuggestions(items);
-  return items.map((item) => enrichArraySuggestionMedia(item, imageMap));
+  const enriched = items.map((item) => enrichArraySuggestionMedia(item, imageMap));
+  const mergedAbilities = mergeAbilityImportSuggestions(enriched);
+  if (!mergedAbilities) return enriched;
+  return [
+    ...enriched.filter((item) => item?.field !== 'profile.abilities'),
+    enrichArraySuggestionMedia(mergedAbilities, imageMap),
+  ];
 }
 
 function dedupeImportSuggestions(items) {
@@ -4929,7 +5137,6 @@ function serializeCharacter(row) {
       gifts: parseJson(row.profile_gifts_json, []),
       voiceLines: parseJson(row.profile_voice_lines_json, []),
       awakenings: parseJson(row.profile_awakenings_json, []),
-      consoles: parseJson(row.profile_consoles_json, []),
     },
     status: row.status,
     patch: row.patch_version,
@@ -5325,7 +5532,6 @@ function profileCollectionLabel(name) {
       gifts: 'любимые подарки',
       voiceLines: 'реплики',
       awakenings: 'пробуждения',
-      consoles: 'консоли',
     }[name] || name
   );
 }
@@ -5439,18 +5645,6 @@ function normalizeCharacterProfile(value) {
       description: text(item.description, 1000),
     })),
     awakenings,
-    consoles: collection('consoles', 20, (item) => ({
-      id: id(item.id),
-      name: text(item.name, 160),
-      imageUrls: Array.isArray(item.imageUrls)
-        ? item.imageUrls.slice(0, 8).map(url)
-        : [],
-      description: text(item.description, 8000),
-      features: Array.isArray(item.features)
-        ? item.features.slice(0, 30).map((feature) => text(feature, 1000))
-        : [],
-      recommendedModules: text(item.recommendedModules, 8000),
-    })),
   };
 }
 
@@ -5534,7 +5728,7 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
         JSON.stringify(profile.gifts),
         JSON.stringify(profile.voiceLines),
         JSON.stringify(profile.awakenings),
-        JSON.stringify(profile.consoles),
+        JSON.stringify([]),
       ),
     );
   }

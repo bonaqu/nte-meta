@@ -3403,7 +3403,9 @@
 }
 
 .ability-list--profile .ability-card__body {
-  max-inline-size: min(100%, 92ch);
+  inline-size: min(100%, 112ch);
+  max-inline-size: none;
+  margin-inline: auto;
   padding-inline: clamp(16px, 3vw, 28px);
   padding-block-end: clamp(18px, 3vw, 28px);
 }
@@ -3412,6 +3414,7 @@
   max-inline-size: none;
   font-size: clamp(0.96rem, 1.3vw, 1.04rem);
   line-height: 1.72;
+  overflow-wrap: break-word;
 }
 
   .ability-card:hover,

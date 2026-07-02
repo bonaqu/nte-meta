@@ -395,7 +395,7 @@ function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {
     name: 'Имя',
     originalName: 'Оригинальное имя',
     rarity: 'Редкость',
-    attribute: 'Тип эспера',
+    attribute: 'Атрибут',
     tier: 'Тир',
     imageUrl: 'Карточка персонажа',
     splashUrl: 'Splash персонажа',
@@ -1139,7 +1139,7 @@ export function AdminCharacterEditor({
           />
         </label>
         <label>
-          Тип эспера
+              Атрибут
           <input
             required
             value={draft.attribute}

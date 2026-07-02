@@ -1877,7 +1877,7 @@ function CharacterDetailPage({
             <dd>{profile.releaseDate || 'Не указана'}</dd>
           </div>
           <div>
-            <dt>Тип эспера</dt>
+              <dt>Атрибут</dt>
             <dd>{character.attribute}</dd>
           </div>
         <div>

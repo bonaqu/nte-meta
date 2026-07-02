@@ -674,12 +674,6 @@ export function AdminCharactersManager({
         { name: 'attribute', label: 'Тип эспера', kind: 'text', required: true },
         { name: 'tier', label: 'Тир', kind: 'select', options: tiers },
         {
-          name: 'premiumTier',
-          label: 'Внутренний legacy-тир',
-          kind: 'select',
-          options: tiers,
-        },
-        {
           name: 'imageUrl',
           label: 'URL карточки',
           kind: 'url',
@@ -740,7 +734,7 @@ export function AdminCharactersManager({
         type: textValue(values, 'type'),
         attribute: textValue(values, 'attribute'),
         tier: textValue(values, 'tier'),
-        premiumTier: textValue(values, 'premiumTier'),
+        premiumTier: textValue(values, 'tier'),
         imageUrl: textValue(values, 'imageUrl'),
         splashUrl: textValue(values, 'splashUrl'),
         shortDescription: textValue(values, 'shortDescription'),

@@ -1610,7 +1610,6 @@ function CharactersPage({
   const deferredQuery = useDeferredValue(query);
   const [rarity, setRarity] = useState('Любая редкость');
   const [tier, setTier] = useState('Любой тир');
-  const [attribute, setAttribute] = useState('Любой тип эспера');
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorDirty, setEditorDirty] = useState(false);
   const indexedCharacters = useMemo(
@@ -1622,16 +1621,6 @@ function CharactersPage({
     [data.characters],
   );
 
-  const attributes = useMemo(
-    () => [
-      'Любой тип эспера',
-      ...Array.from(
-        new Set(data.characters.map((character) => character.attribute)),
-      ),
-    ],
-    [data.characters],
-  );
-
   const filtered = useMemo(() => {
     const normalizedQuery = normalizeSearchText(deferredQuery);
 
@@ -1640,14 +1629,13 @@ function CharactersPage({
         const queryMatch =
           !normalizedQuery || searchText.includes(normalizedQuery);
         return (
-            queryMatch &&
-            (rarity === 'Любая редкость' || character.rarity === rarity) &&
-          (tier === 'Любой тир' || character.tier === tier) &&
-          (attribute === 'Любой тип эспера' || character.attribute === attribute)
+          queryMatch &&
+          (rarity === 'Любая редкость' || character.rarity === rarity) &&
+          (tier === 'Любой тир' || character.tier === tier)
         );
       })
       .map(({ character }) => character);
-  }, [attribute, deferredQuery, indexedCharacters, rarity, tier]);
+  }, [deferredQuery, indexedCharacters, rarity, tier]);
 
   async function refreshContent() {
     setData(
@@ -1688,12 +1676,6 @@ function CharactersPage({
           value={tier}
           setValue={setTier}
           options={tierOptions}
-        />
-        <SelectFilter
-          label="Тип эспера"
-          value={attribute}
-          setValue={setAttribute}
-          options={attributes}
         />
         <SelectFilter
           label="Редкость"
@@ -1803,6 +1785,32 @@ function CharacterDetailPage({
   const [guideEditorOpen, setGuideEditorOpen] = useState(false);
   const [characterEditorDirty, setCharacterEditorDirty] = useState(false);
   const [guideEditorDirty, setGuideEditorDirty] = useState(false);
+  const sectionIds = useMemo(
+    () => [
+      'character-biography',
+      'character-abilities',
+      'character-awakenings',
+      'character-progression',
+      'character-voice',
+    ],
+    [],
+  );
+
+  useEffect(() => {
+    const scrollToAnchor = () => {
+      const id = window.location.hash.replace(/^#/, '');
+      if (!sectionIds.includes(id)) return;
+      window.requestAnimationFrame(() => {
+        document
+          .getElementById(id)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    };
+
+    scrollToAnchor();
+    window.addEventListener('hashchange', scrollToAnchor);
+    return () => window.removeEventListener('hashchange', scrollToAnchor);
+  }, [sectionIds]);
 
   if (!character) {
     return (
@@ -3073,16 +3081,8 @@ function GuidesPage({
   const deferredQuery = useDeferredValue(query);
   const [rarity, setRarity] = useState('Любая редкость');
   const [tier, setTier] = useState('Любой тир');
-  const [attribute, setAttribute] = useState('Любой тип эспера');
   const [editorGuideId, setEditorGuideId] = useState<string | null>(null);
   const [editorDirty, setEditorDirty] = useState(false);
-  const attributes = useMemo(
-    () => [
-      'Любой тип эспера',
-      ...new Set(data.characters.map((character) => character.attribute)),
-    ],
-    [data.characters],
-  );
   const filtered = useMemo(() => {
     const needle = normalizeSearchText(deferredQuery);
     return data.guides.filter((guide) => {
@@ -3091,14 +3091,13 @@ function GuidesPage({
       const searchText = normalizeSearchText(
         `${guide.title} ${guide.summary} ${getCharacterSearchText(character)}`,
       );
-          return (
-            (!needle || searchText.includes(needle)) &&
-            (rarity === 'Любая редкость' || character.rarity === rarity) &&
-            (tier === 'Любой тир' || character.tier === tier) &&
-            (attribute === 'Любой тип эспера' || character.attribute === attribute)
-          );
-        });
-  }, [attribute, data, deferredQuery, rarity, tier]);
+      return (
+        (!needle || searchText.includes(needle)) &&
+        (rarity === 'Любая редкость' || character.rarity === rarity) &&
+        (tier === 'Любой тир' || character.tier === tier)
+      );
+    });
+  }, [data, deferredQuery, rarity, tier]);
 
   return (
     <div className="page-stack">
@@ -3132,12 +3131,6 @@ function GuidesPage({
           value={tier}
           setValue={setTier}
           options={tierOptions}
-        />
-        <SelectFilter
-          label="Тип эспера"
-          value={attribute}
-          setValue={setAttribute}
-          options={attributes}
         />
         <SelectFilter
           label="Редкость"
@@ -6695,7 +6688,11 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
 
   function closeWarningDialog() {
     setActionId('');
-    warningDialogRef.current?.close('cancel');
+    warningDialogRef.current?.querySelector('form')?.reset();
+    setWarningTarget(null);
+    if (warningDialogRef.current?.open) {
+      warningDialogRef.current.close('cancel');
+    }
   }
 
   async function submitWarning(event: React.FormEvent<HTMLFormElement>) {

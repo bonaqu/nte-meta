@@ -94,15 +94,6 @@ export interface CharacterAwakening {
   description: string;
 }
 
-export interface CharacterConsole {
-  id: string;
-  name: string;
-  imageUrls: string[];
-  description: string;
-  features: string[];
-  recommendedModules: string;
-}
-
 export interface CharacterProfile {
   faction: string;
   arcType: string;
@@ -121,7 +112,6 @@ export interface CharacterProfile {
   gifts: CharacterGift[];
   voiceLines: CharacterVoiceLine[];
   awakenings: CharacterAwakening[];
-  consoles: CharacterConsole[];
 }
 
 export interface Character {

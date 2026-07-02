@@ -73,6 +73,18 @@ function stableStringify(value: unknown) {
   return JSON.stringify(value);
 }
 
+function makeLocalSlug(value: string) {
+  return (
+    value
+      .toLocaleLowerCase('ru-RU')
+      .trim()
+      .replace(/ё/g, 'e')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9а-я]+/gi, '-')
+      .replace(/^-+|-+$/g, '') || `item-${Date.now()}`
+  );
+}
+
 type ManagerConfig<T extends ManagedItem> = {
   endpoint: string;
   title: string;
@@ -393,7 +405,20 @@ export function ContentManager<T extends ManagedItem>({
   }, [initialSelectedId]);
 
   function setValue(name: string, value: unknown) {
-    setValues((current) => ({ ...current, [name]: value }));
+    setValues((current) => {
+      const next = { ...current, [name]: value };
+      const hasSlugField = configRef.current.fields.some(
+        (field) => field.name === 'slug',
+      );
+      if (
+        name === 'title' &&
+        hasSlugField &&
+        !String(current.slug || '').trim()
+      ) {
+        next.slug = makeLocalSlug(String(value || ''));
+      }
+      return next;
+    });
   }
 
   function startCreate() {

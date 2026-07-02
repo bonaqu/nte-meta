@@ -1992,6 +1992,19 @@ function nextImportLine(lines, label) {
 function normalizeImportArcType(value) {
   const normalized = normalizeImportSearch(value);
   if (!normalized) return '';
+  if (
+    [
+      'camellia',
+      'сообщество камелии',
+      'best arc',
+      'preferred arc',
+      'arcana',
+      'дуги для',
+      'лучшие дуги',
+    ].some((item) => normalized.includes(normalizeImportSearch(item)))
+  ) {
+    return '';
+  }
   const direct = [
     ['重合', 'Гибридный'],
     ['гибрид', 'Гибридный'],
@@ -3146,8 +3159,10 @@ function parseGenshinBuildsImport(text, source, character) {
   for (let index = awakeningStart + 1; awakeningStart >= 0 && index < voiceStart; index += 2) {
     const match = (lines[index] || '').match(/^(\d+)\s+(.+)/);
     if (!match) continue;
+    const level = Number(match[1]);
+    if (!Number.isInteger(level) || level < 1 || level > 6) continue;
     awakenings.push({
-      level: Number(match[1]),
+      level,
       name: match[2],
       iconUrl: '',
       description: lines[index + 1] || '',
@@ -3400,6 +3415,27 @@ function translateGameWithElement(value) {
 function translateGameWithArcType(value) {
   const raw = gameWithLocaleText(value) || String(value || '');
   const normalized = normalizeImportSearch(raw);
+  if (
+    [
+      'camellia',
+      'сообщество камелии',
+      'arcana',
+      'preferred arc',
+      'best arc',
+    ].some((item) => normalized.includes(normalizeImportSearch(item)))
+  ) {
+    return '';
+  }
+  const slug = [
+    ['cluster', 'Гибридный'],
+    ['hybrid', 'Гибридный'],
+    ['solid', 'Твёрдый'],
+    ['liquid', 'Жидкий'],
+    ['gas', 'Газовый'],
+    ['plasma', 'Плазменный'],
+    ['condensate', 'Конденсат'],
+  ].find(([key]) => normalized === key || normalized.includes(key));
+  if (slug) return slug[1];
   const direct = [
     ['重合', 'Гибридный'],
     ['固', 'Твёрдый'],
@@ -3471,15 +3507,33 @@ function gameWithSkillDescription(entry) {
     .trim();
 }
 
+function isImportPlaceholderText(value) {
+  const text = String(value || '').trim();
+  return (
+    !text ||
+    /(?:^|_)GA_[A-Za-z0-9_]+_(?:name|des)$/i.test(text) ||
+    /(?:Skill|Ultra|Attack|Passive|Support)_(?:name|des)$/i.test(text) ||
+    /^(?:name|description|effect|undefined|null)$/i.test(text)
+  );
+}
+
+function hasRussianText(value) {
+  return /[а-яё]/i.test(String(value || ''));
+}
+
 function gameWithAbility(entry, type) {
-  const name = gameWithLocaleText(entry?.name);
-  if (!name) return null;
+  const name = normalizeImportedRuText(gameWithLocaleText(entry?.name));
+  if (isImportPlaceholderText(name) || !hasRussianText(name)) return null;
+  const description = normalizeImportedRuText(gameWithSkillDescription(entry));
   return {
     id: crypto.randomUUID(),
     name,
     type,
     iconUrl: normalizeExternalImageUrl(entry?.iconUrl || ''),
-    description: gameWithSkillDescription(entry) || 'Описание требует проверки в игре.',
+    description:
+      !isImportPlaceholderText(description) && hasRussianText(description)
+        ? description
+        : 'Описание требует проверки в игре.',
   };
 }
 
@@ -3924,10 +3978,10 @@ function translateEsperType(value) {
 function translateArcType(value) {
   const normalized = normalizeImportSearch(value);
   const map = [
-    ['solid', 'Твёрдое'],
-    ['liquid', 'Жидкость'],
-    ['gas', 'Газ'],
-    ['plasma', 'Плазма'],
+    ['solid', 'Твёрдый'],
+    ['liquid', 'Жидкий'],
+    ['gas', 'Газовый'],
+    ['plasma', 'Плазменный'],
     ['condensate', 'Конденсат'],
     ['hybrid', 'Гибридный'],
     ['cluster', 'Гибридный'],

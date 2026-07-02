@@ -100,7 +100,6 @@ function emptyProfile(): CharacterProfile {
     gifts: [],
     voiceLines: [],
     awakenings: [],
-    consoles: [],
   };
 }
 

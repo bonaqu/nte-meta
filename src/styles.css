@@ -518,6 +518,22 @@
   background: rgb(255 255 255 / 0.045);
 }
 
+.guide-facts dd {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+
+.guide-facts dd strong {
+  color: var(--text);
+}
+
+.guide-facts dd span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.3;
+}
+
 .character-profile-facts {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }

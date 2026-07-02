@@ -2360,9 +2360,19 @@ function CharacterHero({
         <div>
           <dt>Тир</dt>
           <dd>
-            {tierPlacement
-              ? `${tierPlacement.tier} · место ${tierPlacement.position}`
-              : 'Не задан'}
+            {tierPlacement ? (
+              <>
+                <strong>
+                  {tierPlacement.tier} · место {tierPlacement.position}
+                </strong>
+                <span>
+                  из тир-листа · патч {tierPlacement.patch} ·{' '}
+                  {formatDate(tierPlacement.updatedAt)}
+                </span>
+              </>
+            ) : (
+              'Не задан'
+            )}
           </dd>
         </div>
         </dl>
@@ -4240,40 +4250,48 @@ function getYoutubeThumbnailUrl(url: string) {
   return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : '';
 }
 
-function getGuideImportPreviewUrl(suggestion: CharacterImportSuggestion) {
+function getImportConfidenceLabel(confidence: CharacterImportSuggestion['confidence']) {
+  if (confidence === 'high') return 'Высокая уверенность';
+  if (confidence === 'medium') return 'Средняя уверенность';
+  return 'Требует ручной проверки';
+}
+
+function getGuideImportPreviewUrls(suggestion: CharacterImportSuggestion) {
+  const urls: string[] = [];
+  const addUrl = (value: unknown) => {
+    if (typeof value !== 'string') return;
+    const normalized =
+      getYoutubeThumbnailUrl(value) ||
+      (/^https?:/i.test(value) || value.startsWith('assets/')
+        ? normalizeExternalAssetUrl(value)
+        : '');
+    if (normalized && !urls.includes(normalized)) urls.push(normalized);
+  };
+
   try {
     const parsed = JSON.parse(suggestion.value) as unknown;
     if (typeof parsed === 'string') {
-      return (
-        getYoutubeThumbnailUrl(parsed) ||
-        (/(?:image|splash|icon)url/i.test(suggestion.field)
-          ? normalizeExternalAssetUrl(parsed)
-          : '')
-      );
+      if (/(?:image|splash|icon)url/i.test(suggestion.field) || getYoutubeThumbnailUrl(parsed)) {
+        addUrl(parsed);
+      }
+      return urls;
     }
     if (Array.isArray(parsed)) {
-      const mediaValue = parsed
-        .flatMap((item) =>
-          item && typeof item === 'object' ? Object.values(item) : [item],
-        )
-        .find(
-          (value) =>
-            typeof value === 'string' &&
-            (/^https?:/i.test(value) || value.startsWith('assets/')),
-        );
-      return typeof mediaValue === 'string'
-        ? getYoutubeThumbnailUrl(mediaValue) || normalizeExternalAssetUrl(mediaValue)
-        : '';
+      for (const item of parsed) {
+        if (item && typeof item === 'object') {
+          Object.values(item).forEach(addUrl);
+        } else {
+          addUrl(item);
+        }
+        if (urls.length >= 4) break;
+      }
     }
   } catch {
-    return (
-      getYoutubeThumbnailUrl(suggestion.value) ||
-      (/(?:image|splash|icon)url/i.test(suggestion.field)
-        ? normalizeExternalAssetUrl(suggestion.value)
-        : '')
-    );
+    if (/(?:image|splash|icon)url/i.test(suggestion.field) || getYoutubeThumbnailUrl(suggestion.value)) {
+      addUrl(suggestion.value);
+    }
   }
-  return '';
+  return urls;
 }
 
 function GuideCreateFields({
@@ -5267,7 +5285,7 @@ function AdminGuides({
             <div className="import-suggestion-list">
               {guideImportSuggestions.map((suggestion) => {
                 const decision = guideImportDecisions[suggestion.id];
-                const previewUrl = getGuideImportPreviewUrl(suggestion);
+                const previewUrls = getGuideImportPreviewUrls(suggestion);
                 return (
                   <article
                     className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
@@ -5276,37 +5294,47 @@ function AdminGuides({
                     <div>
                       <strong>{suggestion.label}</strong>
                       <span>Секция гайда</span>
-                    </div>
-                      <div className="import-suggestion-value">
-                        {previewUrl ? (
-                          <div className="import-image-preview">
-                        <img
-                          src={resolveAssetUrl(previewUrl)}
-                          alt=""
-                          width="92"
-                          height="92"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          onError={(event) => {
-                            event.currentTarget.hidden = true;
-                            event.currentTarget
-                              .closest('.import-image-preview')
-                              ?.setAttribute('data-broken', 'true');
-                          }}
-                        />
+                  </div>
+                  <div className="import-suggestion-value">
+                    {previewUrls.length ? (
+                      <div
+                        className={`import-image-preview ${
+                          previewUrls.length > 1 ? 'import-image-preview--grid' : ''
+                        }`}
+                      >
+                        <div>
+                          {previewUrls.map((previewUrl) => (
                             <a
                               href={resolveAssetUrl(previewUrl)}
+                              key={previewUrl}
                               target="_blank"
                               rel="noreferrer"
+                              aria-label="Открыть изображение из автоимпорта гайда"
                             >
-                              Открыть изображение
+                              <img
+                                src={resolveAssetUrl(previewUrl)}
+                                alt=""
+                                width="92"
+                                height="92"
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                                onError={(event) => {
+                                  event.currentTarget.hidden = true;
+                                  event.currentTarget
+                                    .closest('.import-image-preview')
+                                    ?.setAttribute('data-broken', 'true');
+                                }}
+                              />
                             </a>
-                          </div>
-                        ) : null}
-                      <p>{formatGuideImportValue(suggestion.value)}</p>
-                    </div>
-                    <small>
-                    {suggestion.sourceName} · уверенность: {suggestion.confidence}
+                          ))}
+                        </div>
+                        <span>Нажмите на превью, чтобы открыть оригинал</span>
+                      </div>
+                    ) : null}
+                    <p>{formatGuideImportValue(suggestion.value)}</p>
+                  </div>
+                  <small>
+                    {suggestion.sourceName} · {getImportConfidenceLabel(suggestion.confidence)}
                     {suggestion.note ? ` · ${suggestion.note}` : ''}
                   </small>
                   <div className="import-suggestion-actions">

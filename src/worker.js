@@ -1982,6 +1982,21 @@ function compactImportLines(text) {
     .filter(Boolean);
 }
 
+function extractYoutubeUrls(text) {
+  const seen = new Set();
+  return Array.from(
+    String(text || '').matchAll(
+      /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?[^"' <>\n]*v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})[^"' <>\n]*/gi,
+    ),
+  )
+    .map((match) => `https://www.youtube.com/watch?v=${match[1]}`)
+    .filter((url) => {
+      if (seen.has(url)) return false;
+      seen.add(url);
+      return true;
+    });
+}
+
 function nextImportLine(lines, label) {
   const index = lines.findIndex(
     (line) => line.toLocaleLowerCase('ru-RU') === label.toLocaleLowerCase('ru-RU'),
@@ -3211,6 +3226,7 @@ function parseGenshinBuildsGuideImport(text, source, character) {
   if (!lines.some((line) => lineMatchesCharacter(line, character))) return [];
 
   const howToPlay = collectGuideLines(lines, 'How Play', ['Rotations', 'Tips'], 12);
+  const videoUrl = extractYoutubeUrls(text)[0] || '';
   const rotations = collectGuideLines(lines, 'Rotations', ['Tips', 'Passives'], 8)
     .filter((line) => /combo|rotation|→|->|skill|attack|ultimate/i.test(line))
     .map((description, index) => ({
@@ -3219,6 +3235,7 @@ function parseGenshinBuildsGuideImport(text, source, character) {
     }));
   const tips = collectGuideLines(lines, 'Tips', ['Passives', 'Awakening'], 8);
   return [
+    makeImportSuggestion('guide.videoUrl', 'Видео-гайд', videoUrl, source, 'medium'),
     makeImportSuggestion('guide.tips', 'Советы по механике', [...howToPlay, ...tips], source, 'medium'),
     makeImportSuggestion('guide.rotations', 'Ротации из внешнего гайда', rotations, source, 'medium'),
   ].filter(Boolean);
@@ -3229,11 +3246,13 @@ function parseGameWithGuideImport(text, source, character) {
   const plainText = /<\/?[a-z][\s\S]*>/i.test(text) ? htmlToPlainText(text) : text;
   const lines = compactImportLines(plainText);
   if (!lines.some((line) => lineMatchesCharacter(line, character))) return [];
+  const videoUrl = extractYoutubeUrls(text)[0] || '';
   const awakenings = collectGuideLines(lines, 'Эффекты резонанса', ['Любимые подарки'], 12)
     .join(' ')
     .match(/C\d\s+[^C]+/g);
   return [
     ...structured,
+    makeImportSuggestion('guide.videoUrl', 'Видео-гайд', videoUrl, source, 'medium'),
     makeImportSuggestion(
       'guide.awakenings',
       'Пробуждения и резонансы',
@@ -3331,12 +3350,14 @@ function parseGameWithStructuredGuideImport(text, source, character) {
 function parseNteWikiGuideImport(text, source, character) {
   const lines = compactImportLines(text);
   if (!lines.some((line) => lineMatchesCharacter(line, character))) return [];
+  const videoUrl = extractYoutubeUrls(text)[0] || '';
   const skillNames = lines
     .filter((line) => /Детали$/.test(line))
     .map((line) => line.replace(/\s+Детали$/, '').trim())
     .filter(Boolean)
     .slice(0, 8);
   return [
+    makeImportSuggestion('guide.videoUrl', 'Видео-гайд', videoUrl, source, 'low'),
     makeImportSuggestion(
       'guide.tips',
       'Названия навыков для сверки',

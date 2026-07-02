@@ -63,6 +63,13 @@ function isVideoSourceUrl(url: string) {
   return /youtube\.com|youtu\.be|vimeo\.com|bilibili\.com/i.test(url);
 }
 
+function getYoutubeThumbnailUrl(url: string) {
+  const match = url.match(
+    /(?:youtube\.com\/(?:watch\?[^#\s]*v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/i,
+  );
+  return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : '';
+}
+
 function readCharacterDraft(key: string) {
   try {
     const raw = localStorage.getItem(key);
@@ -362,7 +369,7 @@ function getSuggestionPreviewUrls(suggestion: CharacterImportSuggestion) {
   const addUrl = (value: unknown) => {
     if (typeof value !== 'string') return;
     if (!/^https?:|^assets\//i.test(value)) return;
-    const normalized = normalizeExternalAssetUrl(value);
+    const normalized = getYoutubeThumbnailUrl(value) || normalizeExternalAssetUrl(value);
     if (normalized && !urls.includes(normalized)) urls.push(normalized);
   };
 
@@ -1905,11 +1912,29 @@ export function AdminCharacterEditor({
                     onChange={(event) =>
                       update({ ...item, description: event.target.value })
                     }
+                />
+              </label>
+              {item.sourceUrl && getYoutubeThumbnailUrl(item.sourceUrl) ? (
+                <a
+                  className="audio-source-preview"
+                  href={item.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img
+                    src={getYoutubeThumbnailUrl(item.sourceUrl)}
+                    alt=""
+                    width="168"
+                    height="94"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
                   />
-                </label>
-                {item.audioUrl && isDirectAudioUrl(item.audioUrl) ? (
-                  <audio controls preload="none" src={item.audioUrl}>
-                    Ваш браузер не поддерживает аудио.
+                  <span>Открыть видео-источник реплик</span>
+                </a>
+              ) : null}
+              {item.audioUrl && isDirectAudioUrl(item.audioUrl) ? (
+                <audio controls preload="none" src={item.audioUrl}>
+                  Ваш браузер не поддерживает аудио.
                   </audio>
                 ) : item.audioUrl && isVideoSourceUrl(item.audioUrl) ? (
                   <span className="audio-placeholder audio-placeholder--warning">

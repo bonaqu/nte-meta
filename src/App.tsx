@@ -4215,15 +4215,43 @@ function readGuideEditorDraft(key: string) {
 function formatGuideImportValue(value: string) {
   try {
     const parsed = JSON.parse(value) as unknown;
+    const formatRecord = (record: Record<string, unknown>, index: number) => {
+      const title =
+        record.name ||
+        record.title ||
+        record.label ||
+        record.character ||
+        `Пункт ${index + 1}`;
+      const details = [
+        record.description,
+        record.value,
+        record.effect,
+        record.note,
+      ]
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+        .join(' ');
+      const steps = Array.isArray(record.steps)
+        ? `\n  ${record.steps
+            .map((step, stepIndex) => `${stepIndex + 1}. ${String(step)}`)
+            .join('\n  ')}`
+        : '';
+      const imageUrl = [record.imageUrl, record.iconUrl, record.thumbnailUrl]
+        .map((item) => String(item || '').trim())
+        .find(Boolean);
+      const image = imageUrl
+        ? `\n  ![${String(title)}](${normalizeExternalAssetUrl(imageUrl)})`
+        : '';
+
+      return `- **${String(title)}**${details ? ` — ${details}` : ''}${steps}${image}`;
+    };
+
     if (Array.isArray(parsed)) {
       return parsed
-        .map((item) => {
+        .map((item, index) => {
           if (typeof item === 'string') return `- ${item}`;
           if (item && typeof item === 'object') {
-            const record = item as Record<string, unknown>;
-            const title = record.name || record.title || record.label || 'Пункт';
-            const details = record.description || record.value || record.effect || '';
-            return `- **${String(title)}**${details ? ` — ${String(details)}` : ''}`;
+            return formatRecord(item as Record<string, unknown>, index);
           }
           return `- ${String(item)}`;
         })
@@ -4238,6 +4266,21 @@ function formatGuideImportValue(value: string) {
   } catch {
     return value;
   }
+}
+
+function getGuideImportFieldLabel(field: string) {
+  const labels: Record<string, string> = {
+    'guide.bestArcs': 'Секция: лучшие дуги',
+    'guide.alternativeArcs': 'Секция: альтернативные дуги',
+    'guide.rotations': 'Секция: ротации',
+    'guide.tips': 'Секция: советы и механики',
+    'guide.materials': 'Секция: материалы прокачки',
+    'guide.teams': 'Секция: команды',
+    'guide.videoUrl': 'Поле: видео-гайд',
+    'guide.awakenings': 'Секция: пробуждения',
+    tier: 'Секция: краткий вывод',
+  };
+  return labels[field] || 'Секция гайда';
 }
 
 function getYoutubeThumbnailUrl(url: string) {
@@ -4790,8 +4833,11 @@ function AdminGuides({
 
     const guideImportSections: Record<string, { title: string; type: string }> =
       {
-        'guide.bestArcs': { title: 'Лучшие дуги', type: 'arcs' },
-        'guide.alternativeArcs': { title: 'Альтернативные дуги', type: 'arcs' },
+        'guide.bestArcs': { title: 'Лучшие дуги', type: 'best-arcs' },
+        'guide.alternativeArcs': {
+          title: 'Альтернативные дуги',
+          type: 'alternative-arcs',
+        },
         'guide.rotations': { title: 'Ротации', type: 'rotation' },
         'guide.tips': { title: 'Советы и механики', type: 'tips' },
         'guide.materials': { title: 'Материалы прокачки', type: 'progression' },
@@ -4806,7 +4852,18 @@ function AdminGuides({
     };
     const sectionTitle = sectionConfig.title;
     const sectionType = sectionConfig.type;
+    const importMarker = `<!-- import:${suggestion.id} -->`;
+    if (sections.some((section) => section.content.includes(importMarker))) {
+      setGuideImportDecisions((current) => ({
+        ...current,
+        [suggestion.id]: 'accepted',
+      }));
+      setMessage(`Предложение «${suggestion.label}» уже добавлено в гайд.`);
+      return;
+    }
+
     const importMarkdown = [
+      importMarker,
       `### ${suggestion.label}`,
       formatGuideImportValue(suggestion.value),
       '',
@@ -5290,8 +5347,8 @@ function AdminGuides({
                   >
                     <div>
                       <strong>{suggestion.label}</strong>
-                      <span>Секция гайда</span>
-                  </div>
+                      <span>{getGuideImportFieldLabel(suggestion.field)}</span>
+                    </div>
                   <div className="import-suggestion-value">
                     {previewUrls.length ? (
                       <div

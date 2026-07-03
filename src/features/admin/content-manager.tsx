@@ -281,16 +281,12 @@ function FieldControl({
         />
       ) : (
       <input
-        id={id}
-        name={field.name}
-        type={
-          field.kind === 'number'
-            ? 'number'
-            : field.kind === 'url'
-              ? 'url'
-              : 'text'
-        }
-        inputMode={field.kind === 'url' ? 'url' : undefined}
+            id={id}
+            name={field.name}
+            type={
+              field.kind === 'number' ? 'number' : 'text'
+            }
+            inputMode={field.kind === 'url' ? 'url' : undefined}
           value={
             field.kind === 'number'
               ? numberValue(values, field.name)

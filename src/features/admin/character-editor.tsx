@@ -229,19 +229,23 @@ function ImportSuggestionList({
         </p>
       </div>
       <div className="import-suggestion-list">
-          {suggestions.map((suggestion) => {
-            const decision = decisions[suggestion.id];
-            const previewUrls = getSuggestionPreviewUrls(suggestion);
-            const fieldLabel = getSuggestionFieldLabel(suggestion);
-            const rowSuggestions = getImportSuggestionRows(suggestion);
-            return (
+        {suggestions.map((suggestion) => {
+          const decision = decisions[suggestion.id];
+          const previewUrls = getSuggestionPreviewUrls(suggestion);
+          const fieldLabel = getSuggestionFieldLabel(suggestion);
+          const suggestionContext = getSuggestionContextLabel(
+            suggestion,
+            fieldLabel,
+          );
+          const rowSuggestions = getImportSuggestionRows(suggestion);
+          return (
             <article
               className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
               key={suggestion.id}
             >
               <div>
-                <strong>{suggestion.label}</strong>
-                <span>{fieldLabel}</span>
+                <strong>{fieldLabel}</strong>
+                {suggestionContext ? <span>{suggestionContext}</span> : null}
               </div>
               <div className="import-suggestion-value">
                 {previewUrls.length ? (
@@ -281,7 +285,7 @@ function ImportSuggestionList({
                 ) : null}
                 <p>{summarizeSuggestionValue(suggestion.value)}</p>
                 {rowSuggestions.length ? (
-                  <div className="import-row-review" aria-label={`Строки: ${suggestion.label}`}>
+                  <div className="import-row-review" aria-label={`Строки: ${fieldLabel}`}>
                     {rowSuggestions.map((row) => {
                       const rowDecision = decisions[row.id];
                       const rowPreviewUrls = getSuggestionPreviewUrls(row);
@@ -465,6 +469,28 @@ function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {
     'profile.skins': 'Гардероб',
   };
   return labels[suggestion.field] || suggestion.label;
+}
+
+function getSuggestionContextLabel(
+  suggestion: CharacterImportSuggestion,
+  fieldLabel: string,
+) {
+  const escapedField = suggestion.field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const cleaned = suggestion.label
+    .replace(new RegExp(escapedField, 'gi'), '')
+    .replace(/\bprofile\.[a-zA-Z.]+\b/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:])/g, '$1')
+    .trim();
+
+  if (
+    !cleaned ||
+    cleaned.toLocaleLowerCase('ru-RU') === fieldLabel.toLocaleLowerCase('ru-RU')
+  ) {
+    return '';
+  }
+
+  return cleaned;
 }
 
 function getImportSuggestionRows(

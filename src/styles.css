@@ -1993,6 +1993,44 @@
   white-space: normal;
 }
 
+.cms-records > button.source-record {
+  position: relative;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 12px;
+  border-color: rgb(255 255 255 / 0.08);
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.055), transparent 56%),
+    rgb(255 255 255 / 0.025);
+}
+
+.cms-records > button.source-record::before {
+  content: '';
+  position: absolute;
+  inset-block: 10px;
+  inset-inline-start: 0;
+  inline-size: 3px;
+  border-radius: 999px;
+  background: var(--muted);
+}
+
+.cms-records > button.source-record.trust-high::before {
+  background: var(--green);
+}
+
+.cms-records > button.source-record.trust-medium::before {
+  background: var(--cyan);
+}
+
+.cms-records > button.source-record.trust-low::before {
+  background: var(--pink);
+}
+
+.cms-records > button.source-record.is-auto-import small::after {
+  content: ' · очередь автоимпорта';
+  color: var(--green);
+  font-weight: 900;
+}
+
   .cms-fields small,
   .cms-toggle small {
     display: block;
@@ -2521,12 +2559,43 @@
 }
 
 .source-preview-card {
-  gap: 10px;
+  gap: 12px;
   min-inline-size: 0;
   border-color: color-mix(in srgb, var(--cyan) 22%, var(--border));
   background:
     linear-gradient(135deg, rgb(38 217 255 / 0.08), transparent 48%),
-    color-mix(in srgb, var(--surface) 94%, #111827);
+  color-mix(in srgb, var(--surface) 94%, #111827);
+}
+
+.source-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.source-preview-meta span {
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.055);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.source-preview-meta .trust-high {
+  border-color: rgb(64 255 174 / 0.4);
+  color: var(--green);
+}
+
+.source-preview-meta .trust-medium {
+  border-color: rgb(38 217 255 / 0.36);
+  color: var(--cyan);
+}
+
+.source-preview-meta .trust-low {
+  border-color: rgb(255 80 160 / 0.36);
+  color: var(--pink);
 }
 
 .source-preview-card h2 {

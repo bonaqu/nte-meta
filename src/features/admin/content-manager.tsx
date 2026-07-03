@@ -99,6 +99,7 @@ type ManagerConfig<T extends ManagedItem> = {
   ) => Record<string, unknown>;
   itemTitle: (item: T) => string;
   itemMeta: (item: T) => string;
+  itemClassName?: (item: T) => string;
   preview: (values: EditorValues) => ReactNode;
   supportsPublishing?: boolean;
 };
@@ -126,6 +127,13 @@ function splitTags(value: unknown) {
 
 function options(values: readonly string[]): FieldOption[] {
   return values.map((value) => ({ label: value, value }));
+}
+
+function sourceTrustClass(value: unknown) {
+  const trust = String(value || '');
+  if (trust === 'высокий') return 'trust-high';
+  if (trust === 'низкий') return 'trust-low';
+  return 'trust-medium';
 }
 
 function FieldControl({
@@ -272,11 +280,17 @@ function FieldControl({
           onChange={(event) => setValue(field.name, event.target.value)}
         />
       ) : (
-        <input
-          id={id}
-          name={field.name}
-          type={field.kind === 'number' ? 'number' : 'text'}
-          inputMode={field.kind === 'url' ? 'url' : undefined}
+      <input
+        id={id}
+        name={field.name}
+        type={
+          field.kind === 'number'
+            ? 'number'
+            : field.kind === 'url'
+              ? 'url'
+              : 'text'
+        }
+        inputMode={field.kind === 'url' ? 'url' : undefined}
           value={
             field.kind === 'number'
               ? numberValue(values, field.name)
@@ -531,7 +545,12 @@ export function ContentManager<T extends ManagedItem>({
         <div className="cms-records">
           {filteredItems.map((item) => (
             <button
-              className={item.id === selectedId ? 'active' : ''}
+              className={[
+                item.id === selectedId ? 'active' : '',
+                config.itemClassName?.(item) || '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
               key={item.id}
               type="button"
               aria-pressed={item.id === selectedId}
@@ -1074,7 +1093,13 @@ export function AdminSourcesManager({
         'Список каналов и сайтов для будущей очереди автоматического импорта.',
       supportsPublishing: false,
       fields: [
-        { name: 'sourceName', label: 'Название', kind: 'text', required: true },
+        {
+          name: 'sourceName',
+          label: 'Название',
+          kind: 'text',
+          required: true,
+          help: 'Понятное название для редакции, например GameWith NTE RU.',
+        },
         {
           name: 'sourceType',
           label: 'Тип',
@@ -1087,7 +1112,13 @@ export function AdminSourcesManager({
             'manual',
           ]),
         },
-        { name: 'sourceUrl', label: 'URL', kind: 'url', required: true },
+        {
+          name: 'sourceUrl',
+          label: 'URL',
+          kind: 'url',
+          required: true,
+          help: 'Полная ссылка на источник. Автоимпорт всё равно требует ручного подтверждения.',
+        },
         {
           name: 'trustLevel',
           label: 'Доверие',
@@ -1121,12 +1152,23 @@ export function AdminSourcesManager({
         `${item.sourceType} · доверие: ${item.trustLevel} · ${
           item.autoImportEnabled ? 'автоимпорт включён' : 'ручная проверка'
         }`,
+      itemClassName: (item) =>
+        `source-record ${sourceTrustClass(item.trustLevel)} ${
+          item.autoImportEnabled ? 'is-auto-import' : 'is-manual-source'
+        }`,
       preview: (values) => (
         <article className="cms-article-preview source-preview-card">
-          <p className="eyebrow">
-            {textValue(values, 'sourceType')} · доверие:{' '}
-            {textValue(values, 'trustLevel')}
-          </p>
+          <div className="source-preview-meta" aria-label="Параметры источника">
+            <span>{textValue(values, 'sourceType') || 'manual'}</span>
+            <span className={sourceTrustClass(values.trustLevel)}>
+              Доверие: {textValue(values, 'trustLevel') || 'средний'}
+            </span>
+            <span>
+              {booleanValue(values, 'autoImportEnabled')
+                ? 'Автоимпорт включён'
+                : 'Ручная проверка'}
+            </span>
+          </div>
           <h2>{textValue(values, 'sourceName') || 'Название источника'}</h2>
           {textValue(values, 'sourceUrl') ? (
             <a

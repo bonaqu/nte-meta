@@ -836,7 +836,7 @@ function HomePage({
         />
         <div className="character-grid">
           {popularCharacters.map((character) => (
-            <CharacterCard key={character.id} character={character} />
+            <CharacterCard key={character.id} character={character} data={data} />
           ))}
         </div>
       </section>
@@ -1373,13 +1373,23 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
   );
 }
 
-function CharacterCard({ character }: { character: Character }) {
-  const cardTags = character.profile?.arcType
-    ? [`Дуга: ${character.profile.arcType}`, ...character.tags]
-    : character.tags;
+function CharacterCard({
+  character,
+  data,
+}: {
+  character: Character;
+  data: SiteData;
+}) {
+const cardTags = character.profile?.arcType
+? [`Дуга: ${character.profile.arcType}`, ...character.tags]
+: character.tags;
+const tierPlacement = getCharacterTierPlacement(data, character.id);
+const tierLabel = tierPlacement
+? `${tierPlacement.tier} #${tierPlacement.position}`
+: 'Тир-лист';
 
-  return (
-    <article className="character-card">
+return (
+<article className="character-card">
       <a
         href={`#/characters/${character.slug}`}
         aria-label={`Открыть страницу персонажа ${character.name}`}
@@ -1389,11 +1399,20 @@ function CharacterCard({ character }: { character: Character }) {
           alt={character.name}
           width="360"
           height="460"
-          loading="lazy"
-          referrerPolicy="no-referrer"
-        />
-        <span className="tier-badge">{character.tier}</span>
-        <div>
+loading="lazy"
+referrerPolicy="no-referrer"
+/>
+<span
+className="tier-badge"
+title={
+tierPlacement
+? `Позиция из единого тир-листа, патч ${tierPlacement.patch}`
+: 'Персонаж ещё не добавлен в единый тир-лист'
+}
+>
+{tierLabel}
+</span>
+<div>
           <h3>{character.name}</h3>
           <p>
             {character.role} · {character.attribute} · {character.rarity}
@@ -1695,7 +1714,7 @@ function CharactersPage({
       {filtered.length ? (
         <section className="character-grid">
           {filtered.map((character) => (
-            <CharacterCard key={character.id} character={character} />
+            <CharacterCard key={character.id} character={character} data={data} />
           ))}
         </section>
       ) : (

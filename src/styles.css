@@ -3241,11 +3241,28 @@
     inline-size: 100%;
   }
 
-  .inline-note,
-  .team-difficulty {
-    color: var(--muted);
-    font-size: 0.9rem;
-  }
+.inline-note,
+.team-difficulty {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.inline-note.wide-field {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--cyan) 22%, var(--border));
+  border-radius: var(--radius-sm);
+  background: rgb(38 217 255 / 0.06);
+}
+
+.inline-note.wide-field strong {
+  color: var(--text);
+}
+
+.inline-note.wide-field .text-button {
+  justify-self: start;
+}
 
 .guide-toolbar-actions {
   display: flex;

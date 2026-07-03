@@ -31,7 +31,6 @@ import type {
   CharacterVoiceActor,
   CharacterVoiceLine,
   PublishStatus,
-  Tier,
 } from '../../types';
 
 type CharacterDraft = Omit<Character, 'id' | 'updatedAt'> & {
@@ -51,7 +50,6 @@ const voiceLanguages = [
   'Корейский',
   'Китайский',
 ] as const;
-const tiers: Tier[] = ['S', 'A', 'B', 'C', 'D'];
 const directAudioPattern = /\.(mp3|m4a|ogg|oga|wav|flac|webm)(?:[?#].*)?$/i;
 
 function isDirectAudioUrl(url: string) {
@@ -924,9 +922,21 @@ export function AdminCharacterEditor({
     setPending(false);
   }
 
-  function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
-    const parsed = parseImportValue(suggestion.value);
-    setDraft((current) => {
+function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
+  const parsed = parseImportValue(suggestion.value);
+  if (suggestion.field === 'tier') {
+    setImportDecisions((current) => ({
+      ...current,
+      [suggestion.id]: 'rejected',
+    }));
+    setTone('info');
+    setMessage(
+      `Внешний тир «${String(parsed)}» не записан в профиль персонажа. Позиция персонажа редактируется только в едином разделе «Тир-листы».`,
+    );
+    return;
+  }
+
+  setDraft((current) => {
       const next: CharacterDraft = {
         ...current,
         profile: { ...current.profile },
@@ -935,11 +945,8 @@ export function AdminCharacterEditor({
       else if (suggestion.field === 'originalName') next.originalName = String(parsed);
       else if (suggestion.field === 'rarity' && ['S', 'A'].includes(String(parsed))) {
         next.rarity = String(parsed) as Character['rarity'];
-      } else if (suggestion.field === 'attribute') next.attribute = String(parsed);
-      else if (suggestion.field === 'tier' && tiers.includes(String(parsed) as Tier)) {
-        next.tier = String(parsed) as Tier;
-        next.premiumTier = String(parsed) as Tier;
-      } else if (suggestion.field === 'profile.faction') {
+  } else if (suggestion.field === 'attribute') next.attribute = String(parsed);
+  else if (suggestion.field === 'profile.faction') {
         next.profile.faction = String(parsed);
       } else if (suggestion.field === 'profile.arcType') {
         next.profile.arcType = String(parsed);
@@ -1359,22 +1366,17 @@ export function AdminCharacterEditor({
                 }
               />
             </label>
-            <label>
-              Тир
-          <select
-            value={draft.tier}
-            onChange={(event) =>
-              patch({
-                tier: event.target.value as Tier,
-                premiumTier: event.target.value as Tier,
-              })
-            }
-          >
-                {tiers.map((tier) => (
-                  <option key={tier}>{tier}</option>
-                ))}
-              </select>
-            </label>
+            <div className="inline-note wide-field">
+              <strong>Тир персонажа редактируется в разделе «Тир-листы».</strong>
+              <span>
+                Профиль персонажа хранит лор, биографию и игровые данные.
+                Актуальная позиция S/A/B/C/D берётся из единого тир-листа и не
+                меняется на странице профиля.
+              </span>
+              <a className="text-button" href="#/tierlists">
+                Открыть тир-лист
+              </a>
+            </div>
             <label>
               Патч
               <input

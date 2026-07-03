@@ -1198,12 +1198,14 @@ test('owner создаёт персонажа inline и открывает со�
     await mainInfo.getByLabel('Адрес страницы (slug)').fill(uiCharacterSlug);
     await mainInfo.getByLabel('Фракция').fill('Редакционный тест');
     await mainInfo.getByLabel('Тип дуги').fill('Тестовая дуга');
-    await mainInfo.getByLabel('Атрибут').fill('Тест');
-    await mainInfo.getByLabel('Основная роль').fill('DD');
-    await mainInfo.getByLabel('Роли в отряде, через запятую').fill('DD, тест');
-    await mainInfo.getByLabel('Тир').selectOption('D');
-    await mainInfo
-      .getByLabel('URL иконки')
+await mainInfo.getByLabel('Атрибут').fill('Тест');
+await mainInfo.getByLabel('Основная роль').fill('DD');
+await mainInfo.getByLabel('Роли в отряде, через запятую').fill('DD, тест');
+await expect(
+  mainInfo.getByText('Тир персонажа редактируется в разделе «Тир-листы».'),
+).toBeVisible();
+await mainInfo
+.getByLabel('URL иконки')
       .fill('/assets/characters/Hotori.webp');
     await mainInfo
       .getByLabel('URL splash art')

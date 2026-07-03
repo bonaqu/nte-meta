@@ -49,7 +49,7 @@ test.describe('Публичный портал NTE Meta', () => {
               rarity: 'S',
               role: 'Основной ДД',
               type: 'Урон',
-              attribute: 'Тип эспера тест',
+              attribute: 'Атрибут тест',
               tier: 'S',
               premiumTier: 'S',
               imageUrl: '/assets/characters/Hotori.webp',

@@ -2811,7 +2811,7 @@ function parseFandomRuApiImport(text, source) {
 
   return [
     makeImportSuggestion('rarity', 'Редкость', readWikiParam(content, 'rarity'), source, 'high'),
-    makeImportSuggestion('attribute', 'Тип эспера', readWikiParam(content, 'espertype'), source, 'high'),
+    makeImportSuggestion('attribute', 'Атрибут', readWikiParam(content, 'espertype'), source, 'high'),
     makeImportSuggestion('profile.arcType', 'Тип дуги', readWikiParam(content, 'arctype'), source, 'high'),
     makeImportSuggestion('profile.roleTags', 'Роли персонажа', roleTags, source, 'high'),
     makeImportSuggestion('profile.faction', 'Фракция', faction, source, 'high'),
@@ -3077,7 +3077,7 @@ function parseNteWikiImport(text, source) {
   const lines = compactImportLines(text);
   const suggestions = [
     makeImportSuggestion('rarity', 'Редкость', (lines.find((line) => /^Ранг\s+[SA]/i.test(line)) || '').match(/Ранг\s+([SA])/i)?.[1] || '', source, 'high'),
-    makeImportSuggestion('attribute', 'Тип эспера', nextImportLine(lines, 'Элемент'), source, 'high'),
+    makeImportSuggestion('attribute', 'Атрибут', nextImportLine(lines, 'Элемент'), source, 'high'),
     makeImportSuggestion('profile.birthday', 'День рождения', nextImportLine(lines, 'День рождения'), source, 'high'),
     makeImportSuggestion('profile.faction', 'Фракция', nextImportLine(lines, 'Фракция'), source, 'high'),
   ];
@@ -3257,7 +3257,7 @@ function parseNteWikiCharactersIndexImport(text, source, character) {
       'medium',
       'Индекс NTE Wiki полезен для первичного набора тегов роли; подтвердите каждую строку перед публикацией.',
     ),
-    makeImportSuggestion('attribute', 'Тип эспера', attribute, source, 'medium'),
+    makeImportSuggestion('attribute', 'Атрибут', attribute, source, 'medium'),
   ];
 }
 
@@ -3272,7 +3272,7 @@ function parseGenshinBuildsImport(text, source, character) {
   if (profileLine) {
     const parts = profileLine.split(/\s{1,}/).filter(Boolean);
     suggestions.push(
-      makeImportSuggestion('attribute', 'Тип эспера', parts[0], source, 'medium'),
+      makeImportSuggestion('attribute', 'Атрибут', parts[0], source, 'medium'),
     );
   }
   const awakenings = [];
@@ -3814,7 +3814,7 @@ function parseGameWithStructuredCharacterImport(text, source, character) {
 
   return [
     makeImportSuggestion('rarity', 'Редкость', String(item.rarity || '').match(/[SA]/)?.[0] || '', source, 'high'),
-    makeImportSuggestion('attribute', 'Тип эспера', translateGameWithElement(item.element), source, 'high'),
+    makeImportSuggestion('attribute', 'Атрибут', translateGameWithElement(item.element), source, 'high'),
     makeImportSuggestion('profile.arcType', 'Тип дуги', translateGameWithArcType(item.arcType), source, 'high'),
     makeImportSuggestion('profile.faction', 'Фракция', gameWithLocaleText(item.profile?.faction), source, 'high'),
     makeImportSuggestion('profile.birthday', 'День рождения', formatGameWithRuDate(item.profile?.birthday, { withoutYear: true }), source, 'medium'),
@@ -3966,7 +3966,7 @@ function parseGameWithCharacterDetailImport(text, source, character) {
   return [
     ...structuredSuggestions,
     makeImportSuggestion('rarity', 'Редкость', nextAfter('Редкость').match(/[SA]/)?.[0] || '', source, 'high'),
-    makeImportSuggestion('attribute', 'Тип эспера', nextAfter('Стихия'), source, 'high'),
+    makeImportSuggestion('attribute', 'Атрибут', nextAfter('Стихия'), source, 'high'),
     makeImportSuggestion('profile.arcType', 'Тип дуги', nextAfter('Тип арки'), source, 'high'),
     makeImportSuggestion('profile.baseStats', 'Начальные показатели', stats, source, 'high'),
     makeImportSuggestion('profile.abilities', 'Способности', abilities.slice(0, 8), source, 'medium'),
@@ -4202,7 +4202,7 @@ function parseFandomCharacterImport(text, source, character) {
   const abilities = parseFandomAbilities(lines);
 
   suggestions.push(
-    makeImportSuggestion('attribute', 'Тип эспера', esperType, source, 'medium'),
+    makeImportSuggestion('attribute', 'Атрибут', esperType, source, 'medium'),
     makeImportSuggestion('profile.arcType', 'Тип дуги', arcType, source, 'medium'),
     makeImportSuggestion('profile.birthday', 'День рождения', birthday, source, 'medium'),
     makeImportSuggestion(

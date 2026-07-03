@@ -696,7 +696,7 @@ export function AdminCharactersManager({
         },
         { name: 'role', label: 'Роль', kind: 'text', required: true },
         { name: 'type', label: 'Тип', kind: 'text', required: true },
-        { name: 'attribute', label: 'Тип эспера', kind: 'text', required: true },
+        { name: 'attribute', label: 'Атрибут', kind: 'text', required: true },
         { name: 'tier', label: 'Тир', kind: 'select', options: tiers },
         {
           name: 'imageUrl',

@@ -3571,24 +3571,13 @@
 }
 
 .ability-list--profile .ability-card[open] .markdown-preview {
-  max-inline-size: none;
+  max-inline-size: 104ch;
 }
 
 .ability-card__body .markdown-preview :where(p, li) {
   color: color-mix(in srgb, var(--text) 84%, var(--muted));
-  line-height: 1.68;
-  overflow-wrap: anywhere;
-}
-
-@media (min-width: 920px) {
-  .ability-list--profile .ability-card[open] .markdown-preview {
-    column-width: 34ch;
-    column-gap: 30px;
-  }
-
-  .ability-list--profile .ability-card[open] .markdown-preview > * {
-    break-inside: avoid;
-  }
+  line-height: 1.76;
+  overflow-wrap: break-word;
 }
 
   .ability-list p {
@@ -3611,34 +3600,13 @@
     }
   }
 
-  .console-list,
-  .friendship-track,
-  .voice-line-list {
-    display: grid;
-    gap: 10px;
-  }
+.friendship-track,
+.voice-line-list {
+  display: grid;
+  gap: 10px;
+}
 
-  .console-list article {
-    display: grid;
-    gap: 14px;
-    padding-block: 20px;
-    border-block-end: 1px solid var(--border);
-  }
-
-  .console-gallery {
-    display: flex;
-    gap: 10px;
-    overflow-x: auto;
-  }
-
-  .console-gallery img {
-    flex: 0 0 min(260px, 80vw);
-    aspect-ratio: 13 / 9;
-    border-radius: var(--radius);
-    object-fit: cover;
-  }
-
-  .friendship-track article {
+.friendship-track article {
     display: grid;
     grid-template-columns: 44px 48px 1fr;
     gap: 12px;

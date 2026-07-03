@@ -42,6 +42,7 @@ import {
   UserCircle,
   Users,
   X,
+  XCircle,
 } from 'lucide-react';
 import {
   EmptyState,
@@ -4283,6 +4284,47 @@ function getGuideImportFieldLabel(field: string) {
   return labels[field] || 'Секция гайда';
 }
 
+function getGuideImportRows(
+  suggestion: CharacterImportSuggestion,
+): CharacterImportSuggestion[] {
+  try {
+    const parsed = JSON.parse(suggestion.value) as unknown;
+    if (!Array.isArray(parsed) || parsed.length < 2) return [];
+    return parsed.map((item, index) => ({
+      ...suggestion,
+      id: `${suggestion.id}:row:${index}`,
+      label: getGuideImportRowLabel(item, index),
+      value: JSON.stringify([item]),
+      note: suggestion.note
+        ? `Строка ${index + 1}. ${suggestion.note}`
+        : `Строка ${index + 1}`,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function getGuideImportRowLabel(item: unknown, index: number) {
+  if (typeof item === 'string' && item.trim()) return item.trim();
+  if (!item || typeof item !== 'object') return `Пункт ${index + 1}`;
+  const record = item as Record<string, unknown>;
+  const prefix =
+    typeof record.type === 'string'
+      ? `${record.type}: `
+      : typeof record.role === 'string'
+        ? `${record.role}: `
+        : '';
+  const value =
+    record.name ||
+    record.title ||
+    record.label ||
+    record.character ||
+    record.note ||
+    record.value ||
+    `Пункт ${index + 1}`;
+  return `${prefix}${String(value)}`;
+}
+
 function getYoutubeThumbnailUrl(url: string) {
   const match = url.match(
     /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/,
@@ -5337,10 +5379,11 @@ function AdminGuides({
         </button>
         {guideImportSuggestions.length ? (
             <div className="import-suggestion-list">
-              {guideImportSuggestions.map((suggestion) => {
-                const decision = guideImportDecisions[suggestion.id];
-                const previewUrls = getGuideImportPreviewUrls(suggestion);
-                return (
+                {guideImportSuggestions.map((suggestion) => {
+                  const decision = guideImportDecisions[suggestion.id];
+                  const previewUrls = getGuideImportPreviewUrls(suggestion);
+                  const rowSuggestions = getGuideImportRows(suggestion);
+                  return (
                   <article
                     className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
                     key={suggestion.id}
@@ -5349,8 +5392,8 @@ function AdminGuides({
                       <strong>{suggestion.label}</strong>
                       <span>{getGuideImportFieldLabel(suggestion.field)}</span>
                     </div>
-                  <div className="import-suggestion-value">
-                    {previewUrls.length ? (
+                    <div className="import-suggestion-value">
+                      {previewUrls.length ? (
                       <div
                         className={`import-image-preview ${
                           previewUrls.length > 1 ? 'import-image-preview--grid' : ''
@@ -5383,10 +5426,61 @@ function AdminGuides({
                           ))}
                         </div>
                         <span>Нажмите на превью, чтобы открыть оригинал</span>
-                      </div>
-                    ) : null}
-                    <p>{formatGuideImportValue(suggestion.value)}</p>
-                  </div>
+                        </div>
+                      ) : null}
+                      <p>{formatGuideImportValue(suggestion.value)}</p>
+                      {rowSuggestions.length ? (
+                        <div
+                          className="import-row-review"
+                          aria-label={`Строки гайда: ${suggestion.label}`}
+                        >
+                          {rowSuggestions.map((row) => {
+                            const rowDecision = guideImportDecisions[row.id];
+                            const rowPreviewUrls = getGuideImportPreviewUrls(row);
+                            return (
+                              <div
+                                className={`import-row ${
+                                  rowDecision ? `is-${rowDecision}` : ''
+                                }`}
+                                key={row.id}
+                              >
+                                {rowPreviewUrls[0] ? (
+                                  <img
+                                    src={resolveAssetUrl(rowPreviewUrls[0])}
+                                    alt=""
+                                    width="44"
+                                    height="44"
+                                    loading="lazy"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : null}
+                                <span>{row.label}</span>
+                                <div className="import-row-actions">
+                                  <button
+                                    className="icon-button success"
+                                    type="button"
+                                    aria-label={`Принять строку гайда: ${row.label}`}
+                                    disabled={rowDecision === 'accepted'}
+                                    onClick={() => applyGuideImportSuggestion(row)}
+                                  >
+                                    <CheckCircle2 aria-hidden="true" />
+                                  </button>
+                                  <button
+                                    className="icon-button danger"
+                                    type="button"
+                                    aria-label={`Отклонить строку гайда: ${row.label}`}
+                                    disabled={rowDecision === 'rejected'}
+                                    onClick={() => rejectGuideImportSuggestion(row)}
+                                  >
+                                    <XCircle aria-hidden="true" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
                   <small>
                     {suggestion.sourceName} · {getImportConfidenceLabel(suggestion.confidence)}
                     {suggestion.note ? ` · ${suggestion.note}` : ''}

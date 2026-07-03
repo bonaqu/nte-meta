@@ -2010,6 +2010,11 @@ function normalizeImportArcType(value) {
     [
       'camellia',
       'сообщество камелии',
+      'бозе',
+      'boze',
+      'arc',
+      'арка',
+      'арк',
       'best arc',
       'preferred arc',
       'arcana',
@@ -2862,7 +2867,9 @@ function parseFandomRuImagesImport(text, source, character) {
 function cleanImportImageTitle(title) {
   return String(title || '')
     .replace(/^Файл:/i, '')
+    .replace(/^Image:\s*/i, '')
     .replace(/\.(png|webp|jpe?g|gif|svg)$/i, '')
+    .replace(/\s+Детали$/i, '')
     .replace(/_/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();

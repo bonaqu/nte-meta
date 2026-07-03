@@ -2867,12 +2867,48 @@ function parseFandomRuImagesImport(text, source, character) {
 function cleanImportImageTitle(title) {
   return String(title || '')
     .replace(/^Файл:/i, '')
+    .replace(/^File:\s*/i, '')
     .replace(/^Image:\s*/i, '')
     .replace(/\.(png|webp|jpe?g|gif|svg)$/i, '')
-    .replace(/\s+Детали$/i, '')
-    .replace(/_/g, ' ')
+    .replace(/\s+(?:Детали|Details)$/i, '')
+    .replace(/[_-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function importImageNameAliases(value) {
+  const base = cleanImportImageTitle(value);
+  const aliases = new Set();
+  const add = (alias) => {
+    const clean = cleanImportImageTitle(alias)
+      .replace(/[«»"]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (clean) aliases.add(clean);
+  };
+
+  add(base);
+  add(base.replace(/^(?:Роль|Редкость|Эспер|Esper|Role|Rarity)\s+/i, ''));
+  add(
+    base.replace(
+      /\s+(?:Иконка|Icon|Skill|Ability|Awakening|Constellation|Card|Portrait|Представление|СплэшАрт|Сплэш|Splash(?:\s+Art)?)$/i,
+      '',
+    ),
+  );
+  add(
+    base.replace(
+      /^(?:Icon|Skill|Ability|Awakening|Constellation|Иконка|Навык|Способность|Пробуждение)\s+/i,
+      '',
+    ),
+  );
+  add(
+    base.replace(
+      /^(?:Базовая атака|Сверхспособность|Навык поддержки|Пассивный навык|Повседневный навык|Навык)\s+/i,
+      '',
+    ),
+  );
+
+  return [...aliases];
 }
 
 function buildImportImageMap(images, character = {}) {
@@ -2882,7 +2918,7 @@ function buildImportImageMap(images, character = {}) {
   for (const image of images) {
     const title = cleanImportImageTitle(image.title);
     if (!title || !image.url) continue;
-    const aliases = new Set([title]);
+    const aliases = new Set(importImageNameAliases(title));
     const normalizedTitle = normalizeImportSearch(title);
 
     for (const characterName of characterNames) {
@@ -2895,8 +2931,7 @@ function buildImportImageMap(images, character = {}) {
       if (withoutCharacter && withoutCharacter !== title) aliases.add(withoutCharacter);
     }
 
-    aliases.add(title.replace(/^(Роль|Редкость|Эспер)\s+/i, '').trim());
-    aliases.add(title.replace(/\s+(Иконка|Представление|СплэшАрт|Splash)$/i, '').trim());
+    for (const alias of importImageNameAliases(title)) aliases.add(alias);
 
     for (const alias of aliases) {
       if (alias) map[alias] = image.url;
@@ -4432,12 +4467,7 @@ function importImageMapFromSuggestions(items) {
 }
 
 function findImportImageByName(imageMap, name) {
-  const cleanName = cleanImportImageTitle(name);
-  const candidates = [
-    cleanName,
-    cleanName.replace(/[«»"]/g, '').trim(),
-    cleanName.replace(/^(Роль|Редкость|Эспер)\s+/i, '').trim(),
-  ]
+  const candidates = importImageNameAliases(name)
     .map((item) => normalizeImportSearch(item))
     .filter(Boolean);
   for (const candidate of candidates) {
@@ -4471,15 +4501,21 @@ function importMediaLookupLabels(entry, field = '') {
   if (field === 'profile.abilities') {
     add([record.type, record.name].filter(Boolean).join(' '));
     add([record.name, record.type].filter(Boolean).join(' '));
+    add(`${record.name || ''} Иконка`);
+    add(`${record.name || ''} Icon`);
+    add(`${record.name || ''} Skill`);
   }
 
   if (field === 'profile.awakenings' && Number(record.level) > 0) {
     add(`Пробуждение ${record.level}`);
     add(`Пробуждение ${record.level} ${record.name || ''}`);
+    add(`Пробуждение ${record.level} Иконка`);
     add(`C${record.level}`);
     add(`C${record.level} ${record.name || ''}`);
+    add(`C${record.level} Icon`);
     add(`A${record.level}`);
     add(`A${record.level} ${record.name || ''}`);
+    add(`A${record.level} Icon`);
   }
 
   return labels;
@@ -4495,6 +4531,7 @@ function enrichArraySuggestionMedia(item, imageMap) {
       'profile.abilities',
       'profile.awakenings',
       'profile.skins',
+      'profile.friendship',
     ].includes(item.field)
   ) {
     return item;
@@ -4525,7 +4562,7 @@ function enrichArraySuggestionMedia(item, imageMap) {
   });
   if (!changed) return item;
   const cleanValue = JSON.stringify(nextValue);
-  const mediaNote = 'Иконки сопоставлены по точному русскому названию файла из Fandom RU.';
+  const mediaNote = 'Иконки сопоставлены по названию или алиасам файла из Fandom RU; проверьте превью перед сохранением.';
   return {
     ...item,
     id: item.id + ':media:' + hashText(cleanValue).slice(0, 8),

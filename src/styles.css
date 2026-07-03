@@ -3857,6 +3857,52 @@
   overflow-wrap: anywhere;
 }
 
+.import-row-review {
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+  margin-block-start: 8px;
+}
+
+.import-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: var(--radius-sm);
+  background: rgb(3 10 20 / 0.38);
+}
+
+.import-row.is-accepted {
+  border-color: rgb(64 255 174 / 0.4);
+  background: rgb(64 255 174 / 0.08);
+}
+
+.import-row.is-rejected {
+  opacity: 0.58;
+}
+
+.import-row img {
+  inline-size: 44px;
+  block-size: 44px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-sm) - 2px);
+  object-fit: cover;
+}
+
+.import-row span {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.import-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
 .editor-icon-preview {
   inline-size: 54px;
   block-size: 54px;

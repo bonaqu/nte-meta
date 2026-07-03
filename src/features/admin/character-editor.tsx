@@ -229,11 +229,12 @@ function ImportSuggestionList({
         </p>
       </div>
       <div className="import-suggestion-list">
-        {suggestions.map((suggestion) => {
-          const decision = decisions[suggestion.id];
-          const previewUrls = getSuggestionPreviewUrls(suggestion);
-          const fieldLabel = getSuggestionFieldLabel(suggestion);
-          return (
+          {suggestions.map((suggestion) => {
+            const decision = decisions[suggestion.id];
+            const previewUrls = getSuggestionPreviewUrls(suggestion);
+            const fieldLabel = getSuggestionFieldLabel(suggestion);
+            const rowSuggestions = getImportSuggestionRows(suggestion);
+            return (
             <article
               className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
               key={suggestion.id}
@@ -279,6 +280,52 @@ function ImportSuggestionList({
                   </div>
                 ) : null}
                 <p>{summarizeSuggestionValue(suggestion.value)}</p>
+                {rowSuggestions.length ? (
+                  <div className="import-row-review" aria-label={`Строки: ${suggestion.label}`}>
+                    {rowSuggestions.map((row) => {
+                      const rowDecision = decisions[row.id];
+                      const rowPreviewUrls = getSuggestionPreviewUrls(row);
+                      return (
+                        <div
+                          className={`import-row ${rowDecision ? `is-${rowDecision}` : ''}`}
+                          key={row.id}
+                        >
+                          {rowPreviewUrls[0] ? (
+                            <img
+                              src={resolveAssetUrl(rowPreviewUrls[0])}
+                              alt=""
+                              width="44"
+                              height="44"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : null}
+                          <span>{row.label}</span>
+                          <div className="import-row-actions">
+                            <button
+                              className="icon-button success"
+                              type="button"
+                              aria-label={`Принять строку: ${row.label}`}
+                              disabled={rowDecision === 'accepted'}
+                              onClick={() => onAccept(row)}
+                            >
+                              <CheckCircle2 aria-hidden="true" />
+                            </button>
+                            <button
+                              className="icon-button danger"
+                              type="button"
+                              aria-label={`Отклонить строку: ${row.label}`}
+                              disabled={rowDecision === 'rejected'}
+                              onClick={() => onReject(row)}
+                            >
+                              <XCircle aria-hidden="true" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
               <small>
                 {suggestion.sourceName} · {formatImportConfidence(suggestion.confidence)}
@@ -418,6 +465,44 @@ function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {
     'profile.skins': 'Гардероб',
   };
   return labels[suggestion.field] || suggestion.label;
+}
+
+function getImportSuggestionRows(
+  suggestion: CharacterImportSuggestion,
+): CharacterImportSuggestion[] {
+  const parsed = parseImportValue(suggestion.value);
+  if (!Array.isArray(parsed) || parsed.length < 2) return [];
+  return parsed.map((item, index) => ({
+    ...suggestion,
+    id: `${suggestion.id}:row:${index}`,
+    label: getImportRowLabel(item, index),
+    value: JSON.stringify([item]),
+    note: suggestion.note
+      ? `Строка ${index + 1}. ${suggestion.note}`
+      : `Строка ${index + 1}`,
+  }));
+}
+
+function getImportRowLabel(item: unknown, index: number) {
+  if (typeof item === 'string' && item.trim()) return item.trim();
+  if (!item || typeof item !== 'object') return `Строка ${index + 1}`;
+  const record = item as Record<string, unknown>;
+  const prefix =
+    typeof record.level === 'number'
+      ? `Уровень ${record.level}: `
+      : typeof record.language === 'string'
+        ? `${record.language}: `
+        : typeof record.type === 'string'
+          ? `${record.type}: `
+          : '';
+  const value =
+    record.name ||
+    record.title ||
+    record.label ||
+    record.rewardName ||
+    record.value ||
+    `Строка ${index + 1}`;
+  return `${prefix}${String(value)}`;
 }
 
 function formatEditorError(error: string) {
@@ -563,6 +648,44 @@ function mergeNamedRows<T extends { id?: string; name: string }>(
     if (index === undefined) {
       result.push(item);
       indexByName.set(key, result.length - 1);
+      return;
+    }
+    result[index] = { ...result[index], ...item };
+  });
+
+  return result;
+}
+
+function normalizeAssetFields<T extends object>(item: T): T {
+  const next = { ...item } as Record<string, unknown>;
+  for (const field of ['iconUrl', 'imageUrl', 'rewardIconUrl'] as const) {
+    if (typeof next[field] === 'string') {
+      next[field] = normalizeExternalAssetUrl(next[field]);
+    }
+  }
+  return next as T;
+}
+
+function mergeRowsByKey<T extends object>(
+  current: T[],
+  imported: T[],
+  getKey: (item: T) => string,
+) {
+  const result = current.map(normalizeAssetFields);
+  const indexByKey = new Map<string, number>();
+
+  result.forEach((item, index) => {
+    const key = getKey(item).trim().toLocaleLowerCase('ru-RU');
+    if (key) indexByKey.set(key, index);
+  });
+
+  imported.map(normalizeAssetFields).forEach((item) => {
+    const key = getKey(item).trim().toLocaleLowerCase('ru-RU');
+    if (!key) return;
+    const index = indexByKey.get(key);
+    if (index === undefined) {
+      result.push(item);
+      indexByKey.set(key, result.length - 1);
       return;
     }
     result[index] = { ...result[index], ...item };
@@ -804,14 +927,28 @@ export function AdminCharacterEditor({
         next.profile.biography = String(parsed);
       } else if (suggestion.field === 'profile.trivia') {
         next.profile.trivia = mergeText(next.profile.trivia, String(parsed));
-      } else if (suggestion.field === 'profile.roleTags' && Array.isArray(parsed)) {
-        next.profile.roleTags = parsed.map(String).filter(Boolean);
+    } else if (suggestion.field === 'profile.roleTags' && Array.isArray(parsed)) {
+      next.profile.roleTags = Array.from(
+        new Set([...next.profile.roleTags, ...parsed.map(String).filter(Boolean)]),
+      );
     } else if (suggestion.field === 'profile.voiceActors' && Array.isArray(parsed)) {
-      next.profile.voiceActors = parsed as CharacterVoiceActor[];
+      next.profile.voiceActors = mergeRowsByKey(
+        next.profile.voiceActors,
+        parsed as CharacterVoiceActor[],
+        (item) => item.language,
+      );
     } else if (suggestion.field === 'profile.voiceLines' && Array.isArray(parsed)) {
-      next.profile.voiceLines = parsed as CharacterVoiceLine[];
+      next.profile.voiceLines = mergeRowsByKey(
+        next.profile.voiceLines,
+        parsed as CharacterVoiceLine[],
+        (item) => `${item.language}:${item.title}`,
+      );
     } else if (suggestion.field === 'profile.materials' && Array.isArray(parsed)) {
-      next.profile.materials = parsed as CharacterMaterial[];
+      next.profile.materials = mergeRowsByKey(
+        next.profile.materials,
+        parsed as CharacterMaterial[],
+        (item) => item.name,
+      );
     } else if (suggestion.field === 'profile.friendship' && Array.isArray(parsed)) {
       next.profile.friendship = mergeFriendshipLevels(
         next.profile.friendship,
@@ -828,11 +965,23 @@ export function AdminCharacterEditor({
         parsed as CharacterSkin[],
       );
     } else if (suggestion.field === 'profile.baseStats' && Array.isArray(parsed)) {
-      next.profile.baseStats = parsed as CharacterStat[];
+      next.profile.baseStats = mergeRowsByKey(
+        next.profile.baseStats,
+        parsed as CharacterStat[],
+        (item) => item.label,
+      );
       } else if (suggestion.field === 'profile.abilities' && Array.isArray(parsed)) {
-        next.profile.abilities = parsed as CharacterAbility[];
+        next.profile.abilities = mergeRowsByKey(
+          next.profile.abilities,
+          parsed as CharacterAbility[],
+          (item) => `${item.type}:${item.name}`,
+        );
       } else if (suggestion.field === 'profile.awakenings' && Array.isArray(parsed)) {
-        next.profile.awakenings = parsed as CharacterAwakening[];
+        next.profile.awakenings = mergeRowsByKey(
+          next.profile.awakenings,
+          parsed as CharacterAwakening[],
+          (item) => `${item.level}`,
+        ).sort((a, b) => a.level - b.level);
       } else if (suggestion.field === 'imageUrl') {
         next.imageUrl = normalizeExternalAssetUrl(String(parsed));
       } else if (suggestion.field === 'splashUrl') {

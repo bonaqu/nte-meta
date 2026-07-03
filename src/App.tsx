@@ -3216,7 +3216,7 @@ function TierListsPage({
         <p className="eyebrow">S · A · B · C · D</p>
         <h1>Тир-листы</h1>
         <p>
-          Единый редакционный список без разделения на C0/C6. Позиции отражают
+          Единый редакционный список S, A, B, C и D. Позиции отражают
           практическую ценность персонажа для большинства игроков и требуют
           ручного подтверждения редакцией.
         </p>
@@ -4344,7 +4344,7 @@ function getGuideImportPreviewUrls(suggestion: CharacterImportSuggestion) {
     if (typeof value !== 'string') return;
     const normalized =
       getYoutubeThumbnailUrl(value) ||
-      (/^https?:/i.test(value) || value.startsWith('assets/')
+      (/^(?:https?:|data:|blob:|\/?assets\/)/i.test(value)
         ? normalizeExternalAssetUrl(value)
         : '');
     if (normalized && !urls.includes(normalized)) urls.push(normalized);

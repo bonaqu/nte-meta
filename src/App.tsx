@@ -4284,6 +4284,28 @@ function getGuideImportFieldLabel(field: string) {
   return labels[field] || 'Секция гайда';
 }
 
+function getGuideImportContextLabel(
+  suggestion: CharacterImportSuggestion,
+  fieldLabel: string,
+) {
+  const escapedField = suggestion.field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const cleaned = suggestion.label
+    .replace(new RegExp(escapedField, 'gi'), '')
+    .replace(/\bguide\.[a-zA-Z.]+\b/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:])/g, '$1')
+    .trim();
+
+  if (
+    !cleaned ||
+    cleaned.toLocaleLowerCase('ru-RU') === fieldLabel.toLocaleLowerCase('ru-RU')
+  ) {
+    return '';
+  }
+
+  return cleaned;
+}
+
 function getGuideImportRows(
   suggestion: CharacterImportSuggestion,
 ): CharacterImportSuggestion[] {
@@ -5381,18 +5403,23 @@ function AdminGuides({
             <div className="import-suggestion-list">
                 {guideImportSuggestions.map((suggestion) => {
                   const decision = guideImportDecisions[suggestion.id];
+                  const fieldLabel = getGuideImportFieldLabel(suggestion.field);
+                  const contextLabel = getGuideImportContextLabel(
+                    suggestion,
+                    fieldLabel,
+                  );
                   const previewUrls = getGuideImportPreviewUrls(suggestion);
                   const rowSuggestions = getGuideImportRows(suggestion);
                   return (
                   <article
                     className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
-                    key={suggestion.id}
-                  >
-                    <div>
-                      <strong>{suggestion.label}</strong>
-                      <span>{getGuideImportFieldLabel(suggestion.field)}</span>
-                    </div>
-                    <div className="import-suggestion-value">
+                      key={suggestion.id}
+                    >
+                      <div>
+                        <strong>{fieldLabel}</strong>
+                        {contextLabel ? <span>{contextLabel}</span> : null}
+                      </div>
+                      <div className="import-suggestion-value">
                       {previewUrls.length ? (
                       <div
                         className={`import-image-preview ${
@@ -5432,7 +5459,7 @@ function AdminGuides({
                       {rowSuggestions.length ? (
                         <div
                           className="import-row-review"
-                          aria-label={`Строки гайда: ${suggestion.label}`}
+                          aria-label={`Строки гайда: ${fieldLabel}`}
                         >
                           {rowSuggestions.map((row) => {
                             const rowDecision = guideImportDecisions[row.id];
@@ -5490,19 +5517,19 @@ function AdminGuides({
                       Источник
                     </a>
                     <button
-                      className="icon-button success"
-                      type="button"
-                      aria-label={`Принять ${suggestion.label}`}
-                      onClick={() => applyGuideImportSuggestion(suggestion)}
-                    >
+                        className="icon-button success"
+                        type="button"
+                        aria-label={`Принять ${fieldLabel}`}
+                        onClick={() => applyGuideImportSuggestion(suggestion)}
+                      >
                       <CheckCircle2 aria-hidden="true" />
                     </button>
                     <button
-                      className="icon-button"
-                      type="button"
-                      aria-label={`Отклонить ${suggestion.label}`}
-                      onClick={() => rejectGuideImportSuggestion(suggestion)}
-                    >
+                        className="icon-button"
+                        type="button"
+                        aria-label={`Отклонить ${fieldLabel}`}
+                        onClick={() => rejectGuideImportSuggestion(suggestion)}
+                      >
                       <X aria-hidden="true" />
                     </button>
                   </div>

@@ -3464,24 +3464,6 @@ function parseGenshinBuildsImport(text, source, character) {
   return suggestions;
 }
 
-function collectGuideLines(lines, startLabel, stopLabels, limit = 8) {
-  const start = lines.findIndex(
-    (line) => normalizeImportSearch(line) === normalizeImportSearch(startLabel),
-  );
-  if (start < 0) return [];
-  const stop = lines.findIndex(
-    (line, index) =>
-      index > start &&
-      stopLabels.some((label) =>
-        normalizeImportSearch(line) === normalizeImportSearch(label),
-      ),
-  );
-  return lines
-    .slice(start + 1, stop > start ? stop : start + limit + 1)
-    .filter((line) => line && !/^\d+$/.test(line))
-    .slice(0, limit);
-}
-
 function extractGuideHeadingBlocks(html) {
   const blocks = [];
   const expression = /<h([2-4])\b[^>]*>([\s\S]*?)<\/h\1>([\s\S]*?)(?=<h[2-4]\b|$)/gi;

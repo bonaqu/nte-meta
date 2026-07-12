@@ -137,6 +137,11 @@ function canPlayDirectAudio(url: string) {
   return /^https?:\/\//i.test(value) && directAudioPattern.test(value);
 }
 
+function formatProfileDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return formatDate(value);
+}
+
 const AdminCharacterEditor = lazy(() =>
   import('./features/admin/character-editor').then((module) => ({
     default: module.AdminCharacterEditor,
@@ -1926,7 +1931,11 @@ function CharacterDetailPage({
           </div>
           <div>
             <dt>Дата релиза</dt>
-            <dd>{profile.releaseDate || 'Не указана'}</dd>
+            <dd>
+              {profile.releaseDate
+                ? formatProfileDate(profile.releaseDate)
+                : 'Не указана'}
+            </dd>
           </div>
           <div>
               <dt>Атрибут</dt>

@@ -933,9 +933,9 @@ function HomePage({
             access={user ? contentAccess(user, 'news') : undefined}
             onRefresh={refreshContent}
             onDirtyChange={setHomeEditorDirty}
-            onSaved={({ values, publishStatus }) => {
+            onSaved={({ saved, values, publishStatus }) => {
               if (publishStatus === 'draft') return;
-              const slug = String(values.slug || '').trim();
+              const slug = String(saved?.slug || values.slug || '').trim();
               if (!slug) return;
               setHomeEditorDirty(false);
               setHomeEditor(null);
@@ -962,8 +962,8 @@ function HomePage({
             access={user ? contentAccess(user, 'leaks') : undefined}
             onRefresh={refreshContent}
             onDirtyChange={setHomeEditorDirty}
-            onSaved={({ values }) => {
-              const slug = String(values.slug || '').trim();
+            onSaved={({ saved, values }) => {
+              const slug = String(saved?.slug || values.slug || '').trim();
               if (!slug) return;
               setHomeEditorDirty(false);
               setHomeEditor(null);
@@ -1648,14 +1648,15 @@ function CharactersPage({
       .filter(({ character, searchText }) => {
         const queryMatch =
           !normalizedQuery || searchText.includes(normalizedQuery);
+        const tierPlacement = getCharacterTierPlacement(data, character.id);
         return (
           queryMatch &&
           (rarity === 'Любая редкость' || character.rarity === rarity) &&
-          (tier === 'Любой тир' || character.tier === tier)
+          (tier === 'Любой тир' || tierPlacement?.tier === tier)
         );
       })
       .map(({ character }) => character);
-  }, [deferredQuery, indexedCharacters, rarity, tier]);
+  }, [data, deferredQuery, indexedCharacters, rarity, tier]);
 
   async function refreshContent() {
     setData(
@@ -3114,7 +3115,7 @@ function GuidesPage({
       return (
         (!needle || searchText.includes(needle)) &&
         (rarity === 'Любая редкость' || character.rarity === rarity) &&
-        (tier === 'Любой тир' || character.tier === tier)
+        (tier === 'Любой тир' || getCharacterTierPlacement(data, character.id)?.tier === tier)
       );
     });
   }, [data, deferredQuery, rarity, tier]);
@@ -3431,9 +3432,9 @@ function NewsDetailPage({
             access={user ? contentAccess(user, 'news') : undefined}
             onRefresh={refreshContent}
             onDirtyChange={setEditorDirty}
-            onSaved={({ values, publishStatus }) => {
+            onSaved={({ saved, values, publishStatus }) => {
               if (publishStatus === 'draft') return;
-              const nextSlug = String(values.slug || '').trim();
+              const nextSlug = String(saved?.slug || values.slug || '').trim();
               setEditorDirty(false);
               setEditorOpen(false);
               if (nextSlug && nextSlug !== slug) {
@@ -3540,8 +3541,8 @@ function LeakDetailPage({
             access={user ? contentAccess(user, 'leaks') : undefined}
             onRefresh={refreshContent}
             onDirtyChange={setEditorDirty}
-            onSaved={({ values }) => {
-              const nextSlug = String(values.slug || '').trim();
+            onSaved={({ saved, values }) => {
+              const nextSlug = String(saved?.slug || values.slug || '').trim();
               setEditorDirty(false);
               setEditorOpen(false);
               if (nextSlug && nextSlug !== slug) {
@@ -5013,7 +5014,11 @@ function AdminGuides({
       return '';
     };
     const slug = getFormString('slug');
-    const result = await saveEntity<{ id: string }>(
+    const result = await saveEntity<{
+      id: string;
+      slug?: string;
+      status?: Guide['status'];
+    }>(
       '/api/guides',
       {
         characterId: getFormString('characterId'),
@@ -5036,7 +5041,9 @@ function AdminGuides({
       const nextData = await loadSiteData({ includePrivate: true });
       const createdGuide =
         nextData.guides.find((item) => item.id === result.data.id) ||
-        nextData.guides.find((item) => item.slug === slug);
+        nextData.guides.find(
+          (item) => item.slug === (result.data.slug || slug),
+        );
       setData(nextData);
       if (createdGuide) {
         setSelectedGuideId(createdGuide.id);
@@ -5046,8 +5053,8 @@ function AdminGuides({
       createGuideDialogRef.current?.close();
       await onSaved?.({
         id: createdGuide?.id || result.data.id,
-        slug: createdGuide?.slug || slug,
-        status: createdGuide?.status || 'draft',
+        slug: createdGuide?.slug || result.data.slug || slug,
+        status: createdGuide?.status || result.data.status || 'draft',
         action: 'created',
   });
   } else {

@@ -976,7 +976,16 @@ async function handleEntity(request, env, parts, ctx) {
     ctx.waitUntil(
       logAudit(env, actor.id, `${entity}.create`, record.id, record),
     );
-    return json({ data: { id: record.id } }, 201);
+    return json(
+      {
+        data: {
+          id: record.id,
+          slug: record.slug || undefined,
+          status: record.status || undefined,
+        },
+      },
+      201,
+    );
   }
 
   if (request.method === 'PATCH' && idOrSlug) {
@@ -1012,7 +1021,14 @@ async function handleEntity(request, env, parts, ctx) {
     ctx.waitUntil(
       logAudit(env, actor.id, `${entity}.update`, idOrSlug, record),
     );
-    return json({ data: { success: true } });
+    return json({
+      data: {
+        success: true,
+        id: target.id,
+        slug: record.slug || target.slug || undefined,
+        status: record.status || undefined,
+      },
+    });
   }
 
   if (request.method === 'DELETE' && idOrSlug) {
@@ -2731,6 +2747,22 @@ function cleanWikiText(value) {
     .trim();
 }
 
+function cleanWikiParagraphText(value) {
+  return normalizeImportedRuText(
+    String(value || '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/\[\[[^\]|]+\|([^\]]+)\]\]/g, '$1')
+      .replace(/\[\[([^\]]+)\]\]/g, '$1')
+      .replace(/\[https?:\/\/[^\s\]]+\s+([^\]]+)\]/g, '$1')
+      .replace(/\{\{[^{}]*\}\}/g, ' ')
+      .replace(/'''?/g, '')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim(),
+  );
+}
+
 function normalizeImportedRuText(value) {
   return String(value || '')
     .replace(/\bЦветение зените\b/g, 'Цветение в зените')
@@ -2739,7 +2771,7 @@ function normalizeImportedRuText(value) {
 
 function readWikiParam(content, key) {
   const pattern = new RegExp(
-    `(?:^|\\n|\\|)\\s*${escapeRegExp(key)}\\s*=??\\s*([^\\n|{}]+)`,
+    `(?:^|\\n|\\|)\\s*${escapeRegExp(key)}\\s*=?\\s*([^\\n|{}]+)`,
     'i',
   );
   const raw = String(content.match(pattern)?.[1] || '').replace(
@@ -2747,6 +2779,20 @@ function readWikiParam(content, key) {
     '',
   );
   return normalizeImportedRuText(cleanWikiText(raw));
+}
+
+function extractFandomCharacterIntro(content) {
+  const match = String(content || '').match(
+    /'''[^']+'''\s*[—-]\s*([\s\S]*?)(?=\n==|\n\{\{|$)/,
+  );
+  return cleanWikiParagraphText(match?.[1] || '');
+}
+
+function extractFandomCharacterDescription(content) {
+  const match = String(content || '').match(
+    /\{\{Описание[\s\S]*?\|\s*текст\s*=\s*([\s\S]*?)(?:\|\s*источник\s*=|\}\})/i,
+  );
+  return cleanWikiParagraphText(match?.[1] || '');
 }
 
 function formatRuImportDate(value) {
@@ -2785,7 +2831,7 @@ function fandomRoleTagsFromCategories(page) {
 }
 
 function parseFandomRuApiImport(text, source) {
-  const { page, content, originalImage } = parseMediaWikiApiContent(text);
+  const { page, content } = parseMediaWikiApiContent(text);
   if (!content) return [];
 
   const roleTags = Array.from(
@@ -2805,6 +2851,8 @@ function parseFandomRuApiImport(text, source) {
     .filter(Boolean)
     .join(', ');
   const quote = cleanWikiText(content.match(/\{\{Цитата\|([^|}]+)/i)?.[1] || '');
+  const biographyShort = extractFandomCharacterIntro(content);
+  const biography = extractFandomCharacterDescription(content);
   const voiceActors = [
     ['Английский', readWikiParam(content, 'voiceEN')],
     ['Японский', readWikiParam(content, 'voiceJP')],
@@ -2822,9 +2870,9 @@ function parseFandomRuApiImport(text, source) {
     makeImportSuggestion('profile.faction', 'Фракция', faction, source, 'high'),
     makeImportSuggestion('profile.birthday', 'День рождения', readWikiParam(content, 'birthday'), source, 'high'),
     makeImportSuggestion('profile.releaseDate', 'Дата релиза', formatRuImportDate(readWikiParam(content, 'releaseDate')), source, 'medium'),
-    makeImportSuggestion('profile.biographyShort', 'Краткая биография', quote, source, 'medium'),
+    makeImportSuggestion('profile.biographyShort', 'Краткая биография', biographyShort || quote, source, biographyShort ? 'high' : 'medium'),
+    makeImportSuggestion('profile.biography', 'Подробная биография', biography, source, 'high'),
     makeImportSuggestion('profile.voiceActors', 'Актёры озвучки', voiceActors, source, 'high'),
-    makeImportSuggestion('imageUrl', 'Карточка персонажа', originalImage, source, 'high'),
   ].filter(Boolean);
 }
 
@@ -3167,7 +3215,7 @@ function parseNteWikiImport(text, source) {
               normalizeImportSearch(line) === 'материалы прорыва'),
         )
       : -1;
-  const abilityNames =
+  const pageAbilityNames =
     abilityStart >= 0
       ? lines
           .slice(abilityStart + 1, abilityEnd > abilityStart ? abilityEnd : abilityStart + 14)
@@ -3189,6 +3237,8 @@ function parseNteWikiImport(text, source) {
               !/^обзор/i.test(line),
           )
       : [];
+  const faqAbilityNames = parseGenshinBuildsFaqAbilityNames(text);
+  const abilityNames = pageAbilityNames.length ? pageAbilityNames : faqAbilityNames;
   const abilityTypes = [
     'Базовая атака',
     'Навык',
@@ -3303,6 +3353,16 @@ function parseNteWikiCharactersIndexImport(text, source, character) {
   ];
 }
 
+function parseGenshinBuildsFaqAbilityNames(text) {
+  const match = String(text || '').match(/skills include:\s*([^"<.]+)(?:\.|"|<)/i);
+  if (!match) return [];
+  return match[1]
+    .split(',')
+    .map((name) => normalizeImportedRuText(decodeHtmlEntities(name).trim()))
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
 function parseGenshinBuildsImport(text, source, character) {
   const lines = compactImportLines(text);
   const suggestions = [];
@@ -3349,6 +3409,36 @@ function parseGenshinBuildsImport(text, source, character) {
   suggestions.push(
     makeImportSuggestion('profile.voiceActors', 'Актёры озвучки', voiceActors, source, 'high'),
   );
+  const faqAbilityNames = parseGenshinBuildsFaqAbilityNames(text);
+  if (faqAbilityNames.length) {
+    const abilityTypes = [
+      'Базовая атака',
+      'Навык',
+      'Сверхспособность',
+      'Навык поддержки',
+      'Пассивный навык',
+      'Пассивный навык',
+      'Повседневный навык',
+      'Повседневный навык',
+    ];
+    suggestions.push(
+      makeImportSuggestion(
+        'profile.abilities',
+        'Способности',
+        faqAbilityNames.map((name, index) => ({
+          id: crypto.randomUUID(),
+          name,
+          type: abilityTypes[index] || 'Навык',
+          iconUrl: '',
+          description:
+            'Название найдено в FAQ GenshinBuilds; описание подтягивается из GameWith или заполняется вручную.',
+        })),
+        source,
+        'medium',
+        'Список имён нужен для сверки русских названий; строку с техническим GA_* отклоните, если источник не дал локализованное имя.',
+      ),
+    );
+  }
   return suggestions;
 }
 
@@ -3525,7 +3615,7 @@ function parseIcyVeinsTierImport(text, source, character) {
   return [
     makeImportSuggestion(
       'tier',
-      'Редакционный тир',
+      'Подсказка для тир-листа',
       match?.[1] || '',
       source,
       'low',
@@ -4048,7 +4138,7 @@ function parseKaidenTierImport(text, source, character) {
   return [
     makeImportSuggestion(
       'tier',
-      'Редакционный тир',
+      'Подсказка для тир-листа',
       tier,
       source,
       'low',
@@ -4466,7 +4556,7 @@ function importImageMapFromSuggestions(items) {
   return map;
 }
 
-function findImportImageByName(imageMap, name) {
+function findImportImageByName(imageMap, name, options = {}) {
   const candidates = importImageNameAliases(name)
     .map((item) => normalizeImportSearch(item))
     .filter(Boolean);
@@ -4474,6 +4564,7 @@ function findImportImageByName(imageMap, name) {
     const imageUrl = imageMap.get(candidate);
     if (imageUrl) return imageUrl;
   }
+  if (options.fuzzy === false) return '';
   for (const candidate of candidates) {
     if (candidate.length < 4) continue;
     const fuzzy = [...imageMap.entries()].find(([key]) =>
@@ -4539,11 +4630,12 @@ function enrichArraySuggestionMedia(item, imageMap) {
   const parsed = parseImportSuggestionJson(item);
   if (!Array.isArray(parsed)) return item;
   let changed = false;
+  const allowFuzzyMediaMatch = !['profile.abilities', 'profile.awakenings'].includes(item.field);
   const nextValue = parsed.map((entry) => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
     const record = entry;
     const imageUrl = importMediaLookupLabels(record, item.field)
-      .map((label) => findImportImageByName(imageMap, label))
+      .map((label) => findImportImageByName(imageMap, label, { fuzzy: allowFuzzyMediaMatch }))
       .find(Boolean);
     if (!imageUrl) return entry;
     if ('imageUrl' in record && !record.imageUrl) {
@@ -4595,28 +4687,41 @@ function mergeAbilityImportSuggestions(items) {
     Math.max(...abilityItems.map(({ value }) => value.length), base.value.length),
   );
   const merged = Array.from({ length: maxLength }, (_, index) => {
-    const candidates = abilityItems.map(({ value }) => value[index]).filter(Boolean);
+    const candidates = abilityItems
+      .map(({ item, value }) => ({ item, ability: value[index] }))
+      .filter(({ ability }) => Boolean(ability));
+    const hasCleanName = ({ ability }) => {
+      const name = normalizeImportedRuText(ability?.name || '');
+      return (
+        name &&
+        !isImportPlaceholderText(name) &&
+        !/bilane|rail|skill|attack|ultra|support/i.test(name)
+      );
+    };
     const withDescription =
-      candidates.find((ability) => abilityDescriptionScore(ability) > 0) ||
+      candidates.find(({ ability }) => abilityDescriptionScore(ability) > 0)?.ability ||
       base.value[index] ||
-      candidates[0];
-    const withCleanName =
-      candidates.find((ability) => {
-        const name = normalizeImportedRuText(ability?.name || '');
+      candidates[0]?.ability;
+    const preferredName =
+      candidates.find((candidate) => {
+        if (!hasCleanName(candidate)) return false;
+        const source = `${candidate.item.sourceName} ${candidate.item.sourceUrl}`.toLocaleLowerCase('ru-RU');
         return (
-          name &&
-          !isImportPlaceholderText(name) &&
-          !/bilane|rail|skill|attack|ultra|support/i.test(name)
+          source.includes('genshinbuilds') ||
+          source.includes('nte wiki') ||
+          source.includes('fandom ru')
         );
-      }) || withDescription;
+      }) || candidates.find(hasCleanName);
+    const withCleanName =
+      preferredName?.ability || withDescription;
     return {
-      ...withDescription,
-      id: withDescription?.id || crypto.randomUUID(),
-      name: withCleanName?.name || withDescription?.name || 'Требует проверки',
-      type: withDescription?.type || withCleanName?.type || 'Навык',
-      iconUrl: withDescription?.iconUrl || withCleanName?.iconUrl || '',
-      description:
-        withDescription?.description ||
+        ...withDescription,
+        id: withDescription?.id || crypto.randomUUID(),
+        name: withCleanName?.name || withDescription?.name || 'Требует проверки',
+        type: withCleanName?.type || withDescription?.type || 'Навык',
+        iconUrl: withCleanName?.iconUrl || withDescription?.iconUrl || '',
+        description:
+          withDescription?.description ||
         withCleanName?.description ||
         'Описание требует проверки в игре.',
     };
@@ -4674,6 +4779,21 @@ function dedupeImportSuggestions(items) {
   const confidenceWeight = { high: 30, medium: 20, low: 10 };
   const sourceWeight = (item) => {
     const source = `${item.sourceName} ${item.sourceUrl}`.toLocaleLowerCase('ru-RU');
+    if (item.field === 'profile.biography' || item.field === 'profile.biographyShort') {
+      if (source.includes('официаль')) return 120;
+      if (source.includes('fandom ru')) return 115;
+      if (source.includes('gamewith')) return 75;
+      if (source.includes('genshinbuilds')) return 50;
+    }
+    if (item.field === 'profile.arcType' || item.field === 'profile.faction' || item.field === 'profile.roleTags') {
+      if (source.includes('fandom ru')) return 120;
+      if (source.includes('официаль')) return 110;
+    }
+    if (item.field === 'imageUrl' || item.field === 'splashUrl') {
+      if (source.includes('медиатека персонажа')) return 125;
+      if (source.includes('изображения')) return 120;
+      if (source.includes('fandom ru')) return 110;
+    }
     if (source.includes('официаль')) return 100;
     if (source.includes('медиатека персонажа')) return 98;
     if (source.includes('fandom ru')) return 95;
@@ -4696,7 +4816,7 @@ function dedupeImportSuggestions(items) {
     if (seen.has(key)) continue;
     seen.add(key);
 
-    if (item.field.startsWith('guide.')) continue;
+    if (item.field === 'tier' || item.field.startsWith('guide.')) continue;
 
     if (scalarFields.has(item.field)) {
       const current = bestByField.get(item.field);
@@ -5712,7 +5832,7 @@ function validateResourceUrl(value, field) {
 async function findEntityId(env, config, idOrSlug) {
   const where = config.slug ? 'id = ? OR slug = ?' : 'id = ?';
   const statement = env.DB.prepare(
-    `SELECT id FROM ${config.table} WHERE ${where}`,
+    `SELECT id${config.slug ? ', slug' : ''} FROM ${config.table} WHERE ${where}`,
   );
   return config.slug
     ? statement.bind(idOrSlug, idOrSlug).first()

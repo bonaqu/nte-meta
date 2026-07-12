@@ -331,6 +331,11 @@ export function ContentManager<T extends ManagedItem>({
     values: EditorValues;
     publishStatus?: 'draft' | 'published';
     item?: T;
+    saved?: {
+      id?: string;
+      slug?: string;
+      status?: string;
+    };
   }) => void | Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
@@ -455,7 +460,12 @@ export function ContentManager<T extends ManagedItem>({
       delete payload.publishStatus;
       delete payload.approved;
     }
-    const result = await saveEntity<{ id?: string; success?: boolean }>(
+    const result = await saveEntity<{
+      id?: string;
+      slug?: string;
+      status?: string;
+      success?: boolean;
+    }>(
       selectedItem
         ? `${config.endpoint}/${encodeURIComponent(selectedItem.id)}`
         : config.endpoint,
@@ -473,6 +483,7 @@ export function ContentManager<T extends ManagedItem>({
         values,
         publishStatus,
         item: selectedItem,
+        saved: result.data,
       });
       setMessageTone('success');
       setMessage(
@@ -841,6 +852,11 @@ export function AdminNewsManager({
     values: EditorValues;
     publishStatus?: 'draft' | 'published';
     item?: NewsItem;
+    saved?: {
+      id?: string;
+      slug?: string;
+      status?: string;
+    };
   }) => void | Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
@@ -965,6 +981,11 @@ export function AdminLeaksManager({
     values: EditorValues;
     publishStatus?: 'draft' | 'published';
     item?: LeakItem;
+    saved?: {
+      id?: string;
+      slug?: string;
+      status?: string;
+    };
   }) => void | Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
 }) {

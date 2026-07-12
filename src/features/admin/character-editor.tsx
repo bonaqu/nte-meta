@@ -445,7 +445,7 @@ function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {
     originalName: 'Оригинальное имя',
     rarity: 'Редкость',
     attribute: 'Атрибут',
-    tier: 'Тир',
+    tier: 'Подсказка для тир-листа',
     imageUrl: 'Карточка персонажа',
     splashUrl: 'Splash персонажа',
     'profile.arcType': 'Тип дуги',
@@ -1079,7 +1079,12 @@ function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
       tagsJson: draft.tags,
       profile: draft.profile,
     };
-    const result = await saveEntity<{ id?: string; success?: boolean }>(
+    const result = await saveEntity<{
+      id?: string;
+      slug?: string;
+      status?: string;
+      success?: boolean;
+    }>(
       selected ? `/api/characters/${selected.id}` : '/api/characters',
       payload,
       selected ? 'PATCH' : 'POST',
@@ -1091,7 +1096,7 @@ function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
       await onRefresh();
       await onSaved?.({
         id: savedId,
-        slug: draft.slug.trim(),
+        slug: String(result.data.slug || draft.slug || '').trim(),
         status,
       });
       setTone('success');

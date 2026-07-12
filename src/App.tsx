@@ -824,7 +824,7 @@ function HomePage({
         <SectionHeader
           eyebrow="Патч 1.0"
           title="Текущий тир-лист"
-          text="Единый preview актуального редакционного тир-листа."
+          text="Единый обзор актуального редакционного тир-листа."
         />
         <TierPreview grouped={grouped} />
       </section>
@@ -1613,7 +1613,7 @@ function MarkdownToolbar({
   }
 
   return (
-    <div className="toolbar" aria-label="Markdown toolbar">
+    <div className="toolbar" aria-label="Панель форматирования текста">
       {actions.map(([action, label]) => (
         <button key={action} type="button" onClick={() => apply(action)}>
           {label}
@@ -4103,8 +4103,8 @@ function AdminDashboard({ data }: { data: SiteData }) {
   const approvedLeaks = data.leaks.filter((item) => item.approved);
   const pendingLeaks = data.leaks.filter((item) => !item.approved);
   const dashboardMetrics = [
-    { label: 'Гайды', value: data.guides.length, detail: 'редактируются inline' },
-    { label: 'Персонажи', value: data.characters.length, detail: 'lore/profile база' },
+    { label: 'Гайды', value: data.guides.length, detail: 'редактируются прямо в разделах' },
+    { label: 'Персонажи', value: data.characters.length, detail: 'база лора и профилей' },
     { label: 'Публикации', value: publishedNews.length + approvedLeaks.length, detail: 'новости и сливы' },
     { label: 'Очередь сливов', value: pendingLeaks.length, detail: 'требуют проверки' },
   ];
@@ -4125,13 +4125,13 @@ function AdminDashboard({ data }: { data: SiteData }) {
       href: '#/tierlists',
       icon: <Star aria-hidden="true" />,
       title: 'Тир-лист',
-      text: 'Единый список S-D с drag-and-drop порядком.',
+      text: 'Единый список S-D с перетаскиванием карточек.',
     },
     {
       href: '#/',
       icon: <Newspaper aria-hidden="true" />,
       title: 'Новости и сливы',
-      text: 'Публикуются на главной и открываются detail-страницами.',
+      text: 'Публикуются на главной и открываются на отдельных страницах.',
     },
   ];
 
@@ -4165,7 +4165,7 @@ function AdminDashboard({ data }: { data: SiteData }) {
       <section className="admin-panel admin-action-panel">
         <div className="panel-title-row">
           <div>
-            <p className="eyebrow">Inline editing</p>
+            <p className="eyebrow">Работа с контентом</p>
             <h2>Быстрые переходы к контенту</h2>
           </div>
         </div>
@@ -4187,11 +4187,11 @@ function AdminDashboard({ data }: { data: SiteData }) {
           </div>
         </div>
         <ul className="admin-role-list">
-          <li><strong>User</strong><span>профиль, комментарии и оценки.</span></li>
-          <li><strong>Editor</strong><span>inline-кнопки разрешённого контента.</span></li>
-          <li><strong>Moderator</strong><span>модерация комментариев и предупреждения.</span></li>
-          <li><strong>Admin</strong><span>пользователи, роли, источники и настройки.</span></li>
-          <li><strong>Owner</strong><span>полный доступ и удаление пользователей.</span></li>
+          <li><strong>Пользователь</strong><span>профиль, комментарии и оценки.</span></li>
+          <li><strong>Редактор</strong><span>кнопки управления разрешённым контентом.</span></li>
+          <li><strong>Модератор</strong><span>модерация комментариев и предупреждения.</span></li>
+          <li><strong>Администратор</strong><span>пользователи, роли, источники и настройки.</span></li>
+          <li><strong>Владелец</strong><span>полный доступ и удаление пользователей.</span></li>
         </ul>
       </section>
     </div>
@@ -5367,7 +5367,7 @@ function AdminGuides({
             </select>
           </label>
             <label>
-              YouTube URL
+              Ссылка на YouTube
               <input
                 type="url"
                 value={guideMeta.videoUrl}
@@ -5707,7 +5707,7 @@ function AdminGuides({
           </p>
         </div>
         <div className="admin-panel editor-panel">
-          <h2>Markdown editor</h2>
+          <h2>Редактор текста</h2>
           <div className="guide-section-fields">
             <label>
               Название секции
@@ -5734,18 +5734,18 @@ function AdminGuides({
               />
             </label>
           </div>
-          <div className="toolbar" aria-label="Markdown toolbar">
+          <div className="toolbar" aria-label="Панель форматирования текста">
             {[
               ['h2', 'H2'],
               ['h3', 'H3'],
               ['bold', 'B'],
               ['italic', 'I'],
-              ['list', 'List'],
-              ['quote', 'Quote'],
-              ['spoiler', 'Spoiler'],
-              ['table', 'Table'],
-              ['link', 'Link'],
-              ['image', 'Image URL'],
+              ['list', 'Список'],
+              ['quote', 'Цитата'],
+              ['spoiler', 'Спойлер'],
+              ['table', 'Таблица'],
+              ['link', 'Ссылка'],
+              ['image', 'Изображение'],
               ['youtube', 'YouTube'],
             ].map(([action, label]) => (
               <button
@@ -5759,7 +5759,7 @@ function AdminGuides({
           </div>
           <div className="guide-image-insert" aria-label="Вставка изображения в секцию">
             <label htmlFor="guide-section-image-url">
-              Image URL для секции
+              Ссылка на изображение для секции
               <input
                 id="guide-section-image-url"
                 type="url"
@@ -5770,7 +5770,7 @@ function AdminGuides({
               />
             </label>
             <label htmlFor="guide-section-image-alt">
-              Подпись / alt
+              Описание изображения
               <input
                 id="guide-section-image-alt"
                 value={sectionImageAlt}
@@ -5790,7 +5790,7 @@ function AdminGuides({
             onChange={(event) => updateSelectedMarkdown(event.target.value)}
             rows={12}
           />
-          <h3>Live preview</h3>
+          <h3>Предпросмотр</h3>
           <MarkdownPreview value={markdown} />
         </div>
       </div>

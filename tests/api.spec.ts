@@ -929,15 +929,19 @@ test.describe('NTE Meta Worker API', () => {
     await guideCreateForm
       .getByLabel('Заголовок')
       .fill(`Гайд ${uiGuideCharacterName}`);
-    await guideCreateForm.getByLabel('Slug').fill(uiGuideSlug);
-    await expect(guideCreateForm.getByLabel('Slug')).toHaveValue(uiGuideSlug);
+    await guideCreateForm.getByLabel('Адрес страницы').fill(uiGuideSlug);
+    await expect(
+      guideCreateForm.getByLabel('Адрес страницы'),
+    ).toHaveValue(uiGuideSlug);
     await guideCreateForm
       .getByLabel('Краткое описание')
       .fill(
         'Гайд создан из публичного раздела и должен открыть detail-страницу.',
       );
     await guideCreateForm.getByLabel('Патч').fill('ui-test');
-    await expect(guideCreateForm.getByLabel('Slug')).toHaveValue(uiGuideSlug);
+    await expect(
+      guideCreateForm.getByLabel('Адрес страницы'),
+    ).toHaveValue(uiGuideSlug);
     const guideCreateRequest = page.waitForRequest(
       (request) =>
         request.method() === 'POST' && request.url().endsWith('/api/guides'),
@@ -1040,7 +1044,7 @@ test.describe('NTE Meta Worker API', () => {
     const newsDialog = page.locator('dialog[open]');
     const newsForm = newsDialog.locator('.cms-editor');
     await newsForm.getByLabel('Заголовок').fill(`UI публикация ${runId}`);
-    await newsForm.getByLabel('Slug URL').fill(uiNewsSlug);
+    await newsForm.getByLabel('Адрес страницы').fill(uiNewsSlug);
     await newsForm
       .getByLabel('Краткое описание')
       .fill('Проверка inline публикации новости.');
@@ -1078,7 +1082,7 @@ test.describe('NTE Meta Worker API', () => {
     const threadDialog = page.locator('dialog[open]');
     const threadForm = threadDialog.locator('form.thread-editor');
     await threadForm.getByLabel('Заголовок').fill(`UI тред ${runId}`);
-    await threadForm.getByLabel('Slug').fill(uiThreadSlug);
+    await threadForm.getByLabel('Адрес страницы').fill(uiThreadSlug);
     await threadForm
       .getByLabel('Краткое описание')
       .fill('Проверка публикации комьюнити-треда.');
@@ -1195,7 +1199,7 @@ test('owner создаёт персонажа inline и открывает со�
     });
     await mainInfo.getByLabel('Имя на русском').fill(uiCharacterName);
     await mainInfo.getByLabel('Оригинальное имя').fill('UI Character');
-    await mainInfo.getByLabel('Адрес страницы (slug)').fill(uiCharacterSlug);
+    await mainInfo.getByLabel('Адрес страницы').fill(uiCharacterSlug);
     await mainInfo.getByLabel('Фракция').fill('Редакционный тест');
     await mainInfo.getByLabel('Тип дуги').fill('Тестовая дуга');
 await mainInfo.getByLabel('Атрибут').fill('Тест');
@@ -1243,7 +1247,9 @@ await mainInfo
     await expect(guideCreateForm.getByLabel('Заголовок')).toHaveValue(
       `Гайд: ${uiCharacterName}`,
     );
-    await guideCreateForm.getByLabel('Slug').fill(uiCharacterGuideSlug);
+    await guideCreateForm
+      .getByLabel('Адрес страницы')
+      .fill(uiCharacterGuideSlug);
     await guideCreateForm
       .getByLabel('Краткое описание')
       .fill(
@@ -1299,7 +1305,7 @@ await mainInfo
     });
     const newsForm = newsDialog.locator('.cms-editor');
     await newsForm.getByLabel('Заголовок').fill(`UI новость detail ${runId}`);
-    await newsForm.getByLabel('Slug URL').fill(uiNewsSlug);
+    await newsForm.getByLabel('Адрес страницы').fill(uiNewsSlug);
     await newsForm
       .getByLabel('Краткое описание')
       .fill('Проверка inline публикации новости.');
@@ -1365,7 +1371,7 @@ await mainInfo
     await leakForm
       .getByLabel('Редактируемый заголовок')
       .fill(`UI слив ${runId}`);
-    await leakForm.getByLabel('Slug URL').fill(uiLeakSlug);
+    await leakForm.getByLabel('Адрес страницы').fill(uiLeakSlug);
     await leakForm
       .getByLabel('Краткое описание')
       .fill('Проверка inline публикации слива.');

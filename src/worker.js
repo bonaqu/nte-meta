@@ -1202,6 +1202,7 @@ function characterProfileSelect() {
     character_profiles.biography_markdown AS profile_biography_markdown,
     character_profiles.trivia_markdown AS profile_trivia_markdown,
     character_profiles.role_tags_json AS profile_role_tags_json,
+    character_profiles.role_icons_json AS profile_role_icons_json,
     character_profiles.voice_actors_json AS profile_voice_actors_json,
     character_profiles.materials_json AS profile_materials_json,
     character_profiles.base_stats_json AS profile_base_stats_json,
@@ -4717,6 +4718,12 @@ const PROFILE_COLLECTION_MERGE_CONFIGS = [
     key: (entry) => normalizeImportSearch(entry),
   },
   {
+    field: 'profile.roleIcons',
+    label: 'Иконки ролей',
+    limit: 12,
+    key: (entry) => normalizeImportSearch(entry?.name),
+  },
+  {
     field: 'profile.voiceActors',
     label: 'Актёры озвучки',
     limit: 12,
@@ -4916,6 +4923,34 @@ function enrichCharacterImportSuggestions(items) {
   const mergedCollections = PROFILE_COLLECTION_MERGE_CONFIGS.map((config) =>
     mergeProfileCollectionImportSuggestions(enriched, config),
   ).filter(Boolean);
+  const roleTagsSuggestion =
+    mergedCollections.find((item) => item.field === 'profile.roleTags') ||
+    enriched.find((item) => item?.field === 'profile.roleTags');
+  const importedRoleTags = parseImportSuggestionJson(roleTagsSuggestion);
+  const roleIcons = Array.isArray(importedRoleTags)
+    ? importedRoleTags
+        .map((name) => ({
+          name: String(name || '').trim(),
+          iconUrl: findImportImageByName(imageMap, `Роль ${name}`, {
+            fuzzy: false,
+          }),
+        }))
+        .filter((item) => item.name && item.iconUrl)
+    : [];
+  const roleIconSuggestion = roleIcons.length
+    ? {
+        id: `merged:profile.roleIcons:${hashText(JSON.stringify(roleIcons)).slice(0, 10)}`,
+        field: 'profile.roleIcons',
+        label: 'Иконки ролей',
+        value: JSON.stringify(roleIcons),
+        sourceName: 'Fandom RU: изображения ролей',
+        sourceUrl:
+          enriched.find((item) => item?.field === '__imageMap')?.sourceUrl || '',
+        confidence: 'high',
+        note:
+          'Иконки сопоставлены с подтверждёнными русскими названиями ролей. Подтвердите каждую строку.',
+      }
+    : null;
   const mergedFields = new Set(mergedCollections.map((item) => item.field));
   return [
     ...enriched.filter(
@@ -4927,6 +4962,7 @@ function enrichCharacterImportSuggestions(items) {
       ? [enrichArraySuggestionMedia(mergedAbilities, imageMap)]
       : []),
     ...mergedCollections.map((item) => enrichArraySuggestionMedia(item, imageMap)),
+    ...(roleIconSuggestion ? [roleIconSuggestion] : []),
   ];
 }
 
@@ -4950,6 +4986,7 @@ function dedupeImportSuggestions(items) {
     'profile.awakenings',
     'profile.materials',
     'profile.roleTags',
+    'profile.roleIcons',
     'profile.voiceActors',
     'profile.friendship',
     'profile.gifts',
@@ -5496,6 +5533,7 @@ function serializeCharacter(row) {
       biography: row.profile_biography_markdown || row.summary || '',
       trivia: row.profile_trivia_markdown || '',
       roleTags: parseJson(row.profile_role_tags_json, [row.role]),
+      roleIcons: parseJson(row.profile_role_icons_json, []),
       voiceActors: parseJson(row.profile_voice_actors_json, []),
       materials: parseJson(row.profile_materials_json, []),
       baseStats: parseJson(row.profile_base_stats_json, []),
@@ -5891,6 +5929,7 @@ function profileCollectionLabel(name) {
   return (
     {
       roleTags: 'роли персонажа',
+      roleIcons: 'иконки ролей',
       voiceActors: 'актёры озвучки',
       materials: 'материалы прокачки',
       baseStats: 'начальные показатели',
@@ -5968,6 +6007,10 @@ function normalizeCharacterProfile(value) {
     roleTags: collection('roleTags', 12, (item) => text(item, 80)).filter(
       Boolean,
     ),
+    roleIcons: collection('roleIcons', 12, (item) => ({
+      name: text(item.name, 80),
+      iconUrl: url(item.iconUrl),
+    })).filter((item) => item.name && item.iconUrl),
     voiceActors: collection('voiceActors', 12, (item) => ({
       language: text(item.language, 40),
       name: text(item.name, 160),
@@ -6052,11 +6095,11 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
       env.DB.prepare(
         `INSERT INTO character_profiles (
         character_id, faction, arc_type, birthday, release_date, biography_short,
-        biography_markdown, trivia_markdown, role_tags_json,
+        biography_markdown, trivia_markdown, role_tags_json, role_icons_json,
         voice_actors_json, materials_json, base_stats_json,
         abilities_json, skins_json, friendship_json, gifts_json,
         voice_lines_json, awakenings_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(character_id) DO UPDATE SET
         faction = excluded.faction,
         arc_type = excluded.arc_type,
@@ -6066,6 +6109,7 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
            biography_markdown = excluded.biography_markdown,
            trivia_markdown = excluded.trivia_markdown,
            role_tags_json = excluded.role_tags_json,
+           role_icons_json = excluded.role_icons_json,
            voice_actors_json = excluded.voice_actors_json,
            materials_json = excluded.materials_json,
            base_stats_json = excluded.base_stats_json,
@@ -6086,6 +6130,7 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
         profile.biography,
         profile.trivia,
         JSON.stringify(profile.roleTags),
+        JSON.stringify(profile.roleIcons),
         JSON.stringify(profile.voiceActors),
         JSON.stringify(profile.materials),
         JSON.stringify(profile.baseStats),

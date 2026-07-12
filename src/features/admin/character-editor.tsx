@@ -26,6 +26,7 @@ import type {
   CharacterImportSuggestion,
   CharacterMaterial,
   CharacterProfile,
+  CharacterRoleIcon,
   CharacterSkin,
   CharacterStat,
   CharacterVoiceActor,
@@ -91,6 +92,7 @@ function emptyProfile(): CharacterProfile {
     biography: '',
     trivia: '',
     roleTags: ['DPS'],
+    roleIcons: [],
     voiceActors: [],
     materials: [],
     baseStats: [],
@@ -456,6 +458,7 @@ function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {
     'profile.biography': 'Подробная биография',
     'profile.trivia': 'Интересные факты',
     'profile.roleTags': 'Роли в отряде',
+    'profile.roleIcons': 'Иконки ролей',
     'profile.voiceActors': 'Актёры озвучки',
     'profile.voiceLines': 'Реплики',
     'profile.materials': 'Материалы прокачки',
@@ -964,6 +967,12 @@ function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
       next.profile.roleTags = Array.from(
         new Set([...next.profile.roleTags, ...parsed.map(String).filter(Boolean)]),
       );
+    } else if (suggestion.field === 'profile.roleIcons' && Array.isArray(parsed)) {
+      next.profile.roleIcons = mergeRowsByKey(
+        next.profile.roleIcons || [],
+        parsed as CharacterRoleIcon[],
+        (item) => item.name,
+      );
     } else if (suggestion.field === 'profile.voiceActors' && Array.isArray(parsed)) {
       next.profile.voiceActors = mergeRowsByKey(
         next.profile.voiceActors,
@@ -1375,6 +1384,64 @@ function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
                 }
               />
             </label>
+            <div className="wide-field">
+              <Collection<CharacterRoleIcon>
+                title="Иконки ролей"
+                description="Иконки используются рядом с русскими названиями ролей в профиле."
+                items={profile.roleIcons || []}
+                addLabel="Добавить иконку роли"
+                createItem={() => ({ name: '', iconUrl: '' })}
+                onChange={(roleIcons) => patchProfile({ roleIcons })}
+                render={(item, _index, update) => (
+                  <>
+                    <label>
+                      Роль
+                      <input
+                        value={item.name}
+                        placeholder="Основной ДД"
+                        onChange={(event) =>
+                          update({ ...item, name: event.target.value })
+                        }
+                      />
+                    </label>
+                    <label>
+                      URL иконки
+                      <input
+                        type="text"
+                        inputMode="url"
+                        value={item.iconUrl}
+                        onChange={(event) =>
+                          update({ ...item, iconUrl: event.target.value })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Загрузить иконку
+                      <input
+                        type="file"
+                        accept="image/png,image/webp,image/jpeg"
+                        onChange={(event) =>
+                          void uploadInlineIcon(event.target.files?.[0], (iconUrl) =>
+                            update({ ...item, iconUrl }),
+                          )
+                        }
+                      />
+                    </label>
+                    {item.iconUrl ? (
+                      <img
+                        className="editor-icon-preview"
+                        src={resolveAssetUrl(item.iconUrl)}
+                        alt=""
+                        width="54"
+                        height="54"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : null}
+                  </>
+                )}
+              />
+            </div>
             <div className="inline-note wide-field">
               <strong>Тир персонажа редактируется в разделе «Тир-листы».</strong>
               <span>

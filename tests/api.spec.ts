@@ -491,7 +491,7 @@ test.describe('NTE Meta Worker API', () => {
   ).toBe(403);
 
   const ownerLookup = await owner.post('/api/character-import/lookup', {
-    data: { query: 'Хотори' },
+    data: { query: 'Байканг' },
   });
   expect(ownerLookup.ok()).toBeTruthy();
   const ownerLookupJson = await ownerLookup.json();
@@ -502,6 +502,34 @@ test.describe('NTE Meta Worker API', () => {
     ownerLookupJson.data.suggestions.some(
       (suggestion: { field: string }) => suggestion.field === 'profile.voiceActors',
     ),
+  ).toBeTruthy();
+  expect(
+    ownerLookupJson.data.suggestions.some(
+      (suggestion: { field: string; value: string }) =>
+        suggestion.field === 'profile.arcType' && suggestion.value === 'Гибридный',
+    ),
+  ).toBeTruthy();
+  const roleSuggestion = ownerLookupJson.data.suggestions.find(
+    (suggestion: { field: string }) => suggestion.field === 'profile.roleTags',
+  ) as { value: string } | undefined;
+  expect(roleSuggestion).toBeTruthy();
+  expect(JSON.parse(roleSuggestion?.value || '[]')).toEqual(
+    expect.arrayContaining(['Урон', 'Основной ДД', 'Периодический урон']),
+  );
+  expect(
+    ownerLookupJson.data.suggestions.some(
+      (suggestion: { field: string }) => suggestion.field === 'profile.roleIcons',
+    ),
+  ).toBeTruthy();
+  expect(
+    ownerLookupJson.data.suggestions
+      .filter((suggestion: { field: string }) =>
+        ['profile.biography', 'profile.biographyShort'].includes(suggestion.field),
+      )
+      .every(
+        (suggestion: { value: string }) =>
+          !/указан в базе|эта страница предназначена|ищет гайд/i.test(suggestion.value),
+      ),
   ).toBeTruthy();
   expect(
     ownerLookupJson.data.suggestions.some(

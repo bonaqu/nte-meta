@@ -87,6 +87,11 @@ export interface CharacterVoiceLine {
   description?: string;
 }
 
+export interface CharacterRoleIcon {
+  name: string;
+  iconUrl: string;
+}
+
 export interface CharacterAwakening {
   level: number;
   name: string;
@@ -103,6 +108,7 @@ export interface CharacterProfile {
   biography: string;
   trivia: string;
   roleTags: string[];
+  roleIcons?: CharacterRoleIcon[];
   voiceActors: CharacterVoiceActor[];
   materials: CharacterMaterial[];
   baseStats: CharacterStat[];

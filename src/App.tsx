@@ -110,6 +110,7 @@ import type {
   AppSettings,
   Character,
   CharacterImportSuggestion,
+  CharacterRoleIcon,
   Comment,
   CommunityThread,
   ContentScope,
@@ -1572,12 +1573,35 @@ function TierPreview({ grouped }: { grouped: Record<Tier, Character[]> }) {
   );
 }
 
-function Tags({ tags }: { tags: string[] }) {
+function Tags({
+  tags,
+  icons = [],
+}: {
+  tags: string[];
+  icons?: CharacterRoleIcon[];
+}) {
   return (
     <div className="tag-row">
-      {tags.slice(0, 4).map((tag) => (
-        <span key={tag}>{tag}</span>
-      ))}
+      {tags.slice(0, 4).map((tag) => {
+        const icon = icons.find(
+          (item) => normalizeSearchText(item.name) === normalizeSearchText(tag),
+        );
+        return (
+          <span key={tag}>
+            {icon?.iconUrl ? (
+              <img
+                src={resolveAssetUrl(icon.iconUrl)}
+                alt=""
+                width="18"
+                height="18"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            ) : null}
+            {tag}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -1931,6 +1955,7 @@ function CharacterDetailPage({
           </dl>
           <Tags
             tags={profile.roleTags.length ? profile.roleTags : character.tags}
+            icons={profile.roleIcons}
           />
           <div className="button-row">
             {guide ? (

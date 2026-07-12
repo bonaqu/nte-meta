@@ -477,12 +477,21 @@
   }
 
   .tag-row span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     padding: 5px 8px;
     border: 1px solid var(--border);
     border-radius: 999px;
     background: rgb(255 255 255 / 0.05);
     color: var(--muted);
     font-size: 0.74rem;
+  }
+
+  .tag-row img {
+    inline-size: 18px;
+    block-size: 18px;
+    object-fit: contain;
   }
 
   .tier-badge {

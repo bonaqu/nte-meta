@@ -1279,12 +1279,16 @@ function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
               />
             </label>
             <label>
-              Адрес страницы (slug)
+              Адрес страницы
               <input
                 required
                 value={draft.slug}
                 onChange={(event) => patch({ slug: event.target.value })}
+                aria-describedby="character-slug-help"
               />
+              <small id="character-slug-help">
+                Создаётся из имени автоматически. Измените только если нужна другая короткая ссылка.
+              </small>
             </label>
         <label>
           Фракция

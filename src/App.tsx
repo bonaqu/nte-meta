@@ -889,7 +889,7 @@ function HomePage({
       <EditorShell
         open={homeEditor === 'guide'}
         title={homeEditorItemId === 'new' ? 'Добавить гайд' : 'Редактировать гайд'}
-        eyebrow="Inline CMS"
+        eyebrow="Редактор"
         description="Персонажный гайд создаётся прямо из главной и сразу попадёт в раздел гайдов после публикации."
         dirty={homeEditorDirty}
         onClose={() => {
@@ -1110,14 +1110,20 @@ function ThreadEditor({
             onChange={(event) => updateTitle(event.target.value)}
             required
           />
-          <label htmlFor="thread-slug">Slug</label>
-          <input
-            id="thread-slug"
-            value={slug}
-            maxLength={140}
-            onChange={(event) => setSlug(makeSlug(event.target.value))}
-            required
-          />
+          <label htmlFor="thread-slug">
+            Адрес страницы
+            <input
+              id="thread-slug"
+              value={slug}
+              maxLength={140}
+              onChange={(event) => setSlug(makeSlug(event.target.value))}
+              required
+              aria-describedby="thread-slug-help"
+            />
+            <small id="thread-slug-help">
+              Создаётся из заголовка автоматически. Его можно изменить для короткой ссылки.
+            </small>
+          </label>
           <label htmlFor="thread-summary">Краткое описание</label>
           <textarea
             id="thread-summary"
@@ -4485,14 +4491,18 @@ function GuideCreateFields({
         />
       </label>
       <label htmlFor={`${fieldId}-slug`}>
-        Slug
+        Адрес страницы
         <input
           id={`${fieldId}-slug`}
           name="slug"
           value={slug}
           onChange={(event) => updateSlug(event.target.value)}
           required
+          aria-describedby={`${fieldId}-slug-help`}
         />
+        <small id={`${fieldId}-slug-help`}>
+          Создаётся из заголовка автоматически. При необходимости задайте короткую ссылку вручную.
+        </small>
       </label>
       <label htmlFor={`${fieldId}-summary`}>
         Краткое описание

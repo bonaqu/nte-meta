@@ -648,7 +648,7 @@ export function ContentManager<T extends ManagedItem>({
             onClick={() => setPreviewOpen((current) => !current)}
           >
             <Eye aria-hidden="true" />
-            {previewOpen ? 'Скрыть preview' : 'Предпросмотр'}
+            {previewOpen ? 'Скрыть предпросмотр' : 'Предпросмотр'}
           </button>
         </div>
 
@@ -713,7 +713,13 @@ export function AdminCharactersManager({
           kind: 'text',
           required: true,
         },
-        { name: 'slug', label: 'Slug URL', kind: 'text', required: true },
+        {
+          name: 'slug',
+          label: 'Адрес страницы',
+          kind: 'text',
+          required: true,
+          help: 'Создаётся из названия автоматически. Можно изменить для короткой ссылки.',
+        },
         {
           name: 'rarity',
           label: 'Редкость',
@@ -870,7 +876,13 @@ export function AdminNewsManager({
       supportsPublishing: true,
       fields: [
         { name: 'title', label: 'Заголовок', kind: 'text', required: true },
-        { name: 'slug', label: 'Slug URL', kind: 'text', required: true },
+        {
+          name: 'slug',
+          label: 'Адрес страницы',
+          kind: 'text',
+          required: true,
+          help: 'Создаётся из заголовка автоматически. Можно изменить для короткой ссылки.',
+        },
         {
           name: 'category',
           label: 'Категория',
@@ -1004,7 +1016,13 @@ export function AdminLeaksManager({
           kind: 'text',
           required: true,
         },
-        { name: 'slug', label: 'Slug URL', kind: 'text', required: true },
+        {
+          name: 'slug',
+          label: 'Адрес страницы',
+          kind: 'text',
+          required: true,
+          help: 'Создаётся из заголовка автоматически. Можно изменить для короткой ссылки.',
+        },
         { name: 'summary', label: 'Краткое описание', kind: 'textarea' },
         {
           name: 'body',
@@ -1107,7 +1125,7 @@ export function AdminSourcesManager({
       title: 'Источники',
       singular: 'Источник',
       description:
-        'Список каналов и сайтов для будущей очереди автоматического импорта.',
+        'Проверяемые сайты и каналы, которые помогают редакции собирать данные для импорта.',
       supportsPublishing: false,
       fields: [
         {
@@ -1134,7 +1152,7 @@ export function AdminSourcesManager({
           label: 'URL',
           kind: 'url',
           required: true,
-          help: 'Полная ссылка на источник. Автоимпорт всё равно требует ручного подтверждения.',
+          help: 'Полная ссылка на источник. Любая найденная информация всё равно требует подтверждения редактора.',
         },
         {
           name: 'trustLevel',
@@ -1146,7 +1164,7 @@ export function AdminSourcesManager({
           name: 'autoImportEnabled',
           label: 'Автоимпорт включен',
           kind: 'checkbox',
-          help: 'Пока архитектурный флаг: публикация всё равно требует одобрения.',
+          help: 'Разрешает использовать источник в подсказках импорта. Ничего не публикуется без подтверждения редактора.',
         },
       ],
       empty: () => ({
@@ -1176,7 +1194,7 @@ export function AdminSourcesManager({
       preview: (values) => (
         <article className="cms-article-preview source-preview-card">
           <div className="source-preview-meta" aria-label="Параметры источника">
-            <span>{textValue(values, 'sourceType') || 'manual'}</span>
+            <span>{textValue(values, 'sourceType') || 'вручную'}</span>
             <span className={sourceTrustClass(values.trustLevel)}>
               Доверие: {textValue(values, 'trustLevel') || 'средний'}
             </span>
@@ -1197,12 +1215,12 @@ export function AdminSourcesManager({
               {textValue(values, 'sourceUrl')}
             </a>
           ) : (
-            <p>URL появится после заполнения.</p>
+            <p>Ссылка появится после заполнения.</p>
           )}
           <span>
             {booleanValue(values, 'autoImportEnabled')
-              ? 'Можно использовать в очереди автоимпорта после проверки.'
-              : 'Используется как ручной источник для редакции.'}
+              ? 'Источник участвует в подсказках импорта. Публикация всегда остаётся ручным решением редактора.'
+              : 'Источник используется только для ручной проверки редакцией.'}
           </span>
         </article>
       ),

@@ -4055,6 +4055,14 @@
     font-weight: 800;
   }
 
+  :is(.editor-field-grid, .editor-form) label > small {
+    display: block;
+    color: var(--soft);
+    font-size: 0.78rem;
+    font-weight: 500;
+    line-height: 1.35;
+  }
+
   :is(.editor-field-grid, .collection-row-fields) .wide-field,
   .character-markdown-field {
     grid-column: 1 / -1;

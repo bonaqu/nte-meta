@@ -6,6 +6,14 @@ on:
   pull_request:
     branches: [bonaqu_projects]
   workflow_dispatch:
+    inputs:
+      full_suite:
+        description: Run the full Playwright regression suite
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    - cron: '17 3 * * 0'
 
 permissions:
   contents: read
@@ -37,8 +45,12 @@ jobs:
         run: npm run lint
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
-      - name: Test frontend and API
-        run: npm run test:ui
+      - name: Test baseline frontend and API flows
+        if: github.event_name != 'schedule' && github.event.inputs.full_suite != 'true'
+        run: npm run test:ci
+      - name: Full weekly or manually requested regression
+        if: github.event_name == 'schedule' || github.event.inputs.full_suite == 'true'
+        run: npm run test:full
       - name: Verify production API
         run: |
           test -n "$VITE_API_BASE_URL"
@@ -53,7 +65,7 @@ jobs:
           path: dist
 
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.event_name != 'schedule'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

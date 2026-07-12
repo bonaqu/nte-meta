@@ -1895,6 +1895,22 @@
     background: rgb(0 0 0 / 0.16);
   }
 
+  .cms-list > .panel-title-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .cms-list > .panel-title-row .compact-action {
+    inline-size: 100%;
+    justify-content: center;
+  }
+
+  .cms-editor > .panel-title-row h2 {
+    font-size: 1.35rem;
+    overflow-wrap: anywhere;
+  }
+
   .cms-list > p {
     color: var(--muted);
     font-size: 0.9rem;
@@ -3918,6 +3934,40 @@
 
 .import-suggestion-value p {
   overflow-wrap: anywhere;
+}
+
+.guide-import-panel .import-suggestion {
+  grid-template-columns: minmax(180px, 0.35fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.guide-import-panel .import-suggestion-value,
+.guide-import-panel .import-row-review {
+  grid-column: 1 / -1;
+}
+
+.guide-import-panel .import-suggestion-value {
+  align-items: start;
+}
+
+.import-suggestion-markdown {
+  min-inline-size: 0;
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 0.18);
+}
+
+.import-suggestion-markdown :is(ul, ol) {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-inline-start: 20px;
+}
+
+.import-suggestion-markdown li {
+  color: var(--text);
+  line-height: 1.55;
 }
 
 .import-row-review {

@@ -1964,6 +1964,25 @@ async function refreshCommentScore(env, commentId) {
 
 const IMPORT_SOURCE_TIMEOUT_MS = 7000;
 const IMPORT_MAX_HTML_BYTES = 900000;
+const IMPORT_FETCH_CONCURRENCY = 5;
+const IMPORT_MEDIA_LOOKUP_LIMIT = 6;
+
+async function mapWithConcurrency(items, concurrency, callback) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(Math.max(1, concurrency), items.length) },
+    async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        results[index] = await callback(items[index], index);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return results;
+}
 
 function decodeHtmlEntities(value) {
   return String(value || '')
@@ -2173,12 +2192,12 @@ function normalizeExternalImageUrl(value) {
   const url = String(value || '').trim().replace(/&amp;/g, '&');
   if (!url) return '';
   if (/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) {
-    const [base, query = ''] = url.split('?');
+    const [base] = url.split('?');
     const normalized = base.replace(
       /\/revision\/latest(?:\/(?:scale-to-width-down|smart|thumbnail|width)\/[^/?#]+|\/[^/?#]+)?$/i,
       '/revision/latest',
     );
-    return query ? `${normalized}?${query}` : normalized;
+    return normalized;
   }
   if (url.startsWith('/nte/')) return `https://gamewith.ai${url}`;
   return url;
@@ -2451,8 +2470,9 @@ function guideImportSources(slug, character = {}) {
       name: 'GenshinBuilds NTE RU: гайд',
       trust: 'medium',
       url: `https://genshin-builds.com/ru/neverness-to-everness/characters/${slug}`,
-      parser: parseGenshinBuildsGuideImport,
+      parser: parseEditorialGuideImport,
       extractImages: true,
+      raw: true,
     },
     {
       id: 'gamewith-guide-ru',
@@ -2464,12 +2484,13 @@ function guideImportSources(slug, character = {}) {
       raw: true,
     },
     {
-      id: 'ntewiki-guide-ru',
-      name: 'NTE Wiki RU: гайд',
+      id: 'ntewiki-build-guide-ru',
+      name: 'NTE Wiki RU: билд-гайд',
       trust: 'medium',
-      url: `https://ntewiki.org/ru/characters/${slug}/`,
-      parser: parseNteWikiGuideImport,
+      url: `https://ntewiki.org/ru/blog/${slug}-build-guide-2026/`,
+      parser: parseEditorialGuideImport,
       extractImages: true,
+      raw: true,
     },
   ].map((source) => ({ ...source, character }));
 }
@@ -3461,24 +3482,129 @@ function collectGuideLines(lines, startLabel, stopLabels, limit = 8) {
     .slice(0, limit);
 }
 
-function parseGenshinBuildsGuideImport(text, source, character) {
-  const lines = compactImportLines(text);
-  if (!lines.some((line) => lineMatchesCharacter(line, character))) return [];
+function extractGuideHeadingBlocks(html) {
+  const blocks = [];
+  const expression = /<h([2-4])\b[^>]*>([\s\S]*?)<\/h\1>([\s\S]*?)(?=<h[2-4]\b|$)/gi;
+  for (const match of String(html || '').matchAll(expression)) {
+    blocks.push({
+      level: Number(match[1]),
+      heading: htmlToPlainText(match[2]),
+      lines: compactImportLines(htmlToPlainText(match[3]))
+        .filter((line) => line.length >= 3 && line.length <= 1200)
+        .slice(0, 18),
+    });
+  }
+  return blocks;
+}
 
-  const howToPlay = collectGuideLines(lines, 'How Play', ['Rotations', 'Tips'], 12);
-  const videoUrl = extractYoutubeUrls(text)[0] || '';
-  const rotations = collectGuideLines(lines, 'Rotations', ['Tips', 'Passives'], 8)
-    .filter((line) => /combo|rotation|→|->|skill|attack|ultimate/i.test(line))
-    .map((description, index) => ({
-      title: `Ротация ${index + 1}`,
+function classifyGuideHeading(value) {
+  const heading = normalizeImportSearch(value);
+  const rules = [
+    ['guide.pullAdvice', /стоит ли|pulling advice|pull advice/],
+    ['guide.strengths', /плюс|сильн.*сторон|strength/],
+    ['guide.weaknesses', /минус|слаб.*сторон|weakness/],
+    ['guide.alternativeArcs', /альтернатив|alternative arcs?/],
+    ['guide.bestArcs', /лучш.*дуг|best arcs?/],
+    ['guide.modules', /картридж|модул|cartridge|module layout/],
+    ['guide.mainStats', /основн.*стат|main stats?|приоритет характеристик/],
+    ['guide.subStats', /саб.*стат|дополнительн.*стат|sub.?stats?/],
+    ['guide.teams', /лучш.*команд|лучш.*состав|состав.*(?:команд|для)|отряд|best teams?/],
+    ['guide.rotations', /ротац|rotation/],
+    ['guide.tips', /как играть|совет|механик|приоритет навыков|how to play|tips?/],
+  ];
+  return rules.find(([, pattern]) => pattern.test(heading))?.[0] || '';
+}
+
+function localizeImportedGuideText(value) {
+  const replacements = new Map([
+    ['Baicang', 'Байканг'],
+    ['Hotori', 'Хотори'],
+    ['Nanally', 'Наналли'],
+    ['Sakiri', 'Сакири'],
+    ['Fadia', 'Фадия'],
+    ['Daffodill', 'Даффодил'],
+    ['Hathor', 'Хатор'],
+    ['Jiuyuan', 'Цзююань'],
+    ['Chiz', 'Чиз'],
+    ['Mint', 'Минт'],
+    ['Aurelia', 'Аурелия'],
+    ['Adler', 'Адлер'],
+    ['Skia', 'Ския'],
+    ['Haniel', 'Ханиэль'],
+    ['Edgar', 'Эдгар'],
+    ['Lacrimosa', 'Лакримоза'],
+    ['Esper Zero', 'Нулевой эспер'],
+    ['DPS', 'ДД'],
+    ['ATK', 'АТК'],
+    ['Ultimate', 'сверхспособность'],
+    ['Skill', 'навык'],
+  ]);
+  let result = String(value || '');
+  for (const [source, target] of replacements) {
+    result = result.replace(new RegExp(`\\b${escapeRegExp(source)}\\b`, 'gi'), target);
+  }
+  return result.trim();
+}
+
+function parseEditorialGuideImport(html, source, character) {
+  const plainText = htmlToPlainText(html);
+  if (!compactImportLines(plainText).some((line) => lineMatchesCharacter(line, character))) {
+    return [];
+  }
+
+  const labels = {
+    'guide.pullAdvice': 'Стоит ли качать',
+    'guide.strengths': 'Плюсы',
+    'guide.weaknesses': 'Минусы',
+    'guide.bestArcs': 'Лучшие дуги',
+    'guide.alternativeArcs': 'Альтернативные дуги',
+    'guide.modules': 'Модули и картриджи',
+    'guide.mainStats': 'Основные статы',
+    'guide.subStats': 'Саб-статы',
+    'guide.teams': 'Лучшие команды',
+    'guide.rotations': 'Ротации',
+    'guide.tips': 'Советы и механики',
+  };
+  const rowsByField = new Map();
+  let inheritedField = '';
+
+  for (const block of extractGuideHeadingBlocks(html)) {
+    const directField = classifyGuideHeading(block.heading);
+    if (directField) inheritedField = directField;
+    else if (block.level === 2) inheritedField = '';
+    const field = directField || inheritedField;
+    if (!field || !block.lines.length) continue;
+    const heading = localizeImportedGuideText(block.heading);
+    const description = localizeImportedGuideText(block.lines.join(' '));
+    if (!hasRussianText(`${heading} ${description}`)) continue;
+    const rows = rowsByField.get(field) || [];
+    rows.push({
+      title: hasRussianText(heading) ? heading : labels[field],
       description,
-    }));
-  const tips = collectGuideLines(lines, 'Tips', ['Passives', 'Awakening'], 8);
-  return [
-    makeImportSuggestion('guide.videoUrl', 'Видео-гайд', videoUrl, source, 'medium'),
-    makeImportSuggestion('guide.tips', 'Советы по механике', [...howToPlay, ...tips], source, 'medium'),
-    makeImportSuggestion('guide.rotations', 'Ротации из внешнего гайда', rotations, source, 'medium'),
-  ].filter(Boolean);
+    });
+    rowsByField.set(field, rows);
+  }
+
+  const suggestions = [...rowsByField].map(([field, rows]) =>
+    makeImportSuggestion(
+      field,
+      labels[field],
+      rows,
+      source,
+      source.trust === 'high' ? 'high' : 'medium',
+      'Это материал внешнего гайда. Подтвердите факты, формулировки и актуальность патча перед публикацией.',
+    ),
+  );
+  suggestions.push(
+    makeImportSuggestion(
+      'guide.videoUrl',
+      'Видео-гайд',
+      extractYoutubeUrls(html)[0] || '',
+      source,
+      'medium',
+    ),
+  );
+  return suggestions.filter(Boolean);
 }
 
 function parseGameWithGuideImport(text, source, character) {
@@ -3487,19 +3613,9 @@ function parseGameWithGuideImport(text, source, character) {
   const lines = compactImportLines(plainText);
   if (!lines.some((line) => lineMatchesCharacter(line, character))) return [];
   const videoUrl = extractYoutubeUrls(text)[0] || '';
-  const awakenings = collectGuideLines(lines, 'Эффекты резонанса', ['Любимые подарки'], 12)
-    .join(' ')
-    .match(/C\d\s+[^C]+/g);
   return [
     ...structured,
     makeImportSuggestion('guide.videoUrl', 'Видео-гайд', videoUrl, source, 'medium'),
-    makeImportSuggestion(
-      'guide.awakenings',
-      'Пробуждения и резонансы',
-      awakenings || [],
-      source,
-      'medium',
-    ),
   ].filter(Boolean);
 }
 
@@ -3531,27 +3647,6 @@ function parseGameWithStructuredGuideImport(text, source, character) {
         },
       ]
     : [];
-  const mechanics = parseGameWithStructuredAbilities(item)
-    .filter((ability) => ability.name && ability.name !== 'Не введено')
-    .slice(0, 8)
-    .map((ability) => ({
-      title: `${ability.type}: ${ability.name}`,
-      description: ability.description,
-      iconUrl: ability.iconUrl,
-    }));
-  const awakenings = parseGameWithStructuredAwakenings(item).map((awakening) => ({
-    title: `C${awakening.level}: ${awakening.name}`,
-    description: awakening.description,
-    iconUrl: awakening.iconUrl,
-  }));
-  const materials = collectGameWithStructuredMaterials(item)
-    .slice(0, 24)
-    .map((material) => ({
-      name: material.name,
-      value: `${material.source}: ${material.amount}`,
-      iconUrl: material.iconUrl,
-    }));
-
   return [
     makeImportSuggestion(
       'guide.bestArcs',
@@ -3560,51 +3655,6 @@ function parseGameWithStructuredGuideImport(text, source, character) {
       source,
       'medium',
       'Это не автоматический BiS-рейтинг: проверьте дугу и итоговую рекомендацию вручную.',
-    ),
-    makeImportSuggestion(
-      'guide.tips',
-      'Ключевые механики и навыки',
-      mechanics,
-      source,
-      'medium',
-      'Описание навыков можно использовать как черновик раздела механик; редактор должен добавить практические выводы.',
-    ),
-    makeImportSuggestion(
-      'guide.awakenings',
-      'Пробуждения',
-      awakenings,
-      source,
-      'medium',
-    ),
-    makeImportSuggestion(
-      'guide.materials',
-      'Материалы прокачки',
-      materials,
-      source,
-      'medium',
-      'Материалы относятся к прогрессии персонажа и полезны как справочный блок в гайде.',
-    ),
-  ].filter(Boolean);
-}
-
-function parseNteWikiGuideImport(text, source, character) {
-  const lines = compactImportLines(text);
-  if (!lines.some((line) => lineMatchesCharacter(line, character))) return [];
-  const videoUrl = extractYoutubeUrls(text)[0] || '';
-  const skillNames = lines
-    .filter((line) => /Детали$/.test(line))
-    .map((line) => line.replace(/\s+Детали$/, '').trim())
-    .filter(Boolean)
-    .slice(0, 8);
-  return [
-    makeImportSuggestion('guide.videoUrl', 'Видео-гайд', videoUrl, source, 'low'),
-    makeImportSuggestion(
-      'guide.tips',
-      'Названия навыков для сверки',
-      skillNames,
-      source,
-      'low',
-      'Используйте только как чек-лист названий, описания сверяйте отдельно.',
     ),
   ].filter(Boolean);
 }
@@ -4498,33 +4548,12 @@ function buildKnownVoiceMediaSource(character) {
     trust: 'medium',
     url: sourceInfo.url,
   };
-  const voiceLines = ['Английский', 'Японский', 'Корейский', 'Китайский'].map(
-    (language) => ({
-      id: crypto.randomUUID(),
-      title: `${sourceInfo.title} — ${language}`,
-      language,
-      audioUrl: '',
-      sourceUrl: sourceInfo.url,
-      description:
-        'Видео-источник для ручной проверки реплик. Прямой аудиофайл редактор добавляет отдельно.',
-    }),
-  );
-
   return {
     ...source,
-    status: 'partial',
+    status: 'reference',
     message:
-      'Найден внешний источник записей. Это не прямой audio URL; требуется ручная проверка редактором.',
-    suggestions: [
-      makeImportSuggestion(
-        'profile.voiceLines',
-        'Источники реплик',
-        voiceLines,
-        source,
-        'low',
-        'Видео нельзя автоматически использовать как аудиофайл; добавьте прямые файлы только после проверки прав и качества.',
-      ),
-    ],
+      `Найден видео-справочник «${sourceInfo.title}». Язык отдельных реплик и права на аудиофайлы источник не подтверждает, поэтому строки не создаются автоматически.`,
+    suggestions: [],
   };
 }
 
@@ -5022,13 +5051,17 @@ function dedupeImportSuggestions(items) {
 
 function dedupeGuideImportSuggestions(items) {
   const limits = {
+    'guide.pullAdvice': 6,
+    'guide.strengths': 12,
+    'guide.weaknesses': 12,
     'guide.bestArcs': 12,
     'guide.alternativeArcs': 12,
+    'guide.modules': 16,
+    'guide.mainStats': 12,
+    'guide.subStats': 12,
     'guide.rotations': 20,
     'guide.tips': 24,
-    'guide.materials': 40,
     'guide.teams': 16,
-    'guide.awakenings': 7,
   };
   const grouped = new Map();
   for (const item of items) {
@@ -5054,10 +5087,13 @@ function dedupeGuideImportSuggestions(items) {
       const value = parseImportSuggestionJson(candidate);
       if (!Array.isArray(value)) continue;
       for (const entry of value) {
-        const key = normalizeImportSearch(
+        const primaryText =
           typeof entry === 'string'
             ? entry
-            : entry?.name || entry?.title || entry?.label || entry?.description || '',
+            : entry?.name || entry?.title || entry?.label || entry?.description || '';
+        if (!hasRussianText(primaryText)) continue;
+        const key = normalizeImportSearch(
+          primaryText,
         );
         if (!key) continue;
         const current = rows.get(key);
@@ -5120,7 +5156,7 @@ function collectImportMediaLookupNames(items) {
     }
   }
 
-  return names.slice(0, 30);
+  return names.slice(0, IMPORT_MEDIA_LOOKUP_LIMIT);
 }
 
 async function fetchFandomMediaLookupSource(items) {
@@ -5141,8 +5177,10 @@ async function fetchFandomMediaLookupSource(items) {
   }
 
   const imageMap = {};
-  await Promise.all(
-    names.map(async (name) => {
+  await mapWithConcurrency(
+    names,
+    3,
+    async (name) => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), IMPORT_SOURCE_TIMEOUT_MS);
       try {
@@ -5177,7 +5215,7 @@ async function fetchFandomMediaLookupSource(items) {
       } finally {
         clearTimeout(timeout);
       }
-    }),
+    },
   );
 
   const suggestion = makeImportSuggestion('__imageMap', 'Индекс иконок', imageMap, source, 'low');
@@ -5217,18 +5255,15 @@ async function handleCharacterImportLookup(request, env) {
       },
     });
   }
-  const sourceResults = await Promise.all(
-    characterImportSources(slug, {
+  const importCharacter = {
       name: character.name || query,
       originalName: character.original_name || query,
       slug,
-    }).map((source) =>
-      fetchImportSource(source, {
-        name: character.name || query,
-        originalName: character.original_name || query,
-        slug,
-      }),
-    ),
+    };
+  const sourceResults = await mapWithConcurrency(
+    characterImportSources(slug, importCharacter),
+    IMPORT_FETCH_CONCURRENCY,
+    (source) => fetchImportSource(source, importCharacter),
   );
   const voiceActorSource = buildKnownVoiceActorSource({
     name: character.name || query,
@@ -5328,10 +5363,10 @@ async function handleGuideImportLookup(request, env) {
     originalName: character.original_name || query,
     slug,
   };
-  const sourceResults = await Promise.all(
-    guideImportSources(slug, importCharacter).map((source) =>
-      fetchImportSource(source, importCharacter),
-    ),
+  const sourceResults = await mapWithConcurrency(
+    guideImportSources(slug, importCharacter),
+    IMPORT_FETCH_CONCURRENCY,
+    (source) => fetchImportSource(source, importCharacter),
   );
   const suggestions = dedupeGuideImportSuggestions(
     sourceResults.flatMap((source) => source.suggestions),
@@ -5963,8 +5998,14 @@ function normalizeCharacterProfile(value) {
     if (result.length > max) throwHttp('Поле профиля слишком длинное', 400);
     return result;
   };
-  const url = (input) => {
-    const result = text(input, 1000);
+  const url = (input, label = 'URL медиа') => {
+    const result = String(input || '').trim();
+    if (result.length > 4096) {
+      throwHttp(
+        `${label} слишком длинный. Используйте прямую ссылку на файл до 4096 символов.`,
+        400,
+      );
+    }
     if (result) validateResourceUrl(result, 'profile URL');
     return result;
   };
@@ -5978,7 +6019,7 @@ function normalizeCharacterProfile(value) {
     return {
       level,
       rewardName: text(item.rewardName, 160),
-      rewardIconUrl: url(item.rewardIconUrl),
+      rewardIconUrl: url(item.rewardIconUrl, 'URL иконки награды симпатии'),
       description: text(item.description, 2000),
     };
   });
@@ -6009,7 +6050,7 @@ function normalizeCharacterProfile(value) {
     ),
     roleIcons: collection('roleIcons', 12, (item) => ({
       name: text(item.name, 80),
-      iconUrl: url(item.iconUrl),
+      iconUrl: url(item.iconUrl, 'URL иконки пробуждения'),
     })).filter((item) => item.name && item.iconUrl),
     voiceActors: collection('voiceActors', 12, (item) => ({
       language: text(item.language, 40),

@@ -3663,14 +3663,14 @@ const adminTabs = [
 ] as const;
 
 const adminLabels: Record<(typeof adminTabs)[number], string> = {
-  dashboard: 'Dashboard',
+  dashboard: 'Обзор',
   comments: 'Комментарии',
   warnings: 'Предупреждения',
   users: 'Пользователи',
   settings: 'Настройки',
   sources: 'Источники',
   system: 'Статус API/D1',
-  audit: 'Audit log',
+  audit: 'Журнал действий',
 };
 
 const adminTabRole: Record<(typeof adminTabs)[number], User['role']> = {
@@ -4340,14 +4340,18 @@ function formatGuideImportValue(value: string) {
 
 function getGuideImportFieldLabel(field: string) {
   const labels: Record<string, string> = {
+    'guide.pullAdvice': 'Секция: стоит ли качать',
+    'guide.strengths': 'Секция: плюсы',
+    'guide.weaknesses': 'Секция: минусы',
     'guide.bestArcs': 'Секция: лучшие дуги',
     'guide.alternativeArcs': 'Секция: альтернативные дуги',
+    'guide.modules': 'Секция: модули и картриджи',
+    'guide.mainStats': 'Секция: основные статы',
+    'guide.subStats': 'Секция: саб-статы',
     'guide.rotations': 'Секция: ротации',
     'guide.tips': 'Секция: советы и механики',
-    'guide.materials': 'Секция: материалы прокачки',
     'guide.teams': 'Секция: команды',
     'guide.videoUrl': 'Поле: видео-гайд',
-    'guide.awakenings': 'Секция: пробуждения',
   };
   return labels[field] || 'Секция гайда';
 }
@@ -4969,17 +4973,21 @@ function AdminGuides({
 
     const guideImportSections: Record<string, { title: string; type: string }> =
       {
+        'guide.pullAdvice': { title: 'Стоит ли качать', type: 'pull-advice' },
+        'guide.strengths': { title: 'Плюсы', type: 'strengths' },
+        'guide.weaknesses': { title: 'Минусы', type: 'weaknesses' },
         'guide.bestArcs': { title: 'Лучшие дуги', type: 'best-arcs' },
         'guide.alternativeArcs': {
           title: 'Альтернативные дуги',
           type: 'alternative-arcs',
         },
+        'guide.modules': { title: 'Модули и картриджи', type: 'modules' },
+        'guide.mainStats': { title: 'Основные статы', type: 'main-stats' },
+        'guide.subStats': { title: 'Саб-статы', type: 'sub-stats' },
         'guide.rotations': { title: 'Ротации', type: 'rotation' },
         'guide.tips': { title: 'Советы и механики', type: 'tips' },
-        'guide.materials': { title: 'Материалы прокачки', type: 'progression' },
         'guide.teams': { title: 'Лучшие команды', type: 'teams' },
         'guide.videoUrl': { title: 'Видео-гайд', type: 'video' },
-        'guide.awakenings': { title: 'Пробуждения и резонансы', type: 'awakening' },
       };
     const sectionConfig = guideImportSections[suggestion.field] || {
       title: 'Импортированные заметки',
@@ -5462,10 +5470,11 @@ function AdminGuides({
       <section className="import-review-panel guide-import-panel" aria-label="Автоимпорт гайда">
         <div>
           <p className="eyebrow">Источники гайда</p>
-          <h3>Автозаполнение мета-блоков</h3>
+          <h3>Подсказки именно для гайда</h3>
           <p>
-            Найдите внешние подсказки по дугам, тиру и заметкам гайда. Каждая строка
-            добавляется только после ручного подтверждения.
+            Поиск проверяет билд-гайды: плюсы и минусы, дуги, модули, статы,
+            команды, ротации, советы и видео. Данные профиля персонажа сюда не
+            переносятся. Каждая строка добавляется только после подтверждения.
           </p>
         </div>
         <button
@@ -5532,7 +5541,9 @@ function AdminGuides({
                         <span>Нажмите на превью, чтобы открыть оригинал</span>
                         </div>
                       ) : null}
-                      <p>{formatGuideImportValue(suggestion.value)}</p>
+                      <div className="import-suggestion-markdown">
+                        <MarkdownPreview value={formatGuideImportValue(suggestion.value)} />
+                      </div>
                       {rowSuggestions.length ? (
                         <div
                           className="import-row-review"
@@ -6881,6 +6892,21 @@ function AdminTierlists({
   );
 }
 
+const moderationTargetLabels: Record<string, string> = {
+  site: 'Сайт',
+  character: 'Персонаж',
+  guide: 'Гайд',
+  news: 'Новость',
+  leak: 'Слив',
+  thread: 'Обсуждение',
+};
+
+const moderationStatusLabels: Record<string, string> = {
+  visible: 'Виден',
+  moderated: 'Скрыт',
+  deleted: 'Удалён',
+};
+
 function AdminComments({ data, user }: { data: SiteData; user: User }) {
   const [comments, setComments] = useState<Comment[]>(
     data.comments.map((comment) => ({
@@ -6992,7 +7018,11 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
             <div className="comment-heading">
               <strong>{comment.author}</strong>
               <span>
-                {comment.targetType} · {comment.status || 'visible'}
+                {moderationTargetLabels[comment.targetType] || comment.targetType}
+                {' · '}
+                {moderationStatusLabels[comment.status || 'visible'] ||
+                  comment.status ||
+                  'Виден'}
               </span>
             </div>
             <p>{comment.body}</p>

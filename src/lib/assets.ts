@@ -26,7 +26,7 @@ export function normalizeExternalAssetUrl(value?: string | null) {
   if (!url) return '';
 
   if (/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) {
-    const [base, query = ''] = url.split('?');
+    const [base] = url.split('?');
     const normalized = base
       .replace(
         /\/revision\/latest(?:\/(?:scale-to-width-down|smart|thumbnail|width)\/[^/?#]+|\/[^/?#]+)?$/i,
@@ -34,7 +34,7 @@ export function normalizeExternalAssetUrl(value?: string | null) {
       )
       .replace(/\/revision\/latest\/width\/[^/?#]+$/i, '/revision/latest')
       .replace(/\/revision\/latest\/[^/?#]+$/i, '/revision/latest');
-    return query ? `${normalized}?${query}` : normalized;
+    return normalized;
   }
 
   return url;

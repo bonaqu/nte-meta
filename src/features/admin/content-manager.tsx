@@ -136,6 +136,19 @@ function sourceTrustClass(value: unknown) {
   return 'trust-medium';
 }
 
+const sourceTypeOptions: FieldOption[] = [
+  { value: 'website', label: 'Сайт' },
+  { value: 'youtube', label: 'YouTube' },
+  { value: 'telegram', label: 'Telegram' },
+  { value: 'twitter/x', label: 'X / Twitter' },
+  { value: 'manual', label: 'Ручной источник' },
+];
+
+function sourceTypeLabel(value: unknown) {
+  const type = String(value || 'manual');
+  return sourceTypeOptions.find((option) => option.value === type)?.label || type;
+}
+
 function FieldControl({
   field,
   values,
@@ -1140,13 +1153,7 @@ export function AdminSourcesManager({
           name: 'sourceType',
           label: 'Тип',
           kind: 'select',
-          options: options([
-            'telegram',
-            'website',
-            'youtube',
-            'twitter/x',
-            'manual',
-          ]),
+          options: sourceTypeOptions,
         },
         {
           name: 'sourceUrl',
@@ -1185,7 +1192,7 @@ export function AdminSourcesManager({
       }),
       itemTitle: (item) => item.sourceName,
       itemMeta: (item) =>
-        `${item.sourceType} · доверие: ${item.trustLevel} · ${
+        `${sourceTypeLabel(item.sourceType)} · доверие: ${item.trustLevel} · ${
           item.autoImportEnabled ? 'автоимпорт включён' : 'ручная проверка'
         }`,
       itemClassName: (item) =>
@@ -1195,7 +1202,7 @@ export function AdminSourcesManager({
       preview: (values) => (
         <article className="cms-article-preview source-preview-card">
           <div className="source-preview-meta" aria-label="Параметры источника">
-            <span>{textValue(values, 'sourceType') || 'вручную'}</span>
+            <span>{sourceTypeLabel(values.sourceType)}</span>
             <span className={sourceTrustClass(values.trustLevel)}>
               Доверие: {textValue(values, 'trustLevel') || 'средний'}
             </span>

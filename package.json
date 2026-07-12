@@ -9,6 +9,8 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview --host 127.0.0.1",
     "test:ui": "playwright test",
+    "test:ci": "playwright test tests/smoke.spec.ts tests/portal.spec.ts tests/api.spec.ts --grep \"renders starter app|главная показывает живой meta-dashboard без ошибок|отряды и ротации находятся внутри гайда, тир-лист единый|публичные коллекции доступны с безопасными заголовками\"",
+    "test:full": "playwright test",
     "test:prepare-db": "node scripts/prepare-test-db.mjs",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy",

@@ -811,6 +811,7 @@ export function AdminCharactersManager({
               alt=""
               width="300"
               height="380"
+              referrerPolicy="no-referrer"
             />
           ) : null}
           <div>

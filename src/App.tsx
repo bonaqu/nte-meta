@@ -1561,6 +1561,7 @@ function TierPreview({ grouped }: { grouped: Record<Tier, Character[]> }) {
                   width="58"
                   height="58"
                   loading="lazy"
+                  referrerPolicy="no-referrer"
                 />
               </a>
             ))}
@@ -2036,6 +2037,7 @@ function CharacterDetailPage({
                         width="64"
                         height="64"
                         loading="lazy"
+                        referrerPolicy="no-referrer"
                       />
                     ) : (
                       <BookOpen aria-hidden="true" />
@@ -2079,6 +2081,7 @@ function CharacterDetailPage({
                       width="58"
                       height="58"
                       loading="lazy"
+                      referrerPolicy="no-referrer"
                     />
                   ) : null}
                   <div>
@@ -2119,6 +2122,7 @@ function CharacterDetailPage({
                     width="54"
                     height="54"
                     loading="lazy"
+                    referrerPolicy="no-referrer"
                   />
                 ) : null}
                 <div>
@@ -2144,6 +2148,7 @@ function CharacterDetailPage({
                       width="48"
                       height="48"
                       loading="lazy"
+                      referrerPolicy="no-referrer"
                     />
                   ) : null}
                   <div>
@@ -2167,6 +2172,7 @@ function CharacterDetailPage({
                     width="54"
                     height="54"
                     loading="lazy"
+                    referrerPolicy="no-referrer"
                   />
                 ) : null}
                 <div>
@@ -2192,6 +2198,7 @@ function CharacterDetailPage({
                     width="320"
                     height="420"
                     loading="lazy"
+                    referrerPolicy="no-referrer"
                   />
                 ) : null}
                 <h3>{skin.name}</h3>
@@ -2659,6 +2666,7 @@ function TeamCard({
                 width="54"
                 height="54"
                 loading="lazy"
+                referrerPolicy="no-referrer"
               />
               <span>{member.role}</span>
             </a>
@@ -3385,6 +3393,7 @@ function NewsDetailPage({
             width="1280"
             height="720"
             fetchPriority="high"
+            referrerPolicy="no-referrer"
           />
           <div>
             <p className="eyebrow">{item.category}</p>
@@ -6717,6 +6726,7 @@ function AdminTierlists({
                         width="62"
                         height="62"
                         loading="lazy"
+                        referrerPolicy="no-referrer"
                       />
                       <span>{character.name}</span>
                     </button>
@@ -6769,6 +6779,7 @@ function AdminTierlists({
                   width="56"
                   height="56"
                   loading="lazy"
+                  referrerPolicy="no-referrer"
                 />
                 <strong>{character.name}</strong>
                 <label>

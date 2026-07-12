@@ -6055,8 +6055,8 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
         biography_markdown, trivia_markdown, role_tags_json,
         voice_actors_json, materials_json, base_stats_json,
         abilities_json, skins_json, friendship_json, gifts_json,
-        voice_lines_json, awakenings_json, consoles_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        voice_lines_json, awakenings_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(character_id) DO UPDATE SET
         faction = excluded.faction,
         arc_type = excluded.arc_type,
@@ -6075,7 +6075,6 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
            gifts_json = excluded.gifts_json,
            voice_lines_json = excluded.voice_lines_json,
            awakenings_json = excluded.awakenings_json,
-           consoles_json = excluded.consoles_json,
            updated_at = current_timestamp`,
       ).bind(
         entityId,
@@ -6096,7 +6095,6 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
         JSON.stringify(profile.gifts),
         JSON.stringify(profile.voiceLines),
         JSON.stringify(profile.awakenings),
-        JSON.stringify([]),
       ),
     );
   }

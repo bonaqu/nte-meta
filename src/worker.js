@@ -4984,16 +4984,69 @@ function dedupeImportSuggestions(items) {
 }
 
 function dedupeGuideImportSuggestions(items) {
-  const seen = new Set();
-  return items.filter((item) => {
-    if (!item || !(item.field.startsWith('guide.') || item.field === 'tier')) {
-      return false;
+  const limits = {
+    'guide.bestArcs': 12,
+    'guide.alternativeArcs': 12,
+    'guide.rotations': 20,
+    'guide.tips': 24,
+    'guide.materials': 40,
+    'guide.teams': 16,
+    'guide.awakenings': 7,
+  };
+  const grouped = new Map();
+  for (const item of items) {
+    if (!item?.field?.startsWith('guide.')) continue;
+    const current = grouped.get(item.field) || [];
+    current.push(item);
+    grouped.set(item.field, current);
+  }
+
+  const result = [];
+  for (const [field, candidates] of grouped) {
+    const sorted = [...candidates].sort(
+      (left, right) => importSuggestionScore(right) - importSuggestionScore(left),
+    );
+    if (field === 'guide.videoUrl') {
+      const best = sorted.find((item) => isUsefulImportCollectionValue(item.value));
+      if (best) result.push(best);
+      continue;
     }
-    const key = `${item.field}:${item.value}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+
+    const rows = new Map();
+    for (const candidate of sorted) {
+      const value = parseImportSuggestionJson(candidate);
+      if (!Array.isArray(value)) continue;
+      for (const entry of value) {
+        const key = normalizeImportSearch(
+          typeof entry === 'string'
+            ? entry
+            : entry?.name || entry?.title || entry?.label || entry?.description || '',
+        );
+        if (!key) continue;
+        const current = rows.get(key);
+        rows.set(key, current ? mergeImportCollectionEntry(current, entry) : entry);
+      }
+    }
+    if (!rows.size) {
+      if (sorted[0]) result.push(sorted[0]);
+      continue;
+    }
+
+    const merged = [...rows.values()].slice(0, limits[field] || 24);
+    const cleanValue = JSON.stringify(merged);
+    const sourceNames = [...new Set(sorted.map((item) => item.sourceName).filter(Boolean))];
+    result.push({
+      id: `merged:${field}:${hashText(cleanValue).slice(0, 10)}`,
+      field,
+      label: sorted[0].label,
+      value: cleanValue,
+      sourceName: 'Сводка проверенных источников',
+      sourceUrl: sorted[0].sourceUrl,
+      confidence: sorted[0].confidence,
+      note: `Источники: ${sourceNames.join(', ')}. Добавляйте только подтверждённые строки; место персонажа берётся из единого тир-листа NTE Meta.`,
+    });
+  }
+  return result;
 }
 
 function collectImportMediaLookupNames(items) {

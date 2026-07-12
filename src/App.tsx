@@ -4305,7 +4305,6 @@ function getGuideImportFieldLabel(field: string) {
     'guide.teams': 'Секция: команды',
     'guide.videoUrl': 'Поле: видео-гайд',
     'guide.awakenings': 'Секция: пробуждения',
-    tier: 'Секция: краткий вывод',
   };
   return labels[field] || 'Секция гайда';
 }
@@ -4938,7 +4937,6 @@ function AdminGuides({
         'guide.teams': { title: 'Лучшие команды', type: 'teams' },
         'guide.videoUrl': { title: 'Видео-гайд', type: 'video' },
         'guide.awakenings': { title: 'Пробуждения и резонансы', type: 'awakening' },
-        tier: { title: 'TL;DR / короткий вывод', type: 'summary' },
       };
     const sectionConfig = guideImportSections[suggestion.field] || {
       title: 'Импортированные заметки',

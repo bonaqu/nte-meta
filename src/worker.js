@@ -4669,6 +4669,175 @@ function abilityDescriptionScore(ability) {
   return Math.min(description.length, 1200);
 }
 
+const IMPORT_CONFIDENCE_WEIGHT = { high: 30, medium: 20, low: 10 };
+
+function importSuggestionSourceWeight(item) {
+  const source = `${item.sourceName} ${item.sourceUrl}`.toLocaleLowerCase('ru-RU');
+  if (item.field === 'profile.biography' || item.field === 'profile.biographyShort') {
+    if (source.includes('официаль')) return 120;
+    if (source.includes('fandom ru')) return 115;
+    if (source.includes('gamewith')) return 75;
+    if (source.includes('genshinbuilds')) return 50;
+  }
+  if (
+    item.field === 'profile.arcType' ||
+    item.field === 'profile.faction' ||
+    item.field === 'profile.roleTags'
+  ) {
+    if (source.includes('fandom ru')) return 120;
+    if (source.includes('официаль')) return 110;
+  }
+  if (item.field === 'imageUrl' || item.field === 'splashUrl') {
+    if (source.includes('медиатека персонажа')) return 125;
+    if (source.includes('изображения')) return 120;
+    if (source.includes('fandom ru')) return 110;
+  }
+  if (source.includes('официаль')) return 100;
+  if (source.includes('медиатека персонажа')) return 98;
+  if (source.includes('fandom ru')) return 95;
+  if (source.includes('gamewith')) return 90;
+  if (source.includes('nte wiki')) return 70;
+  if (source.includes('genshinbuilds')) return 60;
+  if (source.includes('icy') || source.includes('kaiden')) return 45;
+  return 50;
+}
+
+function importSuggestionScore(item) {
+  return (
+    importSuggestionSourceWeight(item) +
+    (IMPORT_CONFIDENCE_WEIGHT[item.confidence] || 0)
+  );
+}
+
+const PROFILE_COLLECTION_MERGE_CONFIGS = [
+  {
+    field: 'profile.roleTags',
+    label: 'Роли персонажа',
+    limit: 12,
+    key: (entry) => normalizeImportSearch(entry),
+  },
+  {
+    field: 'profile.voiceActors',
+    label: 'Актёры озвучки',
+    limit: 12,
+    key: (entry) => normalizeImportSearch(entry?.language),
+  },
+  {
+    field: 'profile.materials',
+    label: 'Материалы прокачки',
+    limit: 80,
+    key: (entry) => normalizeImportSearch(entry?.name),
+  },
+  {
+    field: 'profile.baseStats',
+    label: 'Начальные показатели',
+    limit: 40,
+    key: (entry) => normalizeImportSearch(entry?.label),
+  },
+  {
+    field: 'profile.awakenings',
+    label: 'Пробуждения',
+    limit: 7,
+    key: (entry) => `level:${Number(entry?.level)}`,
+    sort: (left, right) => Number(left?.level) - Number(right?.level),
+  },
+  {
+    field: 'profile.friendship',
+    label: 'Симпатия',
+    limit: 10,
+    key: (entry) => `level:${Number(entry?.level)}`,
+    sort: (left, right) => Number(left?.level) - Number(right?.level),
+  },
+  {
+    field: 'profile.gifts',
+    label: 'Любимые подарки',
+    limit: 30,
+    key: (entry) => normalizeImportSearch(entry?.name),
+  },
+  {
+    field: 'profile.skins',
+    label: 'Гардероб',
+    limit: 30,
+    key: (entry) => normalizeImportSearch(entry?.name),
+  },
+  {
+    field: 'profile.voiceLines',
+    label: 'Реплики озвучки',
+    limit: 200,
+    key: (entry) =>
+      `${normalizeImportSearch(entry?.language)}:${normalizeImportSearch(entry?.title)}`,
+  },
+];
+
+function isUsefulImportCollectionValue(value) {
+  const text = String(value || '').trim();
+  return Boolean(text && !/требует проверки|не найден|undefined|null/i.test(text));
+}
+
+function mergeImportCollectionEntry(primary, fallback) {
+  if (typeof primary === 'string' || typeof fallback === 'string') {
+    return primary || fallback;
+  }
+  const merged = { ...fallback, ...primary };
+  for (const key of new Set([
+    ...Object.keys(fallback || {}),
+    ...Object.keys(primary || {}),
+  ])) {
+    const current = primary?.[key];
+    const candidate = fallback?.[key];
+    if (!isUsefulImportCollectionValue(current) && isUsefulImportCollectionValue(candidate)) {
+      merged[key] = candidate;
+      continue;
+    }
+    if (
+      ['description', 'source', 'effect'].includes(key) &&
+      isUsefulImportCollectionValue(candidate) &&
+      String(candidate).length > String(current || '').length
+    ) {
+      merged[key] = candidate;
+    }
+  }
+  return merged;
+}
+
+function mergeProfileCollectionImportSuggestions(items, config) {
+  const candidates = items
+    .filter((item) => item?.field === config.field)
+    .map((item) => ({ item, value: parseImportSuggestionJson(item) }))
+    .filter(({ value }) => Array.isArray(value) && value.length)
+    .sort((left, right) => importSuggestionScore(right.item) - importSuggestionScore(left.item));
+  if (candidates.length < 2) return null;
+
+  const rows = new Map();
+  for (const candidate of candidates) {
+    for (const entry of candidate.value) {
+      const key = config.key(entry);
+      if (!key || /level:nan$/.test(key)) continue;
+      const current = rows.get(key);
+      rows.set(key, current ? mergeImportCollectionEntry(current, entry) : entry);
+    }
+  }
+  const merged = [...rows.values()];
+  if (config.sort) merged.sort(config.sort);
+  const limited = merged.slice(0, config.limit);
+  if (!limited.length) return null;
+
+  const cleanValue = JSON.stringify(limited);
+  const sourceNames = [...new Set(
+    candidates.map(({ item }) => item.sourceName).filter(Boolean),
+  )];
+  return {
+    id: `merged:${config.field}:${hashText(cleanValue).slice(0, 10)}`,
+    field: config.field,
+    label: config.label,
+    value: cleanValue,
+    sourceName: 'Сводка проверенных источников',
+    sourceUrl: candidates[0].item.sourceUrl,
+    confidence: 'high',
+    note: `Источники: ${sourceNames.join(', ')}. Более надёжные значения сохранены, а пустые описания и медиа дополнены. Подтвердите каждую строку отдельно.`,
+  };
+}
+
 function mergeAbilityImportSuggestions(items) {
   const abilityItems = items
     .filter((item) => item?.field === 'profile.abilities')
@@ -4744,10 +4913,20 @@ function enrichCharacterImportSuggestions(items) {
   const imageMap = importImageMapFromSuggestions(items);
   const enriched = items.map((item) => enrichArraySuggestionMedia(item, imageMap));
   const mergedAbilities = mergeAbilityImportSuggestions(enriched);
-  if (!mergedAbilities) return enriched;
+  const mergedCollections = PROFILE_COLLECTION_MERGE_CONFIGS.map((config) =>
+    mergeProfileCollectionImportSuggestions(enriched, config),
+  ).filter(Boolean);
+  const mergedFields = new Set(mergedCollections.map((item) => item.field));
   return [
-    ...enriched.filter((item) => item?.field !== 'profile.abilities'),
-    enrichArraySuggestionMedia(mergedAbilities, imageMap),
+    ...enriched.filter(
+      (item) =>
+        (!mergedAbilities || item?.field !== 'profile.abilities') &&
+        !mergedFields.has(item?.field),
+    ),
+    ...(mergedAbilities
+      ? [enrichArraySuggestionMedia(mergedAbilities, imageMap)]
+      : []),
+    ...mergedCollections.map((item) => enrichArraySuggestionMedia(item, imageMap)),
   ];
 }
 
@@ -4775,36 +4954,8 @@ function dedupeImportSuggestions(items) {
     'profile.friendship',
     'profile.gifts',
     'profile.skins',
+    'profile.voiceLines',
   ]);
-  const confidenceWeight = { high: 30, medium: 20, low: 10 };
-  const sourceWeight = (item) => {
-    const source = `${item.sourceName} ${item.sourceUrl}`.toLocaleLowerCase('ru-RU');
-    if (item.field === 'profile.biography' || item.field === 'profile.biographyShort') {
-      if (source.includes('официаль')) return 120;
-      if (source.includes('fandom ru')) return 115;
-      if (source.includes('gamewith')) return 75;
-      if (source.includes('genshinbuilds')) return 50;
-    }
-    if (item.field === 'profile.arcType' || item.field === 'profile.faction' || item.field === 'profile.roleTags') {
-      if (source.includes('fandom ru')) return 120;
-      if (source.includes('официаль')) return 110;
-    }
-    if (item.field === 'imageUrl' || item.field === 'splashUrl') {
-      if (source.includes('медиатека персонажа')) return 125;
-      if (source.includes('изображения')) return 120;
-      if (source.includes('fandom ru')) return 110;
-    }
-    if (source.includes('официаль')) return 100;
-    if (source.includes('медиатека персонажа')) return 98;
-    if (source.includes('fandom ru')) return 95;
-    if (source.includes('gamewith')) return 90;
-    if (source.includes('nte wiki')) return 70;
-    if (source.includes('genshinbuilds')) return 60;
-    if (source.includes('icy') || source.includes('kaiden')) return 45;
-    return 50;
-  };
-  const score = (item) =>
-    sourceWeight(item) + (confidenceWeight[item.confidence] || 0);
 
   const bestByField = new Map();
   const seen = new Set();
@@ -4820,7 +4971,7 @@ function dedupeImportSuggestions(items) {
 
     if (scalarFields.has(item.field)) {
       const current = bestByField.get(item.field);
-      if (!current || score(item) > score(current)) {
+      if (!current || importSuggestionScore(item) > importSuggestionScore(current)) {
         bestByField.set(item.field, item);
       }
       continue;

@@ -4360,11 +4360,19 @@ function formatGuideImportValue(value: string) {
   }
 }
 
+function mergeGuideImportText(current: string, imported: string) {
+  const next = imported.trim();
+  if (!next || current.includes(next)) return current;
+  return current.trim() ? `${current.trim()}\n\n${next}` : next;
+}
+
 function getGuideImportFieldLabel(field: string) {
   const labels: Record<string, string> = {
+    'guide.summary': 'Поле: краткий вывод',
     'guide.pullAdvice': 'Секция: стоит ли качать',
     'guide.strengths': 'Секция: плюсы',
     'guide.weaknesses': 'Секция: минусы',
+    'guide.skillPriority': 'Секция: приоритет навыков',
     'guide.bestArcs': 'Секция: лучшие дуги',
     'guide.alternativeArcs': 'Секция: альтернативные дуги',
     'guide.modules': 'Секция: модули и картриджи',
@@ -4983,6 +4991,18 @@ function AdminGuides({
   }
 
   function applyGuideImportSuggestion(suggestion: CharacterImportSuggestion) {
+    if (suggestion.field === 'guide.summary') {
+      setGuideMeta((current) => ({
+        ...current,
+        summary: mergeGuideImportText(current.summary, suggestion.value),
+      }));
+      setGuideImportDecisions((current) => ({
+        ...current,
+        [suggestion.id]: 'accepted',
+      }));
+      setMessage('Краткий вывод добавлен в параметры гайда. Проверьте текст и сохраните.');
+      return;
+    }
     if (suggestion.field === 'guide.videoUrl') {
       setGuideMeta((current) => ({ ...current, videoUrl: suggestion.value }));
       setGuideImportDecisions((current) => ({
@@ -4998,6 +5018,7 @@ function AdminGuides({
         'guide.pullAdvice': { title: 'Стоит ли качать', type: 'pull-advice' },
         'guide.strengths': { title: 'Плюсы', type: 'strengths' },
         'guide.weaknesses': { title: 'Минусы', type: 'weaknesses' },
+        'guide.skillPriority': { title: 'Приоритет навыков', type: 'skill-priority' },
         'guide.bestArcs': { title: 'Лучшие дуги', type: 'best-arcs' },
         'guide.alternativeArcs': {
           title: 'Альтернативные дуги',

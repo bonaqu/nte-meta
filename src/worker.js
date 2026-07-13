@@ -39,7 +39,9 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
 // Salt + HMAC pepper remain mandatory, while this keeps auth deployable.
 const PASSWORD_ITERATIONS = 100000;
 const SESSION_COOKIE = 'nte_meta_session';
-const MAX_JSON_BYTES = 512 * 1024;
+const MAX_JSON_BYTES = 1800000;
+const MAX_PROFILE_JSON_BYTES = 1750000;
+const MAX_PROFILE_DATA_URL_CHARS = 1300000;
 
 const tableConfig = {
   characters: {
@@ -1964,8 +1966,9 @@ async function refreshCommentScore(env, commentId) {
 
 const IMPORT_SOURCE_TIMEOUT_MS = 7000;
 const IMPORT_MAX_HTML_BYTES = 900000;
-const IMPORT_FETCH_CONCURRENCY = 5;
+const IMPORT_FETCH_CONCURRENCY = 4;
 const IMPORT_MEDIA_LOOKUP_LIMIT = 6;
+const IMPORT_SOURCE_LIMIT = 20;
 
 async function mapWithConcurrency(items, concurrency, callback) {
   const results = new Array(items.length);
@@ -2584,7 +2587,7 @@ function guideImportSources(slug, character = {}) {
     {
       id: 'ntewiki-build-guide-ru',
       name: 'NTE Wiki RU: билд-гайд',
-      trust: 'medium',
+      trust: 'high',
       url: `https://ntewiki.org/ru/blog/${slug}-build-guide-2026/`,
       parser: parseEditorialGuideImport,
       extractImages: true,
@@ -2908,7 +2911,7 @@ async function fetchImportSource(source, character) {
         suggestions: [],
       };
     }
-      const html = await response.text();
+      const html = await readLimitedImportResponse(response);
       const text = htmlToPlainText(html.slice(0, IMPORT_MAX_HTML_BYTES));
       const suggestions = [
         ...source
@@ -2929,7 +2932,9 @@ async function fetchImportSource(source, character) {
       ...source,
       status: 'failed',
       message:
-        error instanceof Error && error.name === 'AbortError'
+        error instanceof Error && error.message === 'IMPORT_SOURCE_TOO_LARGE'
+          ? 'Страница слишком большая для безопасного автоимпорта.'
+          : error instanceof Error && error.name === 'AbortError'
           ? 'Источник не ответил вовремя.'
           : 'Источник временно недоступен.',
       suggestions: [],
@@ -2937,6 +2942,26 @@ async function fetchImportSource(source, character) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function readLimitedImportResponse(response) {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const decoder = new globalThis.TextDecoder();
+  let received = 0;
+  let text = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    if (received > IMPORT_MAX_HTML_BYTES) {
+      await reader.cancel();
+      throw new Error('IMPORT_SOURCE_TOO_LARGE');
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
 }
 
 function parseMediaWikiApiContent(text) {
@@ -4079,17 +4104,19 @@ function extractGuideHeadingBlocks(html) {
 function classifyGuideHeading(value) {
   const heading = normalizeImportSearch(value);
   const rules = [
+    ['guide.summary', /кратк.*(?:справ|вывод|итог|обзор)|tl.?dr|quick summary/],
     ['guide.pullAdvice', /стоит ли|pulling advice|pull advice/],
     ['guide.strengths', /плюс|сильн.*сторон|strength/],
     ['guide.weaknesses', /минус|слаб.*сторон|weakness/],
-    ['guide.alternativeArcs', /альтернатив|alternative arcs?/],
-    ['guide.bestArcs', /лучш.*дуг|best arcs?/],
-    ['guide.modules', /картридж|модул|cartridge|module layout/],
-    ['guide.mainStats', /основн.*стат|main stats?|приоритет характеристик/],
-    ['guide.subStats', /саб.*стат|дополнительн.*стат|sub.?stats?/],
+    ['guide.skillPriority', /навык.*приоритет|приоритет.*(?:навык|прокач)|skill priority/],
+    ['guide.alternativeArcs', /альтернатив|f2p.*(?:arc|дуг)|(?:arc|дуг).*f2p|alternative arcs?/],
+    ['guide.bestArcs', /лучш.*(?:дуг|arc|арк)|best arcs?/],
+    ['guide.modules', /патрон|картридж|консол|модул|cartridge|console|module layout/],
+    ['guide.mainStats', /основн.*(?:стат|характерист)|main stats?|приоритет характеристик/],
+    ['guide.subStats', /саб.*стат|дополнительн.*(?:стат|характерист)|sub.?stats?/],
     ['guide.teams', /лучш.*команд|лучш.*состав|состав.*(?:команд|для)|отряд|best teams?/],
     ['guide.rotations', /ротац|rotation/],
-    ['guide.tips', /как играть|совет|механик|приоритет навыков|how to play|tips?/],
+    ['guide.tips', /как играть|совет|механик|управлен|how to play|tips?/],
   ];
   return rules.find(([, pattern]) => pattern.test(heading))?.[0] || '';
 }
@@ -4132,9 +4159,11 @@ function parseEditorialGuideImport(html, source, character) {
   }
 
   const labels = {
+    'guide.summary': 'Краткий вывод',
     'guide.pullAdvice': 'Стоит ли качать',
     'guide.strengths': 'Плюсы',
     'guide.weaknesses': 'Минусы',
+    'guide.skillPriority': 'Приоритет навыков',
     'guide.bestArcs': 'Лучшие дуги',
     'guide.alternativeArcs': 'Альтернативные дуги',
     'guide.modules': 'Модули и картриджи',
@@ -4155,7 +4184,7 @@ function parseEditorialGuideImport(html, source, character) {
     if (!field || !block.lines.length) continue;
     const heading = localizeImportedGuideText(block.heading);
     const description = localizeImportedGuideText(block.lines.join(' '));
-    if (!hasRussianText(`${heading} ${description}`)) continue;
+    if (!hasRussianText(description)) continue;
     const rows = rowsByField.get(field) || [];
     rows.push({
       title: hasRussianText(heading) ? heading : labels[field],
@@ -4164,16 +4193,24 @@ function parseEditorialGuideImport(html, source, character) {
     rowsByField.set(field, rows);
   }
 
-  const suggestions = [...rowsByField].map(([field, rows]) =>
-    makeImportSuggestion(
+  const suggestions = [...rowsByField].map(([field, rows]) => {
+    const value =
+      field === 'guide.summary'
+        ? rows
+            .map((row) => row.description)
+            .filter(Boolean)
+            .join('\n\n')
+            .slice(0, 2000)
+        : rows;
+    return makeImportSuggestion(
       field,
       labels[field],
-      rows,
+      value,
       source,
       source.trust === 'high' ? 'high' : 'medium',
       'Это материал внешнего гайда. Подтвердите факты, формулировки и актуальность патча перед публикацией.',
-    ),
-  );
+    );
+  });
   suggestions.push(
     makeImportSuggestion(
       'guide.videoUrl',
@@ -5817,6 +5854,7 @@ async function handleCharacterImportLookup(request, env) {
   if (request.method !== 'POST') {
     return json({ error: 'Метод не поддерживается' }, 405);
   }
+  await rateLimit(request, env, 'character-import', 12, 60);
   const body = await readJson(request);
   const query = cleanString(body.query, 2, 120);
   const character =
@@ -5844,7 +5882,7 @@ async function handleCharacterImportLookup(request, env) {
       slug,
     };
   const sourceResults = await mapWithConcurrency(
-    characterImportSources(slug, importCharacter),
+    characterImportSources(slug, importCharacter).slice(0, IMPORT_SOURCE_LIMIT),
     IMPORT_FETCH_CONCURRENCY,
     (source) => fetchImportSource(source, importCharacter),
   );
@@ -5900,6 +5938,7 @@ async function handleGuideImportLookup(request, env) {
   if (request.method !== 'POST') {
     return json({ error: 'Метод не поддерживается' }, 405);
   }
+  await rateLimit(request, env, 'guide-import', 12, 60);
   const body = await readJson(request);
   let query = cleanString(body.query || '', 0, 120);
   let character = {};
@@ -5953,7 +5992,7 @@ async function handleGuideImportLookup(request, env) {
     slug,
   };
   const sourceResults = await mapWithConcurrency(
-    guideImportSources(slug, importCharacter),
+    guideImportSources(slug, importCharacter).slice(0, IMPORT_SOURCE_LIMIT),
     IMPORT_FETCH_CONCURRENCY,
     (source) => fetchImportSource(source, importCharacter),
   );
@@ -6589,6 +6628,15 @@ function normalizeCharacterProfile(value) {
   };
   const url = (input, label = 'URL медиа') => {
     const result = String(input || '').trim();
+    if (result.startsWith('data:')) {
+      if (!/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/i.test(result)) {
+        throwHttp(`${label} должен быть изображением PNG, JPEG или WebP`, 400);
+      }
+      if (result.length > MAX_PROFILE_DATA_URL_CHARS) {
+        throwHttp(`${label} слишком большой. Уменьшите изображение перед загрузкой.`, 400);
+      }
+      return result;
+    }
     if (result.length > 4096) {
       throwHttp(
         `${label} слишком длинный. Используйте прямую ссылку на файл до 4096 символов.`,
@@ -6598,7 +6646,11 @@ function normalizeCharacterProfile(value) {
     if (result) validateResourceUrl(result, 'profile URL');
     return result;
   };
-  const id = (input) => text(input, 80) || crypto.randomUUID();
+  const id = (input) => {
+    const raw = String(input || '').trim();
+    if (!raw) return crypto.randomUUID();
+    return raw.length <= 80 ? raw : `media-${hashText(raw).slice(0, 24)}`;
+  };
 
   const friendship = collection('friendship', 10, (item) => {
     const level = Number(item.level);
@@ -6637,7 +6689,7 @@ function normalizeCharacterProfile(value) {
     };
   });
 
-  return {
+  const profile = {
     faction: text(value.faction, 160),
     arcType: text(value.arcType, 120),
     birthday: text(value.birthday, 80),
@@ -6698,6 +6750,13 @@ function normalizeCharacterProfile(value) {
     })),
     awakenings,
   };
+  if (new TextEncoder().encode(JSON.stringify(profile)).byteLength > MAX_PROFILE_JSON_BYTES) {
+    throwHttp(
+      'Общий размер изображений профиля слишком большой. Уменьшите файлы или используйте прямые ссылки.',
+      400,
+    );
+  }
+  return profile;
 }
 
 function validateResourceUrl(value, field) {

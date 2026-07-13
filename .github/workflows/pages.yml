@@ -45,7 +45,7 @@ jobs:
         run: npm run lint
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
-      - name: Test baseline frontend and API flows
+      - name: Test two baseline browser flows
         if: github.event_name != 'schedule' && github.event.inputs.full_suite != 'true'
         run: npm run test:ci
       - name: Full weekly or manually requested regression

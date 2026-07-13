@@ -140,6 +140,8 @@ Push в ветку `bonaqu_projects` запускает `.github/workflows/pages
 VITE_API_BASE_URL=https://nte-meta-api.bonaqu.workers.dev
 ```
 
+На обычном push Actions запускает typecheck, lint, production build, проверку API и два коротких browser-smoke сценария: загрузку приложения и главную meta-страницу. Полный Playwright-набор запускается только по воскресенью или вручную через `workflow_dispatch` с `full_suite=true`. Локально достаточно focused-проверки затронутого сценария; полный e2e перед каждым небольшим изменением не требуется.
+
 ## Роли
 
 | Роль | Возможности |
@@ -163,7 +165,7 @@ Worker проверяет роли и точечные права для каж�
 - `/api/sources`, `/api/settings`, `/api/warnings`, `/api/system/status`, `/api/audit-log`.
 - `/api/character-import/lookup`, `/api/guide-import/lookup` — editor-only автоимпорт из внешних источников; данные не пишутся автоматически и требуют подтверждения каждой строки.
 
-Актуальная последняя миграция D1: `0015_hotori_arc_voice_sources.sql`.
+Актуальная последняя миграция D1: `0019_cleanup_legacy_tier_columns.sql`.
 
 Для озвучки система различает `audioUrl` и `sourceUrl`: прямой аудиофайл можно проигрывать нативным `<audio>`, а YouTube/страница источника сохраняется как ссылка для ручной проверки и не притворяется mp3-файлом.
 

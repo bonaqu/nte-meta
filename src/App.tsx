@@ -5898,7 +5898,11 @@ function AdminGuides({
             initialCharacterId={initialCharacterId}
           />
           <div className="button-row">
-            <button className="ghost-button" value="cancel">
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => createGuideDialogRef.current?.close('cancel')}
+            >
               Отменить
             </button>
             <button
@@ -7013,12 +7017,9 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
   }
 
   function closeWarningDialog() {
-    setActionId('');
-    warningDialogRef.current?.querySelector('form')?.reset();
-    setWarningTarget(null);
-    if (warningDialogRef.current?.open) {
-      warningDialogRef.current.close('cancel');
-    }
+    const dialog = warningDialogRef.current;
+    dialog?.querySelector('form')?.reset();
+    if (dialog?.open) dialog.close('cancel');
   }
 
   async function submitWarning(event: React.FormEvent<HTMLFormElement>) {
@@ -7146,8 +7147,13 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
         <dialog
           className="confirm-dialog"
           ref={warningDialogRef}
+          onCancel={(event) => {
+            event.preventDefault();
+            closeWarningDialog();
+          }}
           onClose={(event) => {
             event.currentTarget.querySelector('form')?.reset();
+            setActionId('');
             setWarningTarget(null);
           }}
         >

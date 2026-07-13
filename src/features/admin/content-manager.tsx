@@ -9,6 +9,7 @@ import {
 import {
   CheckCircle2,
   Eye,
+  ExternalLink,
   FilePlus2,
   Pencil,
   Plus,
@@ -147,6 +148,14 @@ const sourceTypeOptions: FieldOption[] = [
 function sourceTypeLabel(value: unknown) {
   const type = String(value || 'manual');
   return sourceTypeOptions.find((option) => option.value === type)?.label || type;
+}
+
+function sourceHostLabel(value: unknown) {
+  try {
+    return new URL(String(value || '')).hostname.replace(/^www\./, '');
+  } catch {
+    return 'внешний сайт';
+  }
 }
 
 function FieldControl({
@@ -1220,7 +1229,11 @@ export function AdminSourcesManager({
               target="_blank"
               rel="noreferrer"
             >
-              {textValue(values, 'sourceUrl')}
+              <ExternalLink aria-hidden="true" />
+              <span>
+                <strong>Открыть источник</strong>
+                <small>{sourceHostLabel(values.sourceUrl)}</small>
+              </span>
             </a>
           ) : (
             <p>Ссылка появится после заполнения.</p>

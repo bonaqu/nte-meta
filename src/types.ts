@@ -69,6 +69,14 @@ export interface CharacterFriendshipLevel {
   rewardName: string;
   rewardIconUrl: string;
   description: string;
+  rewards?: CharacterFriendshipReward[];
+}
+
+export interface CharacterFriendshipReward {
+  id: string;
+  name: string;
+  quantity: string;
+  iconUrl: string;
 }
 
 export interface CharacterGift {

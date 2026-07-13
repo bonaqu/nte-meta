@@ -2311,6 +2311,7 @@ function nevernessAppCharacterCode(character) {
     ['mint', 'mint'],
     ['nanally', 'nanally'],
     ['sakiri', 'sagiri'],
+    ['shinku', 'shinku'],
     ['skia', 'skia'],
     ['zero', 'zero'],
   ]);
@@ -2318,6 +2319,31 @@ function nevernessAppCharacterCode(character) {
     .map((value) => normalizeImportSlug(value))
     .filter(Boolean);
   return candidates.map((candidate) => codes.get(candidate)).find(Boolean) || '';
+}
+
+function interactiveMapEsperId(character) {
+  const ids = new Map([
+    ['adler', '1033'],
+    ['mitsuki', '1070'],
+    ['cang', '1023'],
+    ['chaos', '1071'],
+    ['chiichan', '1073'],
+    ['daffodill', '1054'],
+    ['edgar', '1021'],
+    ['fadia', '1039'],
+    ['haniel', '1020'],
+    ['hathor', '1025'],
+    ['jin', '1052'],
+    ['kuhara', '1055'],
+    ['lacrimosa', '1004'],
+    ['mint', '1019'],
+    ['nanally', '1010'],
+    ['sagiri', '1003'],
+    ['shinku', '1076'],
+    ['skia', '1008'],
+    ['zero', '1046'],
+  ]);
+  return ids.get(nevernessAppCharacterCode(character)) || '';
 }
 
 function characterImportSources(slug, character = {}) {
@@ -2335,6 +2361,7 @@ function characterImportSources(slug, character = {}) {
     String(character.name || character.originalName || slug || '').trim() || slug,
   );
   const nevernessCode = nevernessAppCharacterCode({ ...character, slug });
+  const interactiveMapId = interactiveMapEsperId({ ...character, slug });
 
   return [
     {
@@ -2388,6 +2415,25 @@ function characterImportSources(slug, character = {}) {
           raw: true,
         }
       : null,
+    interactiveMapId
+      ? {
+          id: 'interactivemap-profile-ru',
+          name: 'InteractiveMap RU: профиль, навыки и симпатия',
+          trust: 'high',
+          url: `https://interactivemap.app/neverness-to-everness/database/ru/espers/esper-${interactiveMapId}/`,
+          parser: parseInteractiveMapRuImport,
+          raw: true,
+        }
+      : null,
+    {
+      id: 'playground-affinity-reference-ru',
+      name: 'Playground RU: лучшие подарки персонажей',
+      trust: 'medium',
+      url: 'https://www.playground.ru/neverness_to_everness/guide/lyubov_i_podarki_v_nte_est_li_nastoyaschaya_romantika_v_igre-1842798',
+      referenceOnly: true,
+      referenceMessage:
+        'Русскоязычный справочник используется для сверки названий лучших подарков. Очки, стоимость и изображения берутся из Neverness Codex; каждую строку подтверждает редактор.',
+    },
     {
       id: 'zeroluck-voice-reference',
       name: 'ZeroLuck: каталог реплик',
@@ -3262,10 +3308,25 @@ function translateGame8Obtain(value, characterName) {
 const knownGiftLocalizations = new Map([
   ['SpecialGift_letter', 'Рукописное письмо'],
   ['Furniture_Ornament_002', 'Золотая луна'],
-  ['SpecialGift_ticket', 'Билет в кинотеатр «Флоу»'],
-  ['Flower0000', 'Золотой источник'],
+  ['SpecialGift_ticket', 'Билет в кино «Флоэ»'],
+  ['Furniture_Light_002', 'Окружающий ночник'],
+  ['Furniture_Light_007', 'Лампа из белого нефрита'],
+  ['Flower0000', 'Золотая весна'],
+  ['Flower0001', 'Соната соловья'],
+  ['Flower0002', 'Голубая басня'],
+  ['Flower0007', 'Пылающий багрянец'],
+  ['Flower0009', 'Фантазия'],
   ['Furniture_FlowerPot_001', 'Ваза с жёлтой глазурью'],
+  ['Food_006', 'Острая закуска «Кул-лала»'],
+  ['Food_033', 'Супер-рамен со свининой'],
   ['Food_038', 'Семейный напиток Чиё'],
+  ['Food_051', 'Розовый личи-торт'],
+  ['Food_060', 'В глубине сердца'],
+  ['Food_062', 'Песнь гладиатора'],
+  ['Food_084', 'Рамен «Нэкомару Они»'],
+  ['Food_092', 'Яркий лёгкий салат'],
+  ['Food_093', 'Энергетический обед для детей'],
+  ['Food_094', 'Охлаждающий напиток «Кули Кул»'],
   ['Food_098', 'Чжу! Витамин!'],
   ['Food_103', 'Королевская башня Эбису'],
 ]);
@@ -3387,7 +3448,7 @@ function parseNevernessAppProfileImport(html, source) {
       gifts,
       source,
       'high',
-      'Очки симпатии и изображения взяты из структурированного каталога; русские названия сверяются редактором перед сохранением.',
+      'Очки симпатии и изображения взяты из структурированного каталога; доступные русские названия сверены по русскоязычному справочнику и всё равно подтверждаются редактором.',
     ),
     makeImportSuggestion(
       'profile.skins',
@@ -3397,6 +3458,238 @@ function parseNevernessAppProfileImport(html, source) {
       'medium',
       'Изображения взяты из каталога, названия являются рабочим переводом и требуют подтверждения редактором.',
     ),
+  ].filter(Boolean);
+}
+
+function extractImportPanel(html, panelId) {
+  const source = String(html || '');
+  const start = source.indexOf(`id="${panelId}"`);
+  if (start < 0) return '';
+  const end = source.indexOf('<div role="tabpanel"', start + panelId.length + 5);
+  return source.slice(start, end < 0 ? source.length : end);
+}
+
+function readImportDefinition(html, label) {
+  const match = String(html || '').match(
+    new RegExp(
+      `<dt[^>]*>${escapeRegExp(label)}<\\/dt>\\s*<dd[^>]*>([\\s\\S]*?)<\\/dd>`,
+      'i',
+    ),
+  );
+  return htmlToPlainText(match?.[1] || '');
+}
+
+function importRecordIdFromHref(href, fallback) {
+  return (
+    String(href || '').match(/\/items\/([^/?#]+)\/?/i)?.[1] ||
+    `import-${hashText(fallback).slice(0, 12)}`
+  );
+}
+
+function parseInteractiveMapRuImport(html, source, character) {
+  const plainText = htmlToPlainText(html);
+  if (!lineMatchesCharacter(plainText, character)) return [];
+
+  const profilePanel = extractImportPanel(html, 'panel-profile');
+  const abilityPanel = extractImportPanel(html, 'panel-abilities');
+  const awakeningPanel = extractImportPanel(html, 'panel-awakening');
+  const cosmeticsPanel = extractImportPanel(html, 'panel-cosmetics');
+  const affinityPanel = extractImportPanel(html, 'panel-affinity');
+
+  const faction = readImportDefinition(profilePanel, 'Место жительства');
+  const birthday = readImportDefinition(profilePanel, 'День рождения');
+  const dossierHtml =
+    profilePanel.match(/>Досье<\/h2>([\s\S]*?)(?=<\/section>)/i)?.[1] || '';
+  const dossierParts = [];
+  for (const match of dossierHtml.matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/gi)) {
+    const title = htmlToPlainText(match[1].match(/<h3\b[^>]*>([\s\S]*?)<\/h3>/i)?.[1] || '');
+    const description = htmlToPlainText(
+      match[1].match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1] || '',
+    );
+    if (description) dossierParts.push({ title, description });
+  }
+  const biography = dossierParts
+    .map(({ title, description }) =>
+      title ? `### ${title}\n\n${description}` : description,
+    )
+    .join('\n\n');
+
+  const typeLabels = new Map([
+    ['Обычная атака', 'Базовая атака'],
+    ['Навык', 'Навык'],
+    ['Ульта', 'Сверхспособность'],
+    ['QTE', 'Навык поддержки'],
+    ['Пассивка 1', 'Пассивный навык'],
+    ['Пассивка 2', 'Пассивный навык'],
+  ]);
+  const abilities = [];
+  for (const match of abilityPanel.matchAll(
+    /<article\b[^>]*class="[^"]*group\/skill[^"]*"[^>]*>([\s\S]*?)<\/article>/gi,
+  )) {
+    const block = match[1].split('<details')[0];
+    const sourceType = htmlToPlainText(
+      block.match(/<p\b[^>]*uppercase[^>]*>([\s\S]*?)<\/p>/i)?.[1] || '',
+    );
+    const type = typeLabels.get(sourceType);
+    if (!type) continue;
+    const name = htmlToPlainText(
+      block.match(/<h4\b[^>]*>([\s\S]*?)<\/h4>/i)?.[1] || '',
+    );
+    const iconUrl = normalizeImportImageSrc(
+      block.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] || '',
+      source.url,
+    );
+    const body = block.slice(block.indexOf('</header>') + 9);
+    const description = compactImportLines(htmlToPlainText(body))
+      .filter((line) => line !== sourceType && line !== name)
+      .join('\n\n');
+    if (!name || !description) continue;
+    abilities.push({
+      id: `ability-${hashText(`${sourceType}:${name}`).slice(0, 12)}`,
+      type,
+      name,
+      iconUrl,
+      description,
+    });
+  }
+
+  const awakenings = [];
+  for (const match of awakeningPanel.matchAll(
+    /<article\b[^>]*>([\s\S]*?)<\/article>/gi,
+  )) {
+    const block = match[1];
+    const level = Number(
+      htmlToPlainText(block.match(/<p\b[^>]*>(Effect[1-6])<\/p>/i)?.[1] || '').replace(
+        /\D/g,
+        '',
+      ),
+    );
+    if (!Number.isInteger(level) || level < 1 || level > 6) continue;
+    const name = htmlToPlainText(
+      block.match(/<h4\b[^>]*>([\s\S]*?)<\/h4>/i)?.[1] || '',
+    );
+    const description = htmlToPlainText(
+      block.match(/<p\b[^>]*whitespace-pre-line[^>]*>([\s\S]*?)<\/p>/i)?.[1] || '',
+    );
+    const iconUrl = normalizeImportImageSrc(
+      block.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] || '',
+      source.url,
+    );
+    if (name && description) {
+      awakenings.push({ level, name, description, iconUrl });
+    }
+  }
+
+  const friendshipHeading = affinityPanel.indexOf('Уровни дружбы</h3>');
+  const giftsHtml = friendshipHeading >= 0 ? affinityPanel.slice(0, friendshipHeading) : '';
+  const gifts = [];
+  for (const match of giftsHtml.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    const attributes = match[1];
+    const block = match[2];
+    const points = block.match(/♥\s*\+([\d\s,.]+)/)?.[1]?.replace(/\D/g, '') || '';
+    if (!points) continue;
+    const name = decodeHtmlEntities(attributes.match(/\btitle="([^"]+)"/i)?.[1] || '').trim();
+    const href = decodeHtmlEntities(attributes.match(/\bhref="([^"]+)"/i)?.[1] || '');
+    const iconUrl = normalizeImportImageSrc(
+      block.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] || '',
+      source.url,
+    );
+    if (!name || (!hasRussianText(name) && /[A-Za-z]/.test(name))) continue;
+    gifts.push({
+      id: importRecordIdFromHref(href, name),
+      name,
+      iconUrl,
+      effect: `+${Number(points).toLocaleString('ru-RU')} очков симпатии`,
+    });
+  }
+
+  const friendship = [];
+  const friendshipHtml = friendshipHeading >= 0 ? affinityPanel.slice(friendshipHeading) : '';
+  const levelMarker =
+    '<div class="flex items-start gap-4 rounded-lg border border-[rgb(var(--border))] p-3 sm:p-4">';
+  const levelChunks = friendshipHtml.split(levelMarker).slice(1, 11);
+  for (const chunk of levelChunks) {
+    const levelMatch = chunk.match(
+      /Уровень<\/p>\s*<p[^>]*>(\d+)<\/p>\s*<p[^>]*>([\d\s,.\u00a0]+)<\/p>/i,
+    );
+    const level = Number(levelMatch?.[1]);
+    const points = Number(String(levelMatch?.[2] || '').replace(/\D/g, ''));
+    if (!Number.isInteger(level) || level < 1 || level > 10 || !points) continue;
+    const rewards = [];
+    for (const rewardMatch of chunk.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+      const attributes = rewardMatch[1];
+      const block = rewardMatch[2];
+      const sourceName = decodeHtmlEntities(
+        attributes.match(/\btitle="([^"]+)"/i)?.[1] || '',
+      ).trim();
+      const name = /[A-Za-z]{2,}/.test(sourceName)
+        ? `Именная награда уровня ${level}`
+        : sourceName;
+      const quantity = block.match(/>×\s*([^<]+)<\/span>/i)?.[1]?.trim() || '';
+      const href = decodeHtmlEntities(attributes.match(/\bhref="([^"]+)"/i)?.[1] || '');
+      const iconUrl = normalizeImportImageSrc(
+        block.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] || '',
+        source.url,
+      );
+      if (!name || !hasRussianText(name)) continue;
+      rewards.push({
+        id: importRecordIdFromHref(href, `${level}:${name}`),
+        name,
+        quantity,
+        iconUrl,
+      });
+    }
+    friendship.push({
+      level,
+      rewardName: rewards
+        .map((reward) => `${reward.name} ×${reward.quantity}`)
+        .join('; ')
+        .slice(0, 160),
+      rewardIconUrl: rewards[0]?.iconUrl || '',
+      rewards,
+      description: `Для достижения уровня ${level} требуется ${points.toLocaleString('ru-RU')} очков симпатии.`,
+    });
+  }
+
+  const skins = [];
+  for (const match of cosmeticsPanel.matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/gi)) {
+    const block = match[1];
+    const name = htmlToPlainText(
+      block.match(/<h4\b[^>]*>([\s\S]*?)<\/h4>/i)?.[1] || '',
+    );
+    const imageUrl = normalizeImportImageSrc(
+      block.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] || '',
+      source.url,
+    );
+    const description = htmlToPlainText(
+      block.match(/<p\b[^>]*leading-relaxed[^>]*>([\s\S]*?)<\/p>/i)?.[1] || '',
+    );
+    if (name && imageUrl) {
+      skins.push({
+        id: `skin-${hashText(name).slice(0, 12)}`,
+        name,
+        imageUrl,
+        description,
+      });
+    }
+  }
+
+  return [
+    makeImportSuggestion('profile.faction', 'Фракция', faction, source, 'high'),
+    makeImportSuggestion('profile.birthday', 'День рождения', birthday, source, 'high'),
+    makeImportSuggestion(
+      'profile.biographyShort',
+      'Краткая биография',
+      dossierParts[0]?.description || '',
+      source,
+      'high',
+    ),
+    makeImportSuggestion('profile.biography', 'Подробная биография', biography, source, 'high'),
+    makeImportSuggestion('profile.abilities', 'Способности', abilities, source, 'high'),
+    makeImportSuggestion('profile.awakenings', 'Пробуждения', awakenings, source, 'high'),
+    makeImportSuggestion('profile.gifts', 'Любимые подарки', gifts, source, 'high'),
+    makeImportSuggestion('profile.friendship', 'Симпатия 1–10', friendship, source, 'high'),
+    makeImportSuggestion('profile.skins', 'Гардероб', skins, source, 'high'),
   ].filter(Boolean);
 }
 
@@ -4991,6 +5284,7 @@ function importSuggestionSourceWeight(item) {
   const source = `${item.sourceName} ${item.sourceUrl}`.toLocaleLowerCase('ru-RU');
   if (item.field === 'profile.biography' || item.field === 'profile.biographyShort') {
     if (source.includes('официаль')) return 120;
+    if (source.includes('interactivemap')) return 118;
     if (source.includes('fandom ru')) return 115;
     if (source.includes('gamewith')) return 75;
     if (source.includes('genshinbuilds')) return 50;
@@ -5000,6 +5294,7 @@ function importSuggestionSourceWeight(item) {
     item.field === 'profile.faction' ||
     item.field === 'profile.roleTags'
   ) {
+    if (source.includes('interactivemap')) return 122;
     if (source.includes('fandom ru')) return 120;
     if (source.includes('официаль')) return 110;
   }
@@ -5009,6 +5304,7 @@ function importSuggestionSourceWeight(item) {
     if (source.includes('fandom ru')) return 110;
   }
   if (source.includes('официаль')) return 100;
+  if (source.includes('interactivemap')) return 118;
   if (source.includes('медиатека персонажа')) return 98;
   if (source.includes('fandom ru')) return 95;
   if (source.includes('gamewith')) return 90;
@@ -5074,13 +5370,13 @@ const PROFILE_COLLECTION_MERGE_CONFIGS = [
     field: 'profile.gifts',
     label: 'Любимые подарки',
     limit: 30,
-    key: (entry) => normalizeImportSearch(entry?.name),
+    key: (entry) => normalizeImportSearch(entry?.id || entry?.name),
   },
   {
     field: 'profile.skins',
     label: 'Гардероб',
     limit: 30,
-    key: (entry) => normalizeImportSearch(entry?.name),
+    key: (entry) => normalizeImportSearch(entry?.id || entry?.name),
   },
   {
     field: 'profile.voiceLines',
@@ -5199,6 +5495,7 @@ function mergeAbilityImportSuggestions(items) {
         const source = `${candidate.item.sourceName} ${candidate.item.sourceUrl}`.toLocaleLowerCase('ru-RU');
         return (
           source.includes('genshinbuilds') ||
+          source.includes('interactivemap') ||
           source.includes('nte wiki') ||
           source.includes('fandom ru')
         );
@@ -6308,11 +6605,22 @@ function normalizeCharacterProfile(value) {
     if (!Number.isInteger(level) || level < 1 || level > 10) {
       throwHttp('Уровень симпатии должен быть от 1 до 10', 400);
     }
+    const rawRewards = Array.isArray(item.rewards) ? item.rewards : [];
+    if (rawRewards.length > 12) {
+      throwHttp('На одном уровне симпатии можно указать не больше 12 наград', 400);
+    }
+    const rewards = rawRewards.map((reward) => ({
+      id: id(reward?.id),
+      name: text(reward?.name, 160),
+      quantity: text(reward?.quantity, 40),
+      iconUrl: url(reward?.iconUrl, 'URL иконки награды симпатии'),
+    }));
     return {
       level,
       rewardName: text(item.rewardName, 160),
       rewardIconUrl: url(item.rewardIconUrl, 'URL иконки награды симпатии'),
       description: text(item.description, 2000),
+      rewards,
     };
   });
 

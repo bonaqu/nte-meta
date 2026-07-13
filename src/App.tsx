@@ -2172,27 +2172,49 @@ function CharacterDetailPage({
           <div className="friendship-track">
             {[...profile.friendship]
               .sort((a, b) => a.level - b.level)
-              .map((level) => (
-                <article key={level.level}>
+              .map((level) => {
+                const rewards = level.rewards?.length
+                  ? level.rewards
+                  : level.rewardName || level.rewardIconUrl
+                    ? [
+                        {
+                          id: `legacy-reward-${level.level}`,
+                          name: level.rewardName,
+                          quantity: '',
+                          iconUrl: level.rewardIconUrl,
+                        },
+                      ]
+                    : [];
+                return (
+                  <article key={level.level}>
                   <strong>{level.level}</strong>
-                  {level.rewardIconUrl ? (
-                    <img
-                      src={resolveAssetUrl(level.rewardIconUrl)}
-                      alt=""
-                      width="48"
-                      height="48"
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : null}
-                  <div>
-                    <h3>
-                      {level.rewardName || `Уровень симпатии ${level.level}`}
-                    </h3>
+                  <div className="friendship-level-content">
+                    <h3>{`Уровень симпатии ${level.level}`}</h3>
                     <p>{level.description}</p>
+                    {rewards.length ? (
+                      <ul className="friendship-reward-list" aria-label={`Награды уровня ${level.level}`}>
+                        {rewards.map((reward) => (
+                          <li key={reward.id}>
+                            {reward.iconUrl ? (
+                              <img
+                                src={resolveAssetUrl(reward.iconUrl)}
+                                alt=""
+                                width="44"
+                                height="44"
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : null}
+                            <span>{reward.name || 'Награда'}</span>
+                            {reward.quantity ? <strong>×{reward.quantity}</strong> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
                 </article>
-              ))}
+                );
+              })}
           </div>
         ) : null}
         {profile.gifts.length ? (

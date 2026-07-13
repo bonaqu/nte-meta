@@ -22,6 +22,7 @@ import type {
   CharacterAbility,
   CharacterAwakening,
   CharacterFriendshipLevel,
+  CharacterFriendshipReward,
   CharacterGift,
   CharacterImportSuggestion,
   CharacterMaterial,
@@ -82,6 +83,38 @@ function rowId() {
   return crypto.randomUUID();
 }
 
+function friendshipRewards(item: CharacterFriendshipLevel) {
+  if (item.rewards?.length) return item.rewards;
+  if (!item.rewardName && !item.rewardIconUrl) return [];
+  return [
+    {
+      id: `legacy-reward-${item.level}`,
+      name: item.rewardName,
+      quantity: '',
+      iconUrl: item.rewardIconUrl,
+    },
+  ];
+}
+
+function withFriendshipRewards(
+  item: CharacterFriendshipLevel,
+  rewards: CharacterFriendshipReward[],
+) {
+  return {
+    ...item,
+    rewards,
+    rewardName: rewards
+      .map((reward) =>
+        [reward.name, reward.quantity ? `×${reward.quantity}` : '']
+          .filter(Boolean)
+          .join(' '),
+      )
+      .join('; ')
+      .slice(0, 160),
+    rewardIconUrl: rewards[0]?.iconUrl || '',
+  };
+}
+
 function emptyProfile(): CharacterProfile {
   return {
     faction: '',
@@ -103,6 +136,7 @@ function emptyProfile(): CharacterProfile {
       rewardName: '',
       rewardIconUrl: '',
       description: '',
+      rewards: [],
     })),
     gifts: [],
     voiceLines: [],
@@ -423,6 +457,20 @@ function getSuggestionPreviewUrls(suggestion: CharacterImportSuggestion) {
     const normalized = getYoutubeThumbnailUrl(value) || normalizeExternalAssetUrl(value);
     if (normalized && !urls.includes(normalized)) urls.push(normalized);
   };
+  const visit = (value: unknown, depth = 0) => {
+    if (urls.length >= 6 || depth > 4) return;
+    if (typeof value === 'string') {
+      addUrl(value);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item) => visit(item, depth + 1));
+      return;
+    }
+    if (value && typeof value === 'object') {
+      Object.values(value).forEach((item) => visit(item, depth + 1));
+    }
+  };
 
   const parsed = parseImportValue(suggestion.value);
   if (typeof parsed === 'string' && /(?:image|splash|icon)url/i.test(suggestion.field)) {
@@ -431,11 +479,7 @@ function getSuggestionPreviewUrls(suggestion: CharacterImportSuggestion) {
   }
 
   if (Array.isArray(parsed)) {
-    for (const item of parsed) {
-      if (!item || typeof item !== 'object') continue;
-      Object.values(item).forEach(addUrl);
-      if (urls.length >= 4) break;
-    }
+    visit(parsed);
   }
 
   return urls;
@@ -1918,10 +1962,15 @@ function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
               rewardName: '',
               rewardIconUrl: '',
               description: '',
+              rewards: [],
             })}
             onChange={(friendship) => patchProfile({ friendship })}
-            render={(item, _index, update) => (
-              <>
+            render={(item, _index, update) => {
+              const rewards = friendshipRewards(item);
+              const setRewards = (nextRewards: CharacterFriendshipReward[]) =>
+                update(withFriendshipRewards(item, nextRewards));
+              return (
+                <>
                 <label>
                   Уровень
                   <input
@@ -1931,26 +1980,6 @@ function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
                     value={item.level}
                     onChange={(event) =>
                       update({ ...item, level: Number(event.target.value) })
-                    }
-                  />
-                </label>
-                <label>
-                  Награда
-                  <input
-                    value={item.rewardName}
-                    onChange={(event) =>
-                      update({ ...item, rewardName: event.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  URL иконки
-                  <input
-                    type="text"
-                    inputMode="url"
-                    value={item.rewardIconUrl}
-                    onChange={(event) =>
-                      update({ ...item, rewardIconUrl: event.target.value })
                     }
                   />
                 </label>
@@ -1964,8 +1993,126 @@ function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
                     }
                   />
                 </label>
-              </>
-            )}
+                <div className="friendship-reward-editor wide-field">
+                  <div className="friendship-reward-editor__header">
+                    <div>
+                      <strong>Награды уровня</strong>
+                      <small>Каждая награда хранится с количеством и своей иконкой.</small>
+                    </div>
+                    <button
+                      className="ghost-button compact-button"
+                      type="button"
+                      onClick={() =>
+                        setRewards([
+                          ...rewards,
+                          { id: rowId(), name: '', quantity: '', iconUrl: '' },
+                        ])
+                      }
+                    >
+                      <Plus aria-hidden="true" /> Добавить награду
+                    </button>
+                  </div>
+                  {rewards.length ? (
+                    <div className="friendship-reward-editor__list">
+                      {rewards.map((reward, rewardIndex) => (
+                        <article key={reward.id}>
+                          {reward.iconUrl ? (
+                            <img
+                              src={resolveAssetUrl(reward.iconUrl)}
+                              alt=""
+                              width="48"
+                              height="48"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <span className="friendship-reward-placeholder" aria-hidden="true">
+                              {rewardIndex + 1}
+                            </span>
+                          )}
+                          <label>
+                            Награда
+                            <input
+                              value={reward.name}
+                              onChange={(event) =>
+                                setRewards(
+                                  rewards.map((entry, index) =>
+                                    index === rewardIndex
+                                      ? { ...entry, name: event.target.value }
+                                      : entry,
+                                  ),
+                                )
+                              }
+                            />
+                          </label>
+                          <label>
+                            Количество
+                            <input
+                              value={reward.quantity}
+                              onChange={(event) =>
+                                setRewards(
+                                  rewards.map((entry, index) =>
+                                    index === rewardIndex
+                                      ? { ...entry, quantity: event.target.value }
+                                      : entry,
+                                  ),
+                                )
+                              }
+                            />
+                          </label>
+                          <label className="friendship-reward-url">
+                            URL иконки
+                            <input
+                              type="text"
+                              inputMode="url"
+                              value={reward.iconUrl}
+                              onChange={(event) =>
+                                setRewards(
+                                  rewards.map((entry, index) =>
+                                    index === rewardIndex
+                                      ? { ...entry, iconUrl: event.target.value }
+                                      : entry,
+                                  ),
+                                )
+                              }
+                            />
+                          </label>
+                          <label className="friendship-reward-upload">
+                            Загрузить иконку
+                            <input
+                              type="file"
+                              accept="image/png,image/webp,image/jpeg"
+                              onChange={(event) =>
+                                void uploadInlineIcon(event.target.files?.[0], (iconUrl) =>
+                                  setRewards(
+                                    rewards.map((entry, index) =>
+                                      index === rewardIndex ? { ...entry, iconUrl } : entry,
+                                    ),
+                                  ),
+                                )
+                              }
+                            />
+                          </label>
+                          <button
+                            className="icon-button danger"
+                            type="button"
+                            aria-label={`Удалить награду ${reward.name || rewardIndex + 1}`}
+                            onClick={() =>
+                              setRewards(rewards.filter((_, index) => index !== rewardIndex))
+                            }
+                          >
+                            <Trash2 aria-hidden="true" />
+                          </button>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="friendship-reward-empty">Награды пока не добавлены.</p>
+                  )}
+                </div>
+                </>
+              );
+            }}
           />
           <Collection<CharacterGift>
             title="Любимые подарки"

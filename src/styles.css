@@ -3650,9 +3650,9 @@
 
 .friendship-track article {
     display: grid;
-    grid-template-columns: 44px 48px 1fr;
+    grid-template-columns: 44px minmax(0, 1fr);
     gap: 12px;
-    align-items: center;
+    align-items: start;
     padding: 12px 0;
     border-block-end: 1px solid var(--border);
   }
@@ -3664,6 +3664,53 @@
     border-radius: 50%;
     background: var(--cyan);
     color: #001015;
+  }
+
+  .friendship-level-content {
+    display: grid;
+    gap: 8px;
+    min-inline-size: 0;
+  }
+
+  .friendship-level-content > :is(h3, p) {
+    margin: 0;
+  }
+
+  .friendship-reward-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 8px;
+    margin: 2px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .friendship-reward-list li {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    gap: 9px;
+    align-items: center;
+    min-inline-size: 0;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+  }
+
+  .friendship-reward-list img {
+    inline-size: 44px;
+    block-size: 44px;
+    object-fit: contain;
+  }
+
+  .friendship-reward-list span {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .friendship-reward-list strong {
+    color: var(--cyan);
+    font-variant-numeric: tabular-nums;
   }
 
   .skin-grid {
@@ -4183,6 +4230,110 @@
 
   .character-collection audio {
     inline-size: 100%;
+  }
+
+  .friendship-reward-editor {
+    display: grid;
+    gap: 10px;
+    padding-block-start: 12px;
+    border-block-start: 1px solid var(--border);
+  }
+
+  .friendship-reward-editor__header {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .friendship-reward-editor__header > div {
+    display: grid;
+    gap: 3px;
+  }
+
+  .friendship-reward-editor__header small,
+  .friendship-reward-empty {
+    color: var(--soft);
+  }
+
+  .friendship-reward-editor__list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .friendship-reward-editor__list > article {
+    display: grid;
+    grid-template-columns: 48px minmax(140px, 1fr) minmax(90px, 0.35fr) minmax(180px, 1fr) 40px;
+    gap: 10px;
+    align-items: end;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--background) 60%, transparent);
+  }
+
+  .friendship-reward-editor__list img,
+  .friendship-reward-placeholder {
+    inline-size: 48px;
+    block-size: 48px;
+    align-self: end;
+    border-radius: var(--radius-sm);
+  }
+
+  .friendship-reward-editor__list img {
+    object-fit: contain;
+  }
+
+  .friendship-reward-placeholder {
+    display: grid;
+    place-items: center;
+    border: 1px dashed var(--border);
+    color: var(--soft);
+  }
+
+  .friendship-reward-editor__list label {
+    display: grid;
+    gap: 6px;
+    min-inline-size: 0;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+
+  .friendship-reward-upload {
+    grid-column: 2 / -2;
+  }
+
+  .friendship-reward-empty {
+    margin: 0;
+    padding: 10px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    text-align: center;
+  }
+
+  @container (max-width: 760px) {
+    .friendship-reward-editor__header {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .friendship-reward-editor__list > article {
+      grid-template-columns: 48px minmax(0, 1fr) 40px;
+    }
+
+    .friendship-reward-editor__list > article > label {
+      grid-column: 2;
+    }
+
+    .friendship-reward-editor__list > article > .icon-button {
+      grid-column: 3;
+      grid-row: 1;
+    }
+
+    .friendship-reward-upload {
+      grid-column: 2 / -1;
+    }
   }
 
   .audio-placeholder {

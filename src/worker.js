@@ -2301,6 +2301,7 @@ function nevernessAppCharacterCode(character) {
     ['chiz', 'chiichan'],
     ['daffodill', 'daffodill'],
     ['edgar', 'edgar'],
+    ['esper-zero', 'zero'],
     ['fadia', 'fadia'],
     ['haniel', 'haniel'],
     ['hathor', 'hathor'],
@@ -2632,7 +2633,26 @@ function buildKnownAffinitySource(character) {
 }
 
 function buildKnownVoiceActorSource(character) {
+  const esperZeroVoiceActors = [
+    { language: 'Английский (мужской)', name: 'Hunter McCoy' },
+    { language: 'Английский (женский)', name: 'Suzie Yeung' },
+    { language: 'Японский (мужской)', name: 'Yuma Uchida (内田雄馬)' },
+    { language: 'Японский (женский)', name: 'Maaya Uchida (内田真礼)' },
+    { language: 'Китайский (мужской)', name: 'Ma Yang (马洋)' },
+    { language: 'Китайский (женский)', name: 'Zeng Tong (曾彤)' },
+    { language: 'Корейский (мужской)', name: 'Park Ki-wook (박기욱)' },
+    { language: 'Корейский (женский)', name: 'Lee Eun-jo (이은조)' },
+  ];
   const knownActors = new Map([
+    [
+      'lacrimosa',
+      [
+        { language: 'Английский', name: 'Baraka May' },
+        { language: 'Японский', name: 'Maria Naganawa (長縄まりあ)' },
+      ],
+    ],
+    ['zero', esperZeroVoiceActors],
+    ['esper zero', esperZeroVoiceActors],
     [
       'hotori',
       [

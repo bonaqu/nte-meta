@@ -1991,7 +1991,11 @@ function decodeHtmlEntities(value) {
     .replace(/&quot;/g, '"')
     .replace(/&#039;/g, "'")
     .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>');
+    .replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (_match, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_match, code) =>
+      String.fromCodePoint(Number.parseInt(code, 16)),
+    );
 }
 
 function htmlToPlainText(html) {
@@ -2288,6 +2292,33 @@ function lineMatchesCharacter(line, character) {
   );
 }
 
+function nevernessAppCharacterCode(character) {
+  const codes = new Map([
+    ['adler', 'adler'],
+    ['aurelia', 'mitsuki'],
+    ['baicang', 'cang'],
+    ['chaos', 'chaos'],
+    ['chiz', 'chiichan'],
+    ['daffodill', 'daffodill'],
+    ['edgar', 'edgar'],
+    ['fadia', 'fadia'],
+    ['haniel', 'haniel'],
+    ['hathor', 'hathor'],
+    ['hotori', 'jin'],
+    ['jiuyuan', 'kuhara'],
+    ['lacrimosa', 'lacrimosa'],
+    ['mint', 'mint'],
+    ['nanally', 'nanally'],
+    ['sakiri', 'sagiri'],
+    ['skia', 'skia'],
+    ['zero', 'zero'],
+  ]);
+  const candidates = [character.slug, character.originalName, character.name]
+    .map((value) => normalizeImportSlug(value))
+    .filter(Boolean);
+  return candidates.map((candidate) => codes.get(candidate)).find(Boolean) || '';
+}
+
 function characterImportSources(slug, character = {}) {
   const fandomTitle = encodeURIComponent(
     String(character.originalName || character.name || slug || '')
@@ -2302,6 +2333,7 @@ function characterImportSources(slug, character = {}) {
   const fandomRuImagePrefix = encodeURIComponent(
     String(character.name || character.originalName || slug || '').trim() || slug,
   );
+  const nevernessCode = nevernessAppCharacterCode({ ...character, slug });
 
   return [
     {
@@ -2344,6 +2376,25 @@ function characterImportSources(slug, character = {}) {
       url: 'https://game8.co/games/Neverness-to-Everness/archives/598619',
       parser: parseGame8SkinsImport,
       raw: true,
+    },
+    nevernessCode
+      ? {
+          id: 'neverness-app-profile',
+          name: 'Neverness Codex: симпатия, подарки и гардероб',
+          trust: 'medium',
+          url: `https://www.neverness.app/codex/characters/${nevernessCode}`,
+          parser: parseNevernessAppProfileImport,
+          raw: true,
+        }
+      : null,
+    {
+      id: 'zeroluck-voice-reference',
+      name: 'ZeroLuck: каталог реплик',
+      trust: 'medium',
+      url: `https://zeroluck.gg/nte/characters/${slug}/`,
+      referenceOnly: true,
+      referenceMessage:
+        'Источник содержит текст и внутренние audio-event ID, но не прямые аудиофайлы и не русскую локализацию. Автозаполнение реплик отключено, чтобы не публиковать английский текст как русский.',
     },
     {
       id: 'ntewiki-ru',
@@ -2460,7 +2511,7 @@ function characterImportSources(slug, character = {}) {
       url: 'https://nte.perfectworld.com/ru/main.html?nav=2',
       parser: parseOfficialImport,
     },
-  ];
+  ].filter(Boolean);
 }
 
 function guideImportSources(slug, character = {}) {
@@ -2493,6 +2544,91 @@ function guideImportSources(slug, character = {}) {
       raw: true,
     },
   ].map((source) => ({ ...source, character }));
+}
+
+function buildKnownAffinitySource(character) {
+  const code = nevernessAppCharacterCode(character);
+  if (!code) return null;
+  const source = {
+    id: 'verified-affinity-fallback',
+    name: 'Проверенная сводка симпатии NTE',
+    trust: 'medium',
+    url: `https://www.neverness.app/codex/characters/${code}`,
+  };
+  const levelRequirements = [100, 500, 1000, 2000, 3500, 5000, 7000, 9000, 12000, 16000];
+  const friendship = levelRequirements.map((points, index) => ({
+    level: index + 1,
+    rewardName: '',
+    rewardIconUrl: '',
+    description: `Для достижения уровня ${index + 1} требуется ${points.toLocaleString('ru-RU')} очков симпатии. Награда за уровень в проверенном источнике не указана.`,
+  }));
+  const suggestions = [
+    makeImportSuggestion(
+      'profile.friendship',
+      'Симпатия 1–10',
+      friendship,
+      source,
+      'high',
+      'Подтверждены только числовые требования уровней. Поля наград намеренно оставлены пустыми.',
+    ),
+  ];
+
+  if (code === 'jin') {
+    const gifts = [
+      ['SpecialGift_letter', 2000, 'награда за задание'],
+      ['Furniture_Ornament_002', 400, '15 000 фонов'],
+      ['SpecialGift_ticket', 400, 'не продаётся за фоны'],
+      ['Flower0000', 200, '7 500 фонов'],
+      ['Furniture_FlowerPot_001', 200, '3 600 фонов'],
+      ['Food_038', 100, '300 фонов'],
+      ['Food_098', 100, '750 фонов'],
+      ['Food_103', 100, 'не продаётся за фоны'],
+    ].map(([itemId, points, acquisition]) => ({
+      id: itemId,
+      name: knownGiftLocalizations.get(itemId),
+      iconUrl: `https://www.neverness.app/assets/codex/likeability/${itemId}.webp`,
+      effect: `+${Number(points).toLocaleString('ru-RU')} очков симпатии · ${acquisition}`,
+    }));
+    const outfitIds = ['Fashion_1052_0', 'Fashion_1052_3', 'Fashion_1052_2'];
+    const outfitFolders = new Map([
+      ['Fashion_1052_0', 'YH_UI_shizhuang_big_xun'],
+      ['Fashion_1052_2', 'YH_UI_shizhuang_big_xun2'],
+      ['Fashion_1052_3', 'YH_UI_shizhuang_big_xun3'],
+    ]);
+    const skins = outfitIds.map((outfitId) => ({
+      id: outfitId,
+      ...knownOutfitLocalizations.get(outfitId),
+      imageUrl: `https://www.neverness.app/assets/codex/outfits/${outfitFolders.get(outfitId)}/splash.webp`,
+    }));
+    suggestions.push(
+      makeImportSuggestion(
+        'profile.gifts',
+        'Любимые подарки Хотори',
+        gifts,
+        source,
+        'high',
+        'Сверены очки симпатии, стоимость и прямые иконки. Каждая строка всё равно требует подтверждения редактором.',
+      ),
+      makeImportSuggestion(
+        'profile.skins',
+        'Гардероб Хотори',
+        skins,
+        source,
+        'medium',
+        'Прямые изображения проверены; русские названия являются рабочим переводом до сверки с клиентом игры.',
+      ),
+    );
+  }
+
+  return {
+    ...source,
+    status: 'ok',
+    message:
+      code === 'jin'
+        ? 'Доступны требования симпатии, подарки и гардероб Хотори.'
+        : 'Доступны проверенные требования симпатии 1–10; награды источник не указывает.',
+    suggestions: suggestions.filter(Boolean),
+  };
 }
 
 function buildKnownVoiceActorSource(character) {
@@ -2673,6 +2809,7 @@ async function fetchImportSource(source, character) {
       ...source,
       status: 'partial',
       message:
+        source.referenceMessage ||
         'Справочный источник подключен для ручной проверки; структурированный авторазбор пока не включен.',
       suggestions: [],
     };
@@ -2684,7 +2821,7 @@ async function fetchImportSource(source, character) {
       const response = await fetch(source.url, {
         headers: {
           accept: 'text/html,application/xhtml+xml,application/json',
-        'user-agent': 'NTE Meta editorial import bot; source verification only',
+        'user-agent': 'NTE-Meta-Editorial/1.0 (+https://bonaqu.github.io/nte-meta/)',
       },
       signal: controller.signal,
     });
@@ -3088,7 +3225,7 @@ function translateGame8Obtain(value, characterName) {
   if (bondMatch) {
     return `Открывается за ${bondMatch[1]} уровень симпатии с ${characterName}.`;
   }
-  return text
+  const translated = text
     .replace(/Purchased for\s+([\d,]+)\s+Fons/i, 'Покупается за $1 фонов')
     .replace(
       /Purchased for\s+([\d,]+)\s+Riftcrystals/i,
@@ -3097,6 +3234,150 @@ function translateGame8Obtain(value, characterName) {
     .replace(/\bScarborough Fair\b/g, 'Ярмарка в Скарборо')
     .replace(/\bEpisodes\b/g, 'Эпизоды')
     .replace(/\bSpinoffs\b/g, 'Спин-оффы');
+  return /[A-Za-z]{3,}/.test(translated)
+    ? 'Способ получения требует ручной проверки.'
+    : translated;
+}
+
+const knownGiftLocalizations = new Map([
+  ['SpecialGift_letter', 'Рукописное письмо'],
+  ['Furniture_Ornament_002', 'Золотая луна'],
+  ['SpecialGift_ticket', 'Билет в кинотеатр «Флоу»'],
+  ['Flower0000', 'Золотой источник'],
+  ['Furniture_FlowerPot_001', 'Ваза с жёлтой глазурью'],
+  ['Food_038', 'Семейный напиток Чиё'],
+  ['Food_098', 'Чжу! Витамин!'],
+  ['Food_103', 'Королевская башня Эбису'],
+]);
+
+const knownOutfitLocalizations = new Map([
+  [
+    'Fashion_1052_0',
+    {
+      name: 'Под яркой луной',
+      description:
+        'Наряд, созданный известным дизайнером специально для Хотори. По слухам, на его стоимость можно было бы открыть ещё десять магазинов «Эйбон». Рабочий перевод требует сверки с русской версией игры.',
+    },
+  ],
+  [
+    'Fashion_1052_2',
+    {
+      name: 'Двор для отдыха',
+      description:
+        'Лёгкая и удобная домашняя одежда Хотори. Рабочий перевод названия требует сверки с русской версией игры.',
+    },
+  ],
+  [
+    'Fashion_1052_3',
+    {
+      name: 'Бесценная орхидея',
+      description:
+        'Высококлассный наряд в тематике призрачной орхидеи, особенно эффектный на студийных снимках. Рабочий перевод названия требует сверки с русской версией игры.',
+    },
+  ],
+]);
+
+const knownOutfitIdsBySourceName = new Map([
+  ['Under the Bright Moon', 'Fashion_1052_0'],
+  ['Recreational Courtyard', 'Fashion_1052_2'],
+  ['Priceless Orchid', 'Fashion_1052_3'],
+]);
+
+function parseHtmlJsonAttribute(html, attribute) {
+  const raw = String(html || '').match(
+    new RegExp(`${escapeRegExp(attribute)}=["']([^"']+)["']`, 'i'),
+  )?.[1];
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(decodeHtmlEntities(raw));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseNevernessAppProfileImport(html, source) {
+  const levels = parseHtmlJsonAttribute(html, 'data-levels')
+    .map((item) => ({
+      level: Number(item.level) + 1,
+      rewardName: '',
+      rewardIconUrl: '',
+      description: `Для достижения уровня ${Number(item.level) + 1} требуется ${Number(item.bondsRequired).toLocaleString('ru-RU')} очков симпатии. Награда за уровень в источнике не указана.`,
+    }))
+    .filter(
+      (item) =>
+        Number.isInteger(item.level) &&
+        item.level >= 1 &&
+        item.level <= 10 &&
+        !item.description.includes('NaN'),
+    );
+
+  const gifts = parseHtmlJsonAttribute(html, 'data-gifts')
+    .map((item) => {
+      const itemId = String(item.itemId || '');
+      const name = knownGiftLocalizations.get(itemId);
+      if (!name || !Number.isFinite(Number(item.bondPoints))) return null;
+      const acquisition =
+        itemId === 'SpecialGift_letter'
+          ? 'награда за задание'
+          : item.currency === 'fons' && Number.isFinite(Number(item.price))
+            ? `${Number(item.price).toLocaleString('ru-RU')} фонов`
+            : 'не продаётся за фоны';
+      return {
+        id: itemId || crypto.randomUUID(),
+        name,
+        iconUrl: normalizeImportImageSrc(item.icon || '', source.url),
+        effect: `+${Number(item.bondPoints).toLocaleString('ru-RU')} очков симпатии · ${acquisition}`,
+      };
+    })
+    .filter(Boolean);
+
+  const skins = [];
+  const outfitPattern = /<article\b[^>]*data-outfit-id=["']([^"']+)["'][\s\S]*?<\/article>/gi;
+  for (const match of String(html || '').matchAll(outfitPattern)) {
+    const outfitId = decodeHtmlEntities(match[1]);
+    const localization = knownOutfitLocalizations.get(outfitId);
+    if (!localization) continue;
+    const block = match[0];
+    const imageUrl = normalizeImportImageSrc(
+      block.match(/data-outfit-splash=["']([^"']+)["']/i)?.[1] || '',
+      source.url,
+    );
+    if (!imageUrl) continue;
+    skins.push({
+      id: outfitId,
+      name: localization.name,
+      imageUrl,
+      description: localization.description,
+    });
+  }
+
+  return [
+    makeImportSuggestion(
+      'profile.friendship',
+      'Симпатия 1–10',
+      levels,
+      source,
+      'high',
+      'Источник подтверждает только количество очков для достижения уровней. Награды не подставляются и остаются пустыми.',
+    ),
+    makeImportSuggestion(
+      'profile.gifts',
+      'Любимые подарки',
+      gifts,
+      source,
+      'high',
+      'Очки симпатии и изображения взяты из структурированного каталога; русские названия сверяются редактором перед сохранением.',
+    ),
+    makeImportSuggestion(
+      'profile.skins',
+      'Гардероб',
+      skins,
+      source,
+      'medium',
+      'Изображения взяты из каталога, названия являются рабочим переводом и требуют подтверждения редактором.',
+    ),
+  ].filter(Boolean);
 }
 
 function parseGame8SkinsImport(text, source, character) {
@@ -3117,9 +3398,12 @@ function parseGame8SkinsImport(text, source, character) {
         chunk.match(/data-src='([^']+)'/)?.[1] ||
         '',
     );
-    const skinName = cleanGame8Text(
+    const sourceSkinName = cleanGame8Text(
       chunk.match(/<b class='a-bold'>([\s\S]*?)<\/b>/i)?.[1] || '',
     );
+    const skinName = knownOutfitLocalizations.get(
+      knownOutfitIdsBySourceName.get(sourceSkinName),
+    )?.name;
     const characterFromAlt = cleanGame8Text(
       chunk.match(/alt='([^']+)\s+Icon'/i)?.[1] || '',
     );
@@ -3139,7 +3423,7 @@ function parseGame8SkinsImport(text, source, character) {
       characterCellIndex >= 0 ? cells[characterCellIndex + 1] || '' : cells[2] || '';
     const description = [
       translateGame8Obtain(obtainText, displayCharacterName),
-      'Название скина взято из англоязычного источника Game8; перед публикацией проверьте перевод в русской версии игры.',
+      'Название является рабочим переводом; перед публикацией проверьте его в русской версии игры.',
     ]
       .filter(Boolean)
       .join('\n\n');
@@ -3172,7 +3456,7 @@ function parseGame8SkinsImport(text, source, character) {
       skins,
       source,
       'medium',
-      'Скины найдены в таблице Game8. Названия требуют сверки с русской локализацией.',
+      'Скины найдены в таблице Game8. Предлагаются только строки с русским рабочим переводом.',
     ),
     makeImportSuggestion(
       'profile.friendship',
@@ -5171,7 +5455,7 @@ async function fetchFandomMediaLookupSource(items) {
           {
             headers: {
               accept: 'application/json',
-              'user-agent': 'NTE Meta editorial import bot; media lookup only',
+              'user-agent': 'NTE-Meta-Editorial/1.0 (+https://bonaqu.github.io/nte-meta/)',
             },
             signal: controller.signal,
           },
@@ -5259,6 +5543,12 @@ async function handleCharacterImportLookup(request, env) {
     slug,
   });
   if (voiceMediaSource) sourceResults.push(voiceMediaSource);
+  const affinitySource = buildKnownAffinitySource({
+    name: character.name || query,
+    originalName: character.original_name || query,
+    slug,
+  });
+  if (affinitySource) sourceResults.push(affinitySource);
   const rawSuggestions = sourceResults.flatMap((source) => source.suggestions);
   sourceResults.push(await fetchFandomMediaLookupSource(rawSuggestions));
   const suggestions = dedupeImportSuggestions(

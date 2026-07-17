@@ -1,6 +1,7 @@
 import React, {
   lazy,
   Suspense,
+  useCallback,
   useDeferredValue,
   useEffect,
   useId,
@@ -1884,21 +1885,32 @@ function CharacterDetailPage({
     [],
   );
 
+  const scrollToCharacterSection = useCallback(
+    (id: string, behavior: ScrollBehavior = 'smooth') => {
+      const target = document.getElementById(id);
+      if (!target) return;
+      const stickyOffset = 146;
+      window.scrollTo({
+        top: Math.max(0, window.scrollY + target.getBoundingClientRect().top - stickyOffset),
+        behavior,
+      });
+    },
+    [],
+  );
+
   useEffect(() => {
     const scrollToAnchor = () => {
       const id = window.location.hash.replace(/^#/, '');
       if (!sectionIds.includes(id)) return;
       window.requestAnimationFrame(() => {
-        document
-          .getElementById(id)
-          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        scrollToCharacterSection(id);
       });
     };
 
     scrollToAnchor();
     window.addEventListener('hashchange', scrollToAnchor);
     return () => window.removeEventListener('hashchange', scrollToAnchor);
-  }, [sectionIds]);
+  }, [scrollToCharacterSection, sectionIds]);
 
   if (!character) {
     return (
@@ -2033,11 +2045,7 @@ function CharacterDetailPage({
           <button
             type="button"
             key={id}
-            onClick={() =>
-              document
-                .getElementById(id)
-                ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            }
+            onClick={() => scrollToCharacterSection(id)}
           >
             {label}
           </button>

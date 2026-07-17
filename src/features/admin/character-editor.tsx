@@ -35,7 +35,10 @@ import type {
   PublishStatus,
 } from '../../types';
 
-type CharacterDraft = Omit<Character, 'id' | 'updatedAt'> & {
+type CharacterDraft = Omit<
+  Character,
+  'id' | 'updatedAt' | 'tier' | 'premiumTier'
+> & {
   id?: string;
   profile: CharacterProfile;
 };
@@ -153,8 +156,6 @@ function emptyDraft(): CharacterDraft {
     role: 'DPS',
     type: 'DPS',
     attribute: '',
-    tier: 'A',
-    premiumTier: 'A',
     imageUrl: '',
     splashUrl: '',
     shortDescription: '',
@@ -167,9 +168,16 @@ function emptyDraft(): CharacterDraft {
 }
 
 function toDraft(character: Character): CharacterDraft {
+  const {
+    tier: legacyTier,
+    premiumTier: legacyPremiumTier,
+    ...characterFields
+  } = character;
+  void legacyTier;
+  void legacyPremiumTier;
   const profile = character.profile || emptyProfile();
   return {
-    ...character,
+    ...characterFields,
     profile: {
       ...emptyProfile(),
       ...profile,
@@ -688,6 +696,13 @@ function mergeFriendshipLevels(
     const level = Number(item.level);
     if (level < 1 || level > 10) return;
     const existing = byLevel.get(level);
+    const importedRewards = (item.rewards || []).map(normalizeAssetFields);
+    const existingRewards = (existing?.rewards || []).map(normalizeAssetFields);
+    const rewards = mergeRowsByKey(
+      existingRewards,
+      importedRewards,
+      (reward) => `${reward.name}:${reward.quantity}`,
+    );
     byLevel.set(level, {
       level,
       rewardName: item.rewardName || existing?.rewardName || '',
@@ -695,6 +710,7 @@ function mergeFriendshipLevels(
         item.rewardIconUrl || existing?.rewardIconUrl || '',
       ),
       description: item.description || existing?.description || '',
+      rewards,
     });
   });
   return [...byLevel.values()].sort((a, b) => a.level - b.level);
@@ -704,7 +720,7 @@ function mergeNamedRows<T extends { id?: string; name: string }>(
   current: T[],
   imported: T[],
 ) {
-  const result = [...current];
+  const result = current.map(normalizeAssetFields);
   const indexByName = new Map<string, number>();
 
   result.forEach((item, index) => {
@@ -712,7 +728,7 @@ function mergeNamedRows<T extends { id?: string; name: string }>(
     if (key) indexByName.set(key, index);
   });
 
-  imported.forEach((item) => {
+  imported.map(normalizeAssetFields).forEach((item) => {
     const key = item.name.trim().toLocaleLowerCase('ru-RU');
     if (!key) return;
     const index = indexByName.get(key);
@@ -729,6 +745,9 @@ function mergeNamedRows<T extends { id?: string; name: string }>(
 
 function normalizeAssetFields<T extends object>(item: T): T {
   const next = { ...item } as Record<string, unknown>;
+  if (typeof next.id === 'string' && next.id.length > 80) {
+    next.id = rowId();
+  }
   for (const field of ['iconUrl', 'imageUrl', 'rewardIconUrl'] as const) {
     if (typeof next[field] === 'string') {
       next[field] = normalizeExternalAssetUrl(next[field]);

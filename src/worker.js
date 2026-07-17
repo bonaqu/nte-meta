@@ -1965,10 +1965,45 @@ async function refreshCommentScore(env, commentId) {
 }
 
 const IMPORT_SOURCE_TIMEOUT_MS = 7000;
-const IMPORT_MAX_HTML_BYTES = 900000;
+const IMPORT_MAX_HTML_BYTES = 600000;
 const IMPORT_FETCH_CONCURRENCY = 4;
 const IMPORT_MEDIA_LOOKUP_LIMIT = 6;
-const IMPORT_SOURCE_LIMIT = 20;
+const IMPORT_AUTO_SOURCE_LIMIT = 14;
+const IMPORT_SOURCE_PRIORITY = new Map([
+  ['official-ru', 100],
+  ['fandom-ru-api', 98],
+  ['ntewiki-ru', 96],
+  ['gamewith-detail-ru', 94],
+  ['interactivemap-profile-ru', 92],
+  ['neverness-app-profile', 90],
+  ['genshin-builds-ru', 88],
+  ['fandom-ru-images-api', 86],
+  ['fandom-ru-media-library', 84],
+  ['game8-skins', 82],
+  ['game8-voice', 80],
+  ['btva-en', 78],
+  ['dubbing-wiki', 76],
+  ['fandom-character', 74],
+]);
+
+function selectImportSources(sources) {
+  const trustWeight = { official: 4, high: 3, medium: 2, low: 1 };
+  const automatic = sources
+    .filter((source) => !source.referenceOnly)
+    .map((source, index) => ({ source, index }))
+    .sort(
+      (left, right) =>
+        (IMPORT_SOURCE_PRIORITY.get(right.source.id) || 0) -
+          (IMPORT_SOURCE_PRIORITY.get(left.source.id) || 0) ||
+        (trustWeight[right.source.trust] || 0) -
+          (trustWeight[left.source.trust] || 0) ||
+        left.index - right.index,
+    )
+    .slice(0, IMPORT_AUTO_SOURCE_LIMIT)
+    .map(({ source }) => source);
+  const references = sources.filter((source) => source.referenceOnly);
+  return [...automatic, ...references];
+}
 
 async function mapWithConcurrency(items, concurrency, callback) {
   const results = new Array(items.length);
@@ -4105,16 +4140,16 @@ function classifyGuideHeading(value) {
   const heading = normalizeImportSearch(value);
   const rules = [
     ['guide.summary', /кратк.*(?:справ|вывод|итог|обзор)|tl.?dr|quick summary/],
-    ['guide.pullAdvice', /стоит ли|pulling advice|pull advice/],
+    ['guide.pullAdvice', /стоит ли|нужно ли|(?:выбив|крут|получ).*(?:персонаж|геро)|pulling advice|pull advice/],
     ['guide.strengths', /плюс|сильн.*сторон|strength/],
     ['guide.weaknesses', /минус|слаб.*сторон|weakness/],
-    ['guide.skillPriority', /навык.*приоритет|приоритет.*(?:навык|прокач)|skill priority/],
+    ['guide.skillPriority', /навык.*приоритет|приоритет.*(?:навык|прокач)|прокач.*навык|skill priority/],
     ['guide.alternativeArcs', /альтернатив|f2p.*(?:arc|дуг)|(?:arc|дуг).*f2p|alternative arcs?/],
     ['guide.bestArcs', /лучш.*(?:дуг|arc|арк)|best arcs?/],
     ['guide.modules', /патрон|картридж|консол|модул|cartridge|console|module layout/],
-    ['guide.mainStats', /основн.*(?:стат|характерист)|main stats?|приоритет характеристик/],
+    ['guide.mainStats', /основн.*(?:стат|характерист)|^характеристик|main stats?|приоритет характеристик/],
     ['guide.subStats', /саб.*стат|дополнительн.*(?:стат|характерист)|sub.?stats?/],
-    ['guide.teams', /лучш.*команд|лучш.*состав|состав.*(?:команд|для)|отряд|best teams?/],
+    ['guide.teams', /лучш.*команд|лучш.*состав|^команд|состав.*(?:команд|для)|отряд|best teams?/],
     ['guide.rotations', /ротац|rotation/],
     ['guide.tips', /как играть|совет|механик|управлен|how to play|tips?/],
   ];
@@ -5882,7 +5917,7 @@ async function handleCharacterImportLookup(request, env) {
       slug,
     };
   const sourceResults = await mapWithConcurrency(
-    characterImportSources(slug, importCharacter).slice(0, IMPORT_SOURCE_LIMIT),
+    selectImportSources(characterImportSources(slug, importCharacter)),
     IMPORT_FETCH_CONCURRENCY,
     (source) => fetchImportSource(source, importCharacter),
   );
@@ -5992,7 +6027,7 @@ async function handleGuideImportLookup(request, env) {
     slug,
   };
   const sourceResults = await mapWithConcurrency(
-    guideImportSources(slug, importCharacter).slice(0, IMPORT_SOURCE_LIMIT),
+    selectImportSources(guideImportSources(slug, importCharacter)),
     IMPORT_FETCH_CONCURRENCY,
     (source) => fetchImportSource(source, importCharacter),
   );
@@ -6162,7 +6197,7 @@ function normalizeSetting(key, value) {
   }
 
   const canonical = cleanString(value.canonical, 8, 300);
-  validateResourceUrl(canonical, 'canonical');
+  validateResourceUrl(canonical, 'основной адрес сайта');
   return {
     canonical,
     description: cleanString(value.description, 20, 180),
@@ -6449,6 +6484,29 @@ function normalizeRecord(config, body, options = {}) {
 }
 
 function validateEntityRecord(entity, record, isCreate) {
+  const fieldLabels = {
+    slug: 'адрес страницы',
+    name: 'имя',
+    original_name: 'оригинальное имя',
+    role: 'роль',
+    type: 'тип',
+    attribute: 'атрибут',
+    image_url: 'изображение',
+    splash_url: 'splash-изображение',
+    short_description: 'краткое описание',
+    summary: 'краткий вывод',
+    character_id: 'персонаж',
+    title: 'название',
+    patch_version: 'патч',
+    body_markdown: 'текст публикации',
+    category: 'категория',
+    source_name: 'название источника',
+    source_url: 'ссылка на источник',
+    source_type: 'тип источника',
+    trust_level: 'уровень доверия',
+    tierlist_type: 'тир-лист',
+  };
+  const fieldLabel = (field) => fieldLabels[field] || 'поле';
   const requiredByEntity = {
     characters: [
       'slug',
@@ -6495,7 +6553,10 @@ function validateEntityRecord(entity, record, isCreate) {
         String(record[field]).trim() === '',
     );
     if (missing.length) {
-      throwHttp(`Не заполнены обязательные поля: ${missing.join(', ')}`, 400);
+      throwHttp(
+        `Заполните обязательные поля: ${missing.map(fieldLabel).join(', ')}`,
+        400,
+      );
     }
   }
 
@@ -6506,7 +6567,7 @@ function validateEntityRecord(entity, record, isCreate) {
           ? 60000
           : 8000;
       if (value.length > maxLength) {
-        throwHttp(`Поле ${field} слишком длинное`, 400);
+        throwHttp(`Поле «${fieldLabel(field)}» содержит слишком много текста`, 400);
       }
       record[field] = value.trim();
     }
@@ -6539,9 +6600,9 @@ function validateEntityRecord(entity, record, isCreate) {
   }
   if (
     record.tierlist_type !== undefined &&
-    !['base', 'premium'].includes(record.tierlist_type)
+    record.tierlist_type !== 'base'
   ) {
-    throwHttp('Неизвестный тип тир-листа', 400);
+    throwHttp('На сайте используется один единый тир-лист', 400);
   }
   if (
     record.budget !== undefined &&
@@ -6583,7 +6644,7 @@ function validateEntityRecord(entity, record, isCreate) {
       record[field] !== null &&
       record[field] !== ''
     ) {
-      validateResourceUrl(record[field], field);
+      validateResourceUrl(record[field], fieldLabel(field));
     }
   }
 }
@@ -6643,7 +6704,7 @@ function normalizeCharacterProfile(value) {
         400,
       );
     }
-    if (result) validateResourceUrl(result, 'profile URL');
+    if (result) validateResourceUrl(result, label);
     return result;
   };
   const id = (input) => {
@@ -6772,7 +6833,10 @@ function validateResourceUrl(value, field) {
     if (!['https:', 'http:'].includes(url.protocol))
       throw new Error('protocol');
   } catch {
-    throwHttp(`Поле ${field} должно содержать корректный URL`, 400);
+    throwHttp(
+      `Проверьте поле «${field}»: нужна корректная ссылка http(s)`,
+      400,
+    );
   }
 }
 

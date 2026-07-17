@@ -184,6 +184,37 @@ function canAccessAdmin(user: User | null) {
 type SiteDataSetter = React.Dispatch<React.SetStateAction<SiteData>>;
 const rarityOptions = ['Любая редкость', 'S', 'A'];
 const tierOptions = ['Любой тир', ...tierOrder];
+const guideSectionTypeOptions = [
+  ['overview', 'Обзор'],
+  ['verdict', 'Краткий вывод'],
+  ['pull-advice', 'Стоит ли качать'],
+  ['pros', 'Плюсы'],
+  ['strengths', 'Плюсы'],
+  ['cons', 'Минусы'],
+  ['weaknesses', 'Минусы'],
+  ['skills', 'Навыки'],
+  ['skill-priority', 'Приоритет навыков'],
+  ['build', 'Билд'],
+  ['best-arcs', 'Лучшие дуги'],
+  ['alternative-arcs', 'Альтернативные дуги'],
+  ['modules', 'Модули и картриджи'],
+  ['main-stats', 'Основные статы'],
+  ['sub-stats', 'Саб-статы'],
+  ['teams', 'Команды'],
+  ['rotations', 'Ротации'],
+  ['rotation', 'Ротации'],
+  ['tips', 'Советы и механики'],
+  ['mistakes', 'Частые ошибки'],
+  ['video', 'Видео-гайд'],
+  ['faq', 'Вопросы и ответы'],
+] as const;
+
+function guideSectionTypeLabel(value: string) {
+  return (
+    guideSectionTypeOptions.find(([type]) => type === value)?.[1] ||
+    'Другой раздел'
+  );
+}
 
 function makeSlug(value: string) {
   return (
@@ -2545,7 +2576,6 @@ function GuideDetail({
               id={section.id}
               key={section.id}
             >
-              <p className="eyebrow">{section.type}</p>
               <h2>{section.title}</h2>
               <MarkdownPreview value={section.content} />
             </article>
@@ -5050,11 +5080,7 @@ function AdminGuides({
 
     const importMarkdown = [
       importMarker,
-      `### ${suggestion.label}`,
       formatGuideImportValue(suggestion.value),
-      '',
-      `Источник: [${suggestion.sourceName}](${suggestion.sourceUrl})`,
-      suggestion.note ? `Примечание: ${suggestion.note}` : '',
     ]
       .filter(Boolean)
       .join('\n');
@@ -5754,7 +5780,7 @@ function AdminGuides({
             >
                 <GripVertical aria-hidden="true" />
                 <span>{section.title}</span>
-                <small>{section.type}</small>
+                <small>{guideSectionTypeLabel(section.type)}</small>
               </button>
             ))}
           </div>
@@ -5817,8 +5843,8 @@ function AdminGuides({
               />
             </label>
             <label>
-              Тип секции
-              <input
+              Категория раздела
+              <select
                 value={
                   sections.find((section) => section.id === selectedSectionId)
                     ?.type || ''
@@ -5826,7 +5852,28 @@ function AdminGuides({
                 onChange={(event) =>
                   updateSelectedSection({ type: event.target.value })
                 }
-              />
+              >
+                {(() => {
+                  const selectedType =
+                    sections.find((section) => section.id === selectedSectionId)
+                      ?.type || '';
+                  const known = guideSectionTypeOptions.some(
+                    ([type]) => type === selectedType,
+                  );
+                  return (
+                    <>
+                      {!known && selectedType ? (
+                        <option value={selectedType}>Другой раздел</option>
+                      ) : null}
+                      {guideSectionTypeOptions.map(([type, label]) => (
+                        <option key={type} value={type}>
+                          {label}
+                        </option>
+                      ))}
+                    </>
+                  );
+                })()}
+              </select>
             </label>
           </div>
           <div className="toolbar" aria-label="Панель форматирования текста">

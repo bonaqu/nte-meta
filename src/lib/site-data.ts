@@ -139,8 +139,6 @@ export function getCharacterSearchText(character: Character) {
       character.type,
       character.attribute,
       character.rarity,
-      character.tier,
-      character.premiumTier,
       character.tags.join(' '),
       character.profile?.faction || '',
       character.profile?.roleTags.join(' ') || '',

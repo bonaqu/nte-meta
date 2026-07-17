@@ -12,8 +12,6 @@ on:
         required: false
         default: false
         type: boolean
-  schedule:
-    - cron: '17 3 * * 0'
 
 permissions:
   contents: read
@@ -46,10 +44,10 @@ jobs:
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
       - name: Test two baseline browser flows
-        if: github.event_name != 'schedule' && github.event.inputs.full_suite != 'true'
+        if: github.event.inputs.full_suite != 'true'
         run: npm run test:ci
-      - name: Full weekly or manually requested regression
-        if: github.event_name == 'schedule' || github.event.inputs.full_suite == 'true'
+      - name: Full manually requested regression
+        if: github.event.inputs.full_suite == 'true'
         run: npm run test:full
       - name: Verify production API
         run: |
@@ -65,7 +63,7 @@ jobs:
           path: dist
 
   deploy:
-    if: github.event_name != 'pull_request' && github.event_name != 'schedule'
+    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

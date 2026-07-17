@@ -1318,6 +1318,23 @@
     color: var(--muted);
   }
 
+  .guide-toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .guide-toolbar-actions > .ghost-button,
+  .guide-toolbar-actions .rating-bar button {
+    min-block-size: 40px;
+  }
+
+  .guide-toolbar-actions .rating-bar {
+    align-items: center;
+  }
+
   .rating-bar {
     display: flex;
     flex-wrap: wrap;
@@ -2809,6 +2826,15 @@
 
     .toc {
       position: static;
+    }
+
+    .guide-toolbar {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .guide-toolbar-actions {
+      justify-content: flex-start;
     }
 
     .admin-sidebar {

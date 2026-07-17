@@ -305,6 +305,15 @@
     min-block-size: 40px;
   }
 
+  .leak-editor-note {
+    grid-column: 1 / -1;
+  }
+
+  .leak-editor-controls > .ghost-button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
   .translation-notice {
     inline-size: fit-content;
     padding: 7px 9px;
@@ -1316,6 +1325,13 @@
   .character-card p,
   .character-card span {
     color: var(--muted);
+  }
+
+  .character-card p {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
   }
 
   .character-card:hover,
@@ -4160,6 +4176,37 @@
     align-content: start;
   }
 
+  .comment-actions .text-button.is-active {
+    border-color: color-mix(in srgb, var(--cyan) 48%, var(--border));
+    background: color-mix(in srgb, var(--cyan) 11%, transparent);
+    color: var(--text);
+  }
+
+  .comment-branch-toggle {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    justify-self: start;
+    min-block-size: 34px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--cyan) 8%, transparent);
+    color: var(--cyan);
+    cursor: pointer;
+    font-weight: 800;
+  }
+
+  .comment-branch-toggle svg {
+    inline-size: 16px;
+    block-size: 16px;
+    transition: transform 180ms ease;
+  }
+
+  .comment-branch-toggle[aria-expanded='false'] svg {
+    transform: rotate(-90deg);
+  }
+
   .skin-media {
     display: grid;
     place-items: center;
@@ -4490,7 +4537,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: rgb(0 0 0 / 0.22);
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .import-image-preview {
@@ -4678,7 +4725,7 @@
   block-size: 44px;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius-sm) - 2px);
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .import-row span {
@@ -4710,7 +4757,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: rgb(0 0 0 / 0.24);
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .editor-image-preview {
@@ -4720,7 +4767,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: rgb(0 0 0 / 0.24);
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .editor-image-preview--wide {

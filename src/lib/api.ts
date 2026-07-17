@@ -28,6 +28,7 @@ export type ReactionSummary = {
   likes: number;
   dislikes: number;
   useful: number;
+  active: Array<'like' | 'dislike' | 'useful'>;
 };
 export type AuthConfig = {
   registrationEnabled: boolean;
@@ -404,6 +405,8 @@ export async function updateLeakCandidateEditorial(
     reviewStatus?: Exclude<LeakCandidateReviewStatus, 'accepted'>;
     suggestedStatus?: LeakStatus;
     trustLevel?: 'низкий' | 'средний' | 'высокий';
+    translationStatus?: LeakCandidate['translationStatus'];
+    editorNote?: string;
   },
 ) {
   return request<{ success: boolean }>(
@@ -461,6 +464,17 @@ export async function sendReaction(
     method: 'POST',
     body: JSON.stringify({ targetType, targetId, reactionType }),
   });
+}
+
+export async function removeReaction(
+  targetType: string,
+  targetId: string,
+  reactionType: 'like' | 'dislike' | 'useful',
+) {
+  return request<ReactionSummary>(
+    `/api/reactions?targetType=${encodeURIComponent(targetType)}&targetId=${encodeURIComponent(targetId)}&reactionType=${encodeURIComponent(reactionType)}`,
+    { method: 'DELETE' },
+  );
 }
 
 export async function saveEntity<T>(

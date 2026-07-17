@@ -212,6 +212,7 @@ export function LeakDiscoveryPanel({
   );
   const [pending, setPending] = useState(false);
   const [actionId, setActionId] = useState('');
+  const [editorNotes, setEditorNotes] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
   const [tone, setTone] = useState<'info' | 'danger' | 'success'>('info');
 
@@ -227,7 +228,12 @@ export function LeakDiscoveryPanel({
     let mounted = true;
     loadLeakCandidates().then((result) => {
       if (!mounted) return;
-      if (result.ok) setCandidates(result.data);
+      if (result.ok) {
+        setCandidates(result.data);
+        setEditorNotes(
+          Object.fromEntries(result.data.map((item) => [item.id, item.editorNote || ''])),
+        );
+      }
       else {
         setTone('danger');
         setMessage(result.error);
@@ -245,6 +251,11 @@ export function LeakDiscoveryPanel({
     const result = await discoverLeakCandidates(query);
     if (result.ok) {
       setCandidates(result.data.candidates);
+      setEditorNotes(
+        Object.fromEntries(
+          result.data.candidates.map((item) => [item.id, item.editorNote || '']),
+        ),
+      );
       setSources(result.data.sources);
       setTone('success');
       setMessage(
@@ -313,9 +324,12 @@ export function LeakDiscoveryPanel({
 
   async function updateEditorial(
     candidate: LeakCandidate,
-    patch:
-      | Pick<LeakCandidate, 'suggestedStatus'>
-      | Pick<LeakCandidate, 'trustLevel'>,
+    patch: Partial<
+      Pick<
+        LeakCandidate,
+        'suggestedStatus' | 'trustLevel' | 'translationStatus' | 'editorNote'
+      >
+    >,
   ) {
     setActionId(candidate.id);
     const result = await updateLeakCandidateEditorial(candidate.id, patch);
@@ -418,6 +432,7 @@ export function LeakDiscoveryPanel({
                 </span>
                 <span>Доверие: {candidate.trustLevel}</span>
                 <span>Уверенность: {candidate.confidenceScore}%</span>
+                <span>Перевод: {candidate.translationStatus}</span>
                 {candidate.origin === 'user' ? (
                   <span>Предложено игроком</span>
                 ) : null}
@@ -433,7 +448,7 @@ export function LeakDiscoveryPanel({
                   Первоисточник <ExternalLink aria-hidden="true" />
                 </a>
               </div>
-              {candidate.language !== 'ru' ? (
+              {candidate.translationStatus === 'нужен перевод' ? (
                 <p className="translation-notice">
                   <Languages aria-hidden="true" /> Нужен редакционный перевод на
                   русский.
@@ -476,6 +491,51 @@ export function LeakDiscoveryPanel({
                       <option value="высокий">Высокое</option>
                     </select>
                   </label>
+                  <label>
+                    Статус перевода
+                    <select
+                      value={candidate.translationStatus}
+                      disabled={actionId === candidate.id}
+                      onChange={(event) =>
+                        void updateEditorial(candidate, {
+                          translationStatus: event.target
+                            .value as LeakCandidate['translationStatus'],
+                        })
+                      }
+                    >
+                      <option value="не требуется">Не требуется</option>
+                      <option value="нужен перевод">Нужен перевод</option>
+                      <option value="переведено">Переведено</option>
+                      <option value="проверено">Перевод проверен</option>
+                    </select>
+                  </label>
+                  <label className="leak-editor-note">
+                    Заметка редактора
+                    <textarea
+                      value={editorNotes[candidate.id] || ''}
+                      rows={3}
+                      maxLength={2000}
+                      placeholder="Что сверить, перевести или уточнить перед публикацией"
+                      onChange={(event) =>
+                        setEditorNotes((current) => ({
+                          ...current,
+                          [candidate.id]: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    disabled={actionId === candidate.id}
+                    onClick={() =>
+                      void updateEditorial(candidate, {
+                        editorNote: editorNotes[candidate.id] || '',
+                      })
+                    }
+                  >
+                    <FilePenLine aria-hidden="true" /> Сохранить заметку
+                  </button>
                 </fieldset>
               ) : null}
               <div className="comment-actions">

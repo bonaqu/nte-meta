@@ -77,6 +77,7 @@ import {
   logout,
   me,
   register,
+  removeReaction,
   saveEntity,
   sendReaction,
   updateComment,
@@ -1392,6 +1393,11 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
   const updatedGuide = data.guides[0];
   const pendingLeaks = data.leaks.filter((leak) => !leak.approved).length;
   const sourceCount = data.sources.length;
+  const sourceMetric = sourceCount
+    ? `${sourceCount} источников`
+    : canAccessAdmin(user)
+      ? 'Нет активных'
+      : 'Ручная проверка';
   const recentThread = data.threads[0];
   const leadHref = updatedGuide ? `#/guides/${updatedGuide.slug}` : '#/guides';
   const leadTitle = updatedGuide ? updatedGuide.title : 'Нужен первый глубокий гайд';
@@ -1402,7 +1408,7 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
   const focusItems = [
     {
       title: 'Проверка источников',
-      value: `${sourceCount} источников`,
+      value: sourceMetric,
       text: 'Автоимпорт предлагает строки только с ссылкой на источник и ручным подтверждением.',
       href: canAccessAdmin(user) ? '#/admin/sources' : '#/guides',
       icon: Search,
@@ -2959,8 +2965,12 @@ function CommentsBlock({
   const [deleteTarget, setDeleteTarget] = useState<Comment | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
+  const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(
+    new Set(),
+  );
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const draftKey = `nte-comment-draft:${targetType}:${targetId}`;
   const threadedComments = useMemo(() => {
     const byParent = new Map<string, Comment[]>();
     const roots: Comment[] = [];
@@ -2979,16 +2989,24 @@ function CommentsBlock({
       comment: Comment;
       depth: number;
       parentAuthor?: string;
+      rootId: string;
     }> = [];
-    const append = (comment: Comment, depth = 0, parentAuthor?: string) => {
-      result.push({ comment, depth, parentAuthor });
+    const append = (
+      comment: Comment,
+      depth = 0,
+      parentAuthor?: string,
+      rootId = comment.id,
+    ) => {
+      result.push({ comment, depth, parentAuthor, rootId });
       (byParent.get(comment.id) || [])
         .sort(
           (left, right) =>
             new Date(left.createdAt).getTime() -
             new Date(right.createdAt).getTime(),
         )
-        .forEach((child) => append(child, depth + 1, comment.author));
+        .forEach((child) =>
+          append(child, depth + 1, comment.author, rootId),
+        );
     };
     roots.forEach((comment) => append(comment));
     comments
@@ -2997,9 +3015,18 @@ function CommentsBlock({
           comment.parentId &&
           !comments.some((item) => item.id === comment.parentId),
       )
-      .forEach((comment) => result.push({ comment, depth: 0 }));
+      .forEach((comment) =>
+        result.push({ comment, depth: 0, rootId: comment.id }),
+      );
     return result;
   }, [comments]);
+  const branchReplyCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    threadedComments.forEach(({ depth, rootId }) => {
+      if (depth > 0) counts.set(rootId, (counts.get(rootId) || 0) + 1);
+    });
+    return counts;
+  }, [threadedComments]);
 
   useEffect(() => {
     setComments(fallbackComments);
@@ -3017,6 +3044,23 @@ function CommentsBlock({
     if (!replyTo) return;
     bodyRef.current?.focus();
   }, [replyTo]);
+
+  useEffect(() => {
+    try {
+      setBody(localStorage.getItem(draftKey) || '');
+    } catch {
+      setBody('');
+    }
+  }, [draftKey]);
+
+  useEffect(() => {
+    try {
+      if (body.trim()) localStorage.setItem(draftKey, body);
+      else localStorage.removeItem(draftKey);
+    } catch {
+      // Comments still work when storage is unavailable.
+    }
+  }, [body, draftKey]);
 
   useEffect(() => {
     const commentId = new URL(window.location.href).searchParams.get('comment');
@@ -3046,6 +3090,11 @@ function CommentsBlock({
     if (result.ok) {
       setComments((current) => [result.data, ...current]);
       setBody('');
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {
+        // Nothing to clean up when storage is unavailable.
+      }
       setReplyTo(null);
       setMessage('Комментарий опубликован.');
     } else {
@@ -3128,7 +3177,10 @@ function CommentsBlock({
       return;
     }
     setActionId(comment.id);
-    const result = await sendReaction('comment', comment.id, reactionType);
+    const isActive = comment.activeReactions?.includes(reactionType) || false;
+    const result = isActive
+      ? await removeReaction('comment', comment.id, reactionType)
+      : await sendReaction('comment', comment.id, reactionType);
     if (result.ok) {
       setComments((current) =>
         current.map((item) =>
@@ -3136,7 +3188,12 @@ function CommentsBlock({
             ? {
                 ...item,
                 score: result.data.useful,
-                reactions: result.data,
+                reactions: {
+                  likes: result.data.likes,
+                  dislikes: result.data.dislikes,
+                  useful: result.data.useful,
+                },
+                activeReactions: result.data.active,
               }
             : item,
         ),
@@ -3222,7 +3279,8 @@ function CommentsBlock({
       </form>
       <div className="comment-list">
         {threadedComments.length ? (
-          threadedComments.map(({ comment, depth, parentAuthor }) => (
+          threadedComments.map(({ comment, depth, parentAuthor, rootId }) =>
+            depth > 0 && collapsedBranches.has(rootId) ? null : (
             <article
               className={`comment-card ${
                 comment.parentId
@@ -3279,10 +3337,30 @@ function CommentsBlock({
               ) : (
                 <p>{comment.body}</p>
               )}
+              {depth === 0 && (branchReplyCounts.get(comment.id) || 0) > 0 ? (
+                <button
+                  className="comment-branch-toggle"
+                  type="button"
+                  aria-expanded={!collapsedBranches.has(comment.id)}
+                  onClick={() =>
+                    setCollapsedBranches((current) => {
+                      const next = new Set(current);
+                      if (next.has(comment.id)) next.delete(comment.id);
+                      else next.add(comment.id);
+                      return next;
+                    })
+                  }
+                >
+                  <ChevronDown aria-hidden="true" />
+                  {collapsedBranches.has(comment.id) ? 'Показать' : 'Скрыть'} ответы (
+                  {branchReplyCounts.get(comment.id)})
+                </button>
+              ) : null}
               <div className="comment-actions">
                 <button
-                  className="text-button"
+                  className={`text-button ${comment.activeReactions?.includes('like') ? 'is-active' : ''}`}
                   type="button"
+                  aria-pressed={comment.activeReactions?.includes('like') || false}
                   disabled={actionId === comment.id}
                   onClick={() => void reactToComment(comment, 'like')}
                 >
@@ -3290,8 +3368,9 @@ function CommentsBlock({
                   Поддержать {comment.reactions?.likes || 0}
                 </button>
                 <button
-                  className="text-button"
+                  className={`text-button ${comment.activeReactions?.includes('dislike') ? 'is-active' : ''}`}
                   type="button"
+                  aria-pressed={comment.activeReactions?.includes('dislike') || false}
                   disabled={actionId === comment.id}
                   onClick={() => void reactToComment(comment, 'dislike')}
                 >
@@ -3299,8 +3378,9 @@ function CommentsBlock({
                   Не согласен {comment.reactions?.dislikes || 0}
                 </button>
                 <button
-                  className="text-button"
+                  className={`text-button ${comment.activeReactions?.includes('useful') ? 'is-active' : ''}`}
                   type="button"
+                  aria-pressed={comment.activeReactions?.includes('useful') || false}
                   disabled={actionId === comment.id}
                   onClick={() => void reactToComment(comment, 'useful')}
                 >

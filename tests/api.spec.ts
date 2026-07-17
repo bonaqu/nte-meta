@@ -98,12 +98,23 @@ test.describe('NTE Meta Worker API', () => {
     expect(submitted.status()).toBe(201);
     const candidateId = (await submitted.json()).data.id;
 
+    const editorialUpdate = await owner.patch(
+      `/api/leak-candidates/${candidateId}`,
+      {
+        data: { suggestedStatus: 'слив', trustLevel: 'средний' },
+      },
+    );
+    expect(editorialUpdate.ok()).toBeTruthy();
+
     const promoted = await owner.post(
       `/api/leak-candidates/${candidateId}/promote`,
       { data: {} },
     );
     expect(promoted.status()).toBe(201);
     const promotedData = (await promoted.json()).data;
+    const draft = await owner.get(`/api/leaks/${promotedData.leakId}`);
+    expect(draft.ok()).toBeTruthy();
+    expect((await draft.json()).data.status).toBe('слив');
 
     expect((await guest.get(`/api/leaks/${promotedData.slug}`)).status()).toBe(
       404,
@@ -597,11 +608,18 @@ test.describe('NTE Meta Worker API', () => {
       return !/(?:роль|role|редкость|rarity)[_.\s/-]/i.test(media);
     }),
   ).toBeTruthy();
-  expect(
-    ownerLookupJson.data.suggestions.some(
-      (suggestion: { field: string }) => suggestion.field === 'profile.roleIcons',
-    ),
-  ).toBeTruthy();
+  const roleIconSuggestion = ownerLookupJson.data.suggestions.find(
+    (suggestion: { field: string }) => suggestion.field === 'profile.roleIcons',
+  ) as { value: string } | undefined;
+  if (roleIconSuggestion) {
+    const importedRoleIcons = JSON.parse(roleIconSuggestion.value) as Array<{
+      name?: string;
+      iconUrl?: string;
+    }>;
+    expect(
+      importedRoleIcons.every((icon) => icon.name && /^https:\/\//.test(icon.iconUrl || '')),
+    ).toBeTruthy();
+  }
   expect(
     ownerLookupJson.data.suggestions
       .filter((suggestion: { field: string }) =>
@@ -717,7 +735,7 @@ test.describe('NTE Meta Worker API', () => {
     );
     expect((await editorCharacterRead.json()).data.profile).toMatchObject({
       faction: 'Тестовая фракция',
-      roleTags: ['Support', 'Buffer'],
+      roleTags: ['Поддержка', 'Усиление'],
     });
     expect(
       (

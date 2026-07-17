@@ -576,8 +576,8 @@ function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {
     'profile.trivia': 'Интересные факты',
     'profile.roleTags': 'Роли в отряде',
     'profile.roleIcons': 'Иконки ролей',
-    'profile.voiceActors': 'Актёры озвучки',
-    'profile.voiceLines': 'Реплики',
+    'profile.voiceActors': 'Озвучка: актёры',
+    'profile.voiceLines': 'Озвучка: реплики',
     'profile.materials': 'Материалы прокачки',
     'profile.baseStats': 'Начальные показатели',
     'profile.abilities': 'Способности',
@@ -673,8 +673,8 @@ function formatEditorError(error: string) {
     return text
       .replace(/profile\.awakenings/g, 'Пробуждения')
       .replace(/profile\.abilities/g, 'Способности')
-      .replace(/profile\.voiceActors/g, 'Актёры озвучки')
-      .replace(/profile\.voiceLines/g, 'Реплики')
+      .replace(/profile\.voiceActors/g, 'Озвучка: актёры')
+      .replace(/profile\.voiceLines/g, 'Озвучка: реплики')
       .replace(/profile\.baseStats/g, 'Начальные показатели')
       .replace(/profile\.materials/g, 'Материалы')
       .replace(/profile\.roleTags/g, 'Роли персонажа')
@@ -1748,45 +1748,6 @@ export function AdminCharacterEditor({
             value={profile.trivia}
             onChange={(trivia) => patchProfile({ trivia })}
           />
-          <Collection<CharacterVoiceActor>
-            title="Актёры озвучки"
-            description="Укажите сэйю или актёра для каждого доступного языка."
-            items={profile.voiceActors}
-            addLabel="Добавить актёра"
-            createItem={() => ({ language: 'Японский', name: '' })}
-            onChange={(voiceActors) => patchProfile({ voiceActors })}
-            render={(item, _index, update) => (
-              <>
-                <label>
-                  Язык
-                  <select
-                    value={item.language}
-                    onChange={(event) =>
-                      update({
-                        ...item,
-                        language: event.target
-                          .value as CharacterVoiceActor['language'],
-                      })
-                    }
-                  >
-                    <option>Русский</option>
-                    {voiceLanguages.map((language) => (
-                      <option key={language}>{language}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Имя актёра
-                  <input
-                    value={item.name}
-                    onChange={(event) =>
-                      update({ ...item, name: event.target.value })
-                    }
-                  />
-                </label>
-              </>
-            )}
-          />
         </details>
 
         <details className="editor-section" open>
@@ -2344,6 +2305,49 @@ export function AdminCharacterEditor({
 
         <details className="editor-section">
           <summary>Озвучка персонажа</summary>
+          <p className="editor-section-intro">
+            Актёры дубляжа и реплики собраны вместе. Для каждого языка можно
+            указать исполнителя, аудиофайл и проверяемый источник.
+          </p>
+          <Collection<CharacterVoiceActor>
+            title="Актёры озвучки"
+            description="Укажите сэйю или актёра для каждого доступного языка."
+            items={profile.voiceActors}
+            addLabel="Добавить актёра"
+            createItem={() => ({ language: 'Японский', name: '' })}
+            onChange={(voiceActors) => patchProfile({ voiceActors })}
+            render={(item, _index, update) => (
+              <>
+                <label>
+                  Язык
+                  <select
+                    value={item.language}
+                    onChange={(event) =>
+                      update({
+                        ...item,
+                        language: event.target
+                          .value as CharacterVoiceActor['language'],
+                      })
+                    }
+                  >
+                    <option>Русский</option>
+                    {voiceLanguages.map((language) => (
+                      <option key={language}>{language}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Имя актёра
+                  <input
+                    value={item.name}
+                    onChange={(event) =>
+                      update({ ...item, name: event.target.value })
+                    }
+                  />
+                </label>
+              </>
+            )}
+          />
           <Collection<CharacterVoiceLine>
             title="Реплики"
             description="Аудиофайлы для английской, японской, корейской и китайской озвучки."

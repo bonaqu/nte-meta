@@ -554,6 +554,19 @@ test.describe('NTE Meta Worker API', () => {
   const guideLookupJson = await guideLookup.json();
   expect(guideLookupJson.data.sources.length).toBeGreaterThan(0);
   expect(Array.isArray(guideLookupJson.data.suggestions)).toBeTruthy();
+  expect(
+    guideLookupJson.data.suggestions.some((suggestion: { field: string }) =>
+      [
+        'guide.summary',
+        'guide.pullAdvice',
+        'guide.bestArcs',
+        'guide.alternativeArcs',
+        'guide.teams',
+        'guide.rotations',
+        'guide.tips',
+      ].includes(suggestion.field),
+    ),
+  ).toBeTruthy();
   for (const suggestion of guideLookupJson.data.suggestions) {
     expect(suggestion.field === 'tier' || suggestion.field.startsWith('guide.')).toBeTruthy();
     expect(suggestion.sourceUrl).toContain('https://');

@@ -6210,7 +6210,7 @@ async function handleSystemStatus(request, env) {
       d1: 'ok',
       generatedAt: new Date().toISOString(),
       counts,
-      migrations: { latestKnown: '0021_fix_hotori_voice_cast.sql' },
+      migrations: { latestKnown: '0023_fix_hotori_guide_markdown_newlines.sql' },
     },
   });
 }

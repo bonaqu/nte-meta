@@ -4,9 +4,6 @@
   "main": "src/worker.js",
   "compatibility_date": "2026-06-20",
   "compatibility_flags": ["nodejs_compat"],
-  "limits": {
-    "subrequests": 50,
-  },
   "workers_dev": true,
   "preview_urls": false,
   "observability": {

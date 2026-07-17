@@ -2191,6 +2191,7 @@ function normalizeProfileImportValue(field, value) {
     if (field === 'profile.baseStats') return normalizeBaseStatRows(value);
     if (field === 'profile.voiceActors') return normalizeVoiceActorRows(value);
     if (field === 'profile.roleTags') return normalizeImportedStringList(value);
+    if (field === 'profile.skins') return normalizeSkinRows(value);
     if (
       [
         'profile.abilities',
@@ -3114,6 +3115,7 @@ function cleanWikiParagraphText(value) {
 function normalizeImportedRuText(value) {
   return String(value || '')
     .replace(/^\s*=\s*/, '')
+    .replace(/([,;])\s*=\s*/g, '$1 ')
     .replace(/\[\[[^\]|]+\|([^\]]+)\]\]/g, '$1')
     .replace(/\[\[([^\]]+)\]\]/g, '$1')
     .replace(/\[https?:\/\/[^\s\]]+\s+([^\]]+)\]/g, '$1')
@@ -3243,6 +3245,33 @@ function normalizeProfileCollectionRows(field, value) {
       }
       return next;
     });
+}
+
+function normalizeSkinRows(value) {
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const sourceName = normalizeImportedRuText(item.name);
+    if (/\blivery\b/i.test(sourceName)) return [];
+    const localization = knownOutfitLocalizations.get(
+      knownOutfitIdsBySourceName.get(sourceName),
+    );
+    const name = localization?.name || sourceName;
+    if (!name || (!localization && !hasRussianText(name))) return [];
+    const sourceDescription = normalizeImportedRuText(item.description || '')
+      .replace(
+        /\n\nНазвание скина взято из англоязычного источника Game8;[^\n]*$/i,
+        '',
+      )
+      .trim();
+    return [
+      {
+        ...item,
+        name,
+        description:
+          sourceDescription || localization?.description || '',
+      },
+    ];
+  });
 }
 
 function extractFandomCharacterIntro(content) {
@@ -3572,6 +3601,34 @@ const knownGiftLocalizations = new Map([
 
 const knownOutfitLocalizations = new Map([
   [
+    'Game8_1033_0',
+    {
+      name: 'Пустая лакшана с пятью агрегациями',
+      description: 'Стандартный наряд Адлера.',
+    },
+  ],
+  [
+    'Game8_1019_0',
+    {
+      name: 'Надежда ОС',
+      description: 'Стандартный наряд Минт.',
+    },
+  ],
+  [
+    'Game8_1019_1',
+    {
+      name: 'Для Мэри',
+      description: 'Наряд Минт. Способ получения требует проверки редактором.',
+    },
+  ],
+  [
+    'Game8_1019_2',
+    {
+      name: 'Безмятежный отдых',
+      description: 'Наряд Минт за развитие симпатии.',
+    },
+  ],
+  [
     'Fashion_1052_0',
     {
       name: 'Под яркой луной',
@@ -3598,6 +3655,10 @@ const knownOutfitLocalizations = new Map([
 ]);
 
 const knownOutfitIdsBySourceName = new Map([
+  ['Five Aggregates', 'Game8_1033_0'],
+  ['CSU Prodigy', 'Game8_1019_0'],
+  ['To Mary', 'Game8_1019_1'],
+  ['Leisurely Holiday', 'Game8_1019_2'],
   ['Under the Bright Moon', 'Fashion_1052_0'],
   ['Recreational Courtyard', 'Fashion_1052_2'],
   ['Priceless Orchid', 'Fashion_1052_3'],
@@ -6673,7 +6734,7 @@ function serializeCharacter(row) {
         'profile.abilities',
         parseJson(row.profile_abilities_json, []),
       ),
-      skins: parseJson(row.profile_skins_json, []),
+      skins: normalizeSkinRows(parseJson(row.profile_skins_json, [])),
       friendship: normalizeProfileCollectionRows(
         'profile.friendship',
         parseJson(row.profile_friendship_json, []),

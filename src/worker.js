@@ -1980,6 +1980,7 @@ const IMPORT_SOURCE_PRIORITY = new Map([
   ['interactivemap-profile-ru', 92],
   ['neverness-app-profile', 90],
   ['genshin-builds-ru', 88],
+  ['fandom-ru-voice-library', 87],
   ['fandom-ru-images-api', 86],
   ['fandom-voice-media-api', 85],
   ['fandom-ru-media-library', 84],
@@ -2317,8 +2318,7 @@ function normalizeExternalAudioUrl(value) {
   if (!/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) return url;
   try {
     const parsed = new URL(url);
-    parsed.pathname = parsed.pathname.replace(/\/revision\/latest(?:\/[^/?#]+)?$/i, '');
-    parsed.search = '';
+    parsed.searchParams.delete('cb');
     return parsed.toString();
   } catch {
     return url;
@@ -2504,6 +2504,16 @@ function characterImportSources(slug, character = {}) {
       trust: 'high',
       url: `https://neverness-to-everness.fandom.com/ru/api.php?action=query&list=allimages&aifrom=${fandomRuImagePrefix}&ailimit=50&aiprop=url|mime|size|dimensions&format=json&formatversion=2&origin=*`,
       parser: parseFandomRuAllImagesImport,
+      raw: true,
+    },
+    {
+      id: 'fandom-ru-voice-library',
+      name: 'Fandom RU: медиатека озвучки',
+      trust: 'high',
+      url: 'https://neverness-to-everness.fandom.com/ru/api.php?action=query&list=allimages&aiprefix=VO_&ailimit=max&aiprop=url|mime|size&format=json&formatversion=2&origin=*',
+      publicUrl: `https://neverness-to-everness.fandom.com/ru/wiki/${fandomRuTitle}`,
+      cacheTtl: 1800,
+      parser: parseFandomRuVoiceLibraryImport,
       raw: true,
     },
     {
@@ -3050,13 +3060,20 @@ async function fetchImportSource(source, character) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), IMPORT_SOURCE_TIMEOUT_MS);
   try {
-      const response = await fetch(source.url, {
+      const fetchOptions = {
         headers: {
           accept: 'text/html,application/xhtml+xml,application/json',
         'user-agent': 'NTE-Meta-Editorial/1.0 (+https://bonaqu.github.io/nte-meta/)',
       },
       signal: controller.signal,
-    });
+      };
+      if (source.cacheTtl) {
+        fetchOptions.cf = {
+          cacheEverything: true,
+          cacheTtl: source.cacheTtl,
+        };
+      }
+      const response = await fetch(source.url, fetchOptions);
     const length = Number(response.headers.get('content-length') || 0);
     if (!response.ok) {
       return {
@@ -3698,7 +3715,7 @@ function parseFandomVoiceMediaImport(text, source) {
       })
       .filter(Boolean)
       .sort((left, right) => left.sortKey.localeCompare(right.sortKey, 'ru'))
-      .slice(0, 200)
+      .slice(0, 500)
       .map((row, index) => ({
         id: `voice-${hashText(`${row.language.label}:${row.rawTitle}`).slice(0, 12)}`,
         title: localizeFandomVoiceTitle(row.rawTitle, index),
@@ -3717,6 +3734,79 @@ function parseFandomVoiceMediaImport(text, source) {
         source,
         'medium',
         'Аудиофайлы получены через MediaWiki API. Каждую запись нужно прослушать и подтвердить отдельно.',
+      ),
+    ].filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+const FANDOM_RU_VOICE_LANGUAGES = new Map([
+  ['', { label: 'Английский', adjective: 'английской' }],
+  ['JA', { label: 'Японский', adjective: 'японской' }],
+  ['KR', { label: 'Корейский', adjective: 'корейской' }],
+  ['ZH', { label: 'Китайский', adjective: 'китайской' }],
+]);
+
+function parseFandomRuVoiceLibraryImport(text, source, character) {
+  try {
+    const payload = JSON.parse(text);
+    const images = Array.isArray(payload?.query?.allimages)
+      ? payload.query.allimages
+      : [];
+    const aliases = [character.name, character.originalName, character.slug]
+      .map((value) => String(value || '').trim().replace(/\s+/g, '_'))
+      .filter(Boolean)
+      .sort((left, right) => right.length - left.length);
+    const rows = images
+      .map((image) => {
+        const fileName = String(image?.name || '').trim();
+        const match = fileName.match(
+          /^VO_(?:(JA|KR|ZH)_)?(.+?)\.(mp3|m4a|ogg|oga|wav|flac|webm)$/i,
+        );
+        if (!match || !image?.url || !/(?:audio|mpeg|ogg|webm)/i.test(String(image.mime || ''))) {
+          return null;
+        }
+        const stem = match[2];
+        const alias = aliases.find((candidate) =>
+          stem.toLocaleLowerCase('ru-RU').startsWith(
+            `${candidate.toLocaleLowerCase('ru-RU')}_`,
+          ),
+        );
+        if (!alias) return null;
+        const title = normalizeImportedRuText(
+          stem.slice(alias.length + 1).replace(/_/g, ' '),
+        );
+        const language = FANDOM_RU_VOICE_LANGUAGES.get(
+          String(match[1] || '').toUpperCase(),
+        );
+        const audioUrl = normalizeExternalAudioUrl(image.url);
+        if (!title || !language || !audioUrl) return null;
+        return {
+          id: `voice-${hashText(`${language.label}:${title}`).slice(0, 12)}`,
+          title,
+          language: language.label,
+          audioUrl,
+          sourceUrl: source.publicUrl || source.url,
+          description: `Прямая запись ${language.adjective} озвучки из русской медиатеки. Прослушайте запись перед подтверждением.`,
+        };
+      })
+      .filter(Boolean)
+      .sort(
+        (left, right) =>
+          left.language.localeCompare(right.language, 'ru') ||
+          left.title.localeCompare(right.title, 'ru'),
+      )
+      .slice(0, 500);
+
+    return [
+      makeImportSuggestion(
+        'profile.voiceLines',
+        'Реплики озвучки',
+        rows,
+        source,
+        'high',
+        'Русские названия и прямые аудиофайлы получены из MediaWiki API. Подтвердите каждую запись отдельно.',
       ),
     ].filter(Boolean);
   } catch {
@@ -5977,7 +6067,7 @@ const PROFILE_COLLECTION_MERGE_CONFIGS = [
   {
     field: 'profile.voiceLines',
     label: 'Реплики озвучки',
-    limit: 200,
+    limit: 500,
     key: (entry) =>
       `${normalizeImportSearch(entry?.language)}:${normalizeImportSearch(entry?.title)}`,
   },
@@ -6196,8 +6286,11 @@ function completeKnownAbilitySlots(suggestion, character) {
 function enrichCharacterImportSuggestions(items, character = {}) {
   const imageMap = importImageMapFromSuggestions(items);
   const enriched = items.map((item) => enrichArraySuggestionMedia(item, imageMap));
+  const bestAbilitySuggestion = enriched
+    .filter((item) => item?.field === 'profile.abilities')
+    .sort((left, right) => importSuggestionScore(right) - importSuggestionScore(left))[0];
   const mergedAbilities = completeKnownAbilitySlots(
-    mergeAbilityImportSuggestions(enriched),
+    mergeAbilityImportSuggestions(enriched) || bestAbilitySuggestion,
     character,
   );
   const mergedCollections = PROFILE_COLLECTION_MERGE_CONFIGS.map((config) =>
@@ -7501,7 +7594,7 @@ function normalizeCharacterProfile(value) {
       iconUrl: url(item.iconUrl),
       effect: text(item.effect, 1000),
     })),
-    voiceLines: collection('voiceLines', 200, (item) => ({
+    voiceLines: collection('voiceLines', 500, (item) => ({
       id: id(item.id),
       title: text(item.title, 160),
       language: text(item.language, 40),

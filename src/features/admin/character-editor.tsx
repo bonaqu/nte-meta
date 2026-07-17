@@ -52,7 +52,8 @@ const voiceLanguages = [
   'Корейский',
   'Китайский',
 ] as const;
-const directAudioPattern = /\.(mp3|m4a|ogg|oga|wav|flac|webm)(?:[?#].*)?$/i;
+const directAudioPattern =
+  /\.(mp3|m4a|ogg|oga|wav|flac|webm)(?:\/revision\/latest)?(?:[?#].*)?$/i;
 
 function isDirectAudioUrl(url: string) {
   const value = url.trim();
@@ -317,58 +318,64 @@ function ImportSuggestionList({
                 ) : null}
                 <p>{summarizeSuggestionValue(suggestion.value)}</p>
                 {rowSuggestions.length ? (
-                  <div className="import-row-review" aria-label={`Строки: ${fieldLabel}`}>
-                    {rowSuggestions.map((row) => {
-                      const rowDecision = decisions[row.id];
-                      const rowPreviewUrls = getSuggestionPreviewUrls(row);
-                      const rowAudioUrl = getSuggestionAudioUrl(row);
-                      return (
-                        <div
-                          className={`import-row ${rowDecision ? `is-${rowDecision}` : ''}`}
-                          key={row.id}
-                        >
-                          {rowPreviewUrls[0] ? (
-                            <img
-                              src={resolveAssetUrl(rowPreviewUrls[0])}
-                              alt=""
-                              width="44"
-                              height="44"
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : null}
-                          <div className="import-row-content">
-                            <span>{row.label}</span>
-                            {rowAudioUrl ? (
-                              <audio controls preload="none" src={rowAudioUrl}>
-                                Ваш браузер не поддерживает аудио.
-                              </audio>
+                  <details className="import-row-review">
+                    <summary>
+                      Проверить строки по одной
+                      <span>{rowSuggestions.length}</span>
+                    </summary>
+                    <div className="import-row-review-list" aria-label={`Строки: ${fieldLabel}`}>
+                      {rowSuggestions.map((row) => {
+                        const rowDecision = decisions[row.id];
+                        const rowPreviewUrls = getSuggestionPreviewUrls(row);
+                        const rowAudioUrl = getSuggestionAudioUrl(row);
+                        return (
+                          <div
+                            className={`import-row ${rowDecision ? `is-${rowDecision}` : ''}`}
+                            key={row.id}
+                          >
+                            {rowPreviewUrls[0] ? (
+                              <img
+                                src={resolveAssetUrl(rowPreviewUrls[0])}
+                                alt=""
+                                width="44"
+                                height="44"
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                              />
                             ) : null}
+                            <div className="import-row-content">
+                              <span>{row.label}</span>
+                              {rowAudioUrl ? (
+                                <audio controls preload="none" src={rowAudioUrl}>
+                                  Ваш браузер не поддерживает аудио.
+                                </audio>
+                              ) : null}
+                            </div>
+                            <div className="import-row-actions">
+                              <button
+                                className="icon-button success"
+                                type="button"
+                                aria-label={`Принять строку: ${row.label}`}
+                                disabled={rowDecision === 'accepted'}
+                                onClick={() => onAccept(row)}
+                              >
+                                <CheckCircle2 aria-hidden="true" />
+                              </button>
+                              <button
+                                className="icon-button danger"
+                                type="button"
+                                aria-label={`Отклонить строку: ${row.label}`}
+                                disabled={rowDecision === 'rejected'}
+                                onClick={() => onReject(row)}
+                              >
+                                <XCircle aria-hidden="true" />
+                              </button>
+                            </div>
                           </div>
-                          <div className="import-row-actions">
-                            <button
-                              className="icon-button success"
-                              type="button"
-                              aria-label={`Принять строку: ${row.label}`}
-                              disabled={rowDecision === 'accepted'}
-                              onClick={() => onAccept(row)}
-                            >
-                              <CheckCircle2 aria-hidden="true" />
-                            </button>
-                            <button
-                              className="icon-button danger"
-                              type="button"
-                              aria-label={`Отклонить строку: ${row.label}`}
-                              disabled={rowDecision === 'rejected'}
-                              onClick={() => onReject(row)}
-                            >
-                              <XCircle aria-hidden="true" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  </details>
                 ) : null}
               </div>
               <small>
@@ -612,6 +619,9 @@ function formatEditorError(error: string) {
   }
   if (/profile\.gifts.+не больше/i.test(text)) {
     return 'В любимых подарках слишком много записей. Оставьте проверенные подарки без дублей.';
+  }
+  if (/profile\.voiceLines.+не больше/i.test(text)) {
+    return 'В озвучке можно сохранить не больше 500 записей. Удалите дубли или неподтверждённые реплики.';
   }
   if (/profile\./i.test(text)) {
     return text

@@ -3788,14 +3788,69 @@
     object-fit: cover;
   }
 
+.voice-library {
+  display: grid;
+  gap: 14px;
+}
+
+.voice-language-tabs {
+  display: flex;
+  gap: 4px;
+  max-inline-size: 100%;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 0.18);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.voice-language-tabs button {
+  display: inline-flex;
+  flex: 1 0 auto;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 40px;
+  padding-inline: 12px;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.voice-language-tabs button:is(:hover, .active) {
+  background: rgb(38 217 255 / 0.11);
+  color: var(--text);
+}
+
+.voice-language-tabs button.active {
+  box-shadow: inset 0 0 0 1px rgb(38 217 255 / 0.3);
+}
+
+.voice-language-tabs span {
+  min-inline-size: 24px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+  color: var(--cyan);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .voice-line-list article {
   display: grid;
   grid-template-columns: minmax(180px, 0.45fr) minmax(260px, 1fr);
   gap: 16px;
   align-items: center;
-    padding: 12px 0;
-    border-block-end: 1px solid var(--border);
-  }
+  padding: 12px 0;
+  border-block-end: 1px solid var(--border);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 92px;
+}
 
 .voice-line-list article > div {
   display: grid;
@@ -4085,10 +4140,41 @@
 }
 
 .import-row-review {
-  display: grid;
-  gap: 8px;
   grid-column: 1 / -1;
   margin-block-start: 8px;
+}
+
+.import-row-review:not(details),
+.import-row-review-list {
+  display: grid;
+  gap: 8px;
+}
+
+.import-row-review > summary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgb(255 255 255 / 0.04);
+  color: var(--text);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.import-row-review > summary span {
+  min-inline-size: 30px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgb(38 217 255 / 0.12);
+  color: var(--cyan);
+  text-align: center;
+}
+
+.import-row-review[open] > summary {
+  margin-block-end: 8px;
 }
 
 .import-row {

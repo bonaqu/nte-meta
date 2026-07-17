@@ -112,6 +112,7 @@ import type {
   Character,
   CharacterImportSuggestion,
   CharacterRoleIcon,
+  CharacterVoiceLine,
   Comment,
   CommunityThread,
   ContentScope,
@@ -131,7 +132,8 @@ import type {
   UserWarning,
 } from './types';
 
-const directAudioPattern = /\.(mp3|m4a|ogg|oga|wav|flac|webm)(?:[?#].*)?$/i;
+const directAudioPattern =
+  /\.(mp3|m4a|ogg|oga|wav|flac|webm)(?:\/revision\/latest)?(?:[?#].*)?$/i;
 
 function canPlayDirectAudio(url: string) {
   const value = url.trim();
@@ -1880,6 +1882,96 @@ function SelectFilter({
   );
 }
 
+const voiceLanguageOrder: CharacterVoiceLine['language'][] = [
+  'Японский',
+  'Английский',
+  'Корейский',
+  'Китайский',
+];
+
+function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
+  const languages = useMemo(
+    () =>
+      voiceLanguageOrder.filter((language) =>
+        lines.some((line) => line.language === language),
+      ),
+    [lines],
+  );
+  const [activeLanguage, setActiveLanguage] = useState<
+    CharacterVoiceLine['language']
+  >(languages[0] || 'Японский');
+  const panelId = `${useId().replace(/:/g, '')}-voice-lines`;
+
+  useEffect(() => {
+    if (!languages.includes(activeLanguage) && languages[0]) {
+      setActiveLanguage(languages[0]);
+    }
+  }, [activeLanguage, languages]);
+
+  const visibleLines = lines.filter((line) => line.language === activeLanguage);
+
+  return (
+    <div className="voice-library">
+      <div className="voice-language-tabs" role="tablist" aria-label="Язык озвучки">
+        {languages.map((language) => {
+          const count = lines.filter((line) => line.language === language).length;
+          const selected = language === activeLanguage;
+          return (
+            <button
+              type="button"
+              role="tab"
+              aria-controls={panelId}
+              aria-selected={selected}
+              className={selected ? 'active' : ''}
+              key={language}
+              onClick={() => setActiveLanguage(language)}
+            >
+              {language}
+              <span>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div
+        className="voice-line-list"
+        id={panelId}
+        role="tabpanel"
+        aria-label={`Реплики: ${activeLanguage}`}
+      >
+        {visibleLines.map((line) => (
+          <article key={`${line.language}:${line.id}`}>
+            <div>
+              <strong>{line.title}</strong>
+              <span>{line.language}</span>
+            </div>
+            <div className="voice-line-media">
+              {line.description ? <p>{line.description}</p> : null}
+              {canPlayDirectAudio(line.audioUrl) ? (
+                <audio controls preload="none" src={line.audioUrl}>
+                  Ваш браузер не поддерживает аудио.
+                </audio>
+              ) : line.sourceUrl ? (
+                <a
+                  className="ghost-button"
+                  href={line.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Headphones aria-hidden="true" /> Открыть источник записи
+                </a>
+              ) : (
+                <span className="audio-placeholder">
+                  <Headphones aria-hidden="true" /> Прямой аудиофайл не добавлен
+                </span>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CharacterDetailPage({
   data,
   slug,
@@ -2332,37 +2424,7 @@ function CharacterDetailPage({
           text="Реплики на английском, японском, корейском и китайском языках."
         />
         {profile.voiceLines.length ? (
-          <div className="voice-line-list">
-            {profile.voiceLines.map((line) => (
-              <article key={line.id}>
-              <div>
-                <strong>{line.title}</strong>
-                <span>{line.language}</span>
-              </div>
-              <div className="voice-line-media">
-                {line.description ? <p>{line.description}</p> : null}
-                {canPlayDirectAudio(line.audioUrl) ? (
-                  <audio controls preload="none" src={line.audioUrl}>
-                    Ваш браузер не поддерживает аудио.
-                  </audio>
-                ) : line.sourceUrl ? (
-                  <a
-                    className="ghost-button"
-                    href={line.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Headphones aria-hidden="true" /> Открыть источник записи
-                  </a>
-                ) : (
-                  <span className="audio-placeholder">
-                    <Headphones aria-hidden="true" /> Прямой аудиофайл не добавлен
-                  </span>
-                )}
-              </div>
-            </article>
-          ))}
-          </div>
+          <CharacterVoiceLibrary lines={profile.voiceLines} />
         ) : (
           <EmptyState
             title="Аудио пока не загружено"

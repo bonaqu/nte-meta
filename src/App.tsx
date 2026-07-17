@@ -1988,43 +1988,14 @@ function CharacterDetailPage({
   const [guideEditorOpen, setGuideEditorOpen] = useState(false);
   const [characterEditorDirty, setCharacterEditorDirty] = useState(false);
   const [guideEditorDirty, setGuideEditorDirty] = useState(false);
-  const sectionIds = useMemo(
-    () => [
-      'character-biography',
-      'character-abilities',
-      'character-awakenings',
-      'character-progression',
-      'character-voice',
-    ],
-    [],
-  );
-
   const scrollToCharacterSection = useCallback(
     (id: string, behavior: ScrollBehavior = 'smooth') => {
       const target = document.getElementById(id);
       if (!target) return;
-      const stickyOffset = 146;
-      window.scrollTo({
-        top: Math.max(0, window.scrollY + target.getBoundingClientRect().top - stickyOffset),
-        behavior,
-      });
+      target.scrollIntoView({ behavior, block: 'start' });
     },
     [],
   );
-
-  useEffect(() => {
-    const scrollToAnchor = () => {
-      const id = window.location.hash.replace(/^#/, '');
-      if (!sectionIds.includes(id)) return;
-      window.requestAnimationFrame(() => {
-        scrollToCharacterSection(id);
-      });
-    };
-
-    scrollToAnchor();
-    window.addEventListener('hashchange', scrollToAnchor);
-    return () => window.removeEventListener('hashchange', scrollToAnchor);
-  }, [scrollToCharacterSection, sectionIds]);
 
   if (!character) {
     return (

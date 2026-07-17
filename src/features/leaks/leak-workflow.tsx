@@ -16,6 +16,7 @@ import {
   promoteLeakCandidate,
   reviewLeakCandidate,
   submitLeakCandidate,
+  updateLeakCandidateEditorial,
 } from '../../lib/api';
 import type {
   LeakCandidate,
@@ -310,6 +311,29 @@ export function LeakDiscoveryPanel({
     setActionId('');
   }
 
+  async function updateEditorial(
+    candidate: LeakCandidate,
+    patch:
+      | Pick<LeakCandidate, 'suggestedStatus'>
+      | Pick<LeakCandidate, 'trustLevel'>,
+  ) {
+    setActionId(candidate.id);
+    const result = await updateLeakCandidateEditorial(candidate.id, patch);
+    if (result.ok) {
+      setCandidates((current) =>
+        current.map((item) =>
+          item.id === candidate.id ? { ...item, ...patch } : item,
+        ),
+      );
+      setTone('success');
+      setMessage('Редакционная оценка сохранена.');
+    } else {
+      setTone('danger');
+      setMessage(result.error);
+    }
+    setActionId('');
+  }
+
   return (
     <section className="leak-discovery" aria-labelledby="leak-discovery-title">
       <div className="leak-discovery-heading">
@@ -414,6 +438,45 @@ export function LeakDiscoveryPanel({
                   <Languages aria-hidden="true" /> Нужен редакционный перевод на
                   русский.
                 </p>
+              ) : null}
+              {candidate.reviewStatus === 'pending' ? (
+                <fieldset className="leak-editor-controls">
+                  <legend>Редакционная оценка</legend>
+                  <label>
+                    Тип публикации
+                    <select
+                      value={candidate.suggestedStatus}
+                      disabled={actionId === candidate.id}
+                      onChange={(event) =>
+                        void updateEditorial(candidate, {
+                          suggestedStatus: event.target.value as LeakStatus,
+                        })
+                      }
+                    >
+                      <option value="слух">Слух</option>
+                      <option value="слив">Слив</option>
+                      <option value="подтверждено">Подтверждено</option>
+                      <option value="опровергнуто">Опровергнуто</option>
+                    </select>
+                  </label>
+                  <label>
+                    Доверие к источнику
+                    <select
+                      value={candidate.trustLevel}
+                      disabled={actionId === candidate.id}
+                      onChange={(event) =>
+                        void updateEditorial(candidate, {
+                          trustLevel: event.target
+                            .value as LeakCandidate['trustLevel'],
+                        })
+                      }
+                    >
+                      <option value="низкий">Низкое</option>
+                      <option value="средний">Среднее</option>
+                      <option value="высокий">Высокое</option>
+                    </select>
+                  </label>
+                </fieldset>
               ) : null}
               <div className="comment-actions">
                 {candidate.reviewStatus === 'pending' ? (

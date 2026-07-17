@@ -1731,26 +1731,59 @@ async function handleLeakCandidates(request, env, parts, ctx) {
   if (request.method === 'PATCH' && id) {
     const actor = await requireContentPermission(request, env, 'leaks', 'edit');
     const body = await readJson(request);
-    const reviewStatus = cleanString(body.reviewStatus, 1, 20);
-    if (!['pending', 'rejected', 'duplicate'].includes(reviewStatus)) {
-      return json(
-        { error: 'Принять публикацию можно только через создание черновика' },
-        400,
+    const updates = [];
+    const values = [];
+    const audit = {};
+
+    if (body.reviewStatus !== undefined) {
+      const reviewStatus = cleanString(body.reviewStatus, 1, 20);
+      if (!['pending', 'rejected', 'duplicate'].includes(reviewStatus)) {
+        return json(
+          { error: 'Принять публикацию можно только через создание черновика' },
+          400,
+        );
+      }
+      updates.push(
+        'review_status = ?',
+        'reviewed_by = ?',
+        'reviewed_at = current_timestamp',
       );
+      values.push(reviewStatus, actor.id);
+      audit.reviewStatus = reviewStatus;
+    }
+
+    if (body.suggestedStatus !== undefined) {
+      const suggestedStatus = normalizeLeakCandidateStatus(body.suggestedStatus);
+      updates.push('suggested_status = ?');
+      values.push(suggestedStatus);
+      audit.suggestedStatus = suggestedStatus;
+    }
+
+    if (body.trustLevel !== undefined) {
+      const trustLevel = cleanString(body.trustLevel, 1, 20);
+      if (!['низкий', 'средний', 'высокий'].includes(trustLevel)) {
+        return json({ error: 'Выберите корректный уровень доверия' }, 400);
+      }
+      updates.push('trust_level = ?');
+      values.push(trustLevel);
+      audit.trustLevel = trustLevel;
+    }
+
+    if (!updates.length) {
+      return json({ error: 'Не выбраны изменения для сохранения' }, 400);
     }
     const result = await env.DB.prepare(
       `UPDATE leak_candidates
-       SET review_status = ?, reviewed_by = ?, reviewed_at = current_timestamp,
-           updated_at = current_timestamp
+       SET ${updates.join(', ')}, updated_at = current_timestamp
        WHERE id = ?`,
     )
-      .bind(reviewStatus, actor.id, id)
+      .bind(...values, id)
       .run();
     if (!result.meta.changes) {
       return json({ error: 'Публикация в очереди не найдена' }, 404);
     }
     ctx.waitUntil(
-      logAudit(env, actor.id, 'leak_candidates.review', id, { reviewStatus }),
+      logAudit(env, actor.id, 'leak_candidates.review', id, audit),
     );
     return json({ data: { success: true } });
   }
@@ -2151,10 +2184,15 @@ function leakCandidateTitle(text) {
 }
 
 function leakCandidateMatchesSource(candidate, source) {
+  const text = `${candidate.title} ${candidate.excerpt}`;
+  if (
+    source.requiresGameTag &&
+    !/(?:neverness\s*to\s*everness|\bNTE\b|异环|невернесс)/iu.test(text)
+  ) {
+    return false;
+  }
   if (source.relevance !== 'future') return true;
-  return /(?:leak|rumou?r|upcoming|roadmap|unreleased|preview|future|datamine|слив|слух|утечк|неофициаль|будущ|предполож|爆料)/i.test(
-    `${candidate.title} ${candidate.excerpt}`,
-  );
+  return /(?:leak|rumou?r|upcoming|roadmap|unreleased|preview|future|datamine|слив|слух|утечк|неофициаль|будущ|предполож|爆料)/i.test(text);
 }
 
 function leakCandidateMatchesQuery(candidate, query) {
@@ -2684,6 +2722,27 @@ const LEAK_DISCOVERY_SOURCES = [
     relevance: 'future',
   },
   {
+    id: 'telegram-seele-nte',
+    name: 'Seele NTE Leaks',
+    url: 'https://t.me/s/Seele_NTE_Leaks',
+    type: 'telegram',
+    language: 'en',
+    trustLevel: 'средний',
+    parser: 'telegram',
+    relevance: 'future',
+  },
+  {
+    id: 'telegram-stardust',
+    name: 'Stardust Leaks (несколько игр)',
+    url: 'https://t.me/s/StardustLeaks',
+    type: 'telegram',
+    language: 'en',
+    trustLevel: 'низкий',
+    parser: 'telegram',
+    relevance: 'future',
+    requiresGameTag: true,
+  },
+  {
     id: 'telegram-ru',
     name: 'Neverness to Everness RU',
     url: 'https://t.me/s/neverness_to_evernessru',
@@ -2703,6 +2762,17 @@ const LEAK_DISCOVERY_SOURCES = [
     referenceOnly: true,
     message:
       'Reddit блокирует серверный сбор. Откройте свежие публикации вручную.',
+  },
+  {
+    id: 'reddit-nevernessleaks',
+    name: 'Reddit r/NevernessLeaks',
+    url: 'https://www.reddit.com/r/NevernessLeaks/new/',
+    type: 'reddit',
+    language: 'en',
+    trustLevel: 'средний',
+    referenceOnly: true,
+    message:
+      'Отдельный раздел утечек NTE. Сверяйте автора, дату и исходный китайский материал вручную.',
   },
   {
     id: 'bilibili-search',
@@ -3129,7 +3199,7 @@ function makeImportSuggestion(
       splashUrl: 'Splash персонажа',
       'profile.biography': 'Биография',
       'profile.arcType': 'Тип дуги',
-      'profile.voiceActors': 'Актёры озвучки',
+      'profile.voiceActors': 'Озвучка: актёры',
       'profile.voiceLines': 'Реплики озвучки',
       'profile.roleTags': 'Роли персонажа',
     }[canonicalField] || label;
@@ -3169,7 +3239,7 @@ function isPlaceholderImportImage(value, title = '') {
   const haystack = decodedMediaUrl(`${title} ${value}`)
     .toLocaleLowerCase('ru-RU')
     .replace(/%20/g, ' ');
-  return /(?:^|[/_.\s-])(?:placeholder|no[\s_-]*image|image[\s_-]*(?:not[\s_-]*found|missing)|missing[\s_-]*image|default[\s_-]*(?:image|avatar|portrait)|blank|empty|transparent|spacer|fallback|dummy|meta[\s_-]*image|social[\s_-]*(?:share|image)|og[\s_-]*image)(?:$|[/_.\s-])/i.test(
+  return /(?:^|[/_.\s-])(?:placeholder|no[\s_-]*image|image[\s_-]*(?:not[\s_-]*found|missing)|missing[\s_-]*image|default[\s_-]*(?:image|avatar|portrait)|blank|empty|transparent|spacer|fallback|dummy|site[\s_-]*(?:background|logo)|favicon|wiki[\s_-]*wordmark|meta[\s_-]*image|social[\s_-]*(?:share|image)|og[\s_-]*image)(?:$|[/_.\s-])/i.test(
     haystack,
   );
 }
@@ -3941,7 +4011,7 @@ function buildKnownVoiceActorSource(character) {
     suggestions: [
       makeImportSuggestion(
         'profile.voiceActors',
-        'Актёры озвучки',
+        'Озвучка: актёры',
         actors,
         source,
         'medium',
@@ -4200,6 +4270,10 @@ function normalizeImportedRuText(value) {
     .replace(/\]\]\s*$/, '')
     .replace(/'''?/g, '')
     .replace(/\bЦветение зените\b/g, 'Цветение в зените')
+    .replace(/[ \t]+([,.;:!?])/g, '$1')
+    .replace(/([,;:!?])(?=[А-Яа-яЁёA-Za-z])/g, '$1 ')
+    .replace(/\(\s+/g, '(')
+    .replace(/\s+\)/g, ')')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/[ \t]*\n[ \t]*/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
@@ -4347,7 +4421,7 @@ function normalizeProfileCollectionRows(field, value) {
         ['source', 1000],
       ]) {
         if (typeof next[key] === 'string')
-          next[key] = next[key].trim().slice(0, limit);
+          next[key] = normalizeImportedRuText(next[key]).slice(0, limit);
       }
       for (const key of ['iconUrl', 'imageUrl', 'rewardIconUrl']) {
         if (typeof next[key] === 'string') {
@@ -4638,12 +4712,25 @@ function parseFandomRuApiImport(text, source) {
     ),
     makeImportSuggestion(
       'profile.voiceActors',
-      'Актёры озвучки',
+      'Озвучка: актёры',
       voiceActors,
       source,
       'high',
     ),
   ].filter(Boolean);
+}
+
+function isUsableCharacterImportImage(image, mode = 'any') {
+  if (!image?.url || isPlaceholderImportImage(image.url, image.title)) {
+    return false;
+  }
+  const width = Number(image.width || 0);
+  const height = Number(image.height || 0);
+  const size = Number(image.size || 0);
+  if (width && height && (width < 192 || height < 192)) return false;
+  if (size && size < 12000) return false;
+  if (mode === 'card' && width && height && height < width * 0.9) return false;
+  return true;
 }
 
 function parseFandomRuImagesImport(text, source, character) {
@@ -4661,18 +4748,20 @@ function parseFandomRuImagesImport(text, source, character) {
         height: page.imageinfo?.[0]?.height || 0,
       }))
       .filter(
-        (image) =>
-          image.url && !isPlaceholderImportImage(image.url, image.title),
+        (image) => isUsableCharacterImportImage(image),
       );
     const ownImages = images.filter((image) =>
       normalizeImportSearch(image.title).includes(characterName),
     );
+    const cardImages = ownImages.filter((image) =>
+      isUsableCharacterImportImage(image, 'card'),
+    );
     const card =
-      ownImages.find((image) => /(^|\s)иконка(?:\.|\s|$)/i.test(image.title)) ||
-      ownImages.find((image) =>
+      cardImages.find((image) => /(^|\s)иконка(?:\.|\s|$)/i.test(image.title)) ||
+      cardImages.find((image) =>
         /представление|портрет|portrait/i.test(image.title),
       ) ||
-      ownImages.find((image) => /в игре|спл[эе]ш|splash/i.test(image.title));
+      cardImages.find((image) => /в игре|спл[эе]ш|splash/i.test(image.title));
     const splash =
       ownImages.find((image) => /спл[эе]ш|splash/i.test(image.title)) ||
       ownImages.find(
@@ -4807,17 +4896,19 @@ function parseFandomRuAllImagesImport(text, source, character) {
         size: image.size || 0,
       }))
       .filter(
-        (image) =>
-          image.url && !isPlaceholderImportImage(image.url, image.title),
+        (image) => isUsableCharacterImportImage(image),
       );
     const characterNames = characterNameCandidates(character);
     const ownImages = images.filter((image) => {
       const title = normalizeImportSearch(cleanImportImageTitle(image.title));
       return characterNames.some((name) => title.includes(name));
     });
+    const cardImages = ownImages.filter((image) =>
+      isUsableCharacterImportImage(image, 'card'),
+    );
     const icon =
-      ownImages.find((image) => /(^|\s)иконка($|\s)/i.test(cleanImportImageTitle(image.title))) ||
-      ownImages.find((image) => /аватар/i.test(cleanImportImageTitle(image.title)));
+      cardImages.find((image) => /(^|\s)иконка($|\s)/i.test(cleanImportImageTitle(image.title))) ||
+      cardImages.find((image) => /аватар/i.test(cleanImportImageTitle(image.title)));
     const presentation = ownImages.find((image) =>
       /представление|карточка/i.test(cleanImportImageTitle(image.title)),
     );
@@ -5843,7 +5934,7 @@ function parseGenshinBuildsImport(text, source, character) {
     if (actor) voiceActors.push({ language, name: actor });
   }
   suggestions.push(
-    makeImportSuggestion('profile.voiceActors', 'Актёры озвучки', voiceActors, source, 'high'),
+    makeImportSuggestion('profile.voiceActors', 'Озвучка: актёры', voiceActors, source, 'high'),
   );
   const abilities = [];
   const skillsStart = lines.findIndex((line) => line === 'Skills');
@@ -7100,7 +7191,7 @@ function parseDubbingWikiVoiceImport(text, source, character) {
   return [
     makeImportSuggestion(
       'profile.voiceActors',
-      'Актёры озвучки (Dubbing Wiki)',
+      'Озвучка: актёры (Dubbing Wiki)',
       voiceActors,
       source,
       'medium',
@@ -7138,7 +7229,7 @@ function parseVoiceTableImport(text, source, character, label) {
   return [
     makeImportSuggestion(
       'profile.voiceActors',
-      `Актёры озвучки (${label})`,
+      `Озвучка: актёры (${label})`,
       voiceActors,
       source,
       'medium',
@@ -7310,16 +7401,20 @@ function importMainImageScore(image, source, character) {
   const title = normalizeImportSearch(image.title || '');
   const url = normalizeImportSearch(decodedMediaUrl(image.url));
   const names = characterNameCandidates(character);
+  const recognizedCharacterPath =
+    /\/characters?\/(?:avatars?|portraits?|icons?)\//i.test(image.url) ||
+    /article_tools\/nte\/gacha\/chara_/i.test(image.url) ||
+    /^https:\/\/static\.wikia\.nocookie\.net\/neverness-to-everness\/images\//i.test(
+      image.url,
+    );
+  if (!title && !recognizedCharacterPath) return -1;
   let score = 0;
   if (names.some((name) => title.includes(name))) score += 80;
   if (names.some((name) => url.includes(name))) score += 55;
   if (/иконка|портрет|представление|спл[эе]ш|splash|portrait|character/i.test(title)) {
     score += 20;
   }
-  if (
-    /\/characters?\/(?:avatars?|portraits?|icons?)\//i.test(image.url) ||
-    /article_tools\/nte\/gacha\/chara_/i.test(image.url)
-  ) {
+  if (recognizedCharacterPath) {
     score += 35;
   }
   if (
@@ -7745,7 +7840,7 @@ const PROFILE_COLLECTION_MERGE_CONFIGS = [
   },
   {
     field: 'profile.voiceActors',
-    label: 'Актёры озвучки',
+    label: 'Озвучка: актёры',
     limit: 12,
     key: (entry) => normalizeImportSearch(entry?.language),
   },
@@ -8138,6 +8233,42 @@ function dedupeImportSuggestions(items) {
   return [...variants, ...result];
 }
 
+function normalizeGuideImportEntry(value, key = '') {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeGuideImportEntry(item, key));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([entryKey, entryValue]) => [
+        entryKey,
+        normalizeGuideImportEntry(entryValue, entryKey),
+      ]),
+    );
+  }
+  if (typeof value !== 'string') return value;
+  if (/(?:url|href)$/i.test(key)) {
+    return value.trim().replace(/&amp;/g, '&');
+  }
+  return normalizeImportedRuText(value);
+}
+
+function normalizeGuideImportSuggestion(item) {
+  const parsed = parseImportSuggestionJson(item);
+  if (Array.isArray(parsed) || (parsed && typeof parsed === 'object')) {
+    return {
+      ...item,
+      value: JSON.stringify(normalizeGuideImportEntry(parsed)),
+    };
+  }
+  return {
+    ...item,
+    value:
+      item.field === 'guide.videoUrl'
+        ? String(item.value || '').trim()
+        : normalizeImportedRuText(item.value),
+  };
+}
+
 function dedupeGuideImportSuggestions(items) {
   const limits = {
     'guide.pullAdvice': 6,
@@ -8160,8 +8291,9 @@ function dedupeGuideImportSuggestions(items) {
   const grouped = new Map();
   for (const item of items) {
     if (!item?.field?.startsWith('guide.')) continue;
+    const normalizedItem = normalizeGuideImportSuggestion(item);
     const current = grouped.get(item.field) || [];
-    current.push(item);
+    current.push(normalizedItem);
     grouped.set(item.field, current);
   }
 

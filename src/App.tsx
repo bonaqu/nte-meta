@@ -2169,24 +2169,6 @@ function CharacterDetailPage({
           text="История персонажа без мета-билдов и боевых ротаций."
         />
         <MarkdownPreview value={profile.biography || character.summary} />
-        <div className="character-info-subsection">
-          <h3>Актёры озвучки</h3>
-          {profile.voiceActors.length ? (
-            <dl className="voice-actor-grid">
-              {profile.voiceActors.map((actor) => (
-                <div key={`${actor.language}-${actor.name}`}>
-                  <dt>{actor.language}</dt>
-                  <dd>{actor.name}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : (
-            <EmptyState
-              title="Актёры озвучки не указаны"
-              text="Редакция добавит сейю и актёров дубляжа только после проверки источников."
-            />
-          )}
-        </div>
       </section>
 
       <section className="character-detail-section" id="character-abilities">
@@ -2398,14 +2380,16 @@ function CharacterDetailPage({
             {profile.skins.map((skin) => (
               <article key={skin.id}>
                 {skin.imageUrl ? (
-                  <img
-                    src={resolveAssetUrl(skin.imageUrl)}
-                    alt={skin.name}
-                    width="320"
-                    height="420"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
+                  <div className="skin-media">
+                    <img
+                      src={resolveAssetUrl(skin.imageUrl)}
+                      alt={skin.name}
+                      width="640"
+                      height="720"
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
                 ) : null}
                 <h3>{skin.name}</h3>
                 <p>{skin.description}</p>
@@ -2418,16 +2402,51 @@ function CharacterDetailPage({
       <section className="character-detail-section" id="character-voice">
         <SectionHeader
           title="Озвучка"
-          text="Реплики на английском, японском, корейском и китайском языках."
+          text="Актёры дубляжа и доступные реплики на разных языках."
         />
-        {profile.voiceLines.length ? (
-          <CharacterVoiceLibrary lines={profile.voiceLines} />
-        ) : (
-          <EmptyState
-            title="Аудио пока не загружено"
-            text="Редакторы смогут добавить реплики для каждого языка отдельно."
-          />
-        )}
+        <div className="character-voice-layout">
+          <section
+            className="voice-cast-panel"
+            aria-labelledby="voice-cast-title"
+          >
+            <div>
+              <p className="eyebrow">Дубляж</p>
+              <h3 id="voice-cast-title">Актёры озвучки</h3>
+            </div>
+            {profile.voiceActors.length ? (
+              <dl className="voice-actor-grid">
+                {profile.voiceActors.map((actor) => (
+                  <div key={`${actor.language}-${actor.name}`}>
+                    <dt>{actor.language}</dt>
+                    <dd>{actor.name}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="empty-inline-copy">
+                Актёры пока не указаны: редакция добавит их после проверки
+                источников.
+              </p>
+            )}
+          </section>
+          <section
+            className="voice-records-panel"
+            aria-labelledby="voice-records-title"
+          >
+            <div>
+              <p className="eyebrow">Фонотека</p>
+              <h3 id="voice-records-title">Реплики персонажа</h3>
+            </div>
+            {profile.voiceLines.length ? (
+              <CharacterVoiceLibrary lines={profile.voiceLines} />
+            ) : (
+              <p className="empty-inline-copy">
+                Аудио пока не добавлено. Редакторы смогут разместить реплики
+                для каждого языка отдельно.
+              </p>
+            )}
+          </section>
+        </div>
       </section>
 
       {profile.trivia ? (
@@ -2956,25 +2975,29 @@ function CommentsBlock({
       }
     });
 
-    const result: Comment[] = [];
-    const append = (comment: Comment) => {
-      result.push(comment);
+    const result: Array<{
+      comment: Comment;
+      depth: number;
+      parentAuthor?: string;
+    }> = [];
+    const append = (comment: Comment, depth = 0, parentAuthor?: string) => {
+      result.push({ comment, depth, parentAuthor });
       (byParent.get(comment.id) || [])
         .sort(
           (left, right) =>
             new Date(left.createdAt).getTime() -
             new Date(right.createdAt).getTime(),
         )
-        .forEach(append);
+        .forEach((child) => append(child, depth + 1, comment.author));
     };
-    roots.forEach(append);
+    roots.forEach((comment) => append(comment));
     comments
       .filter(
         (comment) =>
           comment.parentId &&
           !comments.some((item) => item.id === comment.parentId),
       )
-      .forEach((comment) => result.push(comment));
+      .forEach((comment) => result.push({ comment, depth: 0 }));
     return result;
   }, [comments]);
 
@@ -3070,11 +3093,24 @@ function CommentsBlock({
     setActionId(comment.id);
     const result = await deleteComment(comment.id);
     if (result.ok) {
-      setComments((current) =>
-        current.filter(
-          (item) => item.id !== comment.id && item.parentId !== comment.id,
-        ),
-      );
+      setComments((current) => {
+        const removedIds = new Set([comment.id]);
+        let foundChild = true;
+        while (foundChild) {
+          foundChild = false;
+          current.forEach((item) => {
+            if (
+              item.parentId &&
+              removedIds.has(item.parentId) &&
+              !removedIds.has(item.id)
+            ) {
+              removedIds.add(item.id);
+              foundChild = true;
+            }
+          });
+        }
+        return current.filter((item) => !removedIds.has(item.id));
+      });
       setMessage('Комментарий удален.');
     } else {
       setMessage(result.error);
@@ -3186,9 +3222,13 @@ function CommentsBlock({
       </form>
       <div className="comment-list">
         {threadedComments.length ? (
-          threadedComments.map((comment) => (
+          threadedComments.map(({ comment, depth, parentAuthor }) => (
             <article
-              className={`comment-card ${comment.parentId ? 'is-reply' : ''}`}
+              className={`comment-card ${
+                comment.parentId
+                  ? `is-reply reply-depth-${Math.min(depth, 3)}`
+                  : ''
+              }`}
               id={`comment-${comment.id}`}
               key={comment.id}
             >
@@ -3201,6 +3241,11 @@ function CommentsBlock({
                     : ''}
                 </span>
               </div>
+              {parentAuthor ? (
+                <p className="comment-parent-context">
+                  <Reply aria-hidden="true" /> Ответ для {parentAuthor}
+                </p>
+              ) : null}
               {editingId === comment.id ? (
                 <div className="comment-edit">
                   <label htmlFor={`edit-${comment.id}`}>
@@ -3268,7 +3313,6 @@ function CommentsBlock({
                     type="button"
                     onClick={() => {
                       setReplyTo(comment);
-                      setBody('');
                     }}
                   >
                     <Reply aria-hidden="true" />

@@ -395,11 +395,22 @@ export async function reviewLeakCandidate(
   id: string,
   reviewStatus: Exclude<LeakCandidateReviewStatus, 'accepted'>,
 ) {
+  return updateLeakCandidateEditorial(id, { reviewStatus });
+}
+
+export async function updateLeakCandidateEditorial(
+  id: string,
+  payload: {
+    reviewStatus?: Exclude<LeakCandidateReviewStatus, 'accepted'>;
+    suggestedStatus?: LeakStatus;
+    trustLevel?: 'низкий' | 'средний' | 'высокий';
+  },
+) {
   return request<{ success: boolean }>(
     `/api/leak-candidates/${encodeURIComponent(id)}`,
     {
       method: 'PATCH',
-      body: JSON.stringify({ reviewStatus }),
+      body: JSON.stringify(payload),
     },
   );
 }

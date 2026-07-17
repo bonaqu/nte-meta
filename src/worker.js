@@ -2187,6 +2187,23 @@ function normalizeImportFaction(value) {
 }
 
 function normalizeProfileImportValue(field, value) {
+  if (Array.isArray(value)) {
+    if (field === 'profile.baseStats') return normalizeBaseStatRows(value);
+    if (field === 'profile.voiceActors') return normalizeVoiceActorRows(value);
+    if (field === 'profile.roleTags') return normalizeImportedStringList(value);
+    if (
+      [
+        'profile.abilities',
+        'profile.awakenings',
+        'profile.materials',
+        'profile.friendship',
+        'profile.gifts',
+      ].includes(field)
+    ) {
+      return normalizeProfileCollectionRows(field, value);
+    }
+    return value;
+  }
   if (typeof value !== 'string') return value;
   if (field === 'attribute') return normalizeImportElement(value);
   if (field === 'profile.arcType') return normalizeImportArcType(value);
@@ -3096,13 +3113,20 @@ function cleanWikiParagraphText(value) {
 
 function normalizeImportedRuText(value) {
   return String(value || '')
+    .replace(/^\s*=\s*/, '')
+    .replace(/\[\[[^\]|]+\|([^\]]+)\]\]/g, '$1')
+    .replace(/\[\[([^\]]+)\]\]/g, '$1')
+    .replace(/\[https?:\/\/[^\s\]]+\s+([^\]]+)\]/g, '$1')
+    .replace(/^\s*\[\[(?:wp:)?/i, '')
+    .replace(/\]\]\s*$/, '')
+    .replace(/'''?/g, '')
     .replace(/\bЦветение зените\b/g, 'Цветение в зените')
     .trim();
 }
 
 function readWikiParam(content, key) {
   const pattern = new RegExp(
-    `(?:^|\\n|\\|)\\s*${escapeRegExp(key)}\\s*=?\\s*([^\\n{}]+)`,
+    `(?:^|\\n|\\|)\\s*${escapeRegExp(key)}\\s*=\\s*([^\\n{}]+)`,
     'i',
   );
   const raw = String(content.match(pattern)?.[1] || '').replace(
@@ -3110,6 +3134,115 @@ function readWikiParam(content, key) {
     '',
   ).replace(/\|\s*[A-Za-z_][A-Za-z0-9_-]*\s*=.*$/i, '');
   return normalizeImportedRuText(cleanWikiText(raw));
+}
+
+function normalizeImportedStringList(value) {
+  const items = [
+    ...new Set(
+      value
+        .map((item) => normalizeImportedRuText(item))
+        .filter(Boolean),
+    ),
+  ];
+  return items.some((item) => hasRussianText(item))
+    ? items.filter((item) => hasRussianText(item))
+    : items;
+}
+
+function normalizeVoiceActorRows(value) {
+  const rows = new Map();
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const language = normalizeImportedRuText(item.language);
+    const name = normalizeImportedRuText(item.name);
+    if (!language || !name) continue;
+    rows.set(normalizeImportSearch(language), { ...item, language, name });
+  }
+  return [...rows.values()];
+}
+
+function normalizeBaseStatLabel(value) {
+  const label = normalizeImportedRuText(value);
+  const key = normalizeImportSearch(label);
+  if (/^(?:hp|health|оз|здоровье)$/.test(key)) return 'ОЗ';
+  if (/^(?:atk|attack|атака|атк)$/.test(key)) return 'АТК';
+  if (/^(?:def|defense|defence|защита|защ)$/.test(key)) return 'ЗАЩ';
+  if (/^(?:crit|crit rate|critical rate|шанс крит|шанс критического удара)$/.test(key)) {
+    return 'Шанс крит.';
+  }
+  if (/^(?:cdmg|crit dmg|crit damage|critical damage|урон крит|крит урон)$/.test(key)) {
+    return 'Урон крит.';
+  }
+  if (/^(?:damage bonus|dmg bonus|усиление урона|бонус урона)$/.test(key)) {
+    return 'Усиление урона';
+  }
+  return label;
+}
+
+function normalizeBaseStatRows(value) {
+  const rows = new Map();
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const originalLabel = normalizeImportedRuText(item.label);
+    const label = normalizeBaseStatLabel(originalLabel);
+    const statValue = normalizeImportedRuText(item.value);
+    if (!label || !statValue) continue;
+    const key = normalizeImportSearch(label);
+    const rank = originalLabel === label ? 2 : 1;
+    const current = rows.get(key);
+    if (!current || rank > current.rank) {
+      rows.set(key, {
+        rank,
+        value: { ...item, label, value: statValue },
+      });
+    }
+  }
+  return [...rows.values()].map((item) => item.value);
+}
+
+function decodedMediaUrl(value) {
+  try {
+    return decodeURIComponent(String(value || ''));
+  } catch {
+    return String(value || '');
+  }
+}
+
+function isClearlyWrongCollectionMedia(field, value) {
+  const media = decodedMediaUrl(value).toLocaleLowerCase('ru-RU');
+  if (!media) return false;
+  const roleIcon = /(?:^|[/_\s-])(?:роль|role)(?:[_.\s/-]|$)/i.test(media);
+  const rarityIcon = /(?:^|[/_\s-])(?:редкость|rarity)(?:[_.\s/-]|$)/i.test(media);
+  if (
+    [
+      'profile.abilities',
+      'profile.awakenings',
+      'profile.materials',
+      'profile.friendship',
+      'profile.gifts',
+    ].includes(field)
+  ) {
+    return roleIcon || rarityIcon;
+  }
+  return false;
+}
+
+function normalizeProfileCollectionRows(field, value) {
+  return value
+    .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
+    .map((item) => {
+      const next = { ...item };
+      for (const key of ['name', 'title', 'label', 'language']) {
+        if (typeof next[key] === 'string') next[key] = normalizeImportedRuText(next[key]);
+      }
+      for (const key of ['iconUrl', 'imageUrl', 'rewardIconUrl']) {
+        if (isClearlyWrongCollectionMedia(field, next[key])) next[key] = '';
+      }
+      if (field === 'profile.friendship' && Array.isArray(next.rewards)) {
+        next.rewards = normalizeProfileCollectionRows('profile.friendship', next.rewards);
+      }
+      return next;
+    });
 }
 
 function extractFandomCharacterIntro(content) {
@@ -5450,14 +5583,14 @@ function enrichArraySuggestionMedia(item, imageMap) {
   const parsed = parseImportSuggestionJson(item);
   if (!Array.isArray(parsed)) return item;
   let changed = false;
-  const allowFuzzyMediaMatch = !['profile.abilities', 'profile.awakenings'].includes(item.field);
+  const allowFuzzyMediaMatch = item.field === 'profile.skins';
   const nextValue = parsed.map((entry) => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
     const record = entry;
     const imageUrl = importMediaLookupLabels(record, item.field)
       .map((label) => findImportImageByName(imageMap, label, { fuzzy: allowFuzzyMediaMatch }))
       .find(Boolean);
-    if (!imageUrl) return entry;
+    if (!imageUrl || isClearlyWrongCollectionMedia(item.field, imageUrl)) return entry;
     if ('imageUrl' in record && !record.imageUrl) {
       changed = true;
       return { ...record, imageUrl };
@@ -5562,7 +5695,7 @@ const PROFILE_COLLECTION_MERGE_CONFIGS = [
     field: 'profile.baseStats',
     label: 'Начальные показатели',
     limit: 40,
-    key: (entry) => normalizeImportSearch(entry?.label),
+    key: (entry) => normalizeImportSearch(normalizeBaseStatLabel(entry?.label)),
   },
   {
     field: 'profile.awakenings',
@@ -6490,6 +6623,15 @@ function normalizeSetting(key, value) {
 }
 
 function serializeCharacter(row) {
+  const roleTags = normalizeImportedStringList(
+    parseJson(row.profile_role_tags_json, [row.role]),
+  );
+  const voiceActors = normalizeVoiceActorRows(
+    parseJson(row.profile_voice_actors_json, []),
+  );
+  const baseStats = normalizeBaseStatRows(
+    parseJson(row.profile_base_stats_json, []),
+  );
   return {
     id: row.id,
     slug: row.slug,
@@ -6505,25 +6647,46 @@ function serializeCharacter(row) {
     summary: row.summary,
     tags: parseJson(row.tags_json, []),
     profile: {
-      faction: row.profile_faction || '',
-      arcType: row.profile_arc_type || '',
-      birthday: row.profile_birthday || '',
-      releaseDate: row.profile_release_date || '',
+      faction: normalizeImportedRuText(row.profile_faction || ''),
+      arcType: normalizeImportedRuText(row.profile_arc_type || ''),
+      birthday: normalizeImportedRuText(row.profile_birthday || ''),
+      releaseDate: formatRuImportDate(
+        normalizeImportedRuText(row.profile_release_date || ''),
+      ),
       biographyShort:
-        row.profile_biography_short || row.short_description || '',
-      biography: row.profile_biography_markdown || row.summary || '',
-      trivia: row.profile_trivia_markdown || '',
-      roleTags: parseJson(row.profile_role_tags_json, [row.role]),
+        normalizeImportedRuText(
+          row.profile_biography_short || row.short_description || '',
+        ),
+      biography: normalizeImportedRuText(
+        row.profile_biography_markdown || row.summary || '',
+      ),
+      trivia: normalizeImportedRuText(row.profile_trivia_markdown || ''),
+      roleTags,
       roleIcons: parseJson(row.profile_role_icons_json, []),
-      voiceActors: parseJson(row.profile_voice_actors_json, []),
-      materials: parseJson(row.profile_materials_json, []),
-      baseStats: parseJson(row.profile_base_stats_json, []),
-      abilities: parseJson(row.profile_abilities_json, []),
+      voiceActors,
+      materials: normalizeProfileCollectionRows(
+        'profile.materials',
+        parseJson(row.profile_materials_json, []),
+      ),
+      baseStats,
+      abilities: normalizeProfileCollectionRows(
+        'profile.abilities',
+        parseJson(row.profile_abilities_json, []),
+      ),
       skins: parseJson(row.profile_skins_json, []),
-      friendship: parseJson(row.profile_friendship_json, []),
-      gifts: parseJson(row.profile_gifts_json, []),
+      friendship: normalizeProfileCollectionRows(
+        'profile.friendship',
+        parseJson(row.profile_friendship_json, []),
+      ),
+      gifts: normalizeProfileCollectionRows(
+        'profile.gifts',
+        parseJson(row.profile_gifts_json, []),
+      ),
       voiceLines: parseJson(row.profile_voice_lines_json, []),
-      awakenings: parseJson(row.profile_awakenings_json, []),
+      awakenings: normalizeProfileCollectionRows(
+        'profile.awakenings',
+        parseJson(row.profile_awakenings_json, []),
+      ),
     },
     status: row.status,
     patch: row.patch_version,

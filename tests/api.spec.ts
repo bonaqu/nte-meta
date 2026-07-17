@@ -531,6 +531,7 @@ test.describe('NTE Meta Worker API', () => {
     (suggestion: { field: string }) => suggestion.field === 'profile.voiceActors',
   ) as { value: string } | undefined;
   expect(voiceActorSuggestion?.value).not.toContain('[[wp:');
+  expect(voiceActorSuggestion?.value).not.toMatch(/"(?:name|language)":"\s*=/);
   const abilitySuggestion = ownerLookupJson.data.suggestions.find(
     (suggestion: { field: string }) => suggestion.field === 'profile.abilities',
   ) as { value: string } | undefined;
@@ -546,8 +547,17 @@ test.describe('NTE Meta Worker API', () => {
   const giftSuggestion = ownerLookupJson.data.suggestions.find(
     (suggestion: { field: string }) => suggestion.field === 'profile.gifts',
   ) as { value: string } | undefined;
-  const importedGifts = JSON.parse(giftSuggestion?.value || '[]') as Array<{ name?: string }>;
+  const importedGifts = JSON.parse(giftSuggestion?.value || '[]') as Array<{
+    name?: string;
+    iconUrl?: string;
+  }>;
   expect(importedGifts.every((gift) => !/^\d+$/.test(gift.name || ''))).toBeTruthy();
+  expect(
+    importedGifts.every((gift) => {
+      const media = decodeURIComponent(gift.iconUrl || '');
+      return !/(?:роль|role|редкость|rarity)[_.\s/-]/i.test(media);
+    }),
+  ).toBeTruthy();
   expect(
     ownerLookupJson.data.suggestions.some(
       (suggestion: { field: string }) => suggestion.field === 'profile.roleIcons',
@@ -577,6 +587,17 @@ test.describe('NTE Meta Worker API', () => {
       amount?: string;
     }>;
     expect(importedMaterials.some((material) => material.name && material.amount)).toBeTruthy();
+  }
+  const baseStatsSuggestion = ownerLookupJson.data.suggestions.find(
+    (suggestion: { field: string }) => suggestion.field === 'profile.baseStats',
+  ) as { value: string } | undefined;
+  if (baseStatsSuggestion) {
+    const importedStats = JSON.parse(baseStatsSuggestion.value) as Array<{ label?: string }>;
+    const statLabels = importedStats.map((stat) => stat.label).filter(Boolean);
+    expect(new Set(statLabels).size).toBe(statLabels.length);
+    expect(statLabels).not.toEqual(
+      expect.arrayContaining(['HP', 'ATK', 'DEF', 'Crit', 'CDMG']),
+    );
   }
 
   const guideLookup = await owner.post('/api/guide-import/lookup', {

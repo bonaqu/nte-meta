@@ -185,6 +185,16 @@ function canAccessAdmin(user: User | null) {
 type SiteDataSetter = React.Dispatch<React.SetStateAction<SiteData>>;
 const rarityOptions = ['Любая редкость', 'S', 'A'];
 const tierOptions = ['Любой тир', ...tierOrder];
+const anyAttributeOption = 'Любой атрибут';
+
+function getAttributeOptions(characters: Character[]) {
+  return [
+    anyAttributeOption,
+    ...Array.from(
+      new Set(characters.map((character) => character.attribute.trim()).filter(Boolean)),
+    ).sort((left, right) => left.localeCompare(right, 'ru-RU')),
+  ];
+}
 const guideSectionTypeOptions = [
   ['overview', 'Обзор'],
   ['verdict', 'Краткий вывод'],
@@ -1698,6 +1708,7 @@ function CharactersPage({
   const deferredQuery = useDeferredValue(query);
   const [rarity, setRarity] = useState('Любая редкость');
   const [tier, setTier] = useState('Любой тир');
+  const [attribute, setAttribute] = useState(anyAttributeOption);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorDirty, setEditorDirty] = useState(false);
   const indexedCharacters = useMemo(
@@ -1706,6 +1717,10 @@ function CharactersPage({
         character,
         searchText: getCharacterSearchText(character),
       })),
+    [data.characters],
+  );
+  const attributeOptions = useMemo(
+    () => getAttributeOptions(data.characters),
     [data.characters],
   );
 
@@ -1720,11 +1735,12 @@ function CharactersPage({
         return (
           queryMatch &&
           (rarity === 'Любая редкость' || character.rarity === rarity) &&
-          (tier === 'Любой тир' || tierPlacement?.tier === tier)
+          (tier === 'Любой тир' || tierPlacement?.tier === tier) &&
+          (attribute === anyAttributeOption || character.attribute === attribute)
         );
       })
       .map(({ character }) => character);
-  }, [data, deferredQuery, indexedCharacters, rarity, tier]);
+  }, [attribute, data, deferredQuery, indexedCharacters, rarity, tier]);
 
   async function refreshContent() {
     setData(
@@ -1756,7 +1772,7 @@ function CharactersPage({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-          placeholder="Имя, атрибут, тег..."
+            placeholder="Имя, атрибут, тег..."
             aria-describedby="character-results-count"
           />
         </label>
@@ -1765,6 +1781,12 @@ function CharactersPage({
           value={tier}
           setValue={setTier}
           options={tierOptions}
+        />
+        <SelectFilter
+          label="Атрибут"
+          value={attribute}
+          setValue={setAttribute}
+          options={attributeOptions}
         />
         <SelectFilter
           label="Редкость"
@@ -3210,8 +3232,13 @@ function GuidesPage({
   const deferredQuery = useDeferredValue(query);
   const [rarity, setRarity] = useState('Любая редкость');
   const [tier, setTier] = useState('Любой тир');
+  const [attribute, setAttribute] = useState(anyAttributeOption);
   const [editorGuideId, setEditorGuideId] = useState<string | null>(null);
   const [editorDirty, setEditorDirty] = useState(false);
+  const attributeOptions = useMemo(
+    () => getAttributeOptions(data.characters),
+    [data.characters],
+  );
   const filtered = useMemo(() => {
     const needle = normalizeSearchText(deferredQuery);
     return data.guides.filter((guide) => {
@@ -3223,10 +3250,12 @@ function GuidesPage({
       return (
         (!needle || searchText.includes(needle)) &&
         (rarity === 'Любая редкость' || character.rarity === rarity) &&
-        (tier === 'Любой тир' || getCharacterTierPlacement(data, character.id)?.tier === tier)
+        (tier === 'Любой тир' ||
+          getCharacterTierPlacement(data, character.id)?.tier === tier) &&
+        (attribute === anyAttributeOption || character.attribute === attribute)
       );
     });
-  }, [data, deferredQuery, rarity, tier]);
+  }, [attribute, data, deferredQuery, rarity, tier]);
 
   return (
     <div className="page-stack">
@@ -3238,9 +3267,9 @@ function GuidesPage({
           ротации собраны внутри каждого материала.
         </p>
         {canManageContent(user, 'guides', 'create') ? (
-        <button className="primary-button" type="button" onClick={() => setEditorGuideId('new')}>
+          <button className="primary-button" type="button" onClick={() => setEditorGuideId('new')}>
             <Plus aria-hidden="true" /> Создать гайд
-        </button>
+          </button>
         ) : null}
       </section>
       <search className="filter-panel" aria-label="Фильтры гайдов">
@@ -3251,7 +3280,7 @@ function GuidesPage({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-              placeholder="Имя, атрибут, тег..."
+            placeholder="Имя, атрибут, тег..."
             aria-describedby="guide-results-count"
           />
         </label>
@@ -3260,6 +3289,12 @@ function GuidesPage({
           value={tier}
           setValue={setTier}
           options={tierOptions}
+        />
+        <SelectFilter
+          label="Атрибут"
+          value={attribute}
+          setValue={setAttribute}
+          options={attributeOptions}
         />
         <SelectFilter
           label="Редкость"

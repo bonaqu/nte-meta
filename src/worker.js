@@ -1975,6 +1975,7 @@ const IMPORT_AUTO_SOURCE_LIMIT = 14;
 const IMPORT_SOURCE_PRIORITY = new Map([
   ['official-ru', 100],
   ['fandom-ru-api', 98],
+  ['wotpack-character-search-ru', 97],
   ['ntewiki-ru', 96],
   ['gamewith-detail-ru', 94],
   ['interactivemap-profile-ru', 92],
@@ -2512,6 +2513,18 @@ function characterImportSources(slug, character = {}) {
       url: `https://neverness-to-everness.fandom.com/ru/api.php?action=query&prop=revisions|pageimages|categories&rvprop=content&rvslots=main&piprop=original&cllimit=100&format=json&formatversion=2&titles=${fandomRuTitle}&origin=*`,
       parser: parseFandomRuApiImport,
       raw: true,
+    },
+    {
+      id: 'wotpack-character-search-ru',
+      name: 'Wotpack RU: русские способности персонажа',
+      trust: 'high',
+      url: `https://wotpack.ru/wp-json/wp/v2/search?search=${encodeURIComponent(
+        `${character.name || character.originalName || slug} NTE`,
+      )}&per_page=8`,
+      resolveUrl: resolveWotpackGuideSource,
+      parser: parseWotpackCharacterImport,
+      raw: true,
+      cacheTtl: 1800,
     },
     {
       id: 'fandom-ru-images-api',
@@ -3195,7 +3208,34 @@ async function fetchImportSource(source, character) {
   }
 }
 
+const KNOWN_WOTPACK_GUIDE_URLS = new Map([
+  [
+    'lacrimosa',
+    'https://wotpack.ru/lakrimoza-v-neverness-to-everness-nte-guide-and-build/',
+  ],
+  [
+    'lakrimoza',
+    'https://wotpack.ru/lakrimoza-v-neverness-to-everness-nte-guide-and-build/',
+  ],
+  [
+    'shinku',
+    'https://wotpack.ru/shinku-v-neverness-to-everness-nte-guide-and-build/',
+  ],
+]);
+
 async function resolveWotpackGuideSource(source, character, fetchOptions) {
+  const knownUrl = KNOWN_WOTPACK_GUIDE_URLS.get(
+    normalizeImportSlug(character?.slug || character?.originalName || character?.name),
+  );
+  if (knownUrl) {
+    return {
+      ...source,
+      name: `Wotpack RU: ${character?.name || character?.originalName || 'гайд персонажа'}`,
+      url: knownUrl,
+      publicUrl: knownUrl,
+      resolveUrl: undefined,
+    };
+  }
   const response = await fetch(source.url, fetchOptions);
   if (!response.ok) {
     await discardResponseBody(response);
@@ -4877,11 +4917,95 @@ function extractGuideHeadingBlocks(html) {
 function guideImportRow(value, fallbackTitle) {
   const description = localizeImportedGuideText(value).trim();
   if (!description || !isPredominantlyRussianText(description)) return null;
+  const metric = description.match(/^(.{2,80}?)\s+[—–-]\s+(.{1,600})$/);
+  if (metric) {
+    return {
+      title: metric[1].trim(),
+      description: metric[2].trim(),
+    };
+  }
   const firstSentence = description.split(/(?<=[.!?])\s+/)[0] || description;
   return {
     title: firstSentence.slice(0, 120) || fallbackTitle,
     description,
   };
+}
+
+const GUIDE_TEAM_FIELDS = new Set([
+  'guide.teams',
+  'guide.f2pTeams',
+  'guide.premiumTeams',
+  'guide.starterTeams',
+  'guide.endgameTeams',
+]);
+
+function normalizeGuideTeamMember(value) {
+  const name = localizeImportedGuideText(value)
+    .replace(/\s*\([^)]{1,80}\)\s*$/, '')
+    .trim();
+  if (/^зеро$/i.test(name)) return 'Нулевой эспер';
+  return name;
+}
+
+function extractGuideTeamRows(html) {
+  const rows = [];
+  const seen = new Set();
+  const addComposition = (members) => {
+    const normalized = members.map(normalizeGuideTeamMember).filter(Boolean);
+    if (normalized.length < 3 || normalized.length > 5) return;
+    const title = normalized.join(' + ');
+    const key = normalizeImportSearch(title);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    rows.push({
+      title,
+      description:
+        'Состав извлечён из таблицы команд источника. Проверьте актуальность патча и добавьте ротацию перед публикацией.',
+    });
+  };
+
+  for (const rowMatch of String(html || '').matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const cells = [...rowMatch[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+      .map((cellMatch) => {
+        const paragraphNames = [...cellMatch[1].matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
+          .map((paragraph) => normalizeGuideTeamMember(htmlToPlainText(paragraph[1])))
+          .filter(
+            (name) =>
+              name &&
+              name.length <= 60 &&
+              !/[.!?:;]{1,}/.test(name) &&
+              hasRussianText(name),
+          );
+        if (paragraphNames.length) return [...new Set(paragraphNames)].slice(0, 4);
+        const fallback = normalizeGuideTeamMember(htmlToPlainText(cellMatch[1]));
+        return fallback && fallback.length <= 60 ? [fallback] : [];
+      })
+      .filter((options) => options.length);
+    if (cells.length < 3 || cells.length > 5) continue;
+
+    const primary = cells.map((options) => options[0]);
+    addComposition(primary);
+    for (let cellIndex = 0; cellIndex < cells.length && rows.length < 12; cellIndex += 1) {
+      for (const alternative of cells[cellIndex].slice(1)) {
+        const variant = [...primary];
+        variant[cellIndex] = alternative;
+        addComposition(variant);
+        if (rows.length >= 12) break;
+      }
+    }
+  }
+
+  return rows;
+}
+
+function extractExplicitGuideTeamRows(html, fallbackTitle) {
+  const tableRows = extractGuideTeamRows(html);
+  if (tableRows.length) return tableRows;
+  return extractGuideContentRows(html, fallbackTitle).filter((row) => {
+    const value = `${row.title} ${row.description}`.trim();
+    const separators = value.match(/\s(?:\+|\/|→|->)\s/g) || [];
+    return separators.length >= 2 && value.length <= 500;
+  });
 }
 
 function extractGuideContentRows(html, fallbackTitle) {
@@ -4954,6 +5078,149 @@ function extractGuideComparisonRows(html) {
   return { strengths, weaknesses };
 }
 
+function wotpackAbilityType(value) {
+  const normalized = normalizeImportSearch(value);
+  if (normalized.startsWith('базовая атака')) return 'Базовая атака';
+  if (normalized.startsWith('навык перенаправления')) return 'Навык перенаправления';
+  if (normalized.startsWith('сверхспособность')) return 'Сверхспособность';
+  if (normalized.startsWith('навык поддержки')) return 'Навык поддержки';
+  if (normalized.startsWith('пассив')) return 'Пассивный навык';
+  if (normalized.startsWith('черта персонажа')) return 'Черта персонажа';
+  if (normalized.startsWith('повседневный') || normalized.startsWith('вторая способность')) {
+    return 'Повседневный навык';
+  }
+  return 'Навык';
+}
+
+function parseWotpackCharacterImport(html, source, character) {
+  const plainText = htmlToPlainText(html);
+  if (!compactImportLines(plainText).some((line) => lineMatchesCharacter(line, character))) {
+    return [];
+  }
+
+  const blocks = extractGuideHeadingBlocks(html);
+  const skillBlock = blocks.find((block) =>
+    /как.*работ.*навык|разбор.*(?:навык|способност)/.test(
+      normalizeImportSearch(block.heading),
+    ),
+  );
+  const abilities = [];
+  const seenAbilities = new Set();
+  const addAbility = (typeLabel, nameValue, descriptionValue) => {
+    const name = normalizeImportedRuText(nameValue).slice(0, 160);
+    const description = normalizeImportedRuText(descriptionValue).slice(0, 8000);
+    let type = wotpackAbilityType(typeLabel);
+    if (
+      type === 'Навык' &&
+      /кафе|увлечен|ведение бизнеса|дополнительн.*награ|фонс|монет.*лапок/i.test(
+        description,
+      )
+    ) {
+      type = 'Повседневный навык';
+    }
+    const key = normalizeImportSearch(`${type} ${name}`);
+    if (!name || !description || !hasRussianText(name) || seenAbilities.has(key)) return;
+    seenAbilities.add(key);
+    abilities.push({
+      id: `wotpack-${hashText(`${type}:${name}`).slice(0, 20)}`,
+      name,
+      type,
+      iconUrl: '',
+      description,
+    });
+  };
+  const parseAbilityText = (value) => {
+    const text = normalizeImportedRuText(value);
+    const standard = text.match(
+      /^(Базовая атака|Навык перенаправления|Сверхспособность|Навык поддержки|Навык|Пассив(?:ка|ный(?: талант)?)|Черта персонажа|Повседневный навык)\s+[«"]([^»"]+)[»"](?:\s*\([^)]*\))?\s*(?:[—–-]\s*)?(.+)$/i,
+    );
+    if (standard) {
+      addAbility(standard[1], standard[2], standard[3]);
+      return;
+    }
+    const secondDaily = text.match(
+      /^(?:Вторая способность|Другая особенность\s*[—–-]\s*талант)\s+[«"]([^»"]+)[»"]\s*(?:[—–-]\s*)?(.+)$/i,
+    );
+    if (secondDaily) addAbility('Вторая способность', secondDaily[1], secondDaily[2]);
+  };
+
+  if (skillBlock) {
+    for (const match of skillBlock.html.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)) {
+      parseAbilityText(htmlToPlainText(match[1]));
+    }
+    for (const line of compactImportLines(htmlToPlainText(skillBlock.html))) {
+      parseAbilityText(line);
+    }
+  }
+
+  const order = new Map([
+    ['Базовая атака', 0],
+    ['Навык', 1],
+    ['Навык перенаправления', 2],
+    ['Сверхспособность', 3],
+    ['Навык поддержки', 4],
+    ['Пассивный навык', 5],
+    ['Черта персонажа', 6],
+    ['Повседневный навык', 7],
+  ]);
+  abilities.sort((left, right) => (order.get(left.type) ?? 99) - (order.get(right.type) ?? 99));
+
+  const awakeningBlock = blocks.find((block) =>
+    /эффект.*пробужден|пробужден.*выб|лучш.*пробужден/.test(
+      normalizeImportSearch(block.heading),
+    ),
+  );
+  const awakenings = [];
+  if (awakeningBlock) {
+    const lines = compactImportLines(htmlToPlainText(awakeningBlock.html));
+    const ranking = lines.find(
+      (line) => /Э[1-6]\s+[^>]{2,}/i.test(line) && (line.match(/Э[1-6]/gi) || []).length >= 3,
+    );
+    if (ranking) {
+      for (const match of ranking.matchAll(
+        /Э([1-6])\s+(.+?)(?=\s*(?:>|=)\s*Э[1-6]|$)/gi,
+      )) {
+        const level = Number(match[1]);
+        const name = normalizeImportedRuText(match[2]).replace(/[.;:,]+$/, '').trim();
+        if (!name || awakenings.some((item) => item.level === level)) continue;
+        const detail = lines.find(
+          (line) =>
+            normalizeImportSearch(line).includes(normalizeImportSearch(name)) &&
+            normalizeImportSearch(line) !== normalizeImportSearch(ranking),
+        );
+        awakenings.push({
+          level,
+          name,
+          iconUrl: '',
+          description: detail
+            ? normalizeImportedRuText(detail).slice(0, 8000)
+            : 'Название и приоритет найдены в русском гайде; точный эффект требует проверки редактором.',
+        });
+      }
+    }
+  }
+  awakenings.sort((left, right) => left.level - right.level);
+
+  return [
+    makeImportSuggestion(
+      'profile.abilities',
+      'Способности',
+      abilities,
+      source,
+      'high',
+      'Названия и описания извлечены из русского раздела «Как работают навыки». Проверьте значения и иконки перед публикацией.',
+    ),
+    makeImportSuggestion(
+      'profile.awakenings',
+      'Пробуждения',
+      awakenings,
+      source,
+      'medium',
+      'Русский гайд подтверждает названия и редакционный приоритет; точные эффекты сверяйте построчно.',
+    ),
+  ].filter(Boolean);
+}
+
 function classifyGuideHeading(value) {
   const heading = normalizeImportSearch(value);
   const rules = [
@@ -4971,7 +5238,7 @@ function classifyGuideHeading(value) {
     ['guide.premiumTeams', /premium.*(?:team|команд)|премиальн.*(?:команд|отряд|состав)|донатн.*(?:команд|отряд|состав)/],
     ['guide.starterTeams', /стартов.*(?:команд|отряд|состав)|команд.*для.*старт|starter teams?/],
     ['guide.endgameTeams', /эндг(?:ейм|еим).*(?:команд|отряд|состав)|команд.*эндг(?:ейм|еим)|endgame teams?/],
-    ['guide.teams', /лучш.*команд|лучш.*состав|лучш.*союзник|^команд|состав.*(?:команд|для)|отряд|best teams?/],
+    ['guide.teams', /лучш.*команд|лучш.*состав|^команд|состав.*(?:команд|для)|отряд|best teams?/],
     ['guide.rotations', /ротац|rotation/],
     ['guide.mistakes', /част.*ошиб|ошибк.*игр|common mistakes?/],
     ['guide.tips', /как играть|совет|механик|управлен|how to play|tips?/],
@@ -5112,6 +5379,10 @@ function parseEditorialGuideImport(html, source, character) {
 
   for (const block of extractGuideHeadingBlocks(html)) {
     const normalizedHeading = normalizeImportSearch(block.heading);
+    if (/лучш.*союзник|подходящ.*союзник/.test(normalizedHeading)) {
+      inheritedField = '';
+      continue;
+    }
     if (
       /(?:преимуществ.*недостат|плюс.*минус)/.test(normalizedHeading)
     ) {
@@ -5136,8 +5407,15 @@ function parseEditorialGuideImport(html, source, character) {
     const field = directField || inheritedField;
     if (!field || !block.lines.length) continue;
     const heading = localizeImportedGuideText(block.heading);
-    const extractedRows = extractGuideContentRows(block.html, labels[field]);
+    const isTeamField = GUIDE_TEAM_FIELDS.has(field);
+    const teamRows = isTeamField
+      ? extractExplicitGuideTeamRows(block.html, labels[field])
+      : [];
+    const extractedRows = teamRows.length
+      ? teamRows
+      : extractGuideContentRows(block.html, labels[field]);
     const description = localizeImportedGuideText(block.lines.join(' '));
+    if (isTeamField && !teamRows.length) continue;
     if (!extractedRows.length && !isPredominantlyRussianText(description)) continue;
     const rows = rowsByField.get(field) || [];
     rows.push(
@@ -6313,11 +6591,76 @@ function abilityDescriptionScore(ability) {
   return Math.min(description.length, 1200);
 }
 
+function isCleanImportedAbilityName(value) {
+  const name = normalizeImportedRuText(value);
+  if (
+    !name ||
+    name.length > 160 ||
+    !hasRussianText(name) ||
+    isImportPlaceholderText(name) ||
+    /(?:^|\b)GA_[A-Za-z0-9_]+|(?:_name|_des)\b/i.test(name) ||
+    /(?:^|\s)(?:если|когда|после|при)\s.+(?:%|урон|эффект|цель|диссонанс)/i.test(name) ||
+    /[:;]\s*(?:если|когда|после|при|увелич|нанос|получ)/i.test(name)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function normalizedAbilityType(value) {
+  const type = normalizeImportSearch(value);
+  if (type.includes('базов') && type.includes('атак')) return 'Базовая атака';
+  if (type.includes('перенаправ')) return 'Навык перенаправления';
+  if (type.includes('сверхспособ') || type.includes('ультим')) return 'Сверхспособность';
+  if (type.includes('поддерж')) return 'Навык поддержки';
+  if (type.includes('пассив')) return 'Пассивный навык';
+  if (type.includes('черт')) return 'Черта персонажа';
+  if (type.includes('повседнев')) return 'Повседневный навык';
+  return 'Навык';
+}
+
+function cleanImportedAbility(entry) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+  const name = normalizeImportedRuText(entry.name || '');
+  if (!isCleanImportedAbilityName(name)) return null;
+  const description = normalizeImportedRuText(entry.description || '');
+  return {
+    ...entry,
+    id: entry.id || `ability-${hashText(`${entry.type}:${name}`).slice(0, 20)}`,
+    name,
+    type: normalizedAbilityType(entry.type),
+    iconUrl: normalizeExternalImageUrl(entry.iconUrl || ''),
+    description:
+      description && hasRussianText(description)
+        ? description
+        : 'Описание требует проверки в игре.',
+  };
+}
+
+function abilityCollectionQuality(item, abilities) {
+  const clean = abilities.map(cleanImportedAbility).filter(Boolean);
+  const described = clean.filter((ability) => abilityDescriptionScore(ability) > 0);
+  const distinctTypes = new Set(clean.map((ability) => ability.type)).size;
+  return (
+    clean.length * 1200 +
+    described.length * 300 +
+    distinctTypes * 120 +
+    clean.reduce((sum, ability) => sum + Math.min(abilityDescriptionScore(ability), 500), 0) +
+    importSuggestionScore(item) * 5
+  );
+}
+
 const IMPORT_CONFIDENCE_WEIGHT = { high: 30, medium: 20, low: 10 };
 
 function importSuggestionSourceWeight(item) {
   const source = `${item.sourceName} ${item.sourceUrl}`.toLocaleLowerCase('ru-RU');
   if (source.includes('сводка проверенных источников')) return 130;
+  if (
+    ['profile.abilities', 'profile.awakenings'].includes(item.field) &&
+    source.includes('wotpack')
+  ) {
+    return 125;
+  }
   if (item.field === 'profile.biography' || item.field === 'profile.biographyShort') {
     if (source.includes('официаль')) return 120;
     if (source.includes('interactivemap')) return 118;
@@ -6521,61 +6864,80 @@ function mergeAbilityImportSuggestions(items) {
     .filter(({ value }) => Array.isArray(value) && value.length);
   if (abilityItems.length < 2) return null;
 
-  const sorted = [...abilityItems].sort((a, b) => {
-    const score = (entry) =>
-      entry.value.reduce((sum, ability) => sum + abilityDescriptionScore(ability), 0);
-    return score(b) - score(a);
-  });
-  const base = sorted[0];
-  const maxLength = Math.min(
-    8,
-    Math.max(...abilityItems.map(({ value }) => value.length), base.value.length),
+  const sorted = [...abilityItems].sort(
+    (left, right) =>
+      abilityCollectionQuality(right.item, right.value) -
+      abilityCollectionQuality(left.item, left.value),
   );
-  const merged = Array.from({ length: maxLength }, (_, index) => {
-    const candidates = abilityItems
-      .map(({ item, value }) => ({ item, ability: value[index] }))
-      .filter(({ ability }) => Boolean(ability));
-    const hasCleanName = ({ ability }) => {
-      const name = normalizeImportedRuText(ability?.name || '');
-      return (
-        name &&
-        !isImportPlaceholderText(name) &&
-        !/bilane|rail|skill|attack|ultra|support/i.test(name)
-      );
-    };
-    const withDescription =
-      candidates.find(({ ability }) => abilityDescriptionScore(ability) > 0)?.ability ||
-      base.value[index] ||
-      candidates[0]?.ability;
-    const preferredName =
-      candidates.find((candidate) => {
-        if (!hasCleanName(candidate)) return false;
-        const source = `${candidate.item.sourceName} ${candidate.item.sourceUrl}`.toLocaleLowerCase('ru-RU');
-        return (
-          source.includes('genshinbuilds') ||
-          source.includes('interactivemap') ||
-          source.includes('nte wiki') ||
-          source.includes('fandom ru')
-        );
-      }) || candidates.find(hasCleanName);
-    const withCleanName =
-      preferredName?.ability || withDescription;
-    const importedName =
-      withCleanName?.name || withDescription?.name || 'Требует проверки';
+  const base = sorted[0];
+  const cleanCollections = sorted.map(({ item, value }) => ({
+    item,
+    value: value.map(cleanImportedAbility).filter(Boolean),
+  }));
+  const baseAbilities = cleanCollections[0].value;
+  if (!baseAbilities.length) return null;
+
+  const slotKeys = (abilities) => {
+    const counts = new Map();
+    return abilities.map((ability) => {
+      const type = normalizedAbilityType(ability.type);
+      const occurrence = counts.get(type) || 0;
+      counts.set(type, occurrence + 1);
+      return `${type}:${occurrence}`;
+    });
+  };
+  const collectionsWithSlots = cleanCollections.map((collection) => ({
+    ...collection,
+    slots: slotKeys(collection.value),
+  }));
+  const baseSlots = slotKeys(baseAbilities);
+  const merged = baseAbilities.map((ability, index) => {
+    const normalizedName = normalizeImportSearch(ability.name);
+    const matches = collectionsWithSlots.flatMap((collection) =>
+      collection.value
+        .map((candidate, candidateIndex) => ({
+          candidate,
+          item: collection.item,
+          slot: collection.slots[candidateIndex],
+        }))
+        .filter(
+          ({ candidate, slot }) =>
+            normalizeImportSearch(candidate.name) === normalizedName || slot === baseSlots[index],
+        ),
+    );
+    const bestDescription = [...matches]
+      .sort(
+        (left, right) =>
+          abilityDescriptionScore(right.candidate) - abilityDescriptionScore(left.candidate) ||
+          importSuggestionScore(right.item) - importSuggestionScore(left.item),
+      )
+      .find(({ candidate }) => abilityDescriptionScore(candidate) > 0)?.candidate;
+    const bestIcon = matches.find(({ candidate }) => candidate.iconUrl)?.candidate.iconUrl || '';
     return {
-      ...withDescription,
-      id: withDescription?.id || crypto.randomUUID(),
-      name: isImportPlaceholderText(importedName)
-        ? 'Требует проверки'
-        : importedName,
-      type: withCleanName?.type || withDescription?.type || 'Навык',
-      iconUrl: withCleanName?.iconUrl || withDescription?.iconUrl || '',
+      ...ability,
+      iconUrl: ability.iconUrl || bestIcon,
       description:
-        withDescription?.description ||
-        withCleanName?.description ||
-        'Описание требует проверки в игре.',
+        abilityDescriptionScore(ability) > 0
+          ? ability.description
+          : bestDescription?.description || ability.description,
     };
   });
+
+  if (merged.length < 7) {
+    const names = new Set(merged.map((ability) => normalizeImportSearch(ability.name)));
+    const slots = new Set(baseSlots);
+    for (const collection of collectionsWithSlots.slice(1)) {
+      for (let index = 0; index < collection.value.length && merged.length < 12; index += 1) {
+        const ability = collection.value[index];
+        const name = normalizeImportSearch(ability.name);
+        const slot = collection.slots[index];
+        if (!name || names.has(name) || slots.has(slot)) continue;
+        merged.push(ability);
+        names.add(name);
+        slots.add(slot);
+      }
+    }
+  }
 
   return {
     id: `merged:profile.abilities:${hashText(JSON.stringify(merged)).slice(0, 10)}`,
@@ -6585,8 +6947,7 @@ function mergeAbilityImportSuggestions(items) {
     sourceName: 'Сводка проверенных источников',
     sourceUrl: base.item.sourceUrl,
     confidence: 'high',
-    note:
-      'Названия, описания и иконки объединены из нескольких источников. Можно принять блок целиком или проверить строки по одной.',
+    note: `За основу взят наиболее полный русскоязычный набор «${base.item.sourceName}». Другие источники используются только для дополнения совпавших описаний и иконок; технические и похожие на текст описания названия отброшены.`,
   };
 }
 
@@ -6676,12 +7037,12 @@ function enrichCharacterImportSuggestions(items, character = {}) {
       }
     : null;
   return [
-    ...enriched,
     ...(mergedAbilities
       ? [enrichArraySuggestionMedia(mergedAbilities, imageMap)]
       : []),
     ...mergedCollections.map((item) => enrichArraySuggestionMedia(item, imageMap)),
     ...(roleIconSuggestion ? [roleIconSuggestion] : []),
+    ...enriched,
   ];
 }
 

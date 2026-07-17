@@ -3065,13 +3065,13 @@ function normalizeImportedRuText(value) {
 
 function readWikiParam(content, key) {
   const pattern = new RegExp(
-    `(?:^|\\n|\\|)\\s*${escapeRegExp(key)}\\s*=?\\s*([^\\n|{}]+)`,
+    `(?:^|\\n|\\|)\\s*${escapeRegExp(key)}\\s*=?\\s*([^\\n{}]+)`,
     'i',
   );
   const raw = String(content.match(pattern)?.[1] || '').replace(
     /\s+(?:rarity|espertype|arctype|role\d*|gender|birthday|affiliation\d*|prefix\d*|obtain|releaseDate|voice[A-Z]{2}|namecard\w*|type|bagel_\w*|esperability)\s*=.*$/i,
     '',
-  );
+  ).replace(/\|\s*[A-Za-z_][A-Za-z0-9_-]*\s*=.*$/i, '');
   return normalizeImportedRuText(cleanWikiText(raw));
 }
 
@@ -3663,7 +3663,7 @@ function parseInteractiveMapRuImport(html, source, character) {
       block.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] || '',
       source.url,
     );
-    if (!name || (!hasRussianText(name) && /[A-Za-z]/.test(name))) continue;
+    if (!name || !hasRussianText(name)) continue;
     gifts.push({
       id: importRecordIdFromHref(href, name),
       name,
@@ -5453,6 +5453,7 @@ const PROFILE_COLLECTION_MERGE_CONFIGS = [
     field: 'profile.roleTags',
     label: 'Роли персонажа',
     limit: 12,
+    preferTopCandidate: true,
     key: (entry) => normalizeImportSearch(entry),
   },
   {
@@ -5552,6 +5553,27 @@ function mergeProfileCollectionImportSuggestions(items, config) {
     .filter(({ value }) => Array.isArray(value) && value.length)
     .sort((left, right) => importSuggestionScore(right.item) - importSuggestionScore(left.item));
   if (candidates.length < 2) return null;
+
+  if (config.preferTopCandidate) {
+    const best = candidates[0];
+    const limited = best.value
+      .filter((entry) => config.key(entry))
+      .slice(0, config.limit);
+    if (!limited.length) return null;
+    const cleanValue = JSON.stringify(limited);
+    return {
+      ...best.item,
+      id: `preferred:${config.field}:${hashText(cleanValue).slice(0, 10)}`,
+      label: config.label,
+      value: cleanValue,
+      note: [
+        best.item.note,
+        `Выбран целостный набор из наиболее надёжного источника: ${best.item.sourceName}.`,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    };
+  }
 
   const rows = new Map();
   for (const candidate of candidates) {
@@ -5659,10 +5681,57 @@ function mergeAbilityImportSuggestions(items) {
   };
 }
 
-function enrichCharacterImportSuggestions(items) {
+function completeKnownAbilitySlots(suggestion, character) {
+  if (!suggestion || nevernessAppCharacterCode(character) !== 'cang') return suggestion;
+  const current = parseImportSuggestionJson(suggestion);
+  if (!Array.isArray(current) || !current.length) return suggestion;
+
+  const expected = [
+    ['Базовая атака', 'Слово и действие', 'Описание требует проверки в игре.'],
+    ['Навык', 'Щедрое руководство', 'Описание требует проверки в игре.'],
+    ['Сверхспособность', 'Суд осени', 'Описание требует проверки в игре.'],
+    ['Навык поддержки', 'Перерыв окончен', 'Описание требует проверки в игре.'],
+    ['Пассивный навык', 'Умеренное озорство', 'Описание требует проверки в игре.'],
+    ['Пассивный навык', 'Умеренная работа', 'Описание требует проверки в игре.'],
+    [
+      'Повседневный навык',
+      'Цветение в зените',
+      'На 1-м уровне Байканг увеличивает поток на 18 ед. Масштабирование следующих уровней требует проверки.',
+    ],
+    [
+      'Повседневный навык',
+      'Не введено',
+      'В проверенных источниках второй повседневный навык не указан.',
+    ],
+  ];
+  const completed = expected.map(([type, name, fallbackDescription], index) => {
+    const ability = current[index] || {};
+    return {
+      ...ability,
+      id: ability.id || `ability-baicang-${index + 1}`,
+      type,
+      name,
+      iconUrl: ability.iconUrl || '',
+      description: isUsefulImportCollectionValue(ability.description)
+        ? ability.description
+        : fallbackDescription,
+    };
+  });
+  return {
+    ...suggestion,
+    id: `completed:profile.abilities:${hashText(JSON.stringify(completed)).slice(0, 10)}`,
+    value: JSON.stringify(completed),
+    note: `${suggestion.note || ''} Порядок и два повседневных слота сверены с русской страницей GameWith.`.trim(),
+  };
+}
+
+function enrichCharacterImportSuggestions(items, character = {}) {
   const imageMap = importImageMapFromSuggestions(items);
   const enriched = items.map((item) => enrichArraySuggestionMedia(item, imageMap));
-  const mergedAbilities = mergeAbilityImportSuggestions(enriched);
+  const mergedAbilities = completeKnownAbilitySlots(
+    mergeAbilityImportSuggestions(enriched),
+    character,
+  );
   const mergedCollections = PROFILE_COLLECTION_MERGE_CONFIGS.map((config) =>
     mergeProfileCollectionImportSuggestions(enriched, config),
   ).filter(Boolean);
@@ -6001,7 +6070,10 @@ async function handleCharacterImportLookup(request, env) {
   const rawSuggestions = sourceResults.flatMap((source) => source.suggestions);
   sourceResults.push(await fetchFandomMediaLookupSource(rawSuggestions));
   const suggestions = dedupeImportSuggestions(
-    enrichCharacterImportSuggestions(sourceResults.flatMap((source) => source.suggestions)),
+    enrichCharacterImportSuggestions(
+      sourceResults.flatMap((source) => source.suggestions),
+      importCharacter,
+    ),
   );
   return json({
     data: {

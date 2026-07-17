@@ -513,9 +513,32 @@ test.describe('NTE Meta Worker API', () => {
     (suggestion: { field: string }) => suggestion.field === 'profile.roleTags',
   ) as { value: string } | undefined;
   expect(roleSuggestion).toBeTruthy();
-  expect(JSON.parse(roleSuggestion?.value || '[]')).toEqual(
-    expect.arrayContaining(['Урон', 'Основной ДД', 'Периодический урон']),
-  );
+  expect(JSON.parse(roleSuggestion?.value || '[]')).toEqual([
+    'Урон',
+    'Основной ДД',
+    'Периодический урон',
+  ]);
+  const voiceActorSuggestion = ownerLookupJson.data.suggestions.find(
+    (suggestion: { field: string }) => suggestion.field === 'profile.voiceActors',
+  ) as { value: string } | undefined;
+  expect(voiceActorSuggestion?.value).not.toContain('[[wp:');
+  const abilitySuggestion = ownerLookupJson.data.suggestions.find(
+    (suggestion: { field: string }) => suggestion.field === 'profile.abilities',
+  ) as { value: string } | undefined;
+  const importedAbilities = JSON.parse(abilitySuggestion?.value || '[]') as Array<{
+    name?: string;
+    type?: string;
+  }>;
+  expect(importedAbilities).toHaveLength(8);
+  expect(importedAbilities.slice(6)).toMatchObject([
+    { name: 'Цветение в зените', type: 'Повседневный навык' },
+    { name: 'Не введено', type: 'Повседневный навык' },
+  ]);
+  const giftSuggestion = ownerLookupJson.data.suggestions.find(
+    (suggestion: { field: string }) => suggestion.field === 'profile.gifts',
+  ) as { value: string } | undefined;
+  const importedGifts = JSON.parse(giftSuggestion?.value || '[]') as Array<{ name?: string }>;
+  expect(importedGifts.every((gift) => !/^\d+$/.test(gift.name || ''))).toBeTruthy();
   expect(
     ownerLookupJson.data.suggestions.some(
       (suggestion: { field: string }) => suggestion.field === 'profile.roleIcons',

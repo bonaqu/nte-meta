@@ -83,6 +83,45 @@ test.describe('NTE Meta Worker API', () => {
     expect(wrongContentType.status()).toBe(415);
   });
 
+  test('очередь слухов создаёт только непубличный редакционный черновик', async () => {
+    expect((await guest.get('/api/leak-candidates')).status()).toBe(401);
+
+    const submitted = await owner.post('/api/leak-candidates', {
+      data: {
+        title: `Непроверенная публикация ${runId}`,
+        sourceUrl: `https://t.me/example/${encodeURIComponent(runId)}`,
+        sourceName: 'Тестовый источник',
+        note: 'Нужно проверить оригинал и контекст перед публикацией.',
+        status: 'слух',
+      },
+    });
+    expect(submitted.status()).toBe(201);
+    const candidateId = (await submitted.json()).data.id;
+
+    const promoted = await owner.post(
+      `/api/leak-candidates/${candidateId}/promote`,
+      { data: {} },
+    );
+    expect(promoted.status()).toBe(201);
+    const promotedData = (await promoted.json()).data;
+
+    expect((await guest.get(`/api/leaks/${promotedData.slug}`)).status()).toBe(
+      404,
+    );
+    expect(
+      (
+        await owner.patch(`/api/leaks/${promotedData.leakId}`, {
+          data: { approved: true },
+        })
+      ).ok(),
+    ).toBeTruthy();
+    expect(
+      (await guest.get(`/api/leaks/${promotedData.slug}`)).ok(),
+    ).toBeTruthy();
+
+    await owner.delete(`/api/leaks/${promotedData.leakId}`);
+  });
+
   test('профиль, комьюнити, ответы и реакции работают через D1', async () => {
     const profile = await owner.patch('/api/auth/profile', {
       data: { displayName: 'Playwright Owner' },

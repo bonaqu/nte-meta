@@ -23,6 +23,7 @@ import {
   Home,
   ImageIcon,
   ListFilter,
+  Link2,
   LockKeyhole,
   LogOut,
   Menu,
@@ -105,6 +106,10 @@ import { getYoutubeEmbedUrl } from './lib/youtube';
 import { setPageMetadata } from './lib/seo';
 import { canManageContent, editorGradeLabel } from './lib/permissions';
 import { EditorShell } from './features/inline-editors/editor-shell';
+import {
+  LeakDiscoveryPanel,
+  LeakSubmissionButton,
+} from './features/leaks/leak-workflow';
 import type {
   AdminUser,
   AuditLogEntry,
@@ -764,8 +769,8 @@ function HomePage({
                 alt={character.name}
                 width="280"
                 height="360"
-              loading={index === 0 ? 'eager' : 'lazy'}
-              referrerPolicy="no-referrer"
+                loading={index === 0 ? 'eager' : 'lazy'}
+                referrerPolicy="no-referrer"
               />
               <span>{character.name}</span>
             </a>
@@ -843,15 +848,24 @@ function HomePage({
             eyebrow="Отдельно от фактов"
             title="Сливы / слухи"
             action={
-              canCreateLeak ? (
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={() => openHomeEditor('leak')}
-                >
-                  <Plus aria-hidden="true" /> Добавить слив
-                </button>
-              ) : null
+              <div className="section-actions">
+                {user ? (
+                  <LeakSubmissionButton />
+                ) : (
+                  <a className="ghost-button" href="#/profile">
+                    <MessageSquare aria-hidden="true" /> Предложить слух
+                  </a>
+                )}
+                {canCreateLeak ? (
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => openHomeEditor('leak')}
+                  >
+                    <Plus aria-hidden="true" /> Добавить слив
+                  </button>
+                ) : null}
+              </div>
             }
           />
           <div className="compact-list">
@@ -886,14 +900,18 @@ function HomePage({
         />
         <div className="character-grid">
           {popularCharacters.map((character) => (
-            <CharacterCard key={character.id} character={character} data={data} />
+            <CharacterCard
+              key={character.id}
+              character={character}
+              data={data}
+            />
           ))}
         </div>
       </section>
 
-    <section className="community-band">
-      <div>
-        <h2>Треды и обсуждения игроков</h2>
+      <section className="community-band">
+        <div>
+          <h2>Треды и обсуждения игроков</h2>
           <p>
             Создавайте треды с вопросами по отрядам, ротациям, ресурсам и
             патчам. Комментарии под материалами остаются там же, где контекст.
@@ -997,7 +1015,9 @@ function HomePage({
 
       <EditorShell
         open={homeEditor === 'leak'}
-        title={homeEditorItemId === 'new' ? 'Добавить слив' : 'Редактировать слив'}
+        title={
+          homeEditorItemId === 'new' ? 'Добавить слив' : 'Редактировать слив'
+        }
         eyebrow="Слухи отдельно от фактов"
         dirty={homeEditorDirty}
         onClose={() => {
@@ -1006,6 +1026,12 @@ function HomePage({
         }}
       >
         <Suspense fallback={<SkeletonGrid label="Загрузка редактора слива" />}>
+          <LeakDiscoveryPanel
+            onPromoted={async (leakId) => {
+              await refreshContent();
+              setHomeEditorItemId(leakId);
+            }}
+          />
           <AdminLeaksManager
             items={data.leaks}
             initialSelectedId={homeEditorItemId}
@@ -2915,6 +2941,7 @@ function CommentsBlock({
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const threadedComments = useMemo(() => {
     const byParent = new Map<string, Comment[]>();
     const roots: Comment[] = [];
@@ -2962,6 +2989,22 @@ function CommentsBlock({
       mounted = false;
     };
   }, [sort, targetId, targetType]);
+
+  useEffect(() => {
+    if (!replyTo) return;
+    bodyRef.current?.focus();
+  }, [replyTo]);
+
+  useEffect(() => {
+    const commentId = new URL(window.location.href).searchParams.get('comment');
+    if (!commentId || !comments.some((comment) => comment.id === commentId))
+      return;
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(`comment-${commentId}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [comments]);
 
   async function submitComment(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -3040,18 +3083,25 @@ function CommentsBlock({
     setDeleteTarget(null);
   }
 
-  async function markUseful(comment: Comment) {
+  async function reactToComment(
+    comment: Comment,
+    reactionType: 'like' | 'dislike' | 'useful',
+  ) {
     if (!user) {
       setMessage('Войдите, чтобы оценивать комментарии.');
       return;
     }
     setActionId(comment.id);
-    const result = await sendReaction('comment', comment.id, 'useful');
+    const result = await sendReaction('comment', comment.id, reactionType);
     if (result.ok) {
       setComments((current) =>
         current.map((item) =>
           item.id === comment.id
-            ? { ...item, score: result.data.useful }
+            ? {
+                ...item,
+                score: result.data.useful,
+                reactions: result.data,
+              }
             : item,
         ),
       );
@@ -3059,6 +3109,19 @@ function CommentsBlock({
       setMessage(result.error);
     }
     setActionId('');
+  }
+
+  async function copyCommentLink(comment: Comment) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('comment', comment.id);
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      setMessage('Ссылка на комментарий скопирована.');
+    } catch {
+      setMessage(
+        'Не удалось скопировать ссылку. Скопируйте адрес страницы вручную.',
+      );
+    }
   }
 
   return (
@@ -3093,6 +3156,7 @@ function CommentsBlock({
           </div>
         ) : null}
         <textarea
+          ref={bodyRef}
           id="comment-body"
           name="body"
           value={body}
@@ -3107,6 +3171,7 @@ function CommentsBlock({
           disabled={!user || pending}
           aria-describedby="comment-status"
         />
+        <small className="character-counter">{body.length} / 4000</small>
         <button
           className="primary-button"
           type="submit"
@@ -3124,6 +3189,7 @@ function CommentsBlock({
           threadedComments.map((comment) => (
             <article
               className={`comment-card ${comment.parentId ? 'is-reply' : ''}`}
+              id={`comment-${comment.id}`}
               key={comment.id}
             >
               <div className="comment-heading">
@@ -3173,10 +3239,28 @@ function CommentsBlock({
                   className="text-button"
                   type="button"
                   disabled={actionId === comment.id}
-                  onClick={() => markUseful(comment)}
+                  onClick={() => void reactToComment(comment, 'like')}
                 >
                   <ThumbsUp aria-hidden="true" />
-                  Полезно {comment.score}
+                  Поддержать {comment.reactions?.likes || 0}
+                </button>
+                <button
+                  className="text-button"
+                  type="button"
+                  disabled={actionId === comment.id}
+                  onClick={() => void reactToComment(comment, 'dislike')}
+                >
+                  <ThumbsDown aria-hidden="true" />
+                  Не согласен {comment.reactions?.dislikes || 0}
+                </button>
+                <button
+                  className="text-button"
+                  type="button"
+                  disabled={actionId === comment.id}
+                  onClick={() => void reactToComment(comment, 'useful')}
+                >
+                  <CheckCircle2 aria-hidden="true" />
+                  Полезно {comment.reactions?.useful ?? comment.score}
                 </button>
                 {user ? (
                   <button
@@ -3191,6 +3275,15 @@ function CommentsBlock({
                     Ответить
                   </button>
                 ) : null}
+                <button
+                  className="icon-button comment-link-button"
+                  type="button"
+                  title="Скопировать ссылку на комментарий"
+                  aria-label="Скопировать ссылку на комментарий"
+                  onClick={() => void copyCommentLink(comment)}
+                >
+                  <Link2 aria-hidden="true" />
+                </button>
                 {user?.id === comment.userId ? (
                   <>
                     <button

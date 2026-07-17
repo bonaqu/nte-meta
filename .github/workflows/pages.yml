@@ -43,7 +43,7 @@ jobs:
         run: npm run lint
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
-      - name: Test two baseline browser flows
+      - name: Test two browser flows and one editorial API contract
         if: github.event.inputs.full_suite != 'true'
         run: npm run test:ci
       - name: Full manually requested regression

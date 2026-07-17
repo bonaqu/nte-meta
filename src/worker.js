@@ -251,7 +251,14 @@ async function router(request, env, ctx) {
   const parts = url.pathname
     .replace(/^\/api\/?/, '')
     .split('/')
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((part) => {
+      try {
+        return decodeURIComponent(part);
+      } catch {
+        return part;
+      }
+    });
 
   if (!url.pathname.startsWith('/api/')) {
     return json({ error: 'Not found' }, 404);
@@ -314,6 +321,10 @@ async function router(request, env, ctx) {
 
   if (parts[0] === 'reactions') {
     return handleReactions(request, env, parts, ctx);
+  }
+
+  if (parts[0] === 'leak-candidates') {
+    return handleLeakCandidates(request, env, parts, ctx);
   }
 
   if (parts[0] === 'threads') {
@@ -1523,6 +1534,637 @@ async function reorderGuideSections(request, env, guideId, ctx) {
   return json({ data: { success: true } });
 }
 
+async function handleLeakCandidates(request, env, parts, ctx) {
+  const id = parts[1];
+
+  if (request.method === 'GET' && !id) {
+    await requireContentPermission(request, env, 'leaks', 'edit');
+    return json({ data: await listLeakCandidates(env) });
+  }
+
+  if (request.method === 'POST' && id === 'discover') {
+    const actor = await requireContentPermission(request, env, 'leaks', 'edit');
+    await rateLimit(request, env, 'leak-discovery', 6, 10 * 60);
+    const body = await readJson(request);
+    const query = cleanString(body.query || '', 0, 100);
+    const sourceResults = await mapWithConcurrency(
+      LEAK_DISCOVERY_SOURCES,
+      LEAK_DISCOVERY_CONCURRENCY,
+      (source) => fetchLeakDiscoverySource(source, query),
+    );
+    const discovered = dedupeLeakCandidates(
+      sourceResults.flatMap((source) => source.candidates || []),
+    ).slice(0, 40);
+    await upsertLeakCandidates(env, discovered);
+    await env.DB.batch(
+      sourceResults
+        .filter((source) => !source.referenceOnly)
+        .map((source) =>
+          env.DB.prepare(
+            'UPDATE sources SET last_checked_at = current_timestamp, updated_at = current_timestamp WHERE source_url = ?',
+          ).bind(source.url),
+        ),
+    );
+    ctx.waitUntil(
+      logAudit(env, actor.id, 'leak_candidates.discover', null, {
+        query,
+        discovered: discovered.length,
+        sources: sourceResults.map((source) => ({
+          id: source.id,
+          status: source.status,
+          count: source.candidates?.length || 0,
+        })),
+      }),
+    );
+    return json({
+      data: {
+        discoveredCount: discovered.length,
+        candidates: await listLeakCandidates(env),
+        sources: sourceResults.map(serializeLeakDiscoverySource),
+      },
+    });
+  }
+
+  if (request.method === 'POST' && id && parts[2] === 'promote') {
+    const actor = await requireContentPermission(
+      request,
+      env,
+      'leaks',
+      'create',
+    );
+    const candidate = await env.DB.prepare(
+      'SELECT * FROM leak_candidates WHERE id = ?',
+    )
+      .bind(id)
+      .first();
+    if (!candidate)
+      return json({ error: 'Публикация в очереди не найдена' }, 404);
+    if (candidate.created_leak_id) {
+      const existing = await env.DB.prepare(
+        'SELECT id, slug FROM leaks WHERE id = ?',
+      )
+        .bind(candidate.created_leak_id)
+        .first();
+      if (existing)
+        return json({ data: { leakId: existing.id, slug: existing.slug } });
+    }
+
+    const originalTitle = cleanLeakCandidateText(candidate.title, 180);
+    const needsTranslation = candidate.language !== 'ru';
+    const title = cleanLeakCandidateText(
+      needsTranslation ? `Требуется перевод: ${originalTitle}` : originalTitle,
+      180,
+    );
+    const baseSlug = slugify(title) || `leak-${candidate.id.slice(0, 8)}`;
+    const slugExists = await env.DB.prepare(
+      'SELECT id FROM leaks WHERE slug = ?',
+    )
+      .bind(baseSlug)
+      .first();
+    const slug = slugExists
+      ? `${baseSlug.slice(0, 70)}-${candidate.id.slice(0, 7)}`
+      : baseSlug;
+    const leakId = crypto.randomUUID();
+    const excerpt = cleanLeakCandidateText(candidate.excerpt || '', 4000);
+    const editorialNotice = needsTranslation
+      ? 'Текст источника требует перевода на русский и проверки редактором.'
+      : 'Текст источника требует фактчекинга редактором.';
+    const bodyMarkdown = [
+      `> ${editorialNotice}`,
+      '',
+      excerpt || originalTitle,
+      '',
+      `[Открыть оригинальный источник](${candidate.source_url})`,
+    ].join('\n');
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO leaks
+         (id, slug, title, summary, body_markdown, original_post_url, source_name, source_url,
+          trust_level, leak_status, approved, tags_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+      ).bind(
+        leakId,
+        slug,
+        title,
+        editorialNotice,
+        bodyMarkdown,
+        candidate.source_url,
+        candidate.source_name,
+        candidate.source_url,
+        candidate.trust_level,
+        candidate.suggested_status,
+        JSON.stringify([
+          'из очереди',
+          'требует проверки',
+          candidate.source_type,
+        ]),
+      ),
+      env.DB.prepare(
+        `UPDATE leak_candidates
+         SET review_status = 'accepted', reviewed_by = ?, reviewed_at = current_timestamp,
+             created_leak_id = ?, updated_at = current_timestamp
+         WHERE id = ?`,
+      ).bind(actor.id, leakId, candidate.id),
+    ]);
+    ctx.waitUntil(
+      logAudit(env, actor.id, 'leak_candidates.promote', candidate.id, {
+        leakId,
+        slug,
+      }),
+    );
+    return json({ data: { leakId, slug } }, 201);
+  }
+
+  if (request.method === 'POST' && !id) {
+    const actor = await requireRole(request, env, 'user');
+    await rateLimit(request, env, 'leak-candidate-submit', 5, 24 * 60 * 60);
+    const body = await readJson(request);
+    const title = cleanLeakCandidateText(cleanString(body.title, 5, 180), 180);
+    const sourceUrl = normalizeLeakCandidateUrl(body.sourceUrl);
+    const excerpt = cleanLeakCandidateText(
+      cleanString(body.note || '', 0, 4000),
+      4000,
+    );
+    const suggestedStatus = normalizeLeakCandidateStatus(body.status || 'слух');
+    const sourceType = inferLeakSourceType(sourceUrl);
+    const candidate = {
+      id: crypto.randomUUID(),
+      externalKey: leakCandidateExternalKey(sourceUrl),
+      origin: 'user',
+      sourceName: cleanLeakCandidateText(
+        body.sourceName || new URL(sourceUrl).hostname.replace(/^www\./, ''),
+        120,
+      ),
+      sourceUrl,
+      sourceType,
+      language: detectLeakLanguage(`${title} ${excerpt}`),
+      title,
+      excerpt,
+      authorName: actor.displayName,
+      publishedAt: null,
+      trustLevel: 'низкий',
+      suggestedStatus,
+      confidenceScore: 20,
+      submittedBy: actor.id,
+      metadata: { submittedBy: actor.displayName },
+    };
+    try {
+      await insertLeakCandidate(env, candidate);
+    } catch (error) {
+      if (/unique|constraint/i.test(String(error?.message || ''))) {
+        return json(
+          { error: 'Эта ссылка уже есть в редакционной очереди' },
+          409,
+        );
+      }
+      throw error;
+    }
+    ctx.waitUntil(
+      logAudit(env, actor.id, 'leak_candidates.submit', candidate.id, {
+        sourceUrl,
+        suggestedStatus,
+      }),
+    );
+    return json({ data: serializeLeakCandidate(candidate) }, 201);
+  }
+
+  if (request.method === 'PATCH' && id) {
+    const actor = await requireContentPermission(request, env, 'leaks', 'edit');
+    const body = await readJson(request);
+    const reviewStatus = cleanString(body.reviewStatus, 1, 20);
+    if (!['pending', 'rejected', 'duplicate'].includes(reviewStatus)) {
+      return json(
+        { error: 'Принять публикацию можно только через создание черновика' },
+        400,
+      );
+    }
+    const result = await env.DB.prepare(
+      `UPDATE leak_candidates
+       SET review_status = ?, reviewed_by = ?, reviewed_at = current_timestamp,
+           updated_at = current_timestamp
+       WHERE id = ?`,
+    )
+      .bind(reviewStatus, actor.id, id)
+      .run();
+    if (!result.meta.changes) {
+      return json({ error: 'Публикация в очереди не найдена' }, 404);
+    }
+    ctx.waitUntil(
+      logAudit(env, actor.id, 'leak_candidates.review', id, { reviewStatus }),
+    );
+    return json({ data: { success: true } });
+  }
+
+  return json({ error: 'Метод не поддерживается' }, 405);
+}
+
+async function listLeakCandidates(env) {
+  const rows = await env.DB.prepare(
+    `SELECT leak_candidates.*, users.display_name AS submitter_name
+     FROM leak_candidates
+     LEFT JOIN users ON users.id = leak_candidates.submitted_by
+     ORDER BY
+       CASE leak_candidates.review_status WHEN 'pending' THEN 0 ELSE 1 END,
+       COALESCE(leak_candidates.published_at, leak_candidates.created_at) DESC
+     LIMIT 120`,
+  ).all();
+  return rows.results.map(serializeLeakCandidate);
+}
+
+function serializeLeakCandidate(row) {
+  return {
+    id: row.id,
+    origin: row.origin,
+    sourceName: row.source_name || row.sourceName,
+    sourceUrl: row.source_url || row.sourceUrl,
+    sourceType: row.source_type || row.sourceType,
+    language: row.language || 'unknown',
+    title: row.title,
+    excerpt: row.excerpt || '',
+    authorName: row.author_name || row.authorName || undefined,
+    submitterName: row.submitter_name || undefined,
+    publishedAt: row.published_at || row.publishedAt || undefined,
+    trustLevel: row.trust_level || row.trustLevel || 'низкий',
+    suggestedStatus: row.suggested_status || row.suggestedStatus || 'слух',
+    confidenceScore: Number(row.confidence_score ?? row.confidenceScore ?? 0),
+    reviewStatus: row.review_status || row.reviewStatus || 'pending',
+    createdLeakId: row.created_leak_id || row.createdLeakId || undefined,
+    createdAt: row.created_at || row.createdAt || new Date().toISOString(),
+    updatedAt: row.updated_at || row.updatedAt || undefined,
+  };
+}
+
+function serializeLeakDiscoverySource(source) {
+  return {
+    id: source.id,
+    name: source.name,
+    url: source.url,
+    type: source.type,
+    language: source.language,
+    trustLevel: source.trustLevel,
+    status: source.status,
+    message: source.message,
+    foundCount: source.candidates?.length || 0,
+  };
+}
+
+async function fetchLeakDiscoverySource(source, query) {
+  if (source.referenceOnly) {
+    return { ...source, status: 'manual', candidates: [] };
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    LEAK_DISCOVERY_TIMEOUT_MS,
+  );
+  try {
+    const response = await fetch(source.url, {
+      headers: {
+        accept: 'text/html,application/xhtml+xml',
+        'user-agent':
+          'NTE-Meta-Editorial/1.0 (+https://bonaqu.github.io/nte-meta/)',
+      },
+      signal: controller.signal,
+      cf: { cacheEverything: true, cacheTtl: 300 },
+    });
+    const length = Number(response.headers.get('content-length') || 0);
+    if (!response.ok) {
+      await discardResponseBody(response);
+      return {
+        ...source,
+        status: response.status === 403 ? 'blocked' : 'failed',
+        message: `Источник временно недоступен: HTTP ${response.status}`,
+        candidates: [],
+      };
+    }
+    if (length > LEAK_DISCOVERY_MAX_BYTES) {
+      await discardResponseBody(response);
+      return {
+        ...source,
+        status: 'failed',
+        message: 'Страница превышает безопасный лимит чтения.',
+        candidates: [],
+      };
+    }
+    const html = await readLimitedLeakDiscoveryResponse(response);
+    const candidates = (
+      source.parser === 'telegram'
+        ? parseTelegramLeakCandidates(html, source)
+        : parseNteWikiLeakCandidates(html, source)
+    )
+      .filter((candidate) => leakCandidateMatchesSource(candidate, source))
+      .filter((candidate) => leakCandidateMatchesQuery(candidate, query))
+      .slice(0, 12);
+    return {
+      ...source,
+      status: candidates.length ? 'ok' : 'partial',
+      message: candidates.length
+        ? `Найдено публикаций: ${candidates.length}`
+        : 'Новых подходящих публикаций не найдено.',
+      candidates,
+    };
+  } catch (error) {
+    return {
+      ...source,
+      status: error?.name === 'AbortError' ? 'timeout' : 'failed',
+      message:
+        error?.name === 'AbortError'
+          ? 'Источник не ответил за безопасное время.'
+          : 'Не удалось прочитать источник.',
+      candidates: [],
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function readLimitedLeakDiscoveryResponse(response) {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const decoder = new globalThis.TextDecoder();
+  let received = 0;
+  let text = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    if (received > LEAK_DISCOVERY_MAX_BYTES) {
+      await reader.cancel();
+      throw new Error('LEAK_DISCOVERY_SOURCE_TOO_LARGE');
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
+function parseTelegramLeakCandidates(html, source) {
+  return String(html || '')
+    .split(/<div class="tgme_widget_message_wrap[^>]*>/i)
+    .slice(1)
+    .map((block) => {
+      const post = block.match(/data-post="([^"]+)"/i)?.[1];
+      const textHtml =
+        block.match(
+          /<div class="tgme_widget_message_text[^>]*>([\s\S]*?)(?:<div class="tgme_widget_message_footer|<a class="tgme_widget_message_date)/i,
+        )?.[1] || '';
+      const text = cleanLeakCandidateText(htmlToPlainText(textHtml), 4000);
+      if (!post || text.length < 8) return null;
+      const title = leakCandidateTitle(text);
+      if (!title) return null;
+      const sourceUrl = normalizeLeakCandidateUrl(`https://t.me/${post}`);
+      return buildDiscoveredLeakCandidate({
+        source,
+        sourceUrl,
+        title,
+        excerpt: text,
+        publishedAt: block.match(/datetime="([^"]+)"/i)?.[1] || null,
+      });
+    })
+    .filter(Boolean);
+}
+
+function parseNteWikiLeakCandidates(html, source) {
+  const matches = Array.from(
+    String(html || '').matchAll(
+      /<a[^>]+href="(https?:\/\/nte\.wiki\/news\/[^"#?]+|\/news\/[^"#?]+)"[^>]*>([\s\S]*?)<\/a>/gi,
+    ),
+  );
+  const candidates = [];
+  for (const match of matches) {
+    const plainText = cleanLeakCandidateText(htmlToPlainText(match[2]), 1200);
+    const title = compactImportLines(plainText).find(
+      (line) =>
+        line.length >= 8 &&
+        !/^(?:patch notes|event|community|guide|news|hot)$/i.test(line) &&
+        !/^[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}$/.test(line),
+    );
+    if (
+      !title ||
+      !/(?:leak|rumou?r|upcoming|roadmap|unreleased|preview|слив|слух|утечк)/i.test(
+        title,
+      )
+    ) {
+      continue;
+    }
+    const sourceUrl = normalizeLeakCandidateUrl(
+      match[1].startsWith('http') ? match[1] : `https://nte.wiki${match[1]}`,
+    );
+    candidates.push(
+      buildDiscoveredLeakCandidate({
+        source,
+        sourceUrl,
+        title,
+        excerpt: plainText,
+        publishedAt: null,
+      }),
+    );
+  }
+  return candidates;
+}
+
+function buildDiscoveredLeakCandidate({
+  source,
+  sourceUrl,
+  title,
+  excerpt,
+  publishedAt,
+}) {
+  const combined = `${title} ${excerpt}`;
+  const language = detectLeakLanguage(combined) || source.language;
+  const suggestedStatus = inferLeakCandidateStatus(combined);
+  const explicitLeak = /(?:leak|datamine|слив|утечк|爆料)/i.test(combined);
+  const baseConfidence =
+    source.trustLevel === 'высокий'
+      ? 75
+      : source.trustLevel === 'средний'
+        ? 55
+        : 30;
+  return {
+    id: crypto.randomUUID(),
+    externalKey: leakCandidateExternalKey(sourceUrl),
+    origin: 'discovery',
+    sourceName: source.name,
+    sourceUrl,
+    sourceType: source.type,
+    language,
+    title: cleanLeakCandidateText(title, 180),
+    excerpt: cleanLeakCandidateText(excerpt, 4000),
+    authorName: null,
+    publishedAt,
+    trustLevel: source.trustLevel,
+    suggestedStatus,
+    confidenceScore: Math.min(90, baseConfidence + (explicitLeak ? 10 : 0)),
+    submittedBy: null,
+    metadata: { sourceId: source.id, requiresTranslation: language !== 'ru' },
+  };
+}
+
+function dedupeLeakCandidates(candidates) {
+  const seen = new Set();
+  return candidates.filter((candidate) => {
+    if (!candidate?.externalKey || seen.has(candidate.externalKey))
+      return false;
+    seen.add(candidate.externalKey);
+    return true;
+  });
+}
+
+async function upsertLeakCandidates(env, candidates) {
+  if (!candidates.length) return;
+  for (const group of chunkItems(candidates, 40)) {
+    await env.DB.batch(
+      group.map((candidate) =>
+        env.DB.prepare(
+          `INSERT INTO leak_candidates
+           (id, external_key, origin, source_name, source_url, source_type, language,
+            title, excerpt, author_name, published_at, trust_level, suggested_status,
+            confidence_score, submitted_by, metadata_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(external_key) DO UPDATE SET
+             title = excluded.title,
+             excerpt = excluded.excerpt,
+             language = excluded.language,
+             published_at = COALESCE(excluded.published_at, leak_candidates.published_at),
+             confidence_score = MAX(leak_candidates.confidence_score, excluded.confidence_score),
+             metadata_json = excluded.metadata_json,
+             updated_at = current_timestamp`,
+        ).bind(...leakCandidateInsertValues(candidate)),
+      ),
+    );
+  }
+}
+
+async function insertLeakCandidate(env, candidate) {
+  await env.DB.prepare(
+    `INSERT INTO leak_candidates
+     (id, external_key, origin, source_name, source_url, source_type, language,
+      title, excerpt, author_name, published_at, trust_level, suggested_status,
+      confidence_score, submitted_by, metadata_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(...leakCandidateInsertValues(candidate))
+    .run();
+}
+
+function leakCandidateInsertValues(candidate) {
+  return [
+    candidate.id,
+    candidate.externalKey,
+    candidate.origin,
+    candidate.sourceName,
+    candidate.sourceUrl,
+    candidate.sourceType,
+    candidate.language,
+    candidate.title,
+    candidate.excerpt,
+    candidate.authorName,
+    candidate.publishedAt,
+    candidate.trustLevel,
+    candidate.suggestedStatus,
+    candidate.confidenceScore,
+    candidate.submittedBy,
+    JSON.stringify(candidate.metadata || {}),
+  ];
+}
+
+function normalizeLeakCandidateUrl(value) {
+  let url;
+  try {
+    url = new URL(String(value || '').trim());
+  } catch {
+    throwHttp('Укажите корректную ссылку на первоисточник', 400);
+  }
+  if (url.protocol !== 'https:') {
+    throwHttp('Источник должен использовать безопасную HTTPS-ссылку', 400);
+  }
+  for (const key of [...url.searchParams.keys()]) {
+    if (/^(?:utm_|fbclid|gclid)/i.test(key)) url.searchParams.delete(key);
+  }
+  url.hash = '';
+  const result = url.toString();
+  if (result.length > 2048) {
+    throwHttp('Ссылка на источник слишком длинная', 400);
+  }
+  return result;
+}
+
+function leakCandidateExternalKey(sourceUrl) {
+  return normalizeLeakCandidateUrl(sourceUrl).toLocaleLowerCase('en-US');
+}
+
+function inferLeakSourceType(sourceUrl) {
+  const hostname = new URL(sourceUrl).hostname.toLocaleLowerCase('en-US');
+  if (hostname === 't.me' || hostname.endsWith('.t.me')) return 'telegram';
+  if (hostname.includes('reddit.com')) return 'reddit';
+  if (hostname.includes('bilibili.com')) return 'bilibili';
+  if (hostname.includes('weibo.com')) return 'weibo';
+  if (hostname === 'x.com' || hostname.endsWith('.x.com')) return 'twitter/x';
+  return 'website';
+}
+
+function detectLeakLanguage(value) {
+  const text = String(value || '');
+  const cyrillic = (text.match(/[А-Яа-яЁё]/g) || []).length;
+  const chinese = (text.match(/[\u3400-\u9fff]/g) || []).length;
+  const latin = (text.match(/[A-Za-z]/g) || []).length;
+  if (cyrillic >= Math.max(3, chinese, latin * 0.25)) return 'ru';
+  if (chinese >= Math.max(2, cyrillic, latin * 0.25)) return 'zh';
+  if (latin >= 3) return 'en';
+  return 'unknown';
+}
+
+function normalizeLeakCandidateStatus(value) {
+  const status = String(value || '').toLocaleLowerCase('ru-RU');
+  if (!['слух', 'слив', 'подтверждено', 'опровергнуто'].includes(status)) {
+    throwHttp('Выберите корректный статус информации', 400);
+  }
+  return status;
+}
+
+function inferLeakCandidateStatus(value) {
+  const text = String(value || '');
+  if (/(?:debunk|false|fake|опроверг|ложн)/i.test(text)) return 'опровергнуто';
+  if (/(?:confirmed|official|announcement|подтвержд|официальн)/i.test(text)) {
+    return 'подтверждено';
+  }
+  if (/(?:leak|datamine|слив|утечк|爆料)/i.test(text)) return 'слив';
+  return 'слух';
+}
+
+function cleanLeakCandidateText(value, maxLength) {
+  return normalizeImportedRuText(String(value || '').normalize('NFKC'))
+    .replace(/\s*https?:\/\/\S+\s*/gi, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function leakCandidateTitle(text) {
+  return cleanLeakCandidateText(
+    String(text || '')
+      .split('\n')
+      .map((line) => line.replace(/^#+\s*/, '').trim())
+      .find((line) => line.length >= 8) || '',
+    180,
+  ).replace(/^[^\p{L}\p{N}]+/u, '');
+}
+
+function leakCandidateMatchesSource(candidate, source) {
+  if (source.relevance !== 'future') return true;
+  return /(?:leak|rumou?r|upcoming|roadmap|unreleased|preview|future|datamine|слив|слух|утечк|неофициаль|будущ|предполож|爆料)/i.test(
+    `${candidate.title} ${candidate.excerpt}`,
+  );
+}
+
+function leakCandidateMatchesQuery(candidate, query) {
+  const normalized = normalizeImportSearch(query || '');
+  if (!normalized) return true;
+  return normalizeImportSearch(
+    `${candidate.title} ${candidate.excerpt} ${candidate.sourceName}`,
+  ).includes(normalized);
+}
+
 async function handleComments(request, env, ctx) {
   const url = new URL(request.url);
 
@@ -1532,9 +2174,21 @@ async function handleComments(request, env, ctx) {
     if (!targetType || !targetId) {
       await requireRole(request, env, 'moderator');
       const rows = await env.DB.prepare(
-        `SELECT comments.*, users.display_name AS author_name
+        `SELECT comments.*, users.display_name AS author_name,
+                COALESCE(comment_reactions.likes, 0) AS reaction_likes,
+                COALESCE(comment_reactions.dislikes, 0) AS reaction_dislikes,
+                COALESCE(comment_reactions.useful, 0) AS reaction_useful
          FROM comments
          LEFT JOIN users ON users.id = comments.user_id
+         LEFT JOIN (
+           SELECT target_id,
+                  SUM(CASE WHEN reaction_type = 'like' THEN value ELSE 0 END) AS likes,
+                  SUM(CASE WHEN reaction_type = 'dislike' THEN value ELSE 0 END) AS dislikes,
+                  SUM(CASE WHEN reaction_type = 'useful' THEN value ELSE 0 END) AS useful
+           FROM reactions
+           WHERE target_type = 'comment'
+           GROUP BY target_id
+         ) AS comment_reactions ON comment_reactions.target_id = comments.id
          ORDER BY comments.created_at DESC
          LIMIT 200`,
       ).all();
@@ -1545,11 +2199,23 @@ async function handleComments(request, env, ctx) {
         ? 'comments.score DESC, comments.created_at DESC'
         : 'comments.created_at DESC';
     const rows = await env.DB.prepare(
-      `SELECT comments.*, users.display_name AS author_name
+      `SELECT comments.*, users.display_name AS author_name,
+              COALESCE(comment_reactions.likes, 0) AS reaction_likes,
+              COALESCE(comment_reactions.dislikes, 0) AS reaction_dislikes,
+              COALESCE(comment_reactions.useful, 0) AS reaction_useful
        FROM comments
        LEFT JOIN users ON users.id = comments.user_id
-       WHERE target_type = ?
-         AND target_id = ?
+       LEFT JOIN (
+         SELECT target_id,
+                SUM(CASE WHEN reaction_type = 'like' THEN value ELSE 0 END) AS likes,
+                SUM(CASE WHEN reaction_type = 'dislike' THEN value ELSE 0 END) AS dislikes,
+                SUM(CASE WHEN reaction_type = 'useful' THEN value ELSE 0 END) AS useful
+         FROM reactions
+         WHERE target_type = 'comment'
+         GROUP BY target_id
+       ) AS comment_reactions ON comment_reactions.target_id = comments.id
+       WHERE comments.target_type = ?
+         AND comments.target_id = ?
          AND comments.status = 'visible'
          AND (
            comments.parent_id IS NULL
@@ -1627,6 +2293,7 @@ async function handleComments(request, env, ctx) {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           score: 0,
+          reactions: { likes: 0, dislikes: 0, useful: 0 },
           status: 'visible',
         },
       },
@@ -1972,6 +2639,94 @@ const IMPORT_FETCH_CONCURRENCY = 4;
 const IMPORT_MEDIA_FETCH_CONCURRENCY = 3;
 const IMPORT_MEDIA_LOOKUP_LIMIT = 6;
 const IMPORT_AUTO_SOURCE_LIMIT = 14;
+const LEAK_DISCOVERY_TIMEOUT_MS = 5500;
+const LEAK_DISCOVERY_MAX_BYTES = 320000;
+const LEAK_DISCOVERY_CONCURRENCY = 3;
+const LEAK_DISCOVERY_SOURCES = [
+  {
+    id: 'ntewiki-news',
+    name: 'NTE Wiki News',
+    url: 'https://nte.wiki/news/',
+    type: 'website',
+    language: 'en',
+    trustLevel: 'средний',
+    parser: 'ntewiki',
+    relevance: 'future',
+  },
+  {
+    id: 'telegram-loonaly',
+    name: 'Loonaly NTE Leaks',
+    url: 'https://t.me/s/loonaly_nte_leaks',
+    type: 'telegram',
+    language: 'ru',
+    trustLevel: 'средний',
+    parser: 'telegram',
+  },
+  {
+    id: 'telegram-donut',
+    name: 'Donut Leaker (несколько игр)',
+    url: 'https://t.me/s/donutleaker',
+    type: 'telegram',
+    language: 'en',
+    trustLevel: 'низкий',
+    referenceOnly: true,
+    message:
+      'Канал публикует несколько игр. Используйте только ручной поиск по NTE и проверяйте контекст.',
+  },
+  {
+    id: 'telegram-nte',
+    name: 'NTE News & Leaks',
+    url: 'https://t.me/s/NTE_Neverness_to_Everness',
+    type: 'telegram',
+    language: 'en',
+    trustLevel: 'средний',
+    parser: 'telegram',
+    relevance: 'future',
+  },
+  {
+    id: 'telegram-ru',
+    name: 'Neverness to Everness RU',
+    url: 'https://t.me/s/neverness_to_evernessru',
+    type: 'telegram',
+    language: 'ru',
+    trustLevel: 'средний',
+    parser: 'telegram',
+    relevance: 'future',
+  },
+  {
+    id: 'reddit-nteleaks',
+    name: 'Reddit r/NTELeaks',
+    url: 'https://www.reddit.com/r/NTELeaks/new/',
+    type: 'reddit',
+    language: 'en',
+    trustLevel: 'средний',
+    referenceOnly: true,
+    message:
+      'Reddit блокирует серверный сбор. Откройте свежие публикации вручную.',
+  },
+  {
+    id: 'bilibili-search',
+    name: 'Bilibili: 异环 爆料',
+    url: 'https://search.bilibili.com/all?keyword=%E5%BC%82%E7%8E%AF%20%E7%88%86%E6%96%99',
+    type: 'bilibili',
+    language: 'zh',
+    trustLevel: 'низкий',
+    referenceOnly: true,
+    message:
+      'Результаты Bilibili требуют ручного просмотра и перевода редактором.',
+  },
+  {
+    id: 'official-cn',
+    name: 'NTE China official',
+    url: 'https://x.com/NTE_CN',
+    type: 'twitter/x',
+    language: 'zh',
+    trustLevel: 'высокий',
+    referenceOnly: true,
+    message:
+      'Официальный канал используется для подтверждения или опровержения.',
+  },
+];
 const IMPORT_SOURCE_PRIORITY = new Map([
   ['official-ru', 100],
   ['fandom-ru-api', 98],
@@ -2028,6 +2783,14 @@ async function mapWithConcurrency(items, concurrency, callback) {
   );
   await Promise.all(workers);
   return results;
+}
+
+function chunkItems(items, size) {
+  const result = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
+  }
+  return result;
 }
 
 function decodeHtmlEntities(value) {
@@ -2230,8 +2993,67 @@ function normalizeImportFaction(value) {
   return text;
 }
 
+function normalizeGuideImportRows(field, value) {
+  const rows = [];
+  const seen = new Set();
+  for (const item of value) {
+    if (typeof item === 'string') {
+      const text = localizeImportedGuideText(item);
+      const key = normalizeImportSearch(text);
+      if (!key || !hasRussianText(text) || seen.has(key)) continue;
+      seen.add(key);
+      rows.push(text);
+      continue;
+    }
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const next = { ...item };
+    for (const key of [
+      'name',
+      'title',
+      'label',
+      'description',
+      'purpose',
+      'note',
+      'rotation',
+      ]) {
+      if (typeof next[key] === 'string') {
+        const localized = localizeImportedGuideText(next[key]);
+  if (['name', 'title', 'label'].includes(key)) {
+          const [heading, ...details] = localized
+            .split('\n')
+            .map((part) => part.replace(/\s+/g, ' ').trim())
+            .filter(Boolean);
+          next[key] = String(heading || '').slice(0, 160);
+          if (details.length && !next.description) {
+            next.description = details.join('\n').slice(0, 8000);
+          }
+        } else {
+          next[key] = localized.slice(0, 8000);
+        }
+      }
+    }
+    for (const key of ['imageUrl', 'iconUrl']) {
+      if (typeof next[key] === 'string') {
+        next[key] = normalizeExternalImageUrl(next[key]);
+  if (isPlaceholderImportImage(next[key])) next[key] = '';
+  }
+    }
+    const primary =
+      next.name || next.title || next.label || next.description || '';
+  const key = normalizeImportSearch(
+      `${field}:${primary}:${next.description || next.rotation || ''}`,
+    );
+    if (!key || !hasRussianText(primary) || seen.has(key)) continue;
+    seen.add(key);
+    rows.push(next);
+  }
+  return rows;
+}
+
 function normalizeProfileImportValue(field, value) {
   if (Array.isArray(value)) {
+    if (field.startsWith('guide.'))
+      return normalizeGuideImportRows(field, value);
     if (field === 'profile.baseStats') return normalizeBaseStatRows(value);
     if (field === 'profile.voiceActors') return normalizeVoiceActorRows(value);
     if (field === 'profile.roleTags') return normalizeImportedStringList(value);
@@ -2252,9 +3074,17 @@ function normalizeProfileImportValue(field, value) {
     return value;
   }
   if (typeof value !== 'string') return value;
+  if (field.startsWith('guide.')) {
+    if (field === 'guide.videoUrl') return value.trim();
+    const localized = localizeImportedGuideText(value);
+    return hasRussianText(localized) ? localized : '';
+  }
   if (field === 'attribute') return normalizeImportElement(value);
   if (field === 'profile.arcType') return normalizeImportArcType(value);
   if (field === 'profile.faction') return normalizeImportFaction(value);
+  if (field === 'profile.birthday' || field === 'profile.releaseDate') {
+    return formatRuImportDate(value);
+  }
   if (
     (field === 'profile.biography' || field === 'profile.biographyShort') &&
     isSeoImportText(value)
@@ -2264,12 +3094,20 @@ function normalizeProfileImportValue(field, value) {
   return normalizeImportedRuText(value);
 }
 
-function makeImportSuggestion(field, label, value, source, confidence = 'medium', note = '') {
+function makeImportSuggestion(
+  field,
+  label,
+  value,
+  source,
+  confidence = 'medium',
+  note = '',
+) {
   const canonicalField =
     field === 'profile.biographyShort' ? 'profile.biography' : field;
   const normalizedInput = normalizeProfileImportValue(canonicalField, value);
   const normalizedValue =
-    typeof normalizedInput === 'string' && /(?:image|splash|icon)url/i.test(canonicalField)
+    typeof normalizedInput === 'string' &&
+    /(?:image|splash|icon)url/i.test(canonicalField)
       ? normalizeExternalImageUrl(normalizedInput)
       : normalizedInput;
   if (
@@ -3348,7 +4186,11 @@ function cleanWikiParagraphText(value) {
 }
 
 function normalizeImportedRuText(value) {
-  return String(value || '')
+  return decodeHtmlEntities(String(value || ''))
+    .replace(/\r\n?/g, '\n')
+    .replace(/\u00a0|\u200b|\ufeff/g, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?[a-z][^>]*>/gi, '')
     .replace(/^\s*=\s*/, '')
     .replace(/([,;])\s*=\s*/g, '$1 ')
     .replace(/\[\[[^\]|]+\|([^\]]+)\]\]/g, '$1')
@@ -3358,6 +4200,9 @@ function normalizeImportedRuText(value) {
     .replace(/\]\]\s*$/, '')
     .replace(/'''?/g, '')
     .replace(/\bЦветение зените\b/g, 'Цветение в зените')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
@@ -3366,19 +4211,19 @@ function readWikiParam(content, key) {
     `(?:^|\\n|\\|)\\s*${escapeRegExp(key)}\\s*=\\s*([^\\n{}]+)`,
     'i',
   );
-  const raw = String(content.match(pattern)?.[1] || '').replace(
-    /\s+(?:rarity|espertype|arctype|role\d*|gender|birthday|affiliation\d*|prefix\d*|obtain|releaseDate|voice[A-Z]{2}|namecard\w*|type|bagel_\w*|esperability)\s*=.*$/i,
-    '',
-  ).replace(/\|\s*[A-Za-z_][A-Za-z0-9_-]*\s*=.*$/i, '');
+  const raw = String(content.match(pattern)?.[1] || '')
+    .replace(
+      /\s+(?:rarity|espertype|arctype|role\d*|gender|birthday|affiliation\d*|prefix\d*|obtain|releaseDate|voice[A-Z]{2}|namecard\w*|type|bagel_\w*|esperability)\s*=.*$/i,
+      '',
+    )
+    .replace(/\|\s*[A-Za-z_][A-Za-z0-9_-]*\s*=.*$/i, '');
   return normalizeImportedRuText(cleanWikiText(raw));
 }
 
 function normalizeImportedStringList(value) {
   const items = [
     ...new Set(
-      value
-        .map((item) => normalizeImportedRuText(item))
-        .filter(Boolean),
+      value.map((item) => normalizeImportedRuText(item)).filter(Boolean),
     ),
   ];
   return items.some((item) => hasRussianText(item))
@@ -3404,10 +4249,18 @@ function normalizeBaseStatLabel(value) {
   if (/^(?:hp|health|оз|здоровье)$/.test(key)) return 'ОЗ';
   if (/^(?:atk|attack|атака|атк)$/.test(key)) return 'АТК';
   if (/^(?:def|defense|defence|защита|защ)$/.test(key)) return 'ЗАЩ';
-  if (/^(?:crit|crit rate|critical rate|шанс крит|шанс критического удара)$/.test(key)) {
+  if (
+    /^(?:crit|crit rate|critical rate|шанс крит|шанс критического удара)$/.test(
+      key,
+    )
+  ) {
     return 'Шанс крит.';
   }
-  if (/^(?:cdmg|crit dmg|crit damage|critical damage|урон крит|крит урон)$/.test(key)) {
+  if (
+    /^(?:cdmg|crit dmg|crit damage|critical damage|урон крит|крит урон)$/.test(
+      key,
+    )
+  ) {
     return 'Урон крит.';
   }
   if (/^(?:damage bonus|dmg bonus|усиление урона|бонус урона)$/.test(key)) {
@@ -3449,7 +4302,9 @@ function isClearlyWrongCollectionMedia(field, value) {
   const media = decodedMediaUrl(value).toLocaleLowerCase('ru-RU');
   if (!media) return false;
   const roleIcon = /(?:^|[/_\s-])(?:роль|role)(?:[_.\s/-]|$)/i.test(media);
-  const rarityIcon = /(?:^|[/_\s-])(?:редкость|rarity)(?:[_.\s/-]|$)/i.test(media);
+  const rarityIcon = /(?:^|[/_\s-])(?:редкость|rarity)(?:[_.\s/-]|$)/i.test(
+    media,
+  );
   if (
     [
       'profile.abilities',
@@ -3465,7 +4320,7 @@ function isClearlyWrongCollectionMedia(field, value) {
 }
 
 function normalizeProfileCollectionRows(field, value) {
-  return value
+  const normalized = value
     .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
     .map((item) => {
       const next = { ...item };
@@ -3491,7 +4346,8 @@ function normalizeProfileCollectionRows(field, value) {
         ['effect', 1000],
         ['source', 1000],
       ]) {
-        if (typeof next[key] === 'string') next[key] = next[key].trim().slice(0, limit);
+        if (typeof next[key] === 'string')
+          next[key] = next[key].trim().slice(0, limit);
       }
       for (const key of ['iconUrl', 'imageUrl', 'rewardIconUrl']) {
         if (typeof next[key] === 'string') {
@@ -3505,14 +4361,67 @@ function normalizeProfileCollectionRows(field, value) {
         }
       }
       if (field === 'profile.friendship' && Array.isArray(next.rewards)) {
-        next.rewards = normalizeProfileCollectionRows('profile.friendship', next.rewards);
+        next.rewards = normalizeProfileCollectionRows(
+          'profile.friendshipRewards',
+          next.rewards,
+        );
       }
       return next;
-    });
+    })
+    .map((item) => {
+      if (field === 'profile.abilities') return cleanImportedAbility(item);
+      if (field === 'profile.awakenings') {
+        const name = normalizeImportedRuText(item.name || '');
+        if (!name || !hasRussianText(name) || isImportPlaceholderText(name))
+          return null;
+        return { ...item, name };
+      }
+      return item;
+    })
+    .filter(Boolean);
+  return dedupeProfileCollectionRows(field, normalized);
+}
+
+function profileCollectionImportKey(field, item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return '';
+  if (field === 'profile.abilities') {
+    return `${normalizeImportSearch(item.type)}:${normalizeImportSearch(item.name)}`;
+  }
+  if (field === 'profile.awakenings' || field === 'profile.friendship') {
+    return `level:${Number(item.level)}`;
+  }
+  if (field === 'profile.voiceLines') {
+    return `${normalizeImportSearch(item.language)}:${normalizeImportSearch(item.title)}`;
+  }
+  if (field === 'profile.friendshipRewards') {
+    return `${normalizeImportSearch(item.name)}:${normalizeImportSearch(item.quantity)}`;
+  }
+  if (
+    [
+      'profile.materials',
+      'profile.gifts',
+      'profile.skins',
+      'profile.roleIcons',
+    ].includes(field)
+  ) {
+    return normalizeImportSearch(item.name || item.rewardName || item.title);
+  }
+  return normalizeImportSearch(item.id) || hashText(JSON.stringify(item));
+}
+
+function dedupeProfileCollectionRows(field, rows) {
+  const deduped = new Map();
+  for (const row of rows) {
+    const key = profileCollectionImportKey(field, row);
+    if (!key || /level:nan$/.test(key)) continue;
+    const current = deduped.get(key);
+    deduped.set(key, current ? mergeImportCollectionEntry(current, row) : row);
+  }
+  return [...deduped.values()];
 }
 
 function normalizeSkinRows(value) {
-  return value.flatMap((item) => {
+  const rows = value.flatMap((item) => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
     const sourceName = normalizeImportedRuText(item.name);
     if (/\blivery\b/i.test(sourceName)) return [];
@@ -3538,11 +4447,15 @@ function normalizeSkinRows(value) {
             : item.id,
         name: name.slice(0, 160),
         imageUrl,
-        description:
-          (sourceDescription || localization?.description || '').slice(0, 4000),
+        description: (
+          sourceDescription ||
+          localization?.description ||
+          ''
+        ).slice(0, 4000),
       },
     ];
   });
+  return dedupeProfileCollectionRows('profile.skins', rows);
 }
 
 function extractFandomCharacterIntro(content) {
@@ -3560,13 +4473,50 @@ function extractFandomCharacterDescription(content) {
 }
 
 function formatRuImportDate(value) {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return value;
+  const raw = normalizeImportedRuText(value);
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) {
+    return new Intl.DateTimeFormat('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(
+      new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]))),
+    );
+  }
+
+  const months = new Map(
+    [
+      'january',
+      'february',
+      'march',
+      'april',
+      'may',
+      'june',
+      'july',
+      'august',
+      'september',
+      'october',
+      'november',
+      'december',
+    ].map((month, index) => [month, index]),
+  );
+  const english = raw.match(
+    /^(?:([A-Za-z]+)\s+(\d{1,2})|(\d{1,2})\s+([A-Za-z]+))(?:,?\s+(\d{4}))?$/,
+  );
+  if (!english) return raw;
+  const monthName = String(english[1] || english[4] || '').toLocaleLowerCase(
+    'en-US',
+  );
+  const month = months.get(monthName);
+  const day = Number(english[2] || english[3]);
+  const year = Number(english[5] || 2000);
+  if (month === undefined || day < 1 || day > 31) return raw;
   return new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
+    day: 'numeric',
     month: 'long',
-    year: 'numeric',
-  }).format(new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00Z`));
+    ...(english[5] ? { year: 'numeric' } : {}),
+  }).format(new Date(Date.UTC(year, month, day)));
 }
 
 function isSeoImportText(value) {
@@ -3614,7 +4564,9 @@ function parseFandomRuApiImport(text, source) {
   ]
     .filter(Boolean)
     .join(', ');
-  const quote = cleanWikiText(content.match(/\{\{Цитата\|([^|}]+)/i)?.[1] || '');
+  const quote = cleanWikiText(
+    content.match(/\{\{Цитата\|([^|}]+)/i)?.[1] || '',
+  );
   const biographyShort = extractFandomCharacterIntro(content);
   const biography = extractFandomCharacterDescription(content);
   const voiceActors = [
@@ -3627,16 +4579,70 @@ function parseFandomRuApiImport(text, source) {
     .map(([language, name]) => ({ language, name }));
 
   return [
-    makeImportSuggestion('rarity', 'Редкость', readWikiParam(content, 'rarity'), source, 'high'),
-    makeImportSuggestion('attribute', 'Атрибут', readWikiParam(content, 'espertype'), source, 'high'),
-    makeImportSuggestion('profile.arcType', 'Тип дуги', readWikiParam(content, 'arctype'), source, 'high'),
-    makeImportSuggestion('profile.roleTags', 'Роли персонажа', roleTags, source, 'high'),
+    makeImportSuggestion(
+      'rarity',
+      'Редкость',
+      readWikiParam(content, 'rarity'),
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'attribute',
+      'Атрибут',
+      readWikiParam(content, 'espertype'),
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.arcType',
+      'Тип дуги',
+      readWikiParam(content, 'arctype'),
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.roleTags',
+      'Роли персонажа',
+      roleTags,
+      source,
+      'high',
+    ),
     makeImportSuggestion('profile.faction', 'Фракция', faction, source, 'high'),
-    makeImportSuggestion('profile.birthday', 'День рождения', readWikiParam(content, 'birthday'), source, 'high'),
-    makeImportSuggestion('profile.releaseDate', 'Дата релиза', formatRuImportDate(readWikiParam(content, 'releaseDate')), source, 'medium'),
-    makeImportSuggestion('profile.biographyShort', 'Биография', biographyShort || quote, source, biographyShort ? 'high' : 'medium'),
-    makeImportSuggestion('profile.biography', 'Биография', biography, source, 'high'),
-    makeImportSuggestion('profile.voiceActors', 'Актёры озвучки', voiceActors, source, 'high'),
+    makeImportSuggestion(
+      'profile.birthday',
+      'День рождения',
+      readWikiParam(content, 'birthday'),
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.releaseDate',
+      'Дата релиза',
+      formatRuImportDate(readWikiParam(content, 'releaseDate')),
+      source,
+      'medium',
+    ),
+    makeImportSuggestion(
+      'profile.biographyShort',
+      'Биография',
+      biographyShort || quote,
+      source,
+      biographyShort ? 'high' : 'medium',
+    ),
+    makeImportSuggestion(
+      'profile.biography',
+      'Биография',
+      biography,
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.voiceActors',
+      'Актёры озвучки',
+      voiceActors,
+      source,
+      'high',
+    ),
   ].filter(Boolean);
 }
 
@@ -3644,7 +4650,9 @@ function parseFandomRuImagesImport(text, source, character) {
   try {
     const payload = JSON.parse(text);
     const pages = payload?.query?.pages || [];
-    const characterName = normalizeImportSearch(character.name || character.slug || '');
+    const characterName = normalizeImportSearch(
+      character.name || character.slug || '',
+    );
     const images = pages
       .map((page) => ({
         title: String(page.title || ''),
@@ -3661,7 +4669,9 @@ function parseFandomRuImagesImport(text, source, character) {
     );
     const card =
       ownImages.find((image) => /(^|\s)иконка(?:\.|\s|$)/i.test(image.title)) ||
-      ownImages.find((image) => /представление|портрет|portrait/i.test(image.title)) ||
+      ownImages.find((image) =>
+        /представление|портрет|portrait/i.test(image.title),
+      ) ||
       ownImages.find((image) => /в игре|спл[эе]ш|splash/i.test(image.title));
     const splash =
       ownImages.find((image) => /спл[эе]ш|splash/i.test(image.title)) ||
@@ -3674,9 +4684,27 @@ function parseFandomRuImagesImport(text, source, character) {
     const imageMap = buildImportImageMap(images, character);
 
     return [
-      makeImportSuggestion('imageUrl', 'Карточка персонажа', card?.url || '', source, 'high'),
-      makeImportSuggestion('splashUrl', 'Splash персонажа', splash?.url || '', source, 'high'),
-      makeImportSuggestion('__imageMap', 'Индекс изображений', imageMap, source, 'low'),
+      makeImportSuggestion(
+        'imageUrl',
+        'Карточка персонажа',
+        card?.url || '',
+        source,
+        'high',
+      ),
+      makeImportSuggestion(
+        'splashUrl',
+        'Splash персонажа',
+        splash?.url || '',
+        source,
+        'high',
+      ),
+      makeImportSuggestion(
+        '__imageMap',
+        'Индекс изображений',
+        imageMap,
+        source,
+        'low',
+      ),
     ].filter(Boolean);
   } catch {
     return [];
@@ -3751,7 +4779,8 @@ function buildImportImageMap(images, character = {}) {
         const alias = title.slice(characterName.length).trim();
         if (alias) aliases.add(alias);
       }
-      const prefixPattern = new RegExp(`^${escapeRegExp(characterName)}\\s+`, 'i');
+      const prefixPattern = new RegExp(
+        `^${escapeRegExp(characterName)}\\s+`, 'i');
       const withoutCharacter = title.replace(prefixPattern, '').trim();
       if (withoutCharacter && withoutCharacter !== title) aliases.add(withoutCharacter);
     }
@@ -6750,13 +7779,13 @@ const PROFILE_COLLECTION_MERGE_CONFIGS = [
     field: 'profile.gifts',
     label: 'Любимые подарки',
     limit: 30,
-    key: (entry) => normalizeImportSearch(entry?.id || entry?.name),
+    key: (entry) => normalizeImportSearch(entry?.name),
   },
   {
     field: 'profile.skins',
     label: 'Гардероб',
     limit: 30,
-    key: (entry) => normalizeImportSearch(entry?.id || entry?.name),
+    key: (entry) => normalizeImportSearch(entry?.name),
   },
   {
     field: 'profile.voiceLines',
@@ -7732,10 +8761,13 @@ function serializeCharacter(row) {
   const profileBiographyShort = normalizeImportedRuText(
     row.profile_biography_short || '',
   );
-  const rawShortDescription = normalizeImportedRuText(row.short_description || '');
+  const rawShortDescription = normalizeImportedRuText(
+    row.short_description || '',
+  );
   const shortDescription = /^(?:мужчина|женщина)$/i.test(rawShortDescription)
     ? [profileBiographyShort, summary].find(
-        (value) => value && !/^(?:мужчина|женщина)$/i.test(value) && value.length > 16,
+        (value) =>
+          value && !/^(?:мужчина|женщина)$/i.test(value) && value.length > 16,
       ) || 'Краткое описание требует проверки редактором.'
     : rawShortDescription;
   const rawArcType = normalizeImportedRuText(row.profile_arc_type || '');
@@ -7760,8 +8792,7 @@ function serializeCharacter(row) {
       releaseDate: formatRuImportDate(
         normalizeImportedRuText(row.profile_release_date || ''),
       ),
-      biographyShort:
-        profileBiographyShort || shortDescription,
+      biographyShort: profileBiographyShort || shortDescription,
       biography: normalizeImportedRuText(
         row.profile_biography_markdown || row.summary || '',
       ),
@@ -7787,7 +8818,10 @@ function serializeCharacter(row) {
         'profile.gifts',
         parseJson(row.profile_gifts_json, []),
       ),
-      voiceLines: parseJson(row.profile_voice_lines_json, []),
+      voiceLines: normalizeProfileCollectionRows(
+        'profile.voiceLines',
+        parseJson(row.profile_voice_lines_json, []),
+      ),
       awakenings: normalizeProfileCollectionRows(
         'profile.awakenings',
         parseJson(row.profile_awakenings_json, []),
@@ -7866,7 +8900,9 @@ function serializeLeak(row) {
 }
 
 async function listThreads(env, includeHidden = false) {
-  const where = includeHidden ? '1 = 1' : "community_threads.status <> 'hidden'";
+  const where = includeHidden
+    ? '1 = 1'
+    : "community_threads.status <> 'hidden'";
   const rows = await env.DB.prepare(
     `SELECT community_threads.*,
             COUNT(comments.id) AS comments_count
@@ -7929,6 +8965,11 @@ function serializeComment(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     score: row.score || 0,
+    reactions: {
+      likes: Number(row.reaction_likes || 0),
+      dislikes: Number(row.reaction_dislikes || 0),
+      useful: Number(row.reaction_useful ?? row.score ?? 0),
+    },
     status: row.status,
   };
 }
@@ -8028,7 +9069,12 @@ function normalizeRecord(config, body, options = {}) {
       record[field] = value;
     }
   }
-  if (options.deriveSlug !== false && !record.slug && (body.title || body.name) && config.slug) {
+  if (
+    options.deriveSlug !== false &&
+    !record.slug &&
+    (body.title || body.name) &&
+    config.slug
+  ) {
     record.slug = slugify(String(body.title || body.name));
   }
   return record;

@@ -291,6 +291,8 @@ export interface LeakCandidate {
   suggestedStatus: LeakStatus;
   confidenceScore: number;
   reviewStatus: LeakCandidateReviewStatus;
+  translationStatus: 'не требуется' | 'нужен перевод' | 'переведено' | 'проверено';
+  editorNote?: string;
   createdLeakId?: string;
   createdAt: string;
   updatedAt?: string;
@@ -380,6 +382,7 @@ export interface Comment {
     dislikes: number;
     useful: number;
   };
+  activeReactions?: Array<'like' | 'dislike' | 'useful'>;
   status?: 'visible' | 'moderated' | 'deleted';
   parentId?: string;
 }

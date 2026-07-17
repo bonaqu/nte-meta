@@ -1706,7 +1706,13 @@ async function handleLeakCandidates(request, env, parts, ctx) {
       suggestedStatus,
       confidenceScore: 20,
       submittedBy: actor.id,
-      metadata: { submittedBy: actor.displayName },
+      metadata: {
+        submittedBy: actor.displayName,
+        translationStatus:
+          detectLeakLanguage(`${title} ${excerpt}`) === 'ru'
+            ? 'не требуется'
+            : 'нужен перевод',
+      },
     };
     try {
       await insertLeakCandidate(env, candidate);
@@ -1769,6 +1775,36 @@ async function handleLeakCandidates(request, env, parts, ctx) {
       audit.trustLevel = trustLevel;
     }
 
+    if (body.translationStatus !== undefined || body.editorNote !== undefined) {
+      const current = await env.DB.prepare(
+        'SELECT metadata_json, language FROM leak_candidates WHERE id = ?',
+      )
+        .bind(id)
+        .first();
+      if (!current) {
+        return json({ error: 'Публикация в очереди не найдена' }, 404);
+      }
+      const metadata = parseJson(current.metadata_json, {});
+      if (body.translationStatus !== undefined) {
+        const translationStatus = cleanString(body.translationStatus, 1, 30);
+        if (
+          !['не требуется', 'нужен перевод', 'переведено', 'проверено'].includes(
+            translationStatus,
+          )
+        ) {
+          return json({ error: 'Выберите корректный статус перевода' }, 400);
+        }
+        metadata.translationStatus = translationStatus;
+        audit.translationStatus = translationStatus;
+      }
+      if (body.editorNote !== undefined) {
+        metadata.editorNote = cleanString(body.editorNote || '', 0, 2000);
+        audit.editorNoteChanged = true;
+      }
+      updates.push('metadata_json = ?');
+      values.push(JSON.stringify(metadata));
+    }
+
     if (!updates.length) {
       return json({ error: 'Не выбраны изменения для сохранения' }, 400);
     }
@@ -1805,13 +1841,15 @@ async function listLeakCandidates(env) {
 }
 
 function serializeLeakCandidate(row) {
+  const metadata = parseJson(row.metadata_json || row.metadataJson, {});
+  const language = row.language || 'unknown';
   return {
     id: row.id,
     origin: row.origin,
     sourceName: row.source_name || row.sourceName,
     sourceUrl: row.source_url || row.sourceUrl,
     sourceType: row.source_type || row.sourceType,
-    language: row.language || 'unknown',
+    language,
     title: row.title,
     excerpt: row.excerpt || '',
     authorName: row.author_name || row.authorName || undefined,
@@ -1821,6 +1859,10 @@ function serializeLeakCandidate(row) {
     suggestedStatus: row.suggested_status || row.suggestedStatus || 'слух',
     confidenceScore: Number(row.confidence_score ?? row.confidenceScore ?? 0),
     reviewStatus: row.review_status || row.reviewStatus || 'pending',
+    translationStatus:
+      metadata.translationStatus ||
+      (language === 'ru' ? 'не требуется' : 'нужен перевод'),
+    editorNote: metadata.editorNote || '',
     createdLeakId: row.created_leak_id || row.createdLeakId || undefined,
     createdAt: row.created_at || row.createdAt || new Date().toISOString(),
     updatedAt: row.updated_at || row.updatedAt || undefined,
@@ -2028,7 +2070,11 @@ function buildDiscoveredLeakCandidate({
     suggestedStatus,
     confidenceScore: Math.min(90, baseConfidence + (explicitLeak ? 10 : 0)),
     submittedBy: null,
-    metadata: { sourceId: source.id, requiresTranslation: language !== 'ru' },
+    metadata: {
+      sourceId: source.id,
+      requiresTranslation: language !== 'ru',
+      translationStatus: language === 'ru' ? 'не требуется' : 'нужен перевод',
+    },
   };
 }
 
@@ -2210,7 +2256,7 @@ async function handleComments(request, env, ctx) {
     const targetType = url.searchParams.get('targetType');
     const targetId = url.searchParams.get('targetId');
     if (!targetType || !targetId) {
-      await requireRole(request, env, 'moderator');
+      const actor = await requireRole(request, env, 'moderator');
       const rows = await env.DB.prepare(
         `SELECT comments.*, users.display_name AS author_name,
                 COALESCE(comment_reactions.likes, 0) AS reaction_likes,
@@ -2230,7 +2276,15 @@ async function handleComments(request, env, ctx) {
          ORDER BY comments.created_at DESC
          LIMIT 200`,
       ).all();
-      return json({ data: rows.results.map(serializeComment) });
+      const activeByComment = await loadActiveCommentReactions(
+        env,
+        actor.id,
+      );
+      return json({
+        data: rows.results.map((row) =>
+          serializeComment(row, activeByComment.get(row.id)),
+        ),
+      });
     }
     const orderBy =
       url.searchParams.get('sort') === 'popular'
@@ -2266,7 +2320,15 @@ async function handleComments(request, env, ctx) {
     )
       .bind(targetType, targetId)
       .all();
-    return json({ data: rows.results.map(serializeComment) });
+    const actor = await getAuthUser(request, env);
+    const activeByComment = actor
+      ? await loadActiveCommentReactions(env, actor.id, targetType, targetId)
+      : new Map();
+    return json({
+      data: rows.results.map((row) =>
+        serializeComment(row, activeByComment.get(row.id)),
+      ),
+    });
   }
 
   if (request.method === 'POST') {
@@ -2332,6 +2394,7 @@ async function handleComments(request, env, ctx) {
           updatedAt: new Date().toISOString(),
           score: 0,
           reactions: { likes: 0, dislikes: 0, useful: 0 },
+          activeReactions: [],
           status: 'visible',
         },
       },
@@ -2521,23 +2584,15 @@ async function handleReactions(request, env, parts, ctx) {
     const url = new URL(request.url);
     const targetType = cleanString(url.searchParams.get('targetType'), 1, 30);
     const targetId = cleanString(url.searchParams.get('targetId'), 1, 80);
-    const rows = await env.DB.prepare(
-      `SELECT reaction_type, SUM(value) AS total
-       FROM reactions
-       WHERE target_type = ? AND target_id = ?
-       GROUP BY reaction_type`,
-    )
-      .bind(targetType, targetId)
-      .all();
-    const summary = { likes: 0, dislikes: 0, useful: 0 };
-    for (const row of rows.results) {
-      if (row.reaction_type === 'like') summary.likes = Number(row.total || 0);
-      if (row.reaction_type === 'dislike')
-        summary.dislikes = Number(row.total || 0);
-      if (row.reaction_type === 'useful')
-        summary.useful = Number(row.total || 0);
-    }
-    return json({ data: summary });
+    const actor = await getAuthUser(request, env);
+    return json({
+      data: await buildReactionSummary(
+        env,
+        targetType,
+        targetId,
+        actor?.id,
+      ),
+    });
   }
 
   const actor = await requireRole(request, env, 'user');
@@ -2584,14 +2639,9 @@ async function handleReactions(request, env, parts, ctx) {
     ctx.waitUntil(
       logAudit(env, actor.id, 'reactions.upsert', body.targetId, body),
     );
-    return handleReactions(
-      new globalThis.Request(
-        `${new URL(request.url).origin}/api/reactions?targetType=${encodeURIComponent(targetType)}&targetId=${encodeURIComponent(targetId)}`,
-      ),
-      env,
-      [],
-      ctx,
-    );
+    return json({
+      data: await buildReactionSummary(env, targetType, targetId, actor.id),
+    });
   }
 
   if (request.method === 'DELETE') {
@@ -2626,6 +2676,11 @@ async function handleReactions(request, env, parts, ctx) {
         reactionType,
       }),
     );
+    if (targetType && targetId) {
+      return json({
+        data: await buildReactionSummary(env, targetType, targetId, actor.id),
+      });
+    }
     return json({ data: { success: true } });
   }
 
@@ -2671,6 +2726,68 @@ async function refreshCommentScore(env, commentId) {
     .run();
 }
 
+async function buildReactionSummary(env, targetType, targetId, userId) {
+  const rows = await env.DB.prepare(
+    `SELECT reaction_type, SUM(value) AS total
+     FROM reactions
+     WHERE target_type = ? AND target_id = ?
+     GROUP BY reaction_type`,
+  )
+    .bind(targetType, targetId)
+    .all();
+  const summary = { likes: 0, dislikes: 0, useful: 0, active: [] };
+  for (const row of rows.results) {
+    if (row.reaction_type === 'like') summary.likes = Number(row.total || 0);
+    if (row.reaction_type === 'dislike')
+      summary.dislikes = Number(row.total || 0);
+    if (row.reaction_type === 'useful')
+      summary.useful = Number(row.total || 0);
+  }
+  if (userId) {
+    const active = await env.DB.prepare(
+      `SELECT reaction_type FROM reactions
+       WHERE user_id = ? AND target_type = ? AND target_id = ?
+       ORDER BY reaction_type`,
+    )
+      .bind(userId, targetType, targetId)
+      .all();
+    summary.active = active.results
+      .map((row) => row.reaction_type)
+      .filter((type) => ['like', 'dislike', 'useful'].includes(type));
+  }
+  return summary;
+}
+
+async function loadActiveCommentReactions(
+  env,
+  userId,
+  targetType,
+  targetId,
+) {
+  const query = targetType && targetId
+    ? `SELECT reactions.target_id, reactions.reaction_type
+       FROM reactions
+       JOIN comments ON comments.id = reactions.target_id
+       WHERE reactions.user_id = ?
+         AND reactions.target_type = 'comment'
+         AND comments.target_type = ?
+         AND comments.target_id = ?`
+    : `SELECT target_id, reaction_type
+       FROM reactions
+       WHERE user_id = ? AND target_type = 'comment'`;
+  const statement = env.DB.prepare(query);
+  const rows = targetType && targetId
+    ? await statement.bind(userId, targetType, targetId).all()
+    : await statement.bind(userId).all();
+  const byComment = new Map();
+  for (const row of rows.results) {
+    const current = byComment.get(row.target_id) || [];
+    current.push(row.reaction_type);
+    byComment.set(row.target_id, current);
+  }
+  return byComment;
+}
+
 const IMPORT_SOURCE_TIMEOUT_MS = 7000;
 const IMPORT_MAX_HTML_BYTES = 600000;
 const IMPORT_FETCH_CONCURRENCY = 4;
@@ -2707,9 +2824,20 @@ const LEAK_DISCOVERY_SOURCES = [
     type: 'telegram',
     language: 'en',
     trustLevel: 'низкий',
-    referenceOnly: true,
-    message:
-      'Канал публикует несколько игр. Используйте только ручной поиск по NTE и проверяйте контекст.',
+    parser: 'telegram',
+    relevance: 'future',
+    requiresGameTag: true,
+  },
+  {
+    id: 'telegram-mainleakflow',
+    name: 'MainLeakFlow (несколько игр)',
+    url: 'https://t.me/s/mainleakflow_channel',
+    type: 'telegram',
+    language: 'en',
+    trustLevel: 'низкий',
+    parser: 'telegram',
+    relevance: 'future',
+    requiresGameTag: true,
   },
   {
     id: 'telegram-nte',
@@ -2784,6 +2912,17 @@ const LEAK_DISCOVERY_SOURCES = [
     referenceOnly: true,
     message:
       'Результаты Bilibili требуют ручного просмотра и перевода редактором.',
+  },
+  {
+    id: 'weibo-leak-search',
+    name: 'Weibo: 异环 爆料',
+    url: 'https://s.weibo.com/weibo?q=%23%E5%BC%82%E7%8E%AF%23%20%E7%88%86%E6%96%99',
+    type: 'weibo',
+    language: 'zh',
+    trustLevel: 'низкий',
+    referenceOnly: true,
+    message:
+      'Китайский поиск по утечкам. Сверяйте дату, автора и исходное вложение, затем делайте редакционный перевод.',
   },
   {
     id: 'official-cn',
@@ -3221,11 +3360,15 @@ function normalizeExternalImageUrl(value) {
   if (/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) {
     try {
       const parsed = new URL(url);
+      const pathPrefix = [...parsed.searchParams.entries()].find(
+        ([key]) => key.trim().replace(/^\++/, '') === 'path-prefix',
+      )?.[1];
       parsed.pathname = parsed.pathname.replace(
         /\/revision\/latest(?:\/(?:scale-to-width-down|smart|thumbnail|width)\/[^/?#]+|\/[^/?#]+)?$/i,
         '/revision/latest',
       );
-      parsed.searchParams.delete('cb');
+      parsed.search = '';
+      if (pathPrefix) parsed.searchParams.set('path-prefix', pathPrefix.trim());
       return parsed.toString();
     } catch {
       return url;
@@ -3326,10 +3469,26 @@ function normalizeImportSearch(value) {
 }
 
 function characterNameCandidates(character) {
+  const sourceValues = [
+    character.name,
+    character.originalName,
+    character.slug,
+    nevernessAppCharacterCode(character),
+  ];
+  return Array.from(
+    new Set(sourceValues.map((value) => normalizeImportSearch(value)).filter(Boolean)),
+  );
+}
+
+function characterPathSlugCandidates(character) {
   return Array.from(
     new Set(
-      [character.name, character.originalName, character.slug]
-        .map((value) => normalizeImportSearch(value))
+      [
+        character.slug,
+        nevernessAppCharacterCode(character),
+        character.originalName,
+      ]
+        .map((value) => normalizeImportSlug(value))
         .filter(Boolean),
     ),
   );
@@ -3680,6 +3839,8 @@ function guideImportSources(slug, character = {}) {
     extractImages: true,
     raw: true,
   }));
+  const pathSlugs = characterPathSlugCandidates({ ...character, slug });
+  const urlsFor = (buildUrl) => pathSlugs.map(buildUrl);
 
   return [
     {
@@ -3699,7 +3860,11 @@ function guideImportSources(slug, character = {}) {
       id: 'genshin-builds-guide-ru',
       name: 'GenshinBuilds NTE RU: гайд',
       trust: 'medium',
-      url: `https://genshin-builds.com/ru/neverness-to-everness/characters/${slug}`,
+      url: `https://genshin-builds.com/ru/neverness-to-everness/characters/${pathSlugs[0]}`,
+      urlCandidates: urlsFor(
+        (pathSlug) =>
+          `https://genshin-builds.com/ru/neverness-to-everness/characters/${pathSlug}`,
+      ),
       parser: parseEditorialGuideImport,
       extractImages: true,
       raw: true,
@@ -3708,7 +3873,10 @@ function guideImportSources(slug, character = {}) {
       id: 'gamewith-guide-ru',
       name: 'GameWith NTE RU: гайд',
       trust: 'medium',
-      url: `https://gamewith.ai/nte/ru/character/${slug}`,
+      url: `https://gamewith.ai/nte/ru/character/${pathSlugs[0]}`,
+      urlCandidates: urlsFor(
+        (pathSlug) => `https://gamewith.ai/nte/ru/character/${pathSlug}`,
+      ),
       parser: parseGameWithGuideImport,
       extractImages: true,
       raw: true,
@@ -3717,7 +3885,10 @@ function guideImportSources(slug, character = {}) {
       id: 'ntewiki-build-guide-ru',
       name: 'NTE Wiki RU: билд-гайд',
       trust: 'high',
-      url: `https://ntewiki.org/ru/blog/${slug}-build-guide-2026/`,
+      url: `https://ntewiki.org/ru/blog/${pathSlugs[0]}-build-guide-2026/`,
+      urlCandidates: urlsFor(
+        (pathSlug) => `https://ntewiki.org/ru/blog/${pathSlug}-build-guide-2026/`,
+      ),
       parser: parseEditorialGuideImport,
       extractImages: true,
       raw: true,
@@ -3726,7 +3897,10 @@ function guideImportSources(slug, character = {}) {
       id: 'kaiden-character-guide',
       name: 'Kaiden.gg: актуальный билд и команда',
       trust: 'high',
-      url: `https://www.kaiden.gg/nte/characters/${slug}/`,
+      url: `https://www.kaiden.gg/nte/characters/${pathSlugs[0]}/`,
+      urlCandidates: urlsFor(
+        (pathSlug) => `https://www.kaiden.gg/nte/characters/${pathSlug}/`,
+      ),
       parser: parseKaidenGuideImport,
       raw: true,
       cacheTtl: 1800,
@@ -3735,7 +3909,11 @@ function guideImportSources(slug, character = {}) {
       id: 'prydwen-character-guide',
       name: 'Prydwen: дополнительная проверка гайда',
       trust: 'high',
-      url: `https://www.prydwen.gg/neverness-to-everness/characters/${slug}`,
+      url: `https://www.prydwen.gg/neverness-to-everness/characters/${pathSlugs[0]}`,
+      urlCandidates: urlsFor(
+        (pathSlug) =>
+          `https://www.prydwen.gg/neverness-to-everness/characters/${pathSlug}`,
+      ),
       referenceOnly: true,
       referenceMessage:
         'Источник защищён от автоматических запросов. Откройте страницу вручную для дополнительной сверки.',
@@ -4059,12 +4237,32 @@ async function fetchImportSource(source, character) {
         suggestions: [],
       };
     }
-    const response = await fetch(activeSource.url, fetchOptions);
+    const candidateUrls = Array.from(
+      new Set([activeSource.url, ...(activeSource.urlCandidates || [])].filter(Boolean)),
+    ).slice(0, 3);
+    let response;
+    let resolvedSource = activeSource;
+    for (const [index, candidateUrl] of candidateUrls.entries()) {
+      response = await fetch(candidateUrl, fetchOptions);
+      if (response.ok || response.status !== 404 || index === candidateUrls.length - 1) {
+        resolvedSource = { ...activeSource, url: candidateUrl, publicUrl: candidateUrl };
+        break;
+      }
+      await discardResponseBody(response);
+    }
+    if (!response) {
+      return {
+        ...activeSource,
+        status: 'failed',
+        message: 'У источника не настроен адрес страницы.',
+        suggestions: [],
+      };
+    }
     const length = Number(response.headers.get('content-length') || 0);
     if (!response.ok) {
       await discardResponseBody(response);
       return {
-        ...activeSource,
+        ...resolvedSource,
         status: response.status === 403 ? 'blocked' : 'failed',
         message: `HTTP ${response.status}`,
         suggestions: [],
@@ -4073,7 +4271,7 @@ async function fetchImportSource(source, character) {
     if (length > IMPORT_MAX_HTML_BYTES) {
       await discardResponseBody(response);
       return {
-        ...activeSource,
+        ...resolvedSource,
         status: 'failed',
         message: 'Страница слишком большая для безопасного автоимпорта.',
         suggestions: [],
@@ -4082,17 +4280,17 @@ async function fetchImportSource(source, character) {
     const html = await readLimitedImportResponse(response);
     const text = htmlToPlainText(html.slice(0, IMPORT_MAX_HTML_BYTES));
     const suggestions = [
-      ...activeSource
+      ...resolvedSource
         .parser(
-          activeSource.raw ? html.slice(0, IMPORT_MAX_HTML_BYTES) : text,
-          activeSource,
+          resolvedSource.raw ? html.slice(0, IMPORT_MAX_HTML_BYTES) : text,
+          resolvedSource,
           character,
         )
         .filter(Boolean),
-      ...extractImportImages(html, activeSource, character),
+      ...extractImportImages(html, resolvedSource, character),
     ];
     return {
-      ...activeSource,
+      ...resolvedSource,
       status: suggestions.length ? 'ok' : 'partial',
       message: suggestions.length
         ? `Найдено предложений: ${suggestions.length}`
@@ -8204,8 +8402,6 @@ function dedupeImportSuggestions(items) {
   for (const item of items) {
     if (!item || item.field.startsWith('__')) continue;
     const key = `${item.field}:${item.value}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
 
     if (item.field === 'tier' || item.field.startsWith('guide.')) continue;
 
@@ -8216,18 +8412,62 @@ function dedupeImportSuggestions(items) {
       continue;
     }
 
+    if (seen.has(key)) continue;
+    seen.add(key);
     result.push(item);
   }
 
   const variants = [];
   for (const candidates of variantsByField.values()) {
+    const matchingValues = new Map();
+    for (const candidate of candidates) {
+      const key = String(candidate.value || '').trim();
+      if (!key) continue;
+      const current = matchingValues.get(key) || [];
+      current.push(candidate);
+      matchingValues.set(key, current);
+    }
     variants.push(
-      ...candidates
-        .sort(
-          (left, right) =>
-            importSuggestionScore(right) - importSuggestionScore(left),
-        )
-        .slice(0, 3),
+      ...[...matchingValues.values()]
+        .map((matches) => {
+          const sorted = [...matches].sort(
+            (left, right) =>
+              importSuggestionScore(right) - importSuggestionScore(left),
+          );
+          const best = sorted[0];
+          const sourceNames = [
+            ...new Set(
+              sorted
+                .map((item) => item.sourceName)
+                .filter(
+                  (name) =>
+                    name && !String(name).startsWith('Сводка проверенных'),
+                ),
+            ),
+          ];
+          const agreement = sourceNames.length;
+          return {
+            item: {
+              ...best,
+              confidence: agreement >= 2 ? 'high' : best.confidence,
+              note: [
+                best.note,
+                agreement >= 2
+                  ? `Совпадающее значение найдено в ${agreement} независимых источниках: ${sourceNames
+                      .slice(0, 3)
+                      .join(', ')}.`
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' '),
+            },
+            score:
+              importSuggestionScore(best) + Math.min(30, Math.max(0, agreement - 1) * 12),
+          };
+        })
+        .sort((left, right) => right.score - left.score)
+        .slice(0, 3)
+        .map(({ item }) => item),
     );
   }
   return [...variants, ...result];
@@ -8252,20 +8492,55 @@ function normalizeGuideImportEntry(value, key = '') {
   return normalizeImportedRuText(value);
 }
 
+function isUsefulGuideSummary(value) {
+  const text = normalizeImportedRuText(value);
+  if (text.length < 80 || !isPredominantlyRussianText(text)) return false;
+  if (
+    /^(?:[–—-]\s*)?\d{1,2}\s+[а-яё]+\s+20\d{2}\s*(?:г\.)?$/iu.test(text) ||
+    /^(?:обновлено|опубликовано|дата|всего|общему|источник)\b/iu.test(text)
+  ) {
+    return false;
+  }
+  const firstLetter = text.match(/\p{L}/u)?.[0] || '';
+  return !firstLetter || firstLetter === firstLetter.toLocaleUpperCase('ru-RU');
+}
+
+function isPlaceholderGuideImportEntry(entry) {
+  const value =
+    typeof entry === 'string'
+      ? entry
+      : `${entry?.title || entry?.name || entry?.label || ''} ${
+          entry?.description || ''
+        }`;
+  const text = normalizeImportSearch(value);
+  return /(?:персонаж|участник|character|member)\s*[1-4]\b|(?:персонаж|character)\s*\+\s*(?:персонаж|character)/iu.test(
+    text,
+  );
+}
+
 function normalizeGuideImportSuggestion(item) {
   const parsed = parseImportSuggestionJson(item);
   if (Array.isArray(parsed) || (parsed && typeof parsed === 'object')) {
+    const normalized = normalizeGuideImportEntry(parsed);
+    const cleaned = Array.isArray(normalized)
+      ? normalized.filter((entry) => !isPlaceholderGuideImportEntry(entry))
+      : normalized;
+    if (Array.isArray(cleaned) && !cleaned.length) return null;
     return {
       ...item,
-      value: JSON.stringify(normalizeGuideImportEntry(parsed)),
+      value: JSON.stringify(cleaned),
     };
+  }
+  const normalizedValue =
+    item.field === 'guide.videoUrl'
+      ? String(item.value || '').trim()
+      : normalizeImportedRuText(item.value);
+  if (item.field === 'guide.summary' && !isUsefulGuideSummary(normalizedValue)) {
+    return null;
   }
   return {
     ...item,
-    value:
-      item.field === 'guide.videoUrl'
-        ? String(item.value || '').trim()
-        : normalizeImportedRuText(item.value),
+    value: normalizedValue,
   };
 }
 
@@ -8292,6 +8567,7 @@ function dedupeGuideImportSuggestions(items) {
   for (const item of items) {
     if (!item?.field?.startsWith('guide.')) continue;
     const normalizedItem = normalizeGuideImportSuggestion(item);
+    if (!normalizedItem) continue;
     const current = grouped.get(item.field) || [];
     current.push(normalizedItem);
     grouped.set(item.field, current);
@@ -8323,6 +8599,7 @@ function dedupeGuideImportSuggestions(items) {
       const value = parseImportSuggestionJson(candidate);
       if (!Array.isArray(value)) continue;
       for (const entry of value) {
+        if (isPlaceholderGuideImportEntry(entry)) continue;
         const primaryText =
           typeof entry === 'string'
             ? entry
@@ -8447,7 +8724,7 @@ async function fetchFandomMediaLookupSource(items) {
           await discardResponseBody(response);
           return;
         }
-        const payload = await response.json();
+        const payload = JSON.parse(await readLimitedImportResponse(response));
         const normalizedName = normalizeImportSearch(name);
         const exactImages = (payload?.query?.allimages || [])
           .map((image) => ({
@@ -8664,6 +8941,30 @@ async function handleGuideImportLookup(request, env) {
 
 const MAX_PROXIED_MEDIA_BYTES = 2 * 1024 * 1024;
 
+async function readLimitedBinaryResponse(response, maxBytes) {
+  if (!response.body) return new Uint8Array();
+  const reader = response.body.getReader();
+  const chunks = [];
+  let received = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    if (received > maxBytes) {
+      await reader.cancel();
+      throwHttp('Изображение источника превышает безопасный размер', 413);
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
 async function handleMediaProxy(request, ctx) {
   if (!['GET', 'HEAD'].includes(request.method)) {
     return json({ error: 'Метод не поддерживается' }, 405);
@@ -8712,10 +9013,10 @@ async function handleMediaProxy(request, ctx) {
   ) {
     return json({ error: 'Источник вернул неподдерживаемое изображение' }, 415);
   }
-  const bytes = await upstream.arrayBuffer();
-  if (bytes.byteLength > MAX_PROXIED_MEDIA_BYTES) {
-    return json({ error: 'Изображение источника слишком большое' }, 413);
-  }
+  const bytes = await readLimitedBinaryResponse(
+    upstream,
+    MAX_PROXIED_MEDIA_BYTES,
+  );
 
   const response = new Response(request.method === 'HEAD' ? null : bytes, {
     status: 200,
@@ -9085,7 +9386,7 @@ function serializeThread(row) {
   };
 }
 
-function serializeComment(row) {
+function serializeComment(row, activeReactions = []) {
   return {
     id: row.id,
     userId: row.user_id,
@@ -9102,6 +9403,7 @@ function serializeComment(row) {
       dislikes: Number(row.reaction_dislikes || 0),
       useful: Number(row.reaction_useful ?? row.score ?? 0),
     },
+    activeReactions,
     status: row.status,
   };
 }

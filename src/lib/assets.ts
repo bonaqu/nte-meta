@@ -49,6 +49,9 @@ export function normalizeExternalAssetUrl(value?: string | null) {
   if (/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) {
     try {
       const parsed = new URL(url);
+      const pathPrefix = [...parsed.searchParams.entries()].find(
+        ([key]) => key.trim().replace(/^\++/, '') === 'path-prefix',
+      )?.[1];
       parsed.pathname = parsed.pathname
         .replace(
         /\/revision\/latest(?:\/(?:scale-to-width-down|smart|thumbnail|width)\/[^/?#]+|\/[^/?#]+)?$/i,
@@ -56,7 +59,8 @@ export function normalizeExternalAssetUrl(value?: string | null) {
       )
         .replace(/\/revision\/latest\/width\/[^/?#]+$/i, '/revision/latest')
         .replace(/\/revision\/latest\/[^/?#]+$/i, '/revision/latest');
-      parsed.searchParams.delete('cb');
+      parsed.search = '';
+      if (pathPrefix) parsed.searchParams.set('path-prefix', pathPrefix.trim());
       return parsed.toString();
     } catch {
       return url;

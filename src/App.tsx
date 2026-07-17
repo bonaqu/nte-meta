@@ -1462,7 +1462,7 @@ referrerPolicy="no-referrer"
 className="tier-badge"
 title={
 tierPlacement
-? `Позиция из единого тир-листа, патч ${tierPlacement.patch}`
+? `Ранг единого тир-листа, патч ${tierPlacement.patch}`
 : 'Персонаж ещё не добавлен в единый тир-лист'
 }
 >

@@ -3373,10 +3373,10 @@ function translateGame8Obtain(value, characterName) {
 const knownGiftLocalizations = new Map([
   ['SpecialGift_letter', 'Рукописное письмо'],
   ['Furniture_Ornament_002', 'Золотая луна'],
-  ['SpecialGift_ticket', 'Билет в кино «Флоэ»'],
+  ['SpecialGift_ticket', 'Билет в кинотеатр «Флоу»'],
   ['Furniture_Light_002', 'Окружающий ночник'],
   ['Furniture_Light_007', 'Лампа из белого нефрита'],
-  ['Flower0000', 'Золотая весна'],
+  ['Flower0000', 'Золотой источник'],
   ['Flower0001', 'Соната соловья'],
   ['Flower0002', 'Голубая басня'],
   ['Flower0007', 'Пылающий багрянец'],
@@ -3961,13 +3961,15 @@ function parseNteWikiImport(text, source) {
       const name = lines[index];
       const amount = lines[index + 1];
       const sourceText = lines[index + 2];
-      if (!name || !/^×?\d+/.test(amount || '')) continue;
+      if (!name || !hasRussianText(name) || !/^×?\d+/.test(amount || '')) continue;
       materials.push({
         id: crypto.randomUUID(),
         name,
         iconUrl: '',
         amount,
-        source: sourceText || '',
+        source: hasRussianText(sourceText)
+          ? sourceText
+          : 'Источник получения указан на странице NTE Wiki.',
       });
     }
     suggestions.push(
@@ -4092,6 +4094,55 @@ function parseGenshinBuildsImport(text, source, character) {
   }
   suggestions.push(
     makeImportSuggestion('profile.voiceActors', 'Актёры озвучки', voiceActors, source, 'high'),
+  );
+  const abilities = [];
+  const skillsStart = lines.findIndex((line) => line === 'Skills');
+  const passivesStart = lines.findIndex((line) => line === 'Passives');
+  if (skillsStart >= 0 && passivesStart > skillsStart) {
+    const skillTypes = ['Базовая атака', 'Навык', 'Сверхспособность', 'Навык поддержки'];
+    for (let index = skillsStart + 1; index < passivesStart; index += 1) {
+      const match = (lines[index] || '').match(/^Proactive\s+(.+)/i);
+      if (!match || abilities.length >= skillTypes.length) continue;
+      const nextSkillIndex = lines.findIndex(
+        (line, lineIndex) => lineIndex > index && /^Proactive\s+/i.test(line),
+      );
+      const end =
+        nextSkillIndex > index && nextSkillIndex < passivesStart
+          ? nextSkillIndex
+          : passivesStart;
+      abilities.push({
+        id: crypto.randomUUID(),
+        name: normalizeImportedRuText(match[1]),
+        type: skillTypes[abilities.length],
+        iconUrl: '',
+        description: normalizeImportedRuText(lines.slice(index + 1, end).join(' ')),
+      });
+    }
+  }
+  if (passivesStart >= 0 && awakeningStart > passivesStart) {
+    const passiveLines = lines.slice(passivesStart + 1, awakeningStart);
+    for (let index = 0; index + 1 < passiveLines.length && abilities.length < 6; index += 2) {
+      const name = normalizeImportedRuText(passiveLines[index]);
+      const description = normalizeImportedRuText(passiveLines[index + 1]);
+      if (!name || !description || !hasRussianText(name) || !hasRussianText(description)) continue;
+      abilities.push({
+        id: crypto.randomUUID(),
+        name,
+        type: 'Пассивный навык',
+        iconUrl: '',
+        description,
+      });
+    }
+  }
+  suggestions.push(
+    makeImportSuggestion(
+      'profile.abilities',
+      'Способности',
+      abilities,
+      source,
+      'medium',
+      'Русские названия и описания сверяются с другими источниками; технические имена в итог не публикуются.',
+    ),
   );
   const faqAbilityNames = parseGenshinBuildsFaqAbilityNames(text);
   if (faqAbilityNames.length) {
@@ -4224,7 +4275,7 @@ function parseEditorialGuideImport(html, source, character) {
     if (!field || !block.lines.length) continue;
     const heading = localizeImportedGuideText(block.heading);
     const description = localizeImportedGuideText(block.lines.join(' '));
-    if (!hasRussianText(description)) continue;
+    if (!isPredominantlyRussianText(description)) continue;
     const rows = rowsByField.get(field) || [];
     rows.push({
       title: hasRussianText(heading) ? heading : labels[field],
@@ -4293,7 +4344,7 @@ function parseGameWithStructuredGuideImport(text, source, character) {
 
   const signatureArcName = gameWithLocaleText(item.signatureArc?.name);
   const signatureArcIcon = normalizeExternalImageUrl(item.signatureArc?.iconUrl || '');
-  const bestArcs = signatureArcName
+  const bestArcs = signatureArcName && hasRussianText(signatureArcName)
     ? [
         {
           name: signatureArcName,
@@ -4486,6 +4537,13 @@ function isImportPlaceholderText(value) {
 
 function hasRussianText(value) {
   return /[а-яё]/i.test(String(value || ''));
+}
+
+function isPredominantlyRussianText(value, minimumRatio = 0.55) {
+  const letters = String(value || '').match(/[a-zа-яё]/gi) || [];
+  if (!letters.length) return false;
+  const russianLetters = letters.filter((letter) => /[а-яё]/i.test(letter)).length;
+  return russianLetters / letters.length >= minimumRatio;
 }
 
 function gameWithAbility(entry, type) {
@@ -4728,9 +4786,6 @@ function parseGameWithCharacterDetailImport(text, source, character) {
     ['Навык', 'Навык'],
     ['Завершение EX Rail', 'Сверхспособность'],
     ['Навыки поддержки', 'Навык поддержки'],
-    ['Умеренное озорство', 'Пассивный навык'],
-    ['Умеренная работа', 'Пассивный навык'],
-    ['Городские навыки', 'Повседневный навык'],
   ];
   const stopWords = [
     'Базовые значения',
@@ -4773,15 +4828,6 @@ function parseGameWithCharacterDetailImport(text, source, character) {
     });
   }
 
-  if (abilities.filter((ability) => ability.type === 'Повседневный навык').length < 2) {
-    abilities.push({
-      id: crypto.randomUUID(),
-      name: 'Не введено',
-      type: 'Повседневный навык',
-      iconUrl: '',
-      description: 'В источниках не найден второй повседневный навык.',
-    });
-  }
   const giftsStart = lines.findIndex((line) => line === 'Любимые подарки');
   const gifts =
     giftsStart >= 0
@@ -5579,14 +5625,18 @@ function mergeAbilityImportSuggestions(items) {
       }) || candidates.find(hasCleanName);
     const withCleanName =
       preferredName?.ability || withDescription;
+    const importedName =
+      withCleanName?.name || withDescription?.name || 'Требует проверки';
     return {
-        ...withDescription,
-        id: withDescription?.id || crypto.randomUUID(),
-        name: withCleanName?.name || withDescription?.name || 'Требует проверки',
-        type: withCleanName?.type || withDescription?.type || 'Навык',
-        iconUrl: withCleanName?.iconUrl || withDescription?.iconUrl || '',
-        description:
-          withDescription?.description ||
+      ...withDescription,
+      id: withDescription?.id || crypto.randomUUID(),
+      name: isImportPlaceholderText(importedName)
+        ? 'Требует проверки'
+        : importedName,
+      type: withCleanName?.type || withDescription?.type || 'Навык',
+      iconUrl: withCleanName?.iconUrl || withDescription?.iconUrl || '',
+      description:
+        withDescription?.description ||
         withCleanName?.description ||
         'Описание требует проверки в игре.',
     };
@@ -6086,7 +6136,7 @@ async function handleSystemStatus(request, env) {
       d1: 'ok',
       generatedAt: new Date().toISOString(),
       counts,
-        migrations: { latestKnown: '0015_hotori_arc_voice_sources.sql' },
+      migrations: { latestKnown: '0020_hotori_verified_progression.sql' },
     },
   });
 }
@@ -6768,7 +6818,7 @@ function normalizeCharacterProfile(value) {
     ),
     roleIcons: collection('roleIcons', 12, (item) => ({
       name: text(item.name, 80),
-      iconUrl: url(item.iconUrl, 'URL иконки пробуждения'),
+      iconUrl: url(item.iconUrl, 'URL иконки роли'),
     })).filter((item) => item.name && item.iconUrl),
     voiceActors: collection('voiceActors', 12, (item) => ({
       language: text(item.language, 40),

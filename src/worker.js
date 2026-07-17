@@ -2234,12 +2234,17 @@ function normalizeExternalImageUrl(value) {
   const url = String(value || '').trim().replace(/&amp;/g, '&');
   if (!url) return '';
   if (/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) {
-    const [base] = url.split('?');
-    const normalized = base.replace(
-      /\/revision\/latest(?:\/(?:scale-to-width-down|smart|thumbnail|width)\/[^/?#]+|\/[^/?#]+)?$/i,
-      '/revision/latest',
-    );
-    return normalized;
+    try {
+      const parsed = new URL(url);
+      parsed.pathname = parsed.pathname.replace(
+        /\/revision\/latest(?:\/(?:scale-to-width-down|smart|thumbnail|width)\/[^/?#]+|\/[^/?#]+)?$/i,
+        '/revision/latest',
+      );
+      parsed.searchParams.delete('cb');
+      return parsed.toString();
+    } catch {
+      return url;
+    }
   }
   if (url.startsWith('/nte/')) return `https://gamewith.ai${url}`;
   return url;

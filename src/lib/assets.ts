@@ -26,15 +26,20 @@ export function normalizeExternalAssetUrl(value?: string | null) {
   if (!url) return '';
 
   if (/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) {
-    const [base] = url.split('?');
-    const normalized = base
-      .replace(
+    try {
+      const parsed = new URL(url);
+      parsed.pathname = parsed.pathname
+        .replace(
         /\/revision\/latest(?:\/(?:scale-to-width-down|smart|thumbnail|width)\/[^/?#]+|\/[^/?#]+)?$/i,
         '/revision/latest',
       )
-      .replace(/\/revision\/latest\/width\/[^/?#]+$/i, '/revision/latest')
-      .replace(/\/revision\/latest\/[^/?#]+$/i, '/revision/latest');
-    return normalized;
+        .replace(/\/revision\/latest\/width\/[^/?#]+$/i, '/revision/latest')
+        .replace(/\/revision\/latest\/[^/?#]+$/i, '/revision/latest');
+      parsed.searchParams.delete('cb');
+      return parsed.toString();
+    } catch {
+      return url;
+    }
   }
 
   return url;

@@ -4093,13 +4093,17 @@
 
 .import-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   padding: 8px;
   border: 1px solid rgb(255 255 255 / 0.1);
   border-radius: var(--radius-sm);
   background: rgb(3 10 20 / 0.38);
+}
+
+.import-row:has(> img) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .import-row.is-accepted {
@@ -4123,6 +4127,17 @@
   overflow-wrap: anywhere;
   color: var(--text);
   font-weight: 700;
+}
+
+.import-row-content {
+  display: grid;
+  min-inline-size: 0;
+  gap: 6px;
+}
+
+.import-row-content audio {
+  inline-size: min(100%, 360px);
+  block-size: 36px;
 }
 
 .import-row-actions {

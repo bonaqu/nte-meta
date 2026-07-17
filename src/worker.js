@@ -1981,6 +1981,7 @@ const IMPORT_SOURCE_PRIORITY = new Map([
   ['neverness-app-profile', 90],
   ['genshin-builds-ru', 88],
   ['fandom-ru-images-api', 86],
+  ['fandom-voice-media-api', 85],
   ['fandom-ru-media-library', 84],
   ['game8-skins', 82],
   ['game8-voice', 80],
@@ -2245,7 +2246,7 @@ function makeImportSuggestion(field, label, value, source, confidence = 'medium'
     label: canonicalLabel,
     value: cleanValue,
     sourceName: source.name,
-    sourceUrl: source.url,
+    sourceUrl: source.publicUrl || source.url,
     confidence,
     note,
   };
@@ -2269,6 +2270,20 @@ function normalizeExternalImageUrl(value) {
   }
   if (url.startsWith('/nte/')) return `https://gamewith.ai${url}`;
   return url;
+}
+
+function normalizeExternalAudioUrl(value) {
+  const url = String(value || '').trim().replace(/&amp;/g, '&');
+  if (!url) return '';
+  if (!/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) return url;
+  try {
+    const parsed = new URL(url);
+    parsed.pathname = parsed.pathname.replace(/\/revision\/latest(?:\/[^/?#]+)?$/i, '');
+    parsed.search = '';
+    return parsed.toString();
+  } catch {
+    return url;
+  }
 }
 
 function hashText(value) {
@@ -2450,6 +2465,16 @@ function characterImportSources(slug, character = {}) {
       trust: 'high',
       url: `https://neverness-to-everness.fandom.com/ru/api.php?action=query&list=allimages&aifrom=${fandomRuImagePrefix}&ailimit=50&aiprop=url|mime|size|dimensions&format=json&formatversion=2&origin=*`,
       parser: parseFandomRuAllImagesImport,
+      raw: true,
+    },
+    {
+      id: 'fandom-voice-media-api',
+      name: 'Fandom: прямые записи озвучки',
+      trust: 'medium',
+      url: `https://neverness-to-everness.fandom.com/api.php?action=query&generator=images&gimlimit=max&prop=imageinfo&iiprop=url|mime|size&format=json&formatversion=2&titles=${fandomTitle}%2FVoice-Overs&origin=*`,
+      publicUrl: `https://neverness-to-everness.fandom.com/wiki/${fandomTitle}/Voice-Overs`,
+      voiceRoot: String(character.originalName || character.name || slug || '').trim(),
+      parser: parseFandomVoiceMediaImport,
       raw: true,
     },
     {
@@ -3528,6 +3553,132 @@ function parseFandomRuAllImagesImport(text, source, character) {
         'Проверьте, что изображение подходит как крупный арт профиля.',
       ),
       makeImportSuggestion('__imageMap', 'Индекс изображений', imageMap, source, 'low'),
+    ].filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+const FANDOM_VOICE_LANGUAGES = new Map([
+  ['', { label: 'Английский', adjective: 'английской' }],
+  ['ZH', { label: 'Китайский', adjective: 'китайской' }],
+  ['JA', { label: 'Японский', adjective: 'японской' }],
+  ['KO', { label: 'Корейский', adjective: 'корейской' }],
+]);
+
+const FANDOM_VOICE_TITLE_TRANSLATIONS = new Map([
+  ['first meet', 'Первая встреча'],
+  ['chat - business', 'Беседа: дела'],
+  ['chat - lists', 'Беседа: списки'],
+  ['chat - sunya', 'Беседа: Сунья'],
+  ['sunny', 'Солнечная погода'],
+  ['rainy', 'Дождливая погода'],
+  ['cold', 'Холодная погода'],
+  ['hot', 'Жаркая погода'],
+  ['morning greeting', 'Утреннее приветствие'],
+  ['noon greeting', 'Дневное приветствие'],
+  ['evening greeting', 'Вечернее приветствие'],
+  ['good night', 'Спокойной ночи'],
+  ['hobbies', 'Увлечения'],
+  ['worries', 'Заботы'],
+  ['topic - anomalies', 'Тема: аномалии'],
+  ['topic - etiquette', 'Тема: этикет'],
+  ['topic - tips', 'Тема: полезные советы'],
+  ['about myself - armor', 'О себе: броня'],
+  ['about myself - being perfect', 'О себе: совершенство'],
+  ['about myself - esper abilities', 'О себе: способности эспера'],
+  ['about myself - glasses', 'О себе: очки'],
+  ['about eibon antique shop', 'Об антикварном магазине «Эйбон»'],
+]);
+
+const FANDOM_VOICE_SUBJECT_TRANSLATIONS = new Map([
+  ['adler', 'Адлере'],
+  ['baicang', 'Байканге'],
+  ['chiz', 'Чиз'],
+  ['daffodill', 'Даффодил'],
+  ['edgar', 'Эдгаре'],
+  ['fadia', 'Фадии'],
+  ['hathor', 'Хатор'],
+  ['hotori', 'Хотори'],
+  ['lacrimosa', 'Лакримозе'],
+  ['mint', 'Минт'],
+  ['nanally', 'Наналли'],
+  ['sakiri', 'Сакири'],
+  ['sagiri', 'Сакири'],
+  ['skia', 'Скии'],
+  ['taygedo', 'Тайгедо'],
+]);
+
+function localizeFandomVoiceTitle(value, index) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+  const normalized = clean.toLocaleLowerCase('en-US');
+  const direct = FANDOM_VOICE_TITLE_TRANSLATIONS.get(normalized);
+  if (direct) return direct;
+
+  const ascension = clean.match(/^Character Ascension\s+0?([1-6])$/i);
+  if (ascension) return `Возвышение персонажа ${ascension[1]}`;
+
+  const about = clean.match(/^About\s+(.+)$/i);
+  if (about) {
+    const subject = FANDOM_VOICE_SUBJECT_TRANSLATIONS.get(
+      about[1].trim().toLocaleLowerCase('en-US'),
+    );
+    if (subject) return `О ${subject}`;
+  }
+
+  return `Реплика ${index + 1}`;
+}
+
+function parseFandomVoiceMediaImport(text, source) {
+  try {
+    const payload = JSON.parse(text);
+    const pages = Array.isArray(payload?.query?.pages) ? payload.query.pages : [];
+    const voiceRoot = String(source.voiceRoot || '').replace(/[_\s]+/g, ' ').trim();
+    const rootPattern = voiceRoot
+      ? new RegExp(`^${escapeRegExp(voiceRoot).replace(/\\ /g, '\\s+')}\\s+`, 'i')
+      : null;
+    const rows = pages
+      .map((page) => {
+        const info = page?.imageinfo?.[0];
+        const fileTitle = String(page?.title || '').replace(/_/g, ' ').trim();
+        const match = fileTitle.match(/^File:VO\s+(?:(ZH|JA|KO)\s+)?(.+?)\.ogg$/i);
+        if (!match || !info?.url || !/(?:audio|ogg)/i.test(String(info.mime || ''))) {
+          return null;
+        }
+        const languageCode = String(match[1] || '').toUpperCase();
+        const language = FANDOM_VOICE_LANGUAGES.get(languageCode);
+        if (!language) return null;
+        const rawTitle = rootPattern ? match[2].replace(rootPattern, '').trim() : match[2];
+        if (!rawTitle || (rawTitle === match[2] && voiceRoot)) return null;
+        return {
+          sortKey: `${languageCode}:${rawTitle}`,
+          rawTitle,
+          language,
+          audioUrl: normalizeExternalAudioUrl(info.url),
+        };
+      })
+      .filter(Boolean)
+      .sort((left, right) => left.sortKey.localeCompare(right.sortKey, 'ru'))
+      .slice(0, 200)
+      .map((row, index) => ({
+        id: `voice-${hashText(`${row.language.label}:${row.rawTitle}`).slice(0, 12)}`,
+        title: localizeFandomVoiceTitle(row.rawTitle, index),
+        language: row.language.label,
+        audioUrl: row.audioUrl,
+        sourceUrl: source.publicUrl || source.url,
+        description: `Прямая запись ${row.language.adjective} озвучки. Расшифровку и соответствие реплики проверьте в источнике перед публикацией.`,
+      }))
+      .filter((row) => row.audioUrl);
+
+    return [
+      makeImportSuggestion(
+        'profile.voiceLines',
+        'Реплики озвучки',
+        rows,
+        source,
+        'medium',
+        'Аудиофайлы получены через MediaWiki API. Каждую запись нужно прослушать и подтвердить отдельно.',
+      ),
     ].filter(Boolean);
   } catch {
     return [];
@@ -6362,7 +6513,7 @@ async function handleCharacterImportLookup(request, env) {
       sources: sourceResults.map((source) => ({
         id: source.id,
         name: source.name,
-        url: source.url,
+        url: source.publicUrl || source.url,
         trust: source.trust,
         status: source.status,
         message: source.message,

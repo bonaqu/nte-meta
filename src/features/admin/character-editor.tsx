@@ -321,6 +321,7 @@ function ImportSuggestionList({
                     {rowSuggestions.map((row) => {
                       const rowDecision = decisions[row.id];
                       const rowPreviewUrls = getSuggestionPreviewUrls(row);
+                      const rowAudioUrl = getSuggestionAudioUrl(row);
                       return (
                         <div
                           className={`import-row ${rowDecision ? `is-${rowDecision}` : ''}`}
@@ -336,7 +337,14 @@ function ImportSuggestionList({
                               referrerPolicy="no-referrer"
                             />
                           ) : null}
-                          <span>{row.label}</span>
+                          <div className="import-row-content">
+                            <span>{row.label}</span>
+                            {rowAudioUrl ? (
+                              <audio controls preload="none" src={rowAudioUrl}>
+                                Ваш браузер не поддерживает аудио.
+                              </audio>
+                            ) : null}
+                          </div>
                           <div className="import-row-actions">
                             <button
                               className="icon-button success"
@@ -452,6 +460,7 @@ function getSuggestionPreviewUrls(suggestion: CharacterImportSuggestion) {
   const addUrl = (value: unknown) => {
     if (typeof value !== 'string') return;
     if (!/^(?:https?:|data:|blob:|\/?assets\/)/i.test(value)) return;
+    if (directAudioPattern.test(value)) return;
     const normalized = getYoutubeThumbnailUrl(value) || normalizeExternalAssetUrl(value);
     if (normalized && !urls.includes(normalized)) urls.push(normalized);
   };
@@ -481,6 +490,19 @@ function getSuggestionPreviewUrls(suggestion: CharacterImportSuggestion) {
   }
 
   return urls;
+}
+
+function getSuggestionAudioUrl(suggestion: CharacterImportSuggestion) {
+  const parsed = parseImportValue(suggestion.value);
+  if (!Array.isArray(parsed)) return '';
+  const audioUrl = parsed
+    .map((item) =>
+      item && typeof item === 'object' && 'audioUrl' in item
+        ? String((item as { audioUrl?: unknown }).audioUrl || '').trim()
+        : '',
+    )
+    .find((value) => isDirectAudioUrl(value));
+  return audioUrl || '';
 }
 
 function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {

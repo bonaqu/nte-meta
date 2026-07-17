@@ -2130,6 +2130,45 @@ function normalizeImportArcType(value) {
   return direct?.[1] || '';
 }
 
+function normalizeCharacterRoleLabel(value) {
+  const label = normalizeImportedRuText(value);
+  const normalized = normalizeImportSearch(label);
+  const translations = new Map([
+    ['main dps', 'Основной ДД'],
+    ['main dd', 'Основной ДД'],
+    ['burst dps', 'Взрывной ДД'],
+    ['sustain dps', 'Стабильный ДД'],
+    ['sub dps', 'Саб-ДД'],
+    ['sub dd', 'Саб-ДД'],
+    ['dps', 'ДД'],
+    ['dd', 'ДД'],
+    ['support', 'Поддержка'],
+    ['buffer', 'Усиление'],
+    ['debuffer', 'Ослабление'],
+    ['healer', 'Лечение'],
+    ['tank', 'Защита'],
+    ['control', 'Контроль'],
+    ['damage booster', 'Усиление урона'],
+    ['survival', 'Выживание'],
+    ['shield', 'Щит'],
+    ['dot', 'Периодический урон'],
+    ['flex', 'Гибкая роль'],
+    ['quick combine', 'Быстрая комбинация'],
+    ['unknown', 'Требует проверки'],
+  ]);
+  return translations.get(normalized) || label;
+}
+
+function normalizeCharacterRoleTags(value) {
+  return [
+    ...new Set(
+      normalizeImportedStringList(value)
+        .map(normalizeCharacterRoleLabel)
+        .filter(Boolean),
+    ),
+  ];
+}
+
 function normalizeImportElement(value) {
   const normalized = normalizeImportSearch(value);
   if (!normalized) return '';
@@ -6835,7 +6874,7 @@ function normalizeSetting(key, value) {
 }
 
 function serializeCharacter(row) {
-  const roleTags = normalizeImportedStringList(
+  const roleTags = normalizeCharacterRoleTags(
     parseJson(row.profile_role_tags_json, [row.role]),
   );
   const voiceActors = normalizeVoiceActorRows(
@@ -6844,31 +6883,40 @@ function serializeCharacter(row) {
   const baseStats = normalizeBaseStatRows(
     parseJson(row.profile_base_stats_json, []),
   );
+  const summary = normalizeImportedRuText(row.summary || '');
+  const profileBiographyShort = normalizeImportedRuText(
+    row.profile_biography_short || '',
+  );
+  const rawShortDescription = normalizeImportedRuText(row.short_description || '');
+  const shortDescription = /^(?:мужчина|женщина)$/i.test(rawShortDescription)
+    ? [profileBiographyShort, summary].find(
+        (value) => value && !/^(?:мужчина|женщина)$/i.test(value) && value.length > 16,
+      ) || 'Краткое описание требует проверки редактором.'
+    : rawShortDescription;
+  const rawArcType = normalizeImportedRuText(row.profile_arc_type || '');
   return {
     id: row.id,
     slug: row.slug,
     name: row.name,
     originalName: row.original_name,
     rarity: row.rarity,
-    role: row.role,
-    type: row.type,
+    role: normalizeCharacterRoleLabel(row.role),
+    type: normalizeCharacterRoleLabel(row.type),
     attribute: row.attribute,
     imageUrl: row.image_url,
     splashUrl: row.splash_url || row.image_url,
-    shortDescription: row.short_description,
-    summary: row.summary,
+    shortDescription,
+    summary,
     tags: parseJson(row.tags_json, []),
     profile: {
       faction: normalizeImportedRuText(row.profile_faction || ''),
-      arcType: normalizeImportedRuText(row.profile_arc_type || ''),
+      arcType: normalizeImportArcType(rawArcType) || rawArcType,
       birthday: normalizeImportedRuText(row.profile_birthday || ''),
       releaseDate: formatRuImportDate(
         normalizeImportedRuText(row.profile_release_date || ''),
       ),
       biographyShort:
-        normalizeImportedRuText(
-          row.profile_biography_short || row.short_description || '',
-        ),
+        profileBiographyShort || shortDescription,
       biography: normalizeImportedRuText(
         row.profile_biography_markdown || row.summary || '',
       ),

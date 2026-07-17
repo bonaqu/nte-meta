@@ -42,7 +42,7 @@ const SESSION_COOKIE = 'nte_meta_session';
 const MAX_JSON_BYTES = 1800000;
 const MAX_PROFILE_JSON_BYTES = 1750000;
 const MAX_PROFILE_DATA_URL_CHARS = 1300000;
-const MAX_PROFILE_RESOURCE_URL_CHARS = 4096;
+const MAX_PROFILE_RESOURCE_URL_CHARS = 16384;
 
 const tableConfig = {
   characters: {
@@ -1989,6 +1989,7 @@ const IMPORT_SOURCE_PRIORITY = new Map([
   ['btva-en', 78],
   ['dubbing-wiki', 76],
   ['fandom-character', 74],
+  ['wotpack-guide-search-ru', 97],
 ]);
 
 function selectImportSources(sources) {
@@ -2739,6 +2740,19 @@ function guideImportSources(slug, character = {}) {
 
   return [
     {
+      id: 'wotpack-guide-search-ru',
+      name: 'Wotpack RU: поиск персонажного гайда',
+      trust: 'high',
+      url: `https://wotpack.ru/wp-json/wp/v2/search?search=${encodeURIComponent(
+        `${character.name || character.originalName || slug} NTE`,
+      )}&per_page=8`,
+      resolveUrl: resolveWotpackGuideSource,
+      parser: parseEditorialGuideImport,
+      extractImages: true,
+      raw: true,
+      cacheTtl: 1800,
+    },
+    {
       id: 'genshin-builds-guide-ru',
       name: 'GenshinBuilds NTE RU: гайд',
       trust: 'medium',
@@ -3060,24 +3074,35 @@ async function fetchImportSource(source, character) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), IMPORT_SOURCE_TIMEOUT_MS);
   try {
-      const fetchOptions = {
-        headers: {
-          accept: 'text/html,application/xhtml+xml,application/json',
+    const fetchOptions = {
+      headers: {
+        accept: 'text/html,application/xhtml+xml,application/json',
         'user-agent': 'NTE-Meta-Editorial/1.0 (+https://bonaqu.github.io/nte-meta/)',
       },
       signal: controller.signal,
+    };
+    if (source.cacheTtl) {
+      fetchOptions.cf = {
+        cacheEverything: true,
+        cacheTtl: source.cacheTtl,
       };
-      if (source.cacheTtl) {
-        fetchOptions.cf = {
-          cacheEverything: true,
-          cacheTtl: source.cacheTtl,
-        };
-      }
-      const response = await fetch(source.url, fetchOptions);
+    }
+    const activeSource = source.resolveUrl
+      ? await source.resolveUrl(source, character, fetchOptions)
+      : source;
+    if (!activeSource) {
+      return {
+        ...source,
+        status: 'partial',
+        message: 'Персонажный гайд в этом источнике не найден.',
+        suggestions: [],
+      };
+    }
+    const response = await fetch(activeSource.url, fetchOptions);
     const length = Number(response.headers.get('content-length') || 0);
     if (!response.ok) {
       return {
-        ...source,
+        ...activeSource,
         status: response.status === 403 ? 'blocked' : 'failed',
         message: `HTTP ${response.status}`,
         suggestions: [],
@@ -3085,7 +3110,7 @@ async function fetchImportSource(source, character) {
     }
     if (length > IMPORT_MAX_HTML_BYTES) {
       return {
-        ...source,
+        ...activeSource,
         status: 'failed',
         message: 'Страница слишком большая для безопасного автоимпорта.',
         suggestions: [],
@@ -3094,13 +3119,17 @@ async function fetchImportSource(source, character) {
     const html = await readLimitedImportResponse(response);
     const text = htmlToPlainText(html.slice(0, IMPORT_MAX_HTML_BYTES));
     const suggestions = [
-      ...source
-        .parser(source.raw ? html.slice(0, IMPORT_MAX_HTML_BYTES) : text, source, character)
+      ...activeSource
+        .parser(
+          activeSource.raw ? html.slice(0, IMPORT_MAX_HTML_BYTES) : text,
+          activeSource,
+          character,
+        )
         .filter(Boolean),
-      ...extractImportImages(html, source, character),
+      ...extractImportImages(html, activeSource, character),
     ];
     return {
-      ...source,
+      ...activeSource,
       status: suggestions.length ? 'ok' : 'partial',
       message: suggestions.length
         ? `Найдено предложений: ${suggestions.length}`
@@ -3122,6 +3151,34 @@ async function fetchImportSource(source, character) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function resolveWotpackGuideSource(source, character, fetchOptions) {
+  const response = await fetch(source.url, fetchOptions);
+  if (!response.ok) return null;
+  const length = Number(response.headers.get('content-length') || 0);
+  if (length > 100000) return null;
+  const payload = JSON.parse(await readLimitedImportResponse(response));
+  if (!Array.isArray(payload)) return null;
+  const names = characterNameCandidates(character);
+  const match = payload.find((item) => {
+    const title = normalizeImportSearch(item?.title || '');
+    const url = String(item?.url || '');
+    return (
+      names.some((name) => title.includes(name)) &&
+      /(?:nte|neverness)/i.test(`${item?.title || ''} ${url}`) &&
+      /(?:гайд|билд|guide|build)/i.test(item?.title || '') &&
+      /^https:\/\/wotpack\.ru\//i.test(url)
+    );
+  });
+  if (!match) return null;
+  return {
+    ...source,
+    name: `Wotpack RU: ${String(match.title).slice(0, 120)}`,
+    url: match.url,
+    publicUrl: match.url,
+    resolveUrl: undefined,
+  };
 }
 
 async function readLimitedImportResponse(response) {
@@ -3236,8 +3293,8 @@ function normalizeVoiceActorRows(value) {
   const rows = new Map();
   for (const item of value) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
-    const language = normalizeImportedRuText(item.language);
-    const name = normalizeImportedRuText(item.name);
+    const language = normalizeImportedRuText(item.language).slice(0, 40);
+    const name = normalizeImportedRuText(item.name).slice(0, 160);
     if (!language || !name) continue;
     rows.set(normalizeImportSearch(language), { ...item, language, name });
   }
@@ -3315,8 +3372,21 @@ function normalizeProfileCollectionRows(field, value) {
     .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
     .map((item) => {
       const next = { ...item };
-      for (const key of ['name', 'title', 'label', 'language']) {
-        if (typeof next[key] === 'string') next[key] = normalizeImportedRuText(next[key]);
+      const fieldLimits = { name: 160, title: 160, label: 120, language: 40 };
+      for (const [key, limit] of Object.entries(fieldLimits)) {
+        if (typeof next[key] === 'string') {
+          next[key] = normalizeImportedRuText(next[key]).slice(0, limit);
+        }
+      }
+      if (typeof next.id === 'string' && next.id.length > 80) {
+        next.id = `import-${hashText(next.id).slice(0, 24)}`;
+      }
+      for (const [key, limit] of [
+        ['description', 8000],
+        ['effect', 1000],
+        ['source', 1000],
+      ]) {
+        if (typeof next[key] === 'string') next[key] = next[key].trim().slice(0, limit);
       }
       for (const key of ['iconUrl', 'imageUrl', 'rewardIconUrl']) {
         if (isClearlyWrongCollectionMedia(field, next[key])) next[key] = '';
@@ -4718,6 +4788,59 @@ function guideImportRow(value, fallbackTitle) {
   };
 }
 
+function extractGuideContentRows(html, fallbackTitle) {
+  const rows = [];
+  const addRow = (title, description) => {
+    const cleanTitle = localizeImportedGuideText(title).replace(/^Image\s*/i, '').trim();
+    const cleanDescription = localizeImportedGuideText(description).trim();
+    const combined = [cleanTitle, cleanDescription].filter(Boolean).join(' — ');
+    const row = guideImportRow(combined, fallbackTitle);
+    if (!row) return;
+    const derivedTitle = (cleanTitle || row.title || fallbackTitle).slice(0, 120);
+    row.title = derivedTitle;
+    row.description = cleanTitle
+      ? cleanDescription
+      : cleanDescription.slice(derivedTitle.length).replace(/^[\s—:.-]+/, '').trim();
+    const key = normalizeImportSearch(`${row.title} ${row.description}`);
+    if (!key || rows.some((item) => item.key === key)) return;
+    rows.push({ ...row, key });
+  };
+
+  for (const match of String(html || '').matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const cells = [...match[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+      .map((cell) => htmlToPlainText(cell[1]).trim())
+      .filter(Boolean);
+    if (cells.length < 2) continue;
+    if (
+      /^(?:дуга|эффект|персонаж|роль|характеристик|модул|картридж|части консоли)/i.test(
+        cells.join(' '),
+      )
+    ) {
+      continue;
+    }
+    addRow(cells[0], cells.slice(1).join(' '));
+  }
+
+  for (const match of String(html || '').matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)) {
+    const text = htmlToPlainText(match[1]).trim();
+    if (text.length < 3 || text.length > 1800) continue;
+    addRow('', text);
+  }
+
+  if (!rows.length) {
+    for (const match of String(html || '').matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+      const text = htmlToPlainText(match[1]).trim();
+      if (text.length < 20 || text.length > 2400) continue;
+      addRow('', text);
+    }
+  }
+
+  return rows.slice(0, 24).map((row) => ({
+    title: row.title,
+    description: row.description,
+  }));
+}
+
 function extractGuideComparisonRows(html) {
   const strengths = [];
   const weaknesses = [];
@@ -4738,18 +4861,23 @@ function extractGuideComparisonRows(html) {
 function classifyGuideHeading(value) {
   const heading = normalizeImportSearch(value);
   const rules = [
-    ['guide.summary', /кратк.*(?:справ|вывод|итог|обзор)|tl.?dr|quick summary/],
-    ['guide.pullAdvice', /стоит ли|нужно ли|(?:выбив|крут|получ).*(?:персонаж|геро)|pulling advice|pull advice/],
+    ['guide.summary', /кратк.*(?:справ|вывод|итог|обзор)|лучш.*билд.*neverness|tl.?dr|quick summary/],
+    ['guide.pullAdvice', /стоит ли|нужно ли|(?:выбив|крут).*(?:персонаж|геро)|pulling advice|pull advice/],
     ['guide.strengths', /плюс|сильн.*сторон|strength/],
     ['guide.weaknesses', /минус|слаб.*сторон|weakness/],
     ['guide.skillPriority', /навык.*приоритет|приоритет.*(?:навык|прокач)|прокач.*навык|skill priority/],
     ['guide.alternativeArcs', /альтернатив|f2p.*(?:arc|дуг)|(?:arc|дуг).*f2p|alternative arcs?/],
     ['guide.bestArcs', /лучш.*(?:дуг|arc|арк)|(?:какую|выбор).*дуг|дуг.*использ|best arcs?/],
+    ['guide.mainStats', /рекомендуем.*атрибут.*модул|основн.*(?:стат|характерист)|^характеристик|main stats?|приоритет характеристик/],
     ['guide.modules', /патрон|картридж|консол|модул|cartridge|console|module layout/],
-    ['guide.mainStats', /основн.*(?:стат|характерист)|^характеристик|main stats?|приоритет характеристик/],
     ['guide.subStats', /саб.*стат|дополнительн.*(?:стат|характерист)|sub.?stats?/],
+    ['guide.f2pTeams', /f2p.*(?:команд|отряд|состав)|бюджетн.*(?:команд|отряд|состав)|команд.*без.*вложен/],
+    ['guide.premiumTeams', /premium.*(?:team|команд)|премиальн.*(?:команд|отряд|состав)|донатн.*(?:команд|отряд|состав)/],
+    ['guide.starterTeams', /стартов.*(?:команд|отряд|состав)|команд.*для.*старт|starter teams?/],
+    ['guide.endgameTeams', /эндг(?:ейм|еим).*(?:команд|отряд|состав)|команд.*эндг(?:ейм|еим)|endgame teams?/],
     ['guide.teams', /лучш.*команд|лучш.*состав|лучш.*союзник|^команд|состав.*(?:команд|для)|отряд|best teams?/],
     ['guide.rotations', /ротац|rotation/],
+    ['guide.mistakes', /част.*ошиб|ошибк.*игр|common mistakes?/],
     ['guide.tips', /как играть|совет|механик|управлен|how to play|tips?/],
   ];
   return rules.find(([, pattern]) => pattern.test(heading))?.[0] || '';
@@ -4804,8 +4932,13 @@ function parseEditorialGuideImport(html, source, character) {
     'guide.mainStats': 'Основные статы',
     'guide.subStats': 'Саб-статы',
     'guide.teams': 'Лучшие команды',
+    'guide.f2pTeams': 'F2P-команды',
+    'guide.premiumTeams': 'Premium-команды',
+    'guide.starterTeams': 'Команды для старта',
+    'guide.endgameTeams': 'Команды для эндгейма',
     'guide.rotations': 'Ротации',
     'guide.tips': 'Советы и механики',
+    'guide.mistakes': 'Частые ошибки',
   };
   const rowsByField = new Map();
   let inheritedField = '';
@@ -4836,13 +4969,20 @@ function parseEditorialGuideImport(html, source, character) {
     const field = directField || inheritedField;
     if (!field || !block.lines.length) continue;
     const heading = localizeImportedGuideText(block.heading);
+    const extractedRows = extractGuideContentRows(block.html, labels[field]);
     const description = localizeImportedGuideText(block.lines.join(' '));
-    if (!isPredominantlyRussianText(description)) continue;
+    if (!extractedRows.length && !isPredominantlyRussianText(description)) continue;
     const rows = rowsByField.get(field) || [];
-    rows.push({
-      title: hasRussianText(heading) ? heading : labels[field],
-      description,
-    });
+    rows.push(
+      ...(extractedRows.length
+        ? extractedRows
+        : [
+            {
+              title: hasRussianText(heading) ? heading : labels[field],
+              description,
+            },
+          ]),
+    );
     rowsByField.set(field, rows);
   }
 
@@ -6405,7 +6545,12 @@ function dedupeGuideImportSuggestions(items) {
     'guide.subStats': 12,
     'guide.rotations': 20,
     'guide.tips': 24,
+    'guide.mistakes': 16,
     'guide.teams': 16,
+    'guide.f2pTeams': 12,
+    'guide.premiumTeams': 12,
+    'guide.starterTeams': 12,
+    'guide.endgameTeams': 12,
   };
   const grouped = new Map();
   for (const item of items) {
@@ -7364,7 +7509,9 @@ function validateEntityRecord(entity, record, isCreate) {
       const maxLength =
         field === 'body_markdown' || field === 'transcript_markdown'
           ? 60000
-          : 8000;
+          : ['image_url', 'splash_url', 'source_url', 'video_url'].includes(field)
+            ? MAX_PROFILE_RESOURCE_URL_CHARS
+            : 8000;
       if (value.length > maxLength) {
         throwHttp(`Поле «${fieldLabel(field)}» содержит слишком много текста`, 400);
       }
@@ -7645,6 +7792,13 @@ async function findEntityId(env, config, idOrSlug) {
 
 function buildRelationStatements(env, entity, entityId, body, replace) {
   const statements = [];
+  const chunks = (items, size) => {
+    const result = [];
+    for (let index = 0; index < items.length; index += size) {
+      result.push(items.slice(index, index + size));
+    }
+    return result;
+  };
 
   if (entity === 'characters' && body.profile !== undefined) {
     const profile = normalizeCharacterProfile(body.profile);
@@ -7710,18 +7864,21 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
           entityId,
         ),
       );
-    body.members.forEach((member, index) => {
+    const members = body.members.map((member, index) => [
+      entityId,
+      cleanString(member.characterId, 1, 80),
+      cleanString(member.role, 1, 80),
+      index + 1,
+    ]);
+    for (const group of chunks(members, 25)) {
       statements.push(
         env.DB.prepare(
-          'INSERT INTO team_members (team_id, character_id, role, position) VALUES (?, ?, ?, ?)',
-        ).bind(
-          entityId,
-          cleanString(member.characterId, 1, 80),
-          cleanString(member.role, 1, 80),
-          index + 1,
-        ),
+          `INSERT INTO team_members (team_id, character_id, role, position) VALUES ${group
+            .map(() => '(?, ?, ?, ?)')
+            .join(', ')}`,
+        ).bind(...group.flat()),
       );
-    });
+    }
   }
 
   if (entity === 'tierlists' && Array.isArray(body.items)) {
@@ -7733,21 +7890,26 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
           entityId,
         ),
       );
-    body.items.forEach((item, index) => {
+    const tierItems = body.items.map((item, index) => {
       if (!['S', 'A', 'B', 'C', 'D'].includes(item.tier))
         throwHttp('Неизвестный тир в позиции', 400);
+      return [
+        entityId,
+        cleanString(item.characterId, 1, 80),
+        item.tier,
+        index + 1,
+        String(item.note || '').slice(0, 1000),
+      ];
+    });
+    for (const group of chunks(tierItems, 20)) {
       statements.push(
         env.DB.prepare(
-          'INSERT INTO tierlist_items (tierlist_id, character_id, tier, position, note) VALUES (?, ?, ?, ?, ?)',
-        ).bind(
-          entityId,
-          cleanString(item.characterId, 1, 80),
-          item.tier,
-          index + 1,
-          String(item.note || '').slice(0, 1000),
-        ),
+          `INSERT INTO tierlist_items (tierlist_id, character_id, tier, position, note) VALUES ${group
+            .map(() => '(?, ?, ?, ?, ?)')
+            .join(', ')}`,
+        ).bind(...group.flat()),
       );
-    });
+    }
   }
 
   if (entity === 'guides' && Array.isArray(body.sections)) {
@@ -7759,22 +7921,23 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
           entityId,
         ),
       );
-    body.sections.forEach((section, index) => {
+    const sections = body.sections.map((section, index) => [
+      section.id || crypto.randomUUID(),
+      entityId,
+      cleanString(section.title, 1, 120),
+      cleanString(section.type || 'custom', 1, 40),
+      String(section.content || '').slice(0, 60000),
+      index + 1,
+      '{}',
+    ]);
+    for (const group of chunks(sections, 14)) {
       statements.push(
         env.DB.prepare(
           `INSERT INTO guide_sections (id, guide_id, title, section_type, content_markdown, position, meta_json)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        ).bind(
-          section.id || crypto.randomUUID(),
-          entityId,
-          cleanString(section.title, 1, 120),
-          cleanString(section.type || 'custom', 1, 40),
-          String(section.content || '').slice(0, 60000),
-          index + 1,
-          '{}',
-        ),
+           VALUES ${group.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ')}`,
+        ).bind(...group.flat()),
       );
-    });
+    }
   }
 
   return statements;
@@ -7851,13 +8014,18 @@ async function validateEntityRelations(env, entity, body, entityId) {
 async function assertCharacterIdsExist(env, ids) {
   const uniqueIds = [...new Set(ids.filter(Boolean).map(String))];
   if (uniqueIds.length === 0) return;
-  const placeholders = uniqueIds.map(() => '?').join(', ');
-  const row = await env.DB.prepare(
-    `SELECT COUNT(*) AS count FROM characters WHERE id IN (${placeholders})`,
-  )
-    .bind(...uniqueIds)
-    .first();
-  if (Number(row?.count || 0) !== uniqueIds.length) {
+  let found = 0;
+  for (let index = 0; index < uniqueIds.length; index += 100) {
+    const group = uniqueIds.slice(index, index + 100);
+    const placeholders = group.map(() => '?').join(', ');
+    const row = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM characters WHERE id IN (${placeholders})`,
+    )
+      .bind(...group)
+      .first();
+    found += Number(row?.count || 0);
+  }
+  if (found !== uniqueIds.length) {
     throwHttp('Один или несколько персонажей не найдены', 400);
   }
 }

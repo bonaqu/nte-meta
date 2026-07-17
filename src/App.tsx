@@ -4515,7 +4515,12 @@ function getGuideImportFieldLabel(field: string) {
     'guide.subStats': 'Секция: саб-статы',
     'guide.rotations': 'Секция: ротации',
     'guide.tips': 'Секция: советы и механики',
+    'guide.mistakes': 'Секция: частые ошибки',
     'guide.teams': 'Секция: команды',
+    'guide.f2pTeams': 'Секция: F2P-команды',
+    'guide.premiumTeams': 'Секция: Premium-команды',
+    'guide.starterTeams': 'Секция: команды для старта',
+    'guide.endgameTeams': 'Секция: команды для эндгейма',
     'guide.videoUrl': 'Поле: видео-гайд',
   };
   return labels[field] || 'Секция гайда';
@@ -5164,7 +5169,12 @@ function AdminGuides({
         'guide.subStats': { title: 'Саб-статы', type: 'sub-stats' },
         'guide.rotations': { title: 'Ротации', type: 'rotation' },
         'guide.tips': { title: 'Советы и механики', type: 'tips' },
+        'guide.mistakes': { title: 'Частые ошибки', type: 'mistakes' },
         'guide.teams': { title: 'Лучшие команды', type: 'teams' },
+        'guide.f2pTeams': { title: 'F2P-команды', type: 'f2p-teams' },
+        'guide.premiumTeams': { title: 'Premium-команды', type: 'premium-teams' },
+        'guide.starterTeams': { title: 'Команды для старта', type: 'starter-teams' },
+        'guide.endgameTeams': { title: 'Команды для эндгейма', type: 'endgame-teams' },
         'guide.videoUrl': { title: 'Видео-гайд', type: 'video' },
       };
     const sectionConfig = guideImportSections[suggestion.field] || {
@@ -5233,6 +5243,12 @@ function AdminGuides({
     setPending(true);
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const publishNow =
+      canPublish &&
+      submitter instanceof HTMLButtonElement &&
+      submitter.value === 'published';
+    const nextStatus: Guide['status'] = publishNow ? 'published' : 'draft';
     const getFormString = (name: string) => {
       const fromData = String(form.get(name) || '').trim();
       if (fromData) return fromData;
@@ -5259,7 +5275,7 @@ function AdminGuides({
         slug,
         summary: getFormString('summary'),
         patchVersion: getFormString('patch') || '1.0',
-  status: 'draft',
+        status: nextStatus,
         sections: [
           {
             title: 'Обзор персонажа',
@@ -5281,13 +5297,17 @@ function AdminGuides({
       if (createdGuide) {
         setSelectedGuideId(createdGuide.id);
       }
-      setMessage('Новый гайд создан как черновик.');
+      setMessage(
+        nextStatus === 'published'
+          ? 'Гайд опубликован. Открываем новую страницу.'
+          : 'Новый гайд создан как черновик.',
+      );
       formElement.reset();
       createGuideDialogRef.current?.close();
       await onSaved?.({
         id: createdGuide?.id || result.data.id,
         slug: createdGuide?.slug || result.data.slug || slug,
-        status: createdGuide?.status || result.data.status || 'draft',
+        status: createdGuide?.status || result.data.status || nextStatus,
         action: 'created',
   });
   } else {
@@ -5487,15 +5507,32 @@ function AdminGuides({
           characters={availableGuideCharacters}
           initialCharacterId={initialCharacterId}
         />
-        <button
-          className="primary-button"
-          type="submit"
-          disabled={
-            pending || !canCreate || availableGuideCharacters.length === 0
-          }
-        >
-          <Plus aria-hidden="true" /> Создать черновик
-        </button>
+        <div className="button-row">
+          <button
+            className="ghost-button"
+            type="submit"
+            name="status"
+            value="draft"
+            disabled={
+              pending || !canCreate || availableGuideCharacters.length === 0
+            }
+          >
+            Создать черновик
+          </button>
+          {canPublish ? (
+            <button
+              className="primary-button"
+              type="submit"
+              name="status"
+              value="published"
+              disabled={
+                pending || !canCreate || availableGuideCharacters.length === 0
+              }
+            >
+              <Plus aria-hidden="true" /> Создать и опубликовать
+            </button>
+          ) : null}
+        </div>
         <p className="form-message" aria-live="polite">
           {message}
         </p>
@@ -6058,12 +6095,25 @@ function AdminGuides({
               Отменить
             </button>
             <button
-              className="primary-button"
+              className="ghost-button"
               type="submit"
+              name="status"
+              value="draft"
               disabled={availableGuideCharacters.length === 0}
             >
-              <Plus aria-hidden="true" /> Создать черновик
+              Создать черновик
             </button>
+            {canPublish ? (
+              <button
+                className="primary-button"
+                type="submit"
+                name="status"
+                value="published"
+                disabled={availableGuideCharacters.length === 0}
+              >
+                <Plus aria-hidden="true" /> Создать и опубликовать
+              </button>
+            ) : null}
           </div>
         </form>
       </dialog>

@@ -930,7 +930,7 @@ test.describe('NTE Meta Worker API', () => {
     await page.getByLabel('Пароль').fill(ownerPassword);
     await page.getByRole('button', { name: 'Войти', exact: true }).click();
     await expect(
-      page.getByRole('heading', { name: 'Dashboard', level: 1 }),
+      page.getByRole('heading', { name: 'Обзор', level: 1 }),
     ).toBeVisible();
     const sidebar = page.getByRole('complementary', {
       name: 'Разделы админки',
@@ -1051,26 +1051,16 @@ test.describe('NTE Meta Worker API', () => {
         request.method() === 'POST' && request.url().endsWith('/api/guides'),
     );
     await guideCreateForm
-      .getByRole('button', { name: 'Создать черновик' })
+      .getByRole('button', { name: 'Создать и опубликовать' })
       .click();
     const guideCreatePayload = JSON.parse(
       (await guideCreateRequest).postData() || '{}',
     ) as {
       slug?: string;
+      status?: string;
     };
     expect(guideCreatePayload.slug).toBe(uiGuideSlug);
-    await expect(
-      guideDialog.getByRole('heading', {
-        name: `Гайд ${uiGuideCharacterName}`,
-      }),
-    ).toBeVisible();
-    await guideDialog
-      .locator('.guide-meta-fields')
-      .getByLabel('Статус')
-      .selectOption('published');
-    await guideDialog
-      .getByRole('button', { name: 'Сохранить параметры гайда' })
-      .click();
+    expect(guideCreatePayload.status).toBe('published');
     await expect(page).toHaveURL(new RegExp(`/#/guides/${uiGuideSlug}$`));
     await expect(
       page.getByRole('heading', { name: uiGuideCharacterName, level: 1 }),

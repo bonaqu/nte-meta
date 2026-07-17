@@ -286,6 +286,10 @@ async function router(request, env, ctx) {
     return handleAuth(request, env, parts, ctx);
   }
 
+  if (parts[0] === 'media') {
+    return handleMediaProxy(request, ctx);
+  }
+
   if (parts[0] === 'users') {
     return handleUsers(request, env, parts, ctx);
   }
@@ -6112,6 +6116,76 @@ async function handleGuideImportLookup(request, env) {
   });
 }
 
+const MAX_PROXIED_MEDIA_BYTES = 2 * 1024 * 1024;
+
+async function handleMediaProxy(request, ctx) {
+  if (!['GET', 'HEAD'].includes(request.method)) {
+    return json({ error: 'Метод не поддерживается' }, 405);
+  }
+  const requestUrl = new URL(request.url);
+  const rawTarget = requestUrl.searchParams.get('url') || '';
+  if (!rawTarget || rawTarget.length > 2048) {
+    return json({ error: 'Некорректная ссылка на медиа' }, 400);
+  }
+
+  let target;
+  try {
+    target = new URL(rawTarget);
+  } catch {
+    return json({ error: 'Некорректная ссылка на медиа' }, 400);
+  }
+  if (
+    target.protocol !== 'https:' ||
+    target.hostname !== 'www.neverness.app' ||
+    !/^\/assets\/codex\/(?:likeability|outfits)\/[A-Za-z0-9_./-]+\.webp$/i.test(
+      target.pathname,
+    )
+  ) {
+    return json({ error: 'Этот источник медиа не разрешён' }, 403);
+  }
+
+  const cache = globalThis.caches?.default;
+  const cacheKey = new globalThis.Request(request.url, { method: 'GET' });
+  if (request.method === 'GET' && cache) {
+    const cached = await cache.match(cacheKey);
+    if (cached) return new Response(cached.body, cached);
+  }
+
+  const upstream = await fetch(target.toString(), {
+    headers: { accept: 'image/webp,image/*;q=0.8' },
+    redirect: 'manual',
+  });
+  if (!upstream.ok) {
+    return json({ error: 'Изображение источника временно недоступно' }, 502);
+  }
+  const contentType = upstream.headers.get('Content-Type') || '';
+  const contentLength = Number(upstream.headers.get('Content-Length') || 0);
+  if (
+    !/^image\/(?:webp|png|jpeg)$/i.test(contentType) ||
+    contentLength > MAX_PROXIED_MEDIA_BYTES
+  ) {
+    return json({ error: 'Источник вернул неподдерживаемое изображение' }, 415);
+  }
+  const bytes = await upstream.arrayBuffer();
+  if (bytes.byteLength > MAX_PROXIED_MEDIA_BYTES) {
+    return json({ error: 'Изображение источника слишком большое' }, 413);
+  }
+
+  const response = new Response(request.method === 'HEAD' ? null : bytes, {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Content-Length': String(bytes.byteLength),
+      'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    },
+  });
+  if (request.method === 'GET' && cache) {
+    ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  }
+  return response;
+}
+
 async function handleSystemStatus(request, env) {
   await requireRole(request, env, ADMIN_ROLE);
   if (request.method !== 'GET') {
@@ -6136,7 +6210,7 @@ async function handleSystemStatus(request, env) {
       d1: 'ok',
       generatedAt: new Date().toISOString(),
       counts,
-      migrations: { latestKnown: '0020_hotori_verified_progression.sql' },
+      migrations: { latestKnown: '0021_fix_hotori_voice_cast.sql' },
     },
   });
 }
@@ -7467,11 +7541,14 @@ function withCors(request, env, response) {
   const hasSession = Boolean(
     request.headers.get('Authorization') || readCookie(request, SESSION_COOKIE),
   );
+  const isPublicMedia = request.method === 'GET' && url.pathname === '/api/media';
   if (isAllowedOrigin(origin, env)) {
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.set('Access-Control-Allow-Credentials', 'true');
   }
-  if (
+  if (isPublicMedia && response.status === 200) {
+    response.headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
+  } else if (
     request.method === 'GET' &&
     response.status === 200 &&
     !hasSession &&

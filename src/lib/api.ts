@@ -7,6 +7,10 @@ import type {
   Comment,
   CommunityThread,
   EditorPermissions,
+  LeakCandidate,
+  LeakCandidateReviewStatus,
+  LeakDiscoveryResult,
+  LeakStatus,
   Role,
   SiteData,
   SystemStatus,
@@ -353,11 +357,58 @@ export async function lookupCharacterInfo(query: string) {
   });
 }
 
-export async function lookupGuideInfo(payload: { guideId?: string; query?: string }) {
+export async function lookupGuideInfo(payload: {
+  guideId?: string;
+  query?: string;
+}) {
   return request<CharacterImportLookupResult>('/api/guide-import/lookup', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export async function loadLeakCandidates() {
+  return request<LeakCandidate[]>('/api/leak-candidates');
+}
+
+export async function discoverLeakCandidates(query = '') {
+  return request<LeakDiscoveryResult>('/api/leak-candidates/discover', {
+    method: 'POST',
+    body: JSON.stringify({ query }),
+  });
+}
+
+export async function submitLeakCandidate(payload: {
+  title: string;
+  sourceUrl: string;
+  sourceName?: string;
+  note?: string;
+  status: LeakStatus;
+}) {
+  return request<LeakCandidate>('/api/leak-candidates', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function reviewLeakCandidate(
+  id: string,
+  reviewStatus: Exclude<LeakCandidateReviewStatus, 'accepted'>,
+) {
+  return request<{ success: boolean }>(
+    `/api/leak-candidates/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ reviewStatus }),
+    },
+  );
+}
+
+export async function promoteLeakCandidate(id: string) {
+  return request<{ leakId: string; slug: string }>(
+    `/api/leak-candidates/${encodeURIComponent(id)}/promote`,
+    { method: 'POST', body: JSON.stringify({}) },
+  );
 }
 
 export async function loadThreads() {

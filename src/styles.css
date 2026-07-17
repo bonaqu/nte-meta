@@ -30,6 +30,315 @@
   }
 }
 
+@layer components {
+  .character-counter {
+    justify-self: end;
+    color: var(--soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .comment-card {
+    scroll-margin-block: 96px;
+    transition:
+      border-color 180ms ease,
+      background-color 180ms ease,
+      transform 180ms ease;
+  }
+
+  .comment-card:target,
+  .comment-card:has(.comment-link-button:focus-visible) {
+    border-color: color-mix(in srgb, var(--cyan) 58%, var(--border));
+    background: color-mix(in srgb, var(--cyan) 7%, var(--surface));
+  }
+
+  .comment-link-button {
+    inline-size: 34px;
+    block-size: 34px;
+  }
+
+  .leak-submit-dialog {
+    inline-size: min(94vw, 720px);
+    max-block-size: min(90svh, 860px);
+    overflow-y: auto;
+  }
+
+  .leak-submit-form,
+  .leak-submit-form label {
+    display: grid;
+    gap: 8px;
+  }
+
+  .leak-submit-form > p {
+    color: var(--muted);
+  }
+
+  .leak-submit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .leak-discovery {
+    display: grid;
+    gap: 18px;
+    padding: clamp(16px, 2.4vw, 26px);
+    border-block: 1px solid var(--border);
+    background: rgb(255 255 255 / 0.025);
+  }
+
+  .leak-discovery-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 20px;
+    align-items: center;
+  }
+
+  .leak-discovery-heading > div {
+    display: grid;
+    gap: 7px;
+  }
+
+  .leak-discovery-heading > div > p:last-child {
+    max-inline-size: 74ch;
+    color: var(--muted);
+  }
+
+  .leak-discovery-heading > svg {
+    inline-size: 46px;
+    block-size: 46px;
+    color: var(--amber);
+    filter: drop-shadow(0 0 14px rgb(255 209 102 / 0.28));
+    animation: editorial-radar 2.8s ease-in-out infinite;
+  }
+
+  .leak-discovery-search {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) auto;
+    gap: 12px;
+    align-items: end;
+  }
+
+  .leak-discovery-search label {
+    display: grid;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 0.86rem;
+    font-weight: 800;
+  }
+
+  .leak-source-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 9px;
+  }
+
+  .leak-source-status {
+    display: grid;
+    gap: 5px;
+    min-inline-size: 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: rgb(0 0 0 / 0.2);
+  }
+
+  .leak-source-status > span {
+    color: var(--amber);
+    font-size: 0.72rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .leak-source-status.status-ok > span {
+    color: var(--lime);
+  }
+
+  .leak-source-status.status-failed > span,
+  .leak-source-status.status-blocked > span,
+  .leak-source-status.status-timeout > span {
+    color: var(--red);
+  }
+
+  .leak-source-status small {
+    color: var(--soft);
+    overflow-wrap: anywhere;
+  }
+
+  .leak-source-status a,
+  .leak-candidate-source a {
+    display: inline-flex;
+    gap: 5px;
+    align-items: center;
+    color: var(--cyan);
+    font-size: 0.82rem;
+    text-decoration: none;
+  }
+
+  .leak-source-status a svg,
+  .leak-candidate-source a svg {
+    inline-size: 14px;
+    block-size: 14px;
+  }
+
+  .leak-queue-toolbar,
+  .leak-candidate-source {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .leak-queue-toolbar > span {
+    color: var(--soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .leak-candidate-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .leak-candidate {
+    position: relative;
+    display: grid;
+    gap: 11px;
+    padding: clamp(14px, 2vw, 20px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-elevated);
+    overflow: hidden;
+    transition:
+      border-color 180ms ease,
+      transform 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .leak-candidate::before {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    inline-size: 3px;
+    background: var(--amber);
+    content: '';
+    transform: scaleY(0.35);
+    transform-origin: center;
+    transition: transform 220ms ease;
+  }
+
+  .leak-candidate:hover {
+    border-color: color-mix(in srgb, var(--amber) 44%, var(--border));
+    box-shadow: 0 16px 36px rgb(0 0 0 / 0.22);
+    transform: translateY(-2px);
+  }
+
+  .leak-candidate:hover::before {
+    transform: scaleY(1);
+  }
+
+  .leak-candidate h3 {
+    font-size: 1.08rem;
+    overflow-wrap: anywhere;
+  }
+
+  .leak-candidate > p {
+    color: var(--muted);
+    white-space: pre-line;
+  }
+
+  .leak-candidate-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .leak-candidate-meta > span,
+  .review-result,
+  .translation-notice {
+    display: inline-flex;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .leak-candidate-meta > span {
+    padding: 4px 7px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--soft);
+    font-size: 0.76rem;
+  }
+
+  .leak-candidate-meta svg,
+  .translation-notice svg,
+  .review-result svg {
+    inline-size: 15px;
+    block-size: 15px;
+  }
+
+  .translation-notice {
+    inline-size: fit-content;
+    padding: 7px 9px;
+    border-inline-start: 2px solid var(--violet);
+    color: #ddd2ff !important;
+    font-size: 0.84rem;
+  }
+
+  .review-result {
+    color: var(--lime);
+    font-weight: 800;
+  }
+
+  @keyframes editorial-radar {
+    0%,
+    100% {
+      opacity: 0.76;
+      transform: scale(0.96);
+    }
+
+    50% {
+      opacity: 1;
+      transform: scale(1.04);
+    }
+  }
+}
+
+@layer responsive {
+  @media (max-width: 720px) {
+    .leak-submit-grid,
+    .leak-discovery-search {
+      grid-template-columns: 1fr;
+    }
+
+    .leak-discovery-search .primary-button {
+      inline-size: 100%;
+      justify-content: center;
+    }
+
+    .leak-discovery-heading > svg {
+      display: none;
+    }
+
+    .leak-queue-toolbar {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .leak-queue-toolbar .segmented-control {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .comment-actions .text-button {
+      flex: 1 1 auto;
+      justify-content: center;
+    }
+
+    .comment-card.is-reply {
+      margin-inline-start: 10px;
+    }
+  }
+}
+
 @layer tokens {
   :root {
     --bg: #080a12;

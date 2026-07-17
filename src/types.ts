@@ -262,6 +262,58 @@ export interface LeakItem {
   updatedAt?: string;
 }
 
+export type LeakCandidateReviewStatus =
+  | 'pending'
+  | 'accepted'
+  | 'rejected'
+  | 'duplicate';
+
+export interface LeakCandidate {
+  id: string;
+  origin: 'discovery' | 'user';
+  sourceName: string;
+  sourceUrl: string;
+  sourceType:
+    | 'telegram'
+    | 'reddit'
+    | 'website'
+    | 'bilibili'
+    | 'weibo'
+    | 'twitter/x'
+    | 'manual';
+  language: 'ru' | 'en' | 'zh' | 'unknown';
+  title: string;
+  excerpt: string;
+  authorName?: string;
+  submitterName?: string;
+  publishedAt?: string;
+  trustLevel: TrustLevel;
+  suggestedStatus: LeakStatus;
+  confidenceScore: number;
+  reviewStatus: LeakCandidateReviewStatus;
+  createdLeakId?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface LeakDiscoverySource {
+  id: string;
+  name: string;
+  url: string;
+  type: LeakCandidate['sourceType'];
+  language: LeakCandidate['language'];
+  trustLevel: TrustLevel;
+  status: 'ok' | 'partial' | 'blocked' | 'failed' | 'timeout' | 'manual';
+  message: string;
+  foundCount: number;
+}
+
+export interface LeakDiscoveryResult {
+  discoveredCount: number;
+  candidates: LeakCandidate[];
+  sources: LeakDiscoverySource[];
+}
+
 export interface CommunityThread {
   id: string;
   slug: string;
@@ -323,6 +375,11 @@ export interface Comment {
   createdAt: string;
   updatedAt?: string;
   score: number;
+  reactions?: {
+    likes: number;
+    dislikes: number;
+    useful: number;
+  };
   status?: 'visible' | 'moderated' | 'deleted';
   parentId?: string;
 }

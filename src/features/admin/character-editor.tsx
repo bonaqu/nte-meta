@@ -167,11 +167,15 @@ function emptyDraft(): CharacterDraft {
 
 function toDraft(character: Character): CharacterDraft {
   const profile = character.profile || emptyProfile();
+  const biography =
+    profile.biography || profile.biographyShort || character.summary || '';
   return {
     ...character,
     profile: {
       ...emptyProfile(),
       ...profile,
+      biography,
+      biographyShort: createBiographyExcerpt(biography),
       roleTags: profile.roleTags?.length ? profile.roleTags : [character.role],
     },
   };
@@ -250,15 +254,31 @@ function ImportSuggestionList({
   onReject: (suggestion: CharacterImportSuggestion) => void;
 }) {
   if (!suggestions.length) return null;
+  const suggestionsByField = new Map<string, CharacterImportSuggestion[]>();
+  for (const suggestion of suggestions) {
+    const variants = suggestionsByField.get(suggestion.field) || [];
+    variants.push(suggestion);
+    suggestionsByField.set(suggestion.field, variants);
+  }
+  const variantPosition = new Map<string, { index: number; total: number }>();
+  for (const variants of suggestionsByField.values()) {
+    variants.forEach((suggestion, index) => {
+      variantPosition.set(suggestion.id, {
+        index: index + 1,
+        total: variants.length,
+      });
+    });
+  }
 
   return (
     <section className="import-review-panel" aria-label="Предложения автоимпорта">
       <div>
         <p className="eyebrow">Автоимпорт</p>
-        <h3>Подтвердите найденные строки</h3>
+        <h3>Выберите и подтвердите найденные данные</h3>
         <p>
-              Галочка применяет строку в черновик формы. На сайте данные появятся
-              только после сохранения или публикации.
+          Для одного поля может быть несколько вариантов из разных источников.
+          Галочка применяет выбранное в черновик; на сайте данные появятся только
+          после сохранения или публикации.
         </p>
       </div>
       <div className="import-suggestion-list">
@@ -271,6 +291,7 @@ function ImportSuggestionList({
             fieldLabel,
           );
           const rowSuggestions = getImportSuggestionRows(suggestion);
+          const variant = variantPosition.get(suggestion.id);
           return (
             <article
               className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
@@ -278,6 +299,11 @@ function ImportSuggestionList({
             >
               <div>
                 <strong>{fieldLabel}</strong>
+                {variant && variant.total > 1 ? (
+                  <span className="import-variant-label">
+                    Вариант {variant.index} из {variant.total}
+                  </span>
+                ) : null}
                 {suggestionContext ? <span>{suggestionContext}</span> : null}
               </div>
               <div className="import-suggestion-value">
@@ -323,6 +349,26 @@ function ImportSuggestionList({
                       Проверить строки по одной
                       <span>{rowSuggestions.length}</span>
                     </summary>
+                    <div className="import-row-bulk-actions">
+                      <button
+                        className="compact-action"
+                        type="button"
+                        disabled={decision === 'accepted'}
+                        onClick={() => onAccept(suggestion)}
+                      >
+                        <CheckCircle2 aria-hidden="true" />
+                        Принять весь блок
+                      </button>
+                      <button
+                        className="compact-action danger"
+                        type="button"
+                        disabled={decision === 'rejected'}
+                        onClick={() => onReject(suggestion)}
+                      >
+                        <XCircle aria-hidden="true" />
+                        Отклонить весь блок
+                      </button>
+                    </div>
                     <div className="import-row-review-list" aria-label={`Строки: ${fieldLabel}`}>
                       {rowSuggestions.map((row) => {
                         const rowDecision = decisions[row.id];
@@ -525,8 +571,8 @@ function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {
     'profile.birthday': 'День рождения',
     'profile.releaseDate': 'Дата релиза',
     'profile.faction': 'Фракция',
-    'profile.biographyShort': 'Краткая биография',
-    'profile.biography': 'Подробная биография',
+    'profile.biographyShort': 'Биография',
+    'profile.biography': 'Биография',
     'profile.trivia': 'Интересные факты',
     'profile.roleTags': 'Роли в отряде',
     'profile.roleIcons': 'Иконки ролей',
@@ -703,6 +749,17 @@ function mergeText(current: string, addition: string) {
   if (!current.trim()) return cleanAddition;
   if (current.includes(cleanAddition)) return current;
   return `${current.trim()}\n\n${cleanAddition}`;
+}
+
+function createBiographyExcerpt(value: string, maxLength = 320) {
+  const plain = String(value || '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[`#>*_~|-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (plain.length <= maxLength) return plain;
+  return `${plain.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
 function mergeFriendshipLevels(
@@ -1042,9 +1099,10 @@ export function AdminCharacterEditor({
         next.profile.birthday = String(parsed);
       } else if (suggestion.field === 'profile.releaseDate') {
         next.profile.releaseDate = String(parsed);
-      } else if (suggestion.field === 'profile.biographyShort') {
-        next.profile.biographyShort = String(parsed);
-      } else if (suggestion.field === 'profile.biography') {
+      } else if (
+        suggestion.field === 'profile.biography' ||
+        suggestion.field === 'profile.biographyShort'
+      ) {
         next.profile.biography = String(parsed);
       } else if (suggestion.field === 'profile.trivia') {
         next.profile.trivia = mergeText(next.profile.trivia, String(parsed));
@@ -1116,10 +1174,20 @@ export function AdminCharacterEditor({
       }
       return next;
     });
-    setImportDecisions((current) => ({
-      ...current,
-      [suggestion.id]: 'accepted',
-    }));
+    setImportDecisions((current) => {
+      const next = { ...current };
+      if (!/:row:\d+$/.test(suggestion.id)) {
+        importSuggestions
+          .filter((candidate) => candidate.field === suggestion.field)
+          .forEach((candidate) => {
+            next[candidate.id] =
+              candidate.id === suggestion.id ? 'accepted' : 'rejected';
+          });
+      } else {
+        next[suggestion.id] = 'accepted';
+      }
+      return next;
+    });
     setTone('success');
     setMessage(
       `Поле «${suggestion.label}» добавлено в черновик. Проверьте и сохраните персонажа.`,
@@ -1164,16 +1232,24 @@ export function AdminCharacterEditor({
       setMessage('Сохранение доступно после подключения Worker API.');
       return;
     }
+    const biography = draft.profile.biography.trim();
+    if (!biography) {
+      setTone('danger');
+      setMessage('Заполните биографию персонажа перед сохранением.');
+      return;
+    }
+    const biographyShort = createBiographyExcerpt(biography);
+    const profile = { ...draft.profile, biography, biographyShort };
     setPending(true);
     setMessage('');
     const payload = {
       ...draft,
-      shortDescription: draft.profile.biographyShort,
-      summary: draft.profile.biography || draft.profile.biographyShort,
+      shortDescription: biographyShort,
+      summary: biography,
       status,
       patchVersion: draft.patch,
       tagsJson: draft.tags,
-      profile: draft.profile,
+      profile,
     };
     const result = await saveEntity<{
       id?: string;
@@ -1655,17 +1731,6 @@ export function AdminCharacterEditor({
               <span>Превью появится после URL или загрузки файла.</span>
             )}
           </div>
-          <label className="wide-field">
-            Краткая биография
-              <textarea
-                rows={4}
-                required
-                value={profile.biographyShort || draft.shortDescription}
-                onChange={(event) =>
-                  patchProfile({ biographyShort: event.target.value })
-                }
-              />
-            </label>
           </div>
         </details>
 
@@ -1673,7 +1738,7 @@ export function AdminCharacterEditor({
           <summary>Биография и интересные факты</summary>
           <MarkdownField
             id="character-biography"
-            label="Подробная биография"
+            label="Биография"
             value={profile.biography}
             onChange={(biography) => patchProfile({ biography })}
           />

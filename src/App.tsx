@@ -1441,7 +1441,7 @@ const cardTags = character.profile?.arcType
 : character.tags;
 const tierPlacement = getCharacterTierPlacement(data, character.id);
 const tierLabel = tierPlacement
-? `${tierPlacement.tier} #${tierPlacement.position}`
+? tierPlacement.tier
 : 'Тир-лист';
 
 return (
@@ -2051,7 +2051,7 @@ function CharacterDetailPage({
             {character.originalName} · {profile.faction || 'Фракция уточняется'}
           </p>
           <h1>{character.name}</h1>
-          <p>{profile.biographyShort || character.shortDescription}</p>
+          <p>{character.shortDescription}</p>
           <dl className="guide-facts character-profile-facts">
           <div>
             <dt>День рождения</dt>
@@ -2081,7 +2081,7 @@ function CharacterDetailPage({
           <dt>Тир-лист</dt>
           <dd>
             {tierPlacement
-              ? `${tierPlacement.tier} · место ${tierPlacement.position}`
+              ? tierPlacement.tier
               : 'Не задан'}
           </dd>
         </div>
@@ -2559,7 +2559,7 @@ function CharacterHero({
             {tierPlacement ? (
               <>
                 <strong>
-                  {tierPlacement.tier} · место {tierPlacement.position}
+                  {tierPlacement.tier}
                 </strong>
                 <span>
                   из тир-листа · патч {tierPlacement.patch} ·{' '}
@@ -5101,25 +5101,36 @@ function AdminGuides({
     }));
   }
 
+  function acceptGuideImportDecision(suggestion: CharacterImportSuggestion) {
+    setGuideImportDecisions((current) => {
+      const next = { ...current };
+      if (!/:row:\d+$/.test(suggestion.id)) {
+        guideImportSuggestions
+          .filter((candidate) => candidate.field === suggestion.field)
+          .forEach((candidate) => {
+            next[candidate.id] =
+              candidate.id === suggestion.id ? 'accepted' : 'rejected';
+          });
+      } else {
+        next[suggestion.id] = 'accepted';
+      }
+      return next;
+    });
+  }
+
   function applyGuideImportSuggestion(suggestion: CharacterImportSuggestion) {
     if (suggestion.field === 'guide.summary') {
       setGuideMeta((current) => ({
         ...current,
         summary: mergeGuideImportText(current.summary, suggestion.value),
       }));
-      setGuideImportDecisions((current) => ({
-        ...current,
-        [suggestion.id]: 'accepted',
-      }));
+      acceptGuideImportDecision(suggestion);
       setMessage('Краткий вывод добавлен в параметры гайда. Проверьте текст и сохраните.');
       return;
     }
     if (suggestion.field === 'guide.videoUrl') {
       setGuideMeta((current) => ({ ...current, videoUrl: suggestion.value }));
-      setGuideImportDecisions((current) => ({
-        ...current,
-        [suggestion.id]: 'accepted',
-      }));
+      acceptGuideImportDecision(suggestion);
       setMessage('YouTube-ссылка добавлена в параметры гайда. Проверьте превью и сохраните.');
       return;
     }
@@ -5156,10 +5167,7 @@ function AdminGuides({
     const sectionType = sectionConfig.type;
     const importMarker = `<!-- import:${suggestion.id} -->`;
     if (sections.some((section) => section.content.includes(importMarker))) {
-      setGuideImportDecisions((current) => ({
-        ...current,
-        [suggestion.id]: 'accepted',
-      }));
+      acceptGuideImportDecision(suggestion);
       setMessage(`Предложение «${suggestion.label}» уже добавлено в гайд.`);
       return;
     }
@@ -5197,10 +5205,7 @@ function AdminGuides({
       setMarkdown(nextSection.content);
       return [...current, nextSection];
     });
-    setGuideImportDecisions((current) => ({
-      ...current,
-      [suggestion.id]: 'accepted',
-    }));
+    acceptGuideImportDecision(suggestion);
     setMessage(`Предложение «${suggestion.label}» добавлено в секции гайда.`);
   }
 
@@ -5678,6 +5683,12 @@ function AdminGuides({
                   );
                   const previewUrls = getGuideImportPreviewUrls(suggestion);
                   const rowSuggestions = getGuideImportRows(suggestion);
+                  const fieldVariants = guideImportSuggestions.filter(
+                    (candidate) => candidate.field === suggestion.field,
+                  );
+                  const variantIndex = fieldVariants.findIndex(
+                    (candidate) => candidate.id === suggestion.id,
+                  );
                   return (
                   <article
                     className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
@@ -5685,6 +5696,11 @@ function AdminGuides({
                     >
                       <div>
                         <strong>{fieldLabel}</strong>
+                        {fieldVariants.length > 1 ? (
+                          <span className="import-variant-label">
+                            Вариант {variantIndex + 1} из {fieldVariants.length}
+                          </span>
+                        ) : null}
                         {contextLabel ? <span>{contextLabel}</span> : null}
                       </div>
                       <div className="import-suggestion-value">
@@ -5731,6 +5747,26 @@ function AdminGuides({
                           className="import-row-review"
                           aria-label={`Строки гайда: ${fieldLabel}`}
                         >
+                          <div className="import-row-bulk-actions">
+                            <button
+                              className="compact-action"
+                              type="button"
+                              disabled={decision === 'accepted'}
+                              onClick={() => applyGuideImportSuggestion(suggestion)}
+                            >
+                              <CheckCircle2 aria-hidden="true" />
+                              Принять весь блок
+                            </button>
+                            <button
+                              className="compact-action danger"
+                              type="button"
+                              disabled={decision === 'rejected'}
+                              onClick={() => rejectGuideImportSuggestion(suggestion)}
+                            >
+                              <XCircle aria-hidden="true" />
+                              Отклонить весь блок
+                            </button>
+                          </div>
                           {rowSuggestions.map((row) => {
                             const rowDecision = guideImportDecisions[row.id];
                             const rowPreviewUrls = getGuideImportPreviewUrls(row);

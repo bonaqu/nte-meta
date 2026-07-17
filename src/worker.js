@@ -42,7 +42,7 @@ const SESSION_COOKIE = 'nte_meta_session';
 const MAX_JSON_BYTES = 1800000;
 const MAX_PROFILE_JSON_BYTES = 1750000;
 const MAX_PROFILE_DATA_URL_CHARS = 1300000;
-const MAX_PROFILE_RESOURCE_URL_CHARS = 16384;
+const MAX_PROFILE_RESOURCE_URL_CHARS = 65536;
 
 const tableConfig = {
   characters: {
@@ -1990,6 +1990,7 @@ const IMPORT_SOURCE_PRIORITY = new Map([
   ['dubbing-wiki', 76],
   ['fandom-character', 74],
   ['wotpack-guide-search-ru', 97],
+  ['kaiden-character-guide', 96],
 ]);
 
 function selectImportSources(sources) {
@@ -2236,11 +2237,13 @@ function normalizeProfileImportValue(field, value) {
     if (field === 'profile.skins') return normalizeSkinRows(value);
     if (
       [
+        'profile.roleIcons',
         'profile.abilities',
         'profile.awakenings',
         'profile.materials',
         'profile.friendship',
         'profile.gifts',
+        'profile.voiceLines',
       ].includes(field)
     ) {
       return normalizeProfileCollectionRows(field, value);
@@ -2261,11 +2264,20 @@ function normalizeProfileImportValue(field, value) {
 }
 
 function makeImportSuggestion(field, label, value, source, confidence = 'medium', note = '') {
-  const normalizedInput = normalizeProfileImportValue(field, value);
+  const canonicalField =
+    field === 'profile.biographyShort' ? 'profile.biography' : field;
+  const normalizedInput = normalizeProfileImportValue(canonicalField, value);
   const normalizedValue =
-    typeof normalizedInput === 'string' && /(?:image|splash|icon)url/i.test(field)
+    typeof normalizedInput === 'string' && /(?:image|splash|icon)url/i.test(canonicalField)
       ? normalizeExternalImageUrl(normalizedInput)
       : normalizedInput;
+  if (
+    typeof normalizedValue === 'string' &&
+    ['imageUrl', 'splashUrl'].includes(canonicalField) &&
+    isPlaceholderImportImage(normalizedValue)
+  ) {
+    return null;
+  }
   const cleanValue =
     typeof normalizedValue === 'string'
       ? normalizedValue.trim()
@@ -2276,14 +2288,15 @@ function makeImportSuggestion(field, label, value, source, confidence = 'medium'
       attribute: 'Атрибут',
       imageUrl: 'Карточка персонажа',
       splashUrl: 'Splash персонажа',
+      'profile.biography': 'Биография',
       'profile.arcType': 'Тип дуги',
       'profile.voiceActors': 'Актёры озвучки',
       'profile.voiceLines': 'Реплики озвучки',
       'profile.roleTags': 'Роли персонажа',
-    }[field] || label;
+    }[canonicalField] || label;
   return {
-    id: `${source.id}:${field}:${hashText(cleanValue).slice(0, 10)}`,
-    field,
+    id: `${source.id}:${canonicalField}:${hashText(cleanValue).slice(0, 10)}`,
+    field: canonicalField,
     label: canonicalLabel,
     value: cleanValue,
     sourceName: source.name,
@@ -2311,6 +2324,15 @@ function normalizeExternalImageUrl(value) {
   }
   if (url.startsWith('/nte/')) return `https://gamewith.ai${url}`;
   return url;
+}
+
+function isPlaceholderImportImage(value, title = '') {
+  const haystack = decodedMediaUrl(`${title} ${value}`)
+    .toLocaleLowerCase('ru-RU')
+    .replace(/%20/g, ' ');
+  return /(?:^|[/_.\s-])(?:placeholder|no[\s_-]*image|image[\s_-]*(?:not[\s_-]*found|missing)|missing[\s_-]*image|default[\s_-]*(?:image|avatar|portrait)|blank|empty|transparent|spacer|fallback|dummy|meta[\s_-]*image|social[\s_-]*(?:share|image)|og[\s_-]*image)(?:$|[/_.\s-])/i.test(
+    haystack,
+  );
 }
 
 function normalizeExternalAudioUrl(value) {
@@ -2779,6 +2801,24 @@ function guideImportSources(slug, character = {}) {
       extractImages: true,
       raw: true,
     },
+    {
+      id: 'kaiden-character-guide',
+      name: 'Kaiden.gg: актуальный билд и команда',
+      trust: 'high',
+      url: `https://www.kaiden.gg/nte/characters/${slug}/`,
+      parser: parseKaidenGuideImport,
+      raw: true,
+      cacheTtl: 1800,
+    },
+    {
+      id: 'prydwen-character-guide',
+      name: 'Prydwen: дополнительная проверка гайда',
+      trust: 'high',
+      url: `https://www.prydwen.gg/neverness-to-everness/characters/${slug}`,
+      referenceOnly: true,
+      referenceMessage:
+        'Источник защищён от автоматических запросов. Откройте страницу вручную для дополнительной сверки.',
+    },
     ...additionalGuides,
   ].map((source) => ({ ...source, character }));
 }
@@ -3101,6 +3141,7 @@ async function fetchImportSource(source, character) {
     const response = await fetch(activeSource.url, fetchOptions);
     const length = Number(response.headers.get('content-length') || 0);
     if (!response.ok) {
+      await discardResponseBody(response);
       return {
         ...activeSource,
         status: response.status === 403 ? 'blocked' : 'failed',
@@ -3109,6 +3150,7 @@ async function fetchImportSource(source, character) {
       };
     }
     if (length > IMPORT_MAX_HTML_BYTES) {
+      await discardResponseBody(response);
       return {
         ...activeSource,
         status: 'failed',
@@ -3155,9 +3197,15 @@ async function fetchImportSource(source, character) {
 
 async function resolveWotpackGuideSource(source, character, fetchOptions) {
   const response = await fetch(source.url, fetchOptions);
-  if (!response.ok) return null;
+  if (!response.ok) {
+    await discardResponseBody(response);
+    return null;
+  }
   const length = Number(response.headers.get('content-length') || 0);
-  if (length > 100000) return null;
+  if (length > 100000) {
+    await discardResponseBody(response);
+    return null;
+  }
   const payload = JSON.parse(await readLimitedImportResponse(response));
   if (!Array.isArray(payload)) return null;
   const names = characterNameCandidates(character);
@@ -3199,6 +3247,15 @@ async function readLimitedImportResponse(response) {
     text += decoder.decode(value, { stream: true });
   }
   return text + decoder.decode();
+}
+
+async function discardResponseBody(response) {
+  if (!response?.body) return;
+  try {
+    await response.body.cancel();
+  } catch {
+    // The upstream may already have closed the stream.
+  }
 }
 
 function parseMediaWikiApiContent(text) {
@@ -3381,15 +3438,31 @@ function normalizeProfileCollectionRows(field, value) {
       if (typeof next.id === 'string' && next.id.length > 80) {
         next.id = `import-${hashText(next.id).slice(0, 24)}`;
       }
+      const descriptionLimit =
+        field === 'profile.friendship'
+          ? 2000
+          : field === 'profile.voiceLines'
+            ? 1000
+            : field === 'profile.skins'
+              ? 4000
+              : 8000;
       for (const [key, limit] of [
-        ['description', 8000],
+        ['description', descriptionLimit],
         ['effect', 1000],
         ['source', 1000],
       ]) {
         if (typeof next[key] === 'string') next[key] = next[key].trim().slice(0, limit);
       }
       for (const key of ['iconUrl', 'imageUrl', 'rewardIconUrl']) {
-        if (isClearlyWrongCollectionMedia(field, next[key])) next[key] = '';
+        if (typeof next[key] === 'string') {
+          next[key] = normalizeExternalImageUrl(next[key]);
+        }
+        if (
+          isClearlyWrongCollectionMedia(field, next[key]) ||
+          isPlaceholderImportImage(next[key])
+        ) {
+          next[key] = '';
+        }
       }
       if (field === 'profile.friendship' && Array.isArray(next.rewards)) {
         next.rewards = normalizeProfileCollectionRows('profile.friendship', next.rewards);
@@ -3408,6 +3481,8 @@ function normalizeSkinRows(value) {
     );
     const name = localization?.name || sourceName;
     if (!name || (!localization && !hasRussianText(name))) return [];
+    const imageUrl = normalizeExternalImageUrl(item.imageUrl || '');
+    if (imageUrl && isPlaceholderImportImage(imageUrl, sourceName)) return [];
     const sourceDescription = normalizeImportedRuText(item.description || '')
       .replace(
         /\n\nНазвание скина взято из англоязычного источника Game8;[^\n]*$/i,
@@ -3417,9 +3492,14 @@ function normalizeSkinRows(value) {
     return [
       {
         ...item,
-        name,
+        id:
+          String(item.id || '').length > 80
+            ? `skin-${hashText(String(item.id)).slice(0, 24)}`
+            : item.id,
+        name: name.slice(0, 160),
+        imageUrl,
         description:
-          sourceDescription || localization?.description || '',
+          (sourceDescription || localization?.description || '').slice(0, 4000),
       },
     ];
   });
@@ -3514,8 +3594,8 @@ function parseFandomRuApiImport(text, source) {
     makeImportSuggestion('profile.faction', 'Фракция', faction, source, 'high'),
     makeImportSuggestion('profile.birthday', 'День рождения', readWikiParam(content, 'birthday'), source, 'high'),
     makeImportSuggestion('profile.releaseDate', 'Дата релиза', formatRuImportDate(readWikiParam(content, 'releaseDate')), source, 'medium'),
-    makeImportSuggestion('profile.biographyShort', 'Краткая биография', biographyShort || quote, source, biographyShort ? 'high' : 'medium'),
-    makeImportSuggestion('profile.biography', 'Подробная биография', biography, source, 'high'),
+    makeImportSuggestion('profile.biographyShort', 'Биография', biographyShort || quote, source, biographyShort ? 'high' : 'medium'),
+    makeImportSuggestion('profile.biography', 'Биография', biography, source, 'high'),
     makeImportSuggestion('profile.voiceActors', 'Актёры озвучки', voiceActors, source, 'high'),
   ].filter(Boolean);
 }
@@ -3532,17 +3612,24 @@ function parseFandomRuImagesImport(text, source, character) {
         width: page.imageinfo?.[0]?.width || 0,
         height: page.imageinfo?.[0]?.height || 0,
       }))
-      .filter((image) => image.url);
+      .filter(
+        (image) =>
+          image.url && !isPlaceholderImportImage(image.url, image.title),
+      );
     const ownImages = images.filter((image) =>
       normalizeImportSearch(image.title).includes(characterName),
     );
     const card =
-      ownImages.find((image) => /иконка|представление|карточка/i.test(image.title)) ||
-      ownImages[0] ||
-      images.find((image) => /представление|карточка/i.test(image.title));
+      ownImages.find((image) => /(^|\s)иконка(?:\.|\s|$)/i.test(image.title)) ||
+      ownImages.find((image) => /представление|портрет|portrait/i.test(image.title)) ||
+      ownImages.find((image) => /в игре|спл[эе]ш|splash/i.test(image.title));
     const splash =
       ownImages.find((image) => /спл[эе]ш|splash/i.test(image.title)) ||
-      ownImages.find((image) => image.height > image.width) ||
+      ownImages.find(
+        (image) =>
+          /представление|в игре|portrait/i.test(image.title) &&
+          image.height > image.width,
+      ) ||
       card;
     const imageMap = buildImportImageMap(images, character);
 
@@ -3609,7 +3696,13 @@ function buildImportImageMap(images, character = {}) {
 
   for (const image of images) {
     const title = cleanImportImageTitle(image.title);
-    if (!title || !image.url) continue;
+    if (
+      !title ||
+      !image.url ||
+      isPlaceholderImportImage(image.url, image.title)
+    ) {
+      continue;
+    }
     const aliases = new Set(importImageNameAliases(title));
     const normalizedTitle = normalizeImportSearch(title);
 
@@ -3644,7 +3737,10 @@ function parseFandomRuAllImagesImport(text, source, character) {
         height: image.height || 0,
         size: image.size || 0,
       }))
-      .filter((image) => image.url);
+      .filter(
+        (image) =>
+          image.url && !isPlaceholderImportImage(image.url, image.title),
+      );
     const characterNames = characterNameCandidates(character);
     const ownImages = images.filter((image) => {
       const title = normalizeImportSearch(cleanImportImageTitle(image.title));
@@ -4329,12 +4425,12 @@ function parseInteractiveMapRuImport(html, source, character) {
     makeImportSuggestion('profile.birthday', 'День рождения', birthday, source, 'high'),
     makeImportSuggestion(
       'profile.biographyShort',
-      'Краткая биография',
+      'Биография',
       dossierParts[0]?.description || '',
       source,
       'high',
     ),
-    makeImportSuggestion('profile.biography', 'Подробная биография', biography, source, 'high'),
+    makeImportSuggestion('profile.biography', 'Биография', biography, source, 'high'),
     makeImportSuggestion('profile.abilities', 'Способности', abilities, source, 'high'),
     makeImportSuggestion('profile.awakenings', 'Пробуждения', awakenings, source, 'high'),
     makeImportSuggestion('profile.gifts', 'Любимые подарки', gifts, source, 'high'),
@@ -4444,7 +4540,7 @@ function parseNteWikiImport(text, source) {
   suggestions.push(
     makeImportSuggestion(
       'profile.biographyShort',
-      'Краткая биография',
+      'Биография',
       quote ? quote.replace(/^>\s*/, '') : '',
       source,
       'medium',
@@ -4459,7 +4555,7 @@ function parseNteWikiImport(text, source) {
     suggestions.push(
       makeImportSuggestion(
         'profile.biography',
-        'Подробная биография',
+        'Биография',
         overviewText,
         source,
         'medium',
@@ -4618,7 +4714,7 @@ function parseNteWikiCharactersIndexImport(text, source, character) {
       roleTags,
       source,
       'medium',
-      'Индекс NTE Wiki полезен для первичного набора тегов роли; подтвердите каждую строку перед публикацией.',
+      'Индекс NTE Wiki полезен для первичного набора тегов роли. Можно принять блок целиком или проверить строки по одной.',
     ),
     makeImportSuggestion('attribute', 'Атрибут', attribute, source, 'medium'),
   ];
@@ -4887,6 +4983,7 @@ function localizeImportedGuideText(value) {
   const replacements = new Map([
     ['Baicang', 'Байканг'],
     ['Hotori', 'Хотори'],
+    ['Shinku', 'Шинку'],
     ['Nanally', 'Наналли'],
     ['Sakiri', 'Сакири'],
     ['Fadia', 'Фадия'],
@@ -4901,7 +4998,14 @@ function localizeImportedGuideText(value) {
     ['Haniel', 'Ханиэль'],
     ['Edgar', 'Эдгар'],
     ['Lacrimosa', 'Лакримоза'],
+    ['Iroi', 'Ирой'],
     ['Esper Zero', 'Нулевой эспер'],
+    ['Zero', 'Нулевой эспер'],
+    ['Chaos', 'Хаос'],
+    ['CRIT DMG', 'крит. урон'],
+    ['CRIT Rate', 'шанс крит.'],
+    ['Cosmos DMG', 'урон Космосом'],
+    ['ATK%', 'АТК%'],
     ['DPS', 'ДД'],
     ['ATK', 'АТК'],
     ['Ultimate', 'сверхспособность'],
@@ -4912,6 +5016,69 @@ function localizeImportedGuideText(value) {
     result = result.replace(new RegExp(`\\b${escapeRegExp(source)}\\b`, 'gi'), target);
   }
   return result.trim();
+}
+
+function parseKaidenGuideImport(html, source, character) {
+  const plainText = htmlToPlainText(html);
+  if (!compactImportLines(plainText).some((line) => lineMatchesCharacter(line, character))) {
+    return [];
+  }
+
+  const suggestions = [];
+  const teamStart = html.search(/Recommended Team/i);
+  if (teamStart >= 0) {
+    const teamWindow = html.slice(teamStart, teamStart + 60000);
+    const members = [];
+    for (const match of teamWindow.matchAll(/data-name=["']([^"']+)["']/gi)) {
+      const name = localizeImportedGuideText(decodeHtmlEntities(match[1])).trim();
+      if (name && !members.includes(name)) members.push(name);
+      if (members.length >= 4) break;
+    }
+    if (members.length === 4) {
+      suggestions.push(
+        makeImportSuggestion(
+          'guide.teams',
+          'Лучшие команды',
+          [
+            {
+              title: members.join(' + '),
+              description:
+                'Основной рекомендуемый состав по данным актуального гайда. Перед публикацией проверьте патч и добавьте ротацию команды.',
+            },
+          ],
+          source,
+          'high',
+          'Состав извлечён из блока Recommended Team.',
+        ),
+      );
+    }
+  }
+
+  const statsMatch = plainText.match(
+    /For main stats, prioritise\s+([^.!?]+)[.!?]/i,
+  );
+  if (statsMatch) {
+    const stats = localizeImportedGuideText(statsMatch[1])
+      .split(/,|\bthen\b|\band\b/i)
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .slice(0, 8)
+      .map((value, index) => ({
+        title: `${index + 1}. ${value}`,
+        description: 'Приоритет основной характеристики по данным источника.',
+      }));
+    suggestions.push(
+      makeImportSuggestion(
+        'guide.mainStats',
+        'Основные статы',
+        stats,
+        source,
+        'high',
+      ),
+    );
+  }
+
+  return suggestions.filter(Boolean);
 }
 
 function parseEditorialGuideImport(html, source, character) {
@@ -5417,7 +5584,7 @@ function parseGameWithStructuredCharacterImport(text, source, character) {
     makeImportSuggestion('profile.arcType', 'Тип дуги', translateGameWithArcType(item.arcType), source, 'high'),
     makeImportSuggestion('profile.faction', 'Фракция', gameWithLocaleText(item.profile?.faction), source, 'high'),
     makeImportSuggestion('profile.birthday', 'День рождения', formatGameWithRuDate(item.profile?.birthday, { withoutYear: true }), source, 'medium'),
-    makeImportSuggestion('profile.biographyShort', 'Краткая биография', gameWithLocaleText(item.profileText), source, 'high'),
+    makeImportSuggestion('profile.biographyShort', 'Биография', gameWithLocaleText(item.profileText), source, 'high'),
     makeImportSuggestion('profile.roleTags', 'Роли персонажа', translateGameWithRoleTags(item.role), source, 'medium'),
     makeImportSuggestion('profile.baseStats', 'Начальные показатели', stats, source, 'high'),
     makeImportSuggestion(
@@ -5831,9 +5998,36 @@ function normalizeImportImageSrc(value, sourceUrl) {
   }
 }
 
+function importMainImageScore(image, source, character) {
+  if (!image?.url || isPlaceholderImportImage(image.url, image.title)) return -1;
+  const title = normalizeImportSearch(image.title || '');
+  const url = normalizeImportSearch(decodedMediaUrl(image.url));
+  const names = characterNameCandidates(character);
+  let score = 0;
+  if (names.some((name) => title.includes(name))) score += 80;
+  if (names.some((name) => url.includes(name))) score += 55;
+  if (/иконка|портрет|представление|спл[эе]ш|splash|portrait|character/i.test(title)) {
+    score += 20;
+  }
+  if (
+    /\/characters?\/(?:avatars?|portraits?|icons?)\//i.test(image.url) ||
+    /article_tools\/nte\/gacha\/chara_/i.test(image.url)
+  ) {
+    score += 35;
+  }
+  if (
+    /^fandom-ru-(?:images-api|media-library)$/.test(source.id) &&
+    names.some((name) => title.includes(name))
+  ) {
+    score += 30;
+  }
+  return score;
+}
+
 function extractImportImages(html, source, character = {}) {
   if (!source.extractImages) return [];
   const images = [];
+  const candidates = [];
   const titledImages = [];
   const patterns = [
     /<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["']/gi,
@@ -5848,9 +6042,11 @@ function extractImportImages(html, source, character = {}) {
       if (
         url &&
         !images.includes(url) &&
-        !/Icon|Logo|Fandom|App|Badge/i.test(url)
+        !/Icon|Logo|Fandom|App|Badge/i.test(url) &&
+        !isPlaceholderImportImage(url)
       ) {
         images.push(url);
+        candidates.push({ url, title: '' });
       }
     }
   }
@@ -5866,14 +6062,28 @@ function extractImportImages(html, source, character = {}) {
       '';
     const title = cleanImportImageTitle(decodeHtmlEntities(alt));
     const url = normalizeImportImageSrc(src, source.url);
-    if (!title || !url || /logo|fandom|app|badge|advert/i.test(title)) continue;
+    if (
+      !title ||
+      !url ||
+      /logo|fandom|app|badge|advert/i.test(title) ||
+      isPlaceholderImportImage(url, title)
+    ) {
+      continue;
+    }
     titledImages.push({ title, url });
+    candidates.push({ title, url });
     if (!images.includes(url) && !/Icon|Logo|Fandom|App|Badge/i.test(url)) {
       images.push(url);
     }
   }
 
-  const bestImage = images[0] || '';
+  const bestImage = candidates
+    .map((image) => ({
+      ...image,
+      score: importMainImageScore(image, source, character),
+    }))
+    .filter((image) => image.score >= 20)
+    .sort((left, right) => right.score - left.score)[0]?.url || '';
   const imageMap = buildImportImageMap(titledImages, character);
   return [
     makeImportSuggestion(
@@ -6107,6 +6317,7 @@ const IMPORT_CONFIDENCE_WEIGHT = { high: 30, medium: 20, low: 10 };
 
 function importSuggestionSourceWeight(item) {
   const source = `${item.sourceName} ${item.sourceUrl}`.toLocaleLowerCase('ru-RU');
+  if (source.includes('сводка проверенных источников')) return 130;
   if (item.field === 'profile.biography' || item.field === 'profile.biographyShort') {
     if (source.includes('официаль')) return 120;
     if (source.includes('interactivemap')) return 118;
@@ -6299,7 +6510,7 @@ function mergeProfileCollectionImportSuggestions(items, config) {
     sourceName: 'Сводка проверенных источников',
     sourceUrl: candidates[0].item.sourceUrl,
     confidence: 'high',
-    note: `Источники: ${sourceNames.join(', ')}. Более надёжные значения сохранены, а пустые описания и медиа дополнены. Подтвердите каждую строку отдельно.`,
+    note: `Источники: ${sourceNames.join(', ')}. Более надёжные значения сохранены, а пустые описания и медиа дополнены. Можно принять блок целиком или проверить строки по одной.`,
   };
 }
 
@@ -6375,7 +6586,7 @@ function mergeAbilityImportSuggestions(items) {
     sourceUrl: base.item.sourceUrl,
     confidence: 'high',
     note:
-      'Названия, описания и иконки объединены из нескольких источников. Подтвердите каждую строку перед сохранением.',
+      'Названия, описания и иконки объединены из нескольких источников. Можно принять блок целиком или проверить строки по одной.',
   };
 }
 
@@ -6461,16 +6672,11 @@ function enrichCharacterImportSuggestions(items, character = {}) {
           enriched.find((item) => item?.field === '__imageMap')?.sourceUrl || '',
         confidence: 'high',
         note:
-          'Иконки сопоставлены с подтверждёнными русскими названиями ролей. Подтвердите каждую строку.',
+          'Иконки сопоставлены с подтверждёнными русскими названиями ролей. Можно принять блок целиком или проверить строки по одной.',
       }
     : null;
-  const mergedFields = new Set(mergedCollections.map((item) => item.field));
   return [
-    ...enriched.filter(
-      (item) =>
-        (!mergedAbilities || item?.field !== 'profile.abilities') &&
-        !mergedFields.has(item?.field),
-    ),
+    ...enriched,
     ...(mergedAbilities
       ? [enrichArraySuggestionMedia(mergedAbilities, imageMap)]
       : []),
@@ -6492,7 +6698,6 @@ function dedupeImportSuggestions(items) {
     'profile.birthday',
     'profile.releaseDate',
     'profile.faction',
-    'profile.biographyShort',
     'profile.biography',
     'profile.baseStats',
     'profile.abilities',
@@ -6507,7 +6712,7 @@ function dedupeImportSuggestions(items) {
     'profile.voiceLines',
   ]);
 
-  const bestByField = new Map();
+  const variantsByField = new Map();
   const seen = new Set();
   const result = [];
 
@@ -6520,17 +6725,27 @@ function dedupeImportSuggestions(items) {
     if (item.field === 'tier' || item.field.startsWith('guide.')) continue;
 
     if (scalarFields.has(item.field)) {
-      const current = bestByField.get(item.field);
-      if (!current || importSuggestionScore(item) > importSuggestionScore(current)) {
-        bestByField.set(item.field, item);
-      }
+      const current = variantsByField.get(item.field) || [];
+      current.push(item);
+      variantsByField.set(item.field, current);
       continue;
     }
 
     result.push(item);
   }
 
-  return [...bestByField.values(), ...result];
+  const variants = [];
+  for (const candidates of variantsByField.values()) {
+    variants.push(
+      ...candidates
+        .sort(
+          (left, right) =>
+            importSuggestionScore(right) - importSuggestionScore(left),
+        )
+        .slice(0, 3),
+    );
+  }
+  return [...variants, ...result];
 }
 
 function dedupeGuideImportSuggestions(items) {
@@ -6566,8 +6781,18 @@ function dedupeGuideImportSuggestions(items) {
       (left, right) => importSuggestionScore(right) - importSuggestionScore(left),
     );
     if (field === 'guide.videoUrl') {
-      const best = sorted.find((item) => isUsefulImportCollectionValue(item.value));
-      if (best) result.push(best);
+      const seenUrls = new Set();
+      result.push(
+        ...sorted
+          .filter((item) => {
+            if (!isUsefulImportCollectionValue(item.value) || seenUrls.has(item.value)) {
+              return false;
+            }
+            seenUrls.add(item.value);
+            return true;
+          })
+          .slice(0, 3),
+      );
       continue;
     }
 
@@ -6590,14 +6815,23 @@ function dedupeGuideImportSuggestions(items) {
       }
     }
     if (!rows.size) {
-      if (sorted[0]) result.push(sorted[0]);
+      const seenValues = new Set();
+      result.push(
+        ...sorted
+          .filter((item) => {
+            if (!hasRussianText(item.value) || seenValues.has(item.value)) return false;
+            seenValues.add(item.value);
+            return true;
+          })
+          .slice(0, 3),
+      );
       continue;
     }
 
     const merged = [...rows.values()].slice(0, limits[field] || 24);
     const cleanValue = JSON.stringify(merged);
     const sourceNames = [...new Set(sorted.map((item) => item.sourceName).filter(Boolean))];
-    result.push({
+    const mergedSuggestion = {
       id: `merged:${field}:${hashText(cleanValue).slice(0, 10)}`,
       field,
       label: sorted[0].label,
@@ -6606,7 +6840,11 @@ function dedupeGuideImportSuggestions(items) {
       sourceUrl: sorted[0].sourceUrl,
       confidence: sorted[0].confidence,
       note: `Источники: ${sourceNames.join(', ')}. Добавляйте только подтверждённые строки; место персонажа берётся из единого тир-листа NTE Meta.`,
-    });
+    };
+    const alternatives = sorted
+      .filter((item) => item.value !== cleanValue && hasRussianText(item.value))
+      .slice(0, 2);
+    result.push(mergedSuggestion, ...alternatives);
   }
   return result;
 }
@@ -6683,7 +6921,10 @@ async function fetchFandomMediaLookupSource(items) {
             signal: controller.signal,
           },
         );
-        if (!response.ok) return;
+        if (!response.ok) {
+          await discardResponseBody(response);
+          return;
+        }
         const payload = await response.json();
         const normalizedName = normalizeImportSearch(name);
         const exactImages = (payload?.query?.allimages || [])
@@ -6781,11 +7022,20 @@ async function handleCharacterImportLookup(request, env) {
       importCharacter,
     ),
   );
+  const fields = {};
+  for (const suggestion of suggestions) {
+    if (
+      !suggestion.field.startsWith('guide.') &&
+      fields[suggestion.field] === undefined
+    ) {
+      fields[suggestion.field] = suggestion.value;
+    }
+  }
   return json({
     data: {
       found: suggestions.length > 0,
       message: suggestions.length
-        ? `Найдено ${suggestions.length} предложений. Подтвердите каждую строку перед сохранением.`
+        ? `Найдено ${suggestions.length} предложений. Выберите подходящие варианты: блок можно принять целиком или проверить построчно.`
         : `Для "${query}" не найдено структурированных данных. Проверьте источники вручную.`,
       sources: sourceResults.map((source) => ({
         id: source.id,
@@ -6796,11 +7046,7 @@ async function handleCharacterImportLookup(request, env) {
         message: source.message,
       })),
       suggestions,
-      fields: Object.fromEntries(
-        suggestions
-          .filter((suggestion) => !suggestion.field.startsWith('guide.'))
-          .map((suggestion) => [suggestion.field, suggestion.value]),
-      ),
+      fields,
     },
   });
 }
@@ -6876,7 +7122,7 @@ async function handleGuideImportLookup(request, env) {
     data: {
       found: suggestions.length > 0,
       message: suggestions.length
-        ? `Найдено ${suggestions.length} предложений для гайда. Подтвердите каждую строку.`
+        ? `Найдено ${suggestions.length} предложений для гайда. Выберите подходящие варианты: блок можно принять целиком или проверить построчно.`
         : `Для "${query}" не найдено структурированных guide-данных. Проверьте источники вручную.`,
       sources: sourceResults.map((source) => ({
         id: source.id,
@@ -7624,7 +7870,12 @@ function normalizeCharacterProfile(value) {
   };
   const text = (input, max = 8000) => {
     const result = String(input || '').trim();
-    if (result.length > max) throwHttp('Поле профиля слишком длинное', 400);
+    if (result.length > max) {
+      throwHttp(
+        `В одном из полей профиля больше ${max} символов. Сократите текст и повторите сохранение.`,
+        400,
+      );
+    }
     return result;
   };
   const url = (input, label = 'URL медиа') => {

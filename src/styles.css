@@ -4021,6 +4021,19 @@
   color: var(--muted);
 }
 
+.import-suggestion .import-variant-label {
+  display: inline-flex;
+  inline-size: fit-content;
+  margin-block-start: 5px;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--cyan) 34%, var(--border));
+  border-radius: 999px;
+  background: rgb(38 217 255 / 0.08);
+  color: var(--cyan);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
 .import-suggestion p {
   margin: 0;
   color: var(--text);
@@ -4175,6 +4188,29 @@
 
 .import-row-review[open] > summary {
   margin-block-end: 8px;
+}
+
+.import-row-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-end: 8px;
+}
+
+.import-row-bulk-actions .compact-action {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.import-row-bulk-actions .compact-action svg {
+  inline-size: 16px;
+  block-size: 16px;
+}
+
+.import-row-bulk-actions .compact-action.danger {
+  border-color: rgb(255 80 160 / 0.28);
+  color: var(--pink);
 }
 
 .import-row {

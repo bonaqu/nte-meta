@@ -1308,11 +1308,8 @@ await mainInfo
     await mainInfo
       .getByLabel('URL splash art')
       .fill('/assets/characters/Hotori.webp');
-    await mainInfo
-      .getByLabel('Краткая биография')
-      .fill('Тестовая lore-страница персонажа для inline публикации.');
     await characterDialog
-      .getByRole('textbox', { name: 'Подробная биография' })
+      .getByRole('textbox', { name: 'Биография', exact: true })
       .fill(
         '## Биография\nПерсонаж создан автотестом без выдуманной игровой меты.',
       );

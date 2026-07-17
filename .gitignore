@@ -10,3 +10,8 @@ backups
 !.env.example
 *.log
 .idea/
+.codex/
+AGENTS.md
+AGENTS.override.md
+NODE_WORKFLOW.md
+scripts/analyze_user_voice.py

@@ -50,8 +50,6 @@ test.describe('Публичный портал NTE Meta', () => {
               role: 'Основной ДД',
               type: 'Урон',
               attribute: 'Атрибут тест',
-              tier: 'S',
-              premiumTier: 'S',
               imageUrl: '/assets/characters/Hotori.webp',
               splashUrl: '/assets/characters/Hotori.webp',
               shortDescription: 'Карточка пришла из API, а не из seedData.',

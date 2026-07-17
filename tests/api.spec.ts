@@ -173,6 +173,7 @@ test.describe('NTE Meta Worker API', () => {
 
   test('все редакционные сущности проходят CRUD и связи', async () => {
     const characterSlug = `test-character-${runId}`;
+    const longMediaUrl = `https://static.wikia.nocookie.net/neverness-to-everness/images/${'very-long-imported-file-name-'.repeat(8)}.webp/revision/latest`;
     const characterPayload = {
       slug: characterSlug,
       name: 'Тестовый персонаж',
@@ -181,13 +182,21 @@ test.describe('NTE Meta Worker API', () => {
       role: 'Главный DPS',
       type: 'DPS',
       attribute: 'Электро',
-      tier: 'D',
-      premiumTier: 'D',
-      tierRank: 20,
       imageUrl: '/assets/characters/hotori.webp',
       shortDescription: 'Персонаж для API-регрессии.',
       summary: 'Проверяет создание, публикацию и удаление записи.',
       tagsJson: ['тест'],
+      profile: {
+        abilities: [
+          {
+            id: longMediaUrl,
+            name: 'Тестовый навык',
+            type: 'Навык',
+            iconUrl: longMediaUrl,
+            description: 'Проверяет безопасную нормализацию длинного имени медиа.',
+          },
+        ],
+      },
       status: 'draft',
       patchVersion: 'test',
     };
@@ -577,6 +586,18 @@ test.describe('NTE Meta Worker API', () => {
   const guideLookupJson = await guideLookup.json();
   expect(guideLookupJson.data.sources.length).toBeGreaterThan(0);
   expect(Array.isArray(guideLookupJson.data.suggestions)).toBeTruthy();
+  const guideFields = guideLookupJson.data.suggestions.map(
+    (suggestion: { field: string }) => suggestion.field,
+  );
+  expect(guideFields).toEqual(
+    expect.arrayContaining([
+      'guide.strengths',
+      'guide.weaknesses',
+      'guide.bestArcs',
+      'guide.teams',
+      'guide.rotations',
+    ]),
+  );
   expect(
     guideLookupJson.data.suggestions.some((suggestion: { field: string }) =>
       [
@@ -872,8 +893,6 @@ test.describe('NTE Meta Worker API', () => {
         role: 'DPS',
         type: 'DPS',
         attribute: 'Тест',
-        tier: 'D',
-        premiumTier: 'D',
         imageUrl: '/assets/characters/Hotori.webp',
         splashUrl: '/assets/characters/Hotori.webp',
         shortDescription: 'Персонаж для UI-публикации гайда.',

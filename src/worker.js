@@ -42,6 +42,7 @@ const SESSION_COOKIE = 'nte_meta_session';
 const MAX_JSON_BYTES = 1800000;
 const MAX_PROFILE_JSON_BYTES = 1750000;
 const MAX_PROFILE_DATA_URL_CHARS = 1300000;
+const MAX_PROFILE_RESOURCE_URL_CHARS = 4096;
 
 const tableConfig = {
   characters: {
@@ -55,9 +56,6 @@ const tableConfig = {
       'role',
       'type',
       'attribute',
-      'tier',
-      'premium_tier',
-      'tier_rank',
       'image_url',
       'splash_url',
       'short_description',
@@ -1183,7 +1181,7 @@ async function readEntity(env, entity, idOrSlug, request) {
 async function listCharacters(env, includeDrafts = false) {
   const where = includeDrafts ? '1 = 1' : "status = 'published'";
   const rows = await env.DB.prepare(
-    `${characterProfileSelect()} WHERE ${where} ORDER BY tier_rank, name`,
+    `${characterProfileSelect()} WHERE ${where} ORDER BY name`,
   ).all();
   return rows.results.map(serializeCharacter);
 }
@@ -1318,7 +1316,7 @@ async function serializeTierlistWithItems(env, row) {
     id: row.id,
     slug: row.slug,
     title: row.title,
-    kind: row.tierlist_type,
+    kind: 'base',
     patch: row.patch_version,
     updatedAt: row.updated_at,
     changelog: parseJson(row.changelog_json, []),
@@ -1971,6 +1969,7 @@ async function refreshCommentScore(env, commentId) {
 const IMPORT_SOURCE_TIMEOUT_MS = 7000;
 const IMPORT_MAX_HTML_BYTES = 600000;
 const IMPORT_FETCH_CONCURRENCY = 4;
+const IMPORT_MEDIA_FETCH_CONCURRENCY = 3;
 const IMPORT_MEDIA_LOOKUP_LIMIT = 6;
 const IMPORT_AUTO_SOURCE_LIMIT = 14;
 const IMPORT_SOURCE_PRIORITY = new Map([
@@ -2609,6 +2608,43 @@ function characterImportSources(slug, character = {}) {
 }
 
 function guideImportSources(slug, character = {}) {
+  const knownRussianGuides = {
+    hotori: [
+      {
+        id: 'wotpack-hotori-guide-ru',
+        name: 'Wotpack RU: гайд Хотори',
+        trust: 'medium',
+        url: 'https://wotpack.ru/hotori-v-neverness-to-everness-nte-gayd-i-luchshiy-bild/',
+      },
+      {
+        id: 'rbkgames-hotori-guide-ru',
+        name: 'RBK Games RU: гайд Хотори',
+        trust: 'medium',
+        url: 'https://rbkgames.org/hotori-nte/',
+      },
+    ],
+    baicang: [
+      {
+        id: 'rutab-baicang-build-ru',
+        name: 'Rutab RU: билд Байканга',
+        trust: 'medium',
+        url: 'https://rutab.net/b/games/2026/05/08/luchshiy-bild-dlya-baycana-v-nte-neverness-to-everness.html',
+      },
+      {
+        id: 'rutab-baicang-guide-ru',
+        name: 'Rutab RU: гайд Байканга',
+        trust: 'medium',
+        url: 'https://rutab.net/b/games/2026/05/01/luchshiy-gayd-na-baycana-v-neverness-to-everness-bild-komanda-probuzhdenie.html',
+      },
+    ],
+  };
+  const additionalGuides = (knownRussianGuides[slug] || []).map((source) => ({
+    ...source,
+    parser: parseEditorialGuideImport,
+    extractImages: true,
+    raw: true,
+  }));
+
   return [
     {
       id: 'genshin-builds-guide-ru',
@@ -2637,6 +2673,7 @@ function guideImportSources(slug, character = {}) {
       extractImages: true,
       raw: true,
     },
+    ...additionalGuides,
   ].map((source) => ({ ...source, character }));
 }
 
@@ -2955,14 +2992,14 @@ async function fetchImportSource(source, character) {
         suggestions: [],
       };
     }
-      const html = await readLimitedImportResponse(response);
-      const text = htmlToPlainText(html.slice(0, IMPORT_MAX_HTML_BYTES));
-      const suggestions = [
-        ...source
-          .parser(source.raw ? html.slice(0, IMPORT_MAX_HTML_BYTES) : text, source, character)
-          .filter(Boolean),
-        ...extractImportImages(html, source, character),
-      ];
+    const html = await readLimitedImportResponse(response);
+    const text = htmlToPlainText(html.slice(0, IMPORT_MAX_HTML_BYTES));
+    const suggestions = [
+      ...source
+        .parser(source.raw ? html.slice(0, IMPORT_MAX_HTML_BYTES) : text, source, character)
+        .filter(Boolean),
+      ...extractImportImages(html, source, character),
+    ];
     return {
       ...source,
       status: suggestions.length ? 'ok' : 'partial',
@@ -4188,12 +4225,40 @@ function extractGuideHeadingBlocks(html) {
     blocks.push({
       level: Number(match[1]),
       heading: htmlToPlainText(match[2]),
+      html: match[3],
       lines: compactImportLines(htmlToPlainText(match[3]))
         .filter((line) => line.length >= 3 && line.length <= 1200)
         .slice(0, 18),
     });
   }
   return blocks;
+}
+
+function guideImportRow(value, fallbackTitle) {
+  const description = localizeImportedGuideText(value).trim();
+  if (!description || !isPredominantlyRussianText(description)) return null;
+  const firstSentence = description.split(/(?<=[.!?])\s+/)[0] || description;
+  return {
+    title: firstSentence.slice(0, 120) || fallbackTitle,
+    description,
+  };
+}
+
+function extractGuideComparisonRows(html) {
+  const strengths = [];
+  const weaknesses = [];
+  for (const row of String(html || '').matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const cells = [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+      .map((match) => htmlToPlainText(match[1]).trim())
+      .filter(Boolean);
+    if (cells.length < 2) continue;
+    if (/^преимуществ/i.test(cells[0]) && /^недостат/i.test(cells[1])) continue;
+    const strength = guideImportRow(cells[0], 'Преимущество');
+    const weakness = guideImportRow(cells[1], 'Недостаток');
+    if (strength) strengths.push(strength);
+    if (weakness) weaknesses.push(weakness);
+  }
+  return { strengths, weaknesses };
 }
 
 function classifyGuideHeading(value) {
@@ -4205,11 +4270,11 @@ function classifyGuideHeading(value) {
     ['guide.weaknesses', /минус|слаб.*сторон|weakness/],
     ['guide.skillPriority', /навык.*приоритет|приоритет.*(?:навык|прокач)|прокач.*навык|skill priority/],
     ['guide.alternativeArcs', /альтернатив|f2p.*(?:arc|дуг)|(?:arc|дуг).*f2p|alternative arcs?/],
-    ['guide.bestArcs', /лучш.*(?:дуг|arc|арк)|best arcs?/],
+    ['guide.bestArcs', /лучш.*(?:дуг|arc|арк)|(?:какую|выбор).*дуг|дуг.*использ|best arcs?/],
     ['guide.modules', /патрон|картридж|консол|модул|cartridge|console|module layout/],
     ['guide.mainStats', /основн.*(?:стат|характерист)|^характеристик|main stats?|приоритет характеристик/],
     ['guide.subStats', /саб.*стат|дополнительн.*(?:стат|характерист)|sub.?stats?/],
-    ['guide.teams', /лучш.*команд|лучш.*состав|^команд|состав.*(?:команд|для)|отряд|best teams?/],
+    ['guide.teams', /лучш.*команд|лучш.*состав|лучш.*союзник|^команд|состав.*(?:команд|для)|отряд|best teams?/],
     ['guide.rotations', /ротац|rotation/],
     ['guide.tips', /как играть|совет|механик|управлен|how to play|tips?/],
   ];
@@ -4272,6 +4337,25 @@ function parseEditorialGuideImport(html, source, character) {
   let inheritedField = '';
 
   for (const block of extractGuideHeadingBlocks(html)) {
+    const normalizedHeading = normalizeImportSearch(block.heading);
+    if (
+      /(?:преимуществ.*недостат|плюс.*минус)/.test(normalizedHeading)
+    ) {
+      const comparison = extractGuideComparisonRows(block.html);
+      if (comparison.strengths.length) {
+        rowsByField.set('guide.strengths', [
+          ...(rowsByField.get('guide.strengths') || []),
+          ...comparison.strengths,
+        ]);
+      }
+      if (comparison.weaknesses.length) {
+        rowsByField.set('guide.weaknesses', [
+          ...(rowsByField.get('guide.weaknesses') || []),
+          ...comparison.weaknesses,
+        ]);
+      }
+      if (comparison.strengths.length || comparison.weaknesses.length) continue;
+    }
     const directField = classifyGuideHeading(block.heading);
     if (directField) inheritedField = directField;
     else if (block.level === 2) inheritedField = '';
@@ -5962,7 +6046,7 @@ async function fetchFandomMediaLookupSource(items) {
   const imageMap = {};
   await mapWithConcurrency(
     names,
-    3,
+    IMPORT_MEDIA_FETCH_CONCURRENCY,
     async (name) => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), IMPORT_SOURCE_TIMEOUT_MS);
@@ -5987,10 +6071,10 @@ async function fetchFandomMediaLookupSource(items) {
           }))
           .filter((image) => {
             const title = normalizeImportSearch(cleanImportImageTitle(image.title));
-          return (
-            image.url &&
-            (title.startsWith(normalizedName) || title.includes(normalizedName))
-          );
+            return (
+              image.url &&
+              (title.startsWith(normalizedName) || title.includes(normalizedName))
+            );
           });
         Object.assign(imageMap, buildImportImageMap(exactImages, {}));
       } catch {
@@ -6196,7 +6280,7 @@ async function handleMediaProxy(request, ctx) {
   }
   const requestUrl = new URL(request.url);
   const rawTarget = requestUrl.searchParams.get('url') || '';
-  if (!rawTarget || rawTarget.length > 2048) {
+  if (!rawTarget || rawTarget.length > MAX_PROFILE_RESOURCE_URL_CHARS) {
     return json({ error: 'Некорректная ссылка на медиа' }, 400);
   }
 
@@ -6415,8 +6499,6 @@ function serializeCharacter(row) {
     role: row.role,
     type: row.type,
     attribute: row.attribute,
-    tier: row.tier,
-    premiumTier: row.premium_tier,
     imageUrl: row.image_url,
     splashUrl: row.splash_url || row.image_url,
     shortDescription: row.short_description,
@@ -6794,12 +6876,6 @@ function validateEntityRecord(entity, record, isCreate) {
     throwHttp('Неизвестный тир', 400);
   }
   if (
-    record.premium_tier !== undefined &&
-    !['S', 'A', 'B', 'C', 'D'].includes(record.premium_tier)
-  ) {
-    throwHttp('Неизвестный premium-тир', 400);
-  }
-  if (
     record.tierlist_type !== undefined &&
     record.tierlist_type !== 'base'
   ) {
@@ -6899,9 +6975,9 @@ function normalizeCharacterProfile(value) {
       }
       return result;
     }
-    if (result.length > 4096) {
+    if (result.length > MAX_PROFILE_RESOURCE_URL_CHARS) {
       throwHttp(
-        `${label} слишком длинный. Используйте прямую ссылку на файл до 4096 символов.`,
+        `${label} слишком длинный. Используйте прямую ссылку на файл до ${MAX_PROFILE_RESOURCE_URL_CHARS} символов.`,
         400,
       );
     }

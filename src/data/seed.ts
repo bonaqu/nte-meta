@@ -20,8 +20,6 @@ const characterBase: Character[] = [
     role: 'Burst DPS',
     type: 'DPS',
     attribute: 'Хаос',
-    tier: 'S',
-    premiumTier: 'S',
     imageUrl: 'assets/characters/Hotori.webp',
     splashUrl: 'assets/characters/Hotori.webp',
     shortDescription: 'Взрывной керри для быстрого окна урона и босс-файтов.',
@@ -39,8 +37,6 @@ const characterBase: Character[] = [
     role: 'Debuffer',
     type: 'Debuffer',
     attribute: 'Лакшана',
-    tier: 'S',
-    premiumTier: 'S',
     imageUrl: 'assets/characters/Lacrimosa.webp',
     splashUrl: 'assets/characters/Lacrimosa.webp',
     shortDescription:
@@ -59,8 +55,6 @@ const characterBase: Character[] = [
     role: 'Урон',
     type: 'Основной ДД',
     attribute: 'Чары',
-    tier: 'S',
-    premiumTier: 'S',
     imageUrl: 'assets/characters/Baicang.webp',
     splashUrl: 'assets/characters/Baicang.webp',
     shortDescription:
@@ -79,8 +73,6 @@ const characterBase: Character[] = [
     role: 'Control',
     type: 'Control',
     attribute: 'Психика',
-    tier: 'S',
-    premiumTier: 'S',
     imageUrl: 'assets/characters/Fadia.webp',
     splashUrl: 'assets/characters/Fadia.webp',
     shortDescription:
@@ -99,8 +91,6 @@ const characterBase: Character[] = [
     role: 'Sustain DPS',
     type: 'DPS',
     attribute: 'Анима',
-    tier: 'S',
-    premiumTier: 'S',
     imageUrl: 'assets/characters/Sakiri.webp',
     splashUrl: 'assets/characters/Sakiri.webp',
     shortDescription:
@@ -119,8 +109,6 @@ const characterBase: Character[] = [
     role: 'Healer',
     type: 'Healer',
     attribute: 'Чары',
-    tier: 'A',
-    premiumTier: 'S',
     imageUrl: 'assets/characters/Nanally.webp',
     splashUrl: 'assets/characters/Nanally.webp',
     shortDescription:
@@ -139,8 +127,6 @@ const characterBase: Character[] = [
     role: 'AoE DPS',
     type: 'DPS',
     attribute: 'Чары',
-    tier: 'A',
-    premiumTier: 'S',
     imageUrl: 'assets/characters/Daffodill.webp',
     splashUrl: 'assets/characters/Daffodill.webp',
     shortDescription:
@@ -159,8 +145,6 @@ const characterBase: Character[] = [
     role: 'Tank',
     type: 'Tank',
     attribute: 'Космос',
-    tier: 'A',
-    premiumTier: 'A',
     imageUrl: 'assets/characters/Hathor.png',
     splashUrl: 'assets/characters/Hathor.png',
     shortDescription:
@@ -179,8 +163,6 @@ const characterBase: Character[] = [
     role: 'Buffer',
     type: 'Buffer',
     attribute: 'Психика',
-    tier: 'A',
-    premiumTier: 'S',
     imageUrl: 'assets/characters/Jiuyuan.webp',
     splashUrl: 'assets/characters/Jiuyuan.webp',
     shortDescription:
@@ -199,8 +181,6 @@ const characterBase: Character[] = [
     role: 'Sub DPS',
     type: 'DPS',
     attribute: 'Хаос',
-    tier: 'A',
-    premiumTier: 'A',
     imageUrl: 'assets/characters/Chiz.webp',
     splashUrl: 'assets/characters/Chiz.webp',
     shortDescription:
@@ -219,8 +199,6 @@ const characterBase: Character[] = [
     role: 'Support',
     type: 'Support',
     attribute: 'Анима',
-    tier: 'A',
-    premiumTier: 'A',
     imageUrl: 'assets/characters/Mint.webp',
     splashUrl: 'assets/characters/Mint.webp',
     shortDescription: 'Доступный саппорт для ранней игры и F2P-команд.',
@@ -238,8 +216,6 @@ const characterBase: Character[] = [
     role: 'Debuffer',
     type: 'Debuffer',
     attribute: 'Космос',
-    tier: 'B',
-    premiumTier: 'A',
     imageUrl: 'assets/characters/Aurelia.png',
     splashUrl: 'assets/characters/Aurelia.png',
     shortDescription:
@@ -258,8 +234,6 @@ const characterBase: Character[] = [
     role: 'DPS',
     type: 'DPS',
     attribute: 'Психика',
-    tier: 'B',
-    premiumTier: 'A',
     imageUrl: 'assets/characters/Adler.webp',
     splashUrl: 'assets/characters/Adler.webp',
     shortDescription: 'Простой стартовый DPS с понятной ротацией.',
@@ -277,8 +251,6 @@ const characterBase: Character[] = [
     role: 'Control',
     type: 'Control',
     attribute: 'Чары',
-    tier: 'B',
-    premiumTier: 'A',
     imageUrl: 'assets/characters/Skia.webp',
     splashUrl: 'assets/characters/Skia.webp',
     shortDescription: 'Контроль толпы и комфорт в фарм-комнатах.',
@@ -296,8 +268,6 @@ const characterBase: Character[] = [
     role: 'Healer',
     type: 'Healer',
     attribute: 'Лакшана',
-    tier: 'B',
-    premiumTier: 'A',
     imageUrl: 'assets/characters/Haniel.webp',
     splashUrl: 'assets/characters/Haniel.webp',
     shortDescription: 'Бюджетное восстановление и страховка в долгих боях.',
@@ -315,8 +285,6 @@ const characterBase: Character[] = [
     role: 'Tank',
     type: 'Tank',
     attribute: 'Анима',
-    tier: 'C',
-    premiumTier: 'B',
     imageUrl: 'assets/characters/Edgar.webp',
     splashUrl: 'assets/characters/Edgar.webp',
     shortDescription: 'Ситуативная защита, когда нужен простой фронтлайн.',
@@ -334,8 +302,6 @@ const characterBase: Character[] = [
     role: 'Flex',
     type: 'Flex',
     attribute: 'Космос',
-    tier: 'A',
-    premiumTier: 'A',
     imageUrl: 'assets/characters/Esper-Zero-Male.png',
     splashUrl: 'assets/characters/Esper-Zero-Female.png',
     shortDescription:
@@ -354,8 +320,6 @@ const characterBase: Character[] = [
     role: 'Unknown',
     type: 'Flex',
     attribute: 'Хаос',
-    tier: 'C',
-    premiumTier: 'C',
     imageUrl: 'assets/characters/Chaos.png',
     splashUrl: 'assets/characters/Chaos.png',
     shortDescription:
@@ -622,6 +586,36 @@ const teams: Team[] = [
   },
 ];
 
+const seedTierItems: TierList['items'] = [
+  ...['hotori', 'lacrimosa', 'baicang', 'fadia', 'sakiri'].map(
+    (characterId) => ({
+      characterId,
+      tier: 'S' as const,
+      note: 'Редакционная оценка NTE Meta',
+    }),
+  ),
+  ...[
+    'nanally',
+    'daffodill',
+    'hathor',
+    'jiuyuan',
+    'chiz',
+    'mint',
+    'esper-zero',
+  ].map((characterId) => ({
+    characterId,
+    tier: 'A' as const,
+    note: 'Редакционная оценка NTE Meta',
+  })),
+  ...['aurelia', 'adler', 'skia', 'haniel'].map((characterId) => ({
+    characterId,
+    tier: 'B' as const,
+    note: 'Редакционная оценка NTE Meta',
+  })),
+  { characterId: 'edgar', tier: 'C', note: 'Редакционная оценка NTE Meta' },
+  { characterId: 'chaos', tier: 'C', note: 'Нет подтвержденной меты' },
+];
+
 const tierlists: TierList[] = [
   {
     id: 'tier-base-10',
@@ -633,14 +627,7 @@ const tierlists: TierList[] = [
       'Первый публичный редакционный список',
       'Хаос оставлен в C до подтвержденных тестов',
     ],
-    items: characterBase.map((character) => ({
-      characterId: character.id,
-      tier: character.tier,
-      note:
-        character.id === 'chaos'
-          ? 'Нет подтвержденной меты'
-          : 'Редакционная оценка NTE Meta',
-    })),
+    items: seedTierItems,
   },
 ];
 

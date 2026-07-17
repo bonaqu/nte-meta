@@ -137,8 +137,6 @@ export interface Character {
   role: string;
   type: string;
   attribute: string;
-  tier: Tier;
-  premiumTier: Tier;
   imageUrl: string;
   splashUrl: string;
   shortDescription: string;
@@ -222,7 +220,7 @@ export interface TierList {
   id: string;
   slug?: string;
   title: string;
-  kind: 'base' | 'premium';
+  kind: 'base';
   patch: string;
   updatedAt: string;
   items: TierListItem[];

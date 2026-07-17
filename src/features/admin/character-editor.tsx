@@ -35,10 +35,7 @@ import type {
   PublishStatus,
 } from '../../types';
 
-type CharacterDraft = Omit<
-  Character,
-  'id' | 'updatedAt' | 'tier' | 'premiumTier'
-> & {
+type CharacterDraft = Omit<Character, 'id' | 'updatedAt'> & {
   id?: string;
   profile: CharacterProfile;
 };
@@ -168,16 +165,9 @@ function emptyDraft(): CharacterDraft {
 }
 
 function toDraft(character: Character): CharacterDraft {
-  const {
-    tier: legacyTier,
-    premiumTier: legacyPremiumTier,
-    ...characterFields
-  } = character;
-  void legacyTier;
-  void legacyPremiumTier;
   const profile = character.profile || emptyProfile();
   return {
-    ...characterFields,
+    ...character,
     profile: {
       ...emptyProfile(),
       ...profile,
@@ -988,21 +978,21 @@ export function AdminCharacterEditor({
     setPending(false);
   }
 
-function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
-  const parsed = parseImportValue(suggestion.value);
-  if (suggestion.field === 'tier') {
-    setImportDecisions((current) => ({
-      ...current,
-      [suggestion.id]: 'rejected',
-    }));
-    setTone('info');
-    setMessage(
-      `Внешний тир «${String(parsed)}» не записан в профиль персонажа. Позиция персонажа редактируется только в едином разделе «Тир-листы».`,
-    );
-    return;
-  }
+  function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
+    const parsed = parseImportValue(suggestion.value);
+    if (suggestion.field === 'tier') {
+      setImportDecisions((current) => ({
+        ...current,
+        [suggestion.id]: 'rejected',
+      }));
+      setTone('info');
+      setMessage(
+        `Внешний тир «${String(parsed)}» не записан в профиль персонажа. Позиция персонажа редактируется только в едином разделе «Тир-листы».`,
+      );
+      return;
+    }
 
-  setDraft((current) => {
+    setDraft((current) => {
       const next: CharacterDraft = {
         ...current,
         profile: { ...current.profile },
@@ -1011,8 +1001,8 @@ function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
       else if (suggestion.field === 'originalName') next.originalName = String(parsed);
       else if (suggestion.field === 'rarity' && ['S', 'A'].includes(String(parsed))) {
         next.rarity = String(parsed) as Character['rarity'];
-  } else if (suggestion.field === 'attribute') next.attribute = String(parsed);
-  else if (suggestion.field === 'profile.faction') {
+      } else if (suggestion.field === 'attribute') next.attribute = String(parsed);
+      else if (suggestion.field === 'profile.faction') {
         next.profile.faction = String(parsed);
       } else if (suggestion.field === 'profile.arcType') {
         next.profile.arcType = String(parsed);
@@ -1026,55 +1016,55 @@ function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
         next.profile.biography = String(parsed);
       } else if (suggestion.field === 'profile.trivia') {
         next.profile.trivia = mergeText(next.profile.trivia, String(parsed));
-    } else if (suggestion.field === 'profile.roleTags' && Array.isArray(parsed)) {
-      next.profile.roleTags = Array.from(
-        new Set([...next.profile.roleTags, ...parsed.map(String).filter(Boolean)]),
-      );
-    } else if (suggestion.field === 'profile.roleIcons' && Array.isArray(parsed)) {
-      next.profile.roleIcons = mergeRowsByKey(
-        next.profile.roleIcons || [],
-        parsed as CharacterRoleIcon[],
-        (item) => item.name,
-      );
-    } else if (suggestion.field === 'profile.voiceActors' && Array.isArray(parsed)) {
-      next.profile.voiceActors = mergeRowsByKey(
-        next.profile.voiceActors,
-        parsed as CharacterVoiceActor[],
-        (item) => item.language,
-      );
-    } else if (suggestion.field === 'profile.voiceLines' && Array.isArray(parsed)) {
-      next.profile.voiceLines = mergeRowsByKey(
-        next.profile.voiceLines,
-        parsed as CharacterVoiceLine[],
-        (item) => `${item.language}:${item.title}`,
-      );
-    } else if (suggestion.field === 'profile.materials' && Array.isArray(parsed)) {
-      next.profile.materials = mergeRowsByKey(
-        next.profile.materials,
-        parsed as CharacterMaterial[],
-        (item) => item.name,
-      );
-    } else if (suggestion.field === 'profile.friendship' && Array.isArray(parsed)) {
-      next.profile.friendship = mergeFriendshipLevels(
-        next.profile.friendship,
-        parsed as CharacterFriendshipLevel[],
-      );
-    } else if (suggestion.field === 'profile.gifts' && Array.isArray(parsed)) {
-      next.profile.gifts = mergeNamedRows(
-        next.profile.gifts,
-        parsed as CharacterGift[],
-      );
-    } else if (suggestion.field === 'profile.skins' && Array.isArray(parsed)) {
-      next.profile.skins = mergeNamedRows(
-        next.profile.skins,
-        parsed as CharacterSkin[],
-      );
-    } else if (suggestion.field === 'profile.baseStats' && Array.isArray(parsed)) {
-      next.profile.baseStats = mergeRowsByKey(
-        next.profile.baseStats,
-        parsed as CharacterStat[],
-        (item) => item.label,
-      );
+      } else if (suggestion.field === 'profile.roleTags' && Array.isArray(parsed)) {
+        next.profile.roleTags = Array.from(
+          new Set([...next.profile.roleTags, ...parsed.map(String).filter(Boolean)]),
+        );
+      } else if (suggestion.field === 'profile.roleIcons' && Array.isArray(parsed)) {
+        next.profile.roleIcons = mergeRowsByKey(
+          next.profile.roleIcons || [],
+          parsed as CharacterRoleIcon[],
+          (item) => item.name,
+        );
+      } else if (suggestion.field === 'profile.voiceActors' && Array.isArray(parsed)) {
+        next.profile.voiceActors = mergeRowsByKey(
+          next.profile.voiceActors,
+          parsed as CharacterVoiceActor[],
+          (item) => item.language,
+        );
+      } else if (suggestion.field === 'profile.voiceLines' && Array.isArray(parsed)) {
+        next.profile.voiceLines = mergeRowsByKey(
+          next.profile.voiceLines,
+          parsed as CharacterVoiceLine[],
+          (item) => `${item.language}:${item.title}`,
+        );
+      } else if (suggestion.field === 'profile.materials' && Array.isArray(parsed)) {
+        next.profile.materials = mergeRowsByKey(
+          next.profile.materials,
+          parsed as CharacterMaterial[],
+          (item) => item.name,
+        );
+      } else if (suggestion.field === 'profile.friendship' && Array.isArray(parsed)) {
+        next.profile.friendship = mergeFriendshipLevels(
+          next.profile.friendship,
+          parsed as CharacterFriendshipLevel[],
+        );
+      } else if (suggestion.field === 'profile.gifts' && Array.isArray(parsed)) {
+        next.profile.gifts = mergeNamedRows(
+          next.profile.gifts,
+          parsed as CharacterGift[],
+        );
+      } else if (suggestion.field === 'profile.skins' && Array.isArray(parsed)) {
+        next.profile.skins = mergeNamedRows(
+          next.profile.skins,
+          parsed as CharacterSkin[],
+        );
+      } else if (suggestion.field === 'profile.baseStats' && Array.isArray(parsed)) {
+        next.profile.baseStats = mergeRowsByKey(
+          next.profile.baseStats,
+          parsed as CharacterStat[],
+          (item) => item.label,
+        );
       } else if (suggestion.field === 'profile.abilities' && Array.isArray(parsed)) {
         next.profile.abilities = mergeRowsByKey(
           next.profile.abilities,
@@ -1098,8 +1088,10 @@ function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
       ...current,
       [suggestion.id]: 'accepted',
     }));
-  setTone('success');
-  setMessage(`Поле «${suggestion.label}» добавлено в черновик. Проверьте и сохраните персонажа.`);
+    setTone('success');
+    setMessage(
+      `Поле «${suggestion.label}» добавлено в черновик. Проверьте и сохраните персонажа.`,
+    );
   }
 
   async function uploadInlineIcon(

@@ -2122,10 +2122,32 @@
     backdrop-filter: blur(5px);
   }
 
-.confirm-dialog form {
+.confirm-dialog form,
+.confirm-dialog__content {
   display: grid;
   gap: 14px;
   padding: 22px;
+}
+
+.rich-text-link-dialog label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.rich-text-link-dialog input {
+  inline-size: 100%;
+}
+
+.rich-text-link-dialog .form-message {
+  min-block-size: 1.2em;
+  margin: 0;
+}
+
+.editor-shell__close-dialog .button-row,
+.rich-text-link-dialog .button-row {
+  justify-content: flex-end;
 }
 
 .confirm-dialog menu {
@@ -2157,10 +2179,22 @@
   padding: 14px;
 }
 
-  .filter-summary {
+  .filter-results-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
     margin-block-start: -12px;
+  }
+
+  .filter-summary {
+    margin: 0;
     color: var(--muted);
     font-size: 0.9rem;
+  }
+
+  .filter-reset-button {
+    min-block-size: 38px;
   }
 
   .filter-panel label,
@@ -4130,6 +4164,15 @@
       min-block-size: 220px;
     }
 
+    .filter-results-row {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .filter-reset-button {
+      inline-size: 100%;
+    }
+
     .section-heading,
     .guide-toolbar,
     .admin-topline,
@@ -4167,11 +4210,6 @@
     .rich-text-editor__toolbar {
       align-items: flex-start;
       flex-direction: column;
-    }
-
-    .rich-text-editor__source {
-      align-self: stretch;
-      justify-content: center;
     }
 
     .back-to-top {

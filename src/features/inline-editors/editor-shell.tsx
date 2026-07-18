@@ -21,7 +21,9 @@ export function EditorShell({
   children,
 }: EditorShellProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeDialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const closeTitleId = useId();
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -29,6 +31,7 @@ export function EditorShell({
 
     if (open && !dialog.open) dialog.showModal();
     if (!open && dialog.open) dialog.close();
+    if (!open && closeDialogRef.current?.open) closeDialogRef.current.close();
   }, [open]);
 
   useEffect(() => {
@@ -44,39 +47,75 @@ export function EditorShell({
   }, [dirty]);
 
   function requestClose() {
-    if (dirty && !window.confirm('Закрыть редактор? Несохраненные изменения могут потеряться.')) {
+    if (dirty) {
+      if (!closeDialogRef.current?.open) closeDialogRef.current?.showModal();
       return;
     }
+    onClose();
+  }
 
+  function discardChanges() {
+    closeDialogRef.current?.close();
     onClose();
   }
 
   return (
-    <dialog
-      ref={dialogRef}
-      className="editor-shell"
-      aria-labelledby={titleId}
-      onCancel={(event) => {
-        event.preventDefault();
-        requestClose();
-      }}
-      onClick={(event) => {
-        if (event.target === dialogRef.current) requestClose();
-      }}
-    >
-      <div className="editor-shell__panel">
-        <header className="editor-shell__header">
+    <>
+      <dialog
+        ref={dialogRef}
+        className="editor-shell"
+        aria-labelledby={titleId}
+        onCancel={(event) => {
+          event.preventDefault();
+          requestClose();
+        }}
+        onClick={(event) => {
+          if (event.target === dialogRef.current) requestClose();
+        }}
+      >
+        <div className="editor-shell__panel">
+          <header className="editor-shell__header">
+            <div>
+              {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
+              <h1 id={titleId}>{title}</h1>
+              {description ? <p>{description}</p> : null}
+            </div>
+            <button className="icon-button" type="button" aria-label="Закрыть редактор" onClick={requestClose}>
+              <X aria-hidden="true" />
+            </button>
+          </header>
+          <div className="editor-shell__body">{children}</div>
+        </div>
+      </dialog>
+      <dialog
+        ref={closeDialogRef}
+        className="confirm-dialog editor-shell__close-dialog"
+        aria-labelledby={closeTitleId}
+        onCancel={(event) => {
+          event.preventDefault();
+          closeDialogRef.current?.close();
+        }}
+      >
+        <div className="confirm-dialog__content">
           <div>
-            {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-            <h1 id={titleId}>{title}</h1>
-            {description ? <p>{description}</p> : null}
+            <p className="eyebrow">Есть несохранённые изменения</p>
+            <h2 id={closeTitleId}>Закрыть редактор?</h2>
           </div>
-          <button className="icon-button" type="button" aria-label="Закрыть редактор" onClick={requestClose}>
-            <X aria-hidden="true" />
-          </button>
-        </header>
-        <div className="editor-shell__body">{children}</div>
-      </div>
-    </dialog>
+          <p>Изменения, которые ещё не были сохранены, будут потеряны.</p>
+          <div className="button-row">
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => closeDialogRef.current?.close()}
+            >
+              Продолжить редактирование
+            </button>
+            <button className="danger-button" type="button" onClick={discardChanges}>
+              Закрыть без сохранения
+            </button>
+          </div>
+        </div>
+      </dialog>
+    </>
   );
 }

@@ -593,6 +593,35 @@ export function LeakDiscoveryPanel({
                   Первоисточник <ExternalLink aria-hidden="true" />
                 </a>
               </div>
+              {(candidate.evidence?.length || 0) > 1 ? (
+                <details className="leak-evidence">
+                  <summary>
+                    <ShieldCheck aria-hidden="true" />
+                    Источники события: {candidate.evidence?.length}
+                  </summary>
+                  <ul>
+                    {candidate.evidence?.map((evidence) => (
+                      <li key={evidence.sourceUrl}>
+                        <span>
+                          <strong>{evidence.sourceName}</strong>
+                          <small>
+                            {sourceTypeLabels[evidence.sourceType]} ·{' '}
+                            {languageLabels[evidence.language]} · доверие{' '}
+                            {evidence.trustLevel}
+                          </small>
+                        </span>
+                        <a href={evidence.sourceUrl} target="_blank" rel="noreferrer">
+                          Открыть <ExternalLink aria-hidden="true" />
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                  <p>
+                    Совпадение повышает приоритет проверки, но не подтверждает
+                    публикацию автоматически.
+                  </p>
+                </details>
+              ) : null}
               {candidate.translationStatus === 'нужен перевод' ? (
                 <p className="translation-notice">
                   <Languages aria-hidden="true" /> Нужен редакционный перевод на

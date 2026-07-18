@@ -24,6 +24,7 @@ import type {
   CharacterFriendshipLevel,
   CharacterFriendshipReward,
   CharacterGift,
+  CharacterImportLookupResult,
   CharacterImportSuggestion,
   CharacterMaterial,
   CharacterProfile,
@@ -986,6 +987,9 @@ export function AdminCharacterEditor({
   const [importDecisions, setImportDecisions] = useState<
     Record<string, 'accepted' | 'rejected'>
   >({});
+  const [importCoverage, setImportCoverage] = useState<
+    CharacterImportLookupResult['coverage']
+  >();
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const skipNextDraftSaveRef = useRef(false);
   const selected = items.find((item) => item.id === selectedId);
@@ -1048,6 +1052,7 @@ export function AdminCharacterEditor({
     setMessage('');
     setImportSuggestions([]);
     setImportDecisions({});
+    setImportCoverage(undefined);
   }, [selectedId]);
 
   function patch(patchValue: Partial<CharacterDraft>) {
@@ -1077,6 +1082,7 @@ export function AdminCharacterEditor({
       setMessage(result.data.message || 'Источники не настроены. Заполните поля вручную.');
       setImportSuggestions(result.data.suggestions || []);
       setImportDecisions({});
+      setImportCoverage(result.data.coverage);
     } else {
       setTone('danger');
       setMessage(formatEditorError(result.error));
@@ -1434,6 +1440,22 @@ export function AdminCharacterEditor({
         </header>
 
       {message ? <StatusBanner tone={tone} text={message} /> : null}
+      {importCoverage ? (
+        <div className="import-coverage" aria-label="Покрытие найденных данных">
+          <div>
+            <strong>Можно сверять</strong>
+            <span>{importCoverage.readyFields.join(', ') || 'Нет'}</span>
+          </div>
+          <div>
+            <strong>Нужна ручная проверка</strong>
+            <span>{importCoverage.reviewFields.join(', ') || 'Нет'}</span>
+          </div>
+          <div>
+            <strong>Не найдено</strong>
+            <span>{importCoverage.missingFields.join(', ') || 'Нет'}</span>
+          </div>
+        </div>
+      ) : null}
       <ImportSuggestionList
         suggestions={importSuggestions}
         decisions={importDecisions}

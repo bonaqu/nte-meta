@@ -10,7 +10,7 @@ function getSafeLink(value: string) {
   }
 }
 
-function renderInline(text: string) {
+function renderInline(text: string, allowMedia: boolean) {
   const parts = text.split(
     /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|!\[[^\]]*\]\([^)]+\)|\[[^\]]+\]\([^)]+\))/g,
   );
@@ -30,6 +30,13 @@ function renderInline(text: string) {
 
     const image = part.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
     if (image) {
+      if (!allowMedia) {
+        return (
+          <React.Fragment key={index}>
+            {image[1] ? `[Изображение: ${image[1]}]` : '[Изображение]'}
+          </React.Fragment>
+        );
+      }
       const src = getSafeLink(image[2]);
       if (!src) {
         return <React.Fragment key={index}>{image[1] || 'Изображение'}</React.Fragment>;
@@ -62,7 +69,7 @@ function renderInline(text: string) {
   });
 }
 
-function renderTable(lines: string[], key: string) {
+function renderTable(lines: string[], key: string, allowMedia: boolean) {
   const rows = lines
     .filter((line) => !/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(line))
     .map((line) =>
@@ -85,7 +92,7 @@ function renderTable(lines: string[], key: string) {
         <thead>
           <tr>
             {head.map((cell) => (
-              <th key={cell}>{renderInline(cell)}</th>
+              <th key={cell}>{renderInline(cell, allowMedia)}</th>
             ))}
           </tr>
         </thead>
@@ -94,7 +101,7 @@ function renderTable(lines: string[], key: string) {
             <tr key={`${key}-${rowIndex}`}>
               {row.map((cell, cellIndex) => (
                 <td key={`${key}-${rowIndex}-${cellIndex}`}>
-                  {renderInline(cell)}
+                  {renderInline(cell, allowMedia)}
                 </td>
               ))}
             </tr>
@@ -105,7 +112,13 @@ function renderTable(lines: string[], key: string) {
   );
 }
 
-export function MarkdownPreview({ value }: { value: string }) {
+export function MarkdownPreview({
+  value,
+  allowMedia = true,
+}: {
+  value: string;
+  allowMedia?: boolean;
+}) {
   const lines = value.split('\n');
   const nodes: React.ReactNode[] = [];
   let index = 0;
@@ -130,7 +143,7 @@ export function MarkdownPreview({ value }: { value: string }) {
       nodes.push(
         <details key={`spoiler-${index}`} className="spoiler">
           <summary>{title}</summary>
-          <MarkdownPreview value={content.join('\n')} />
+          <MarkdownPreview value={content.join('\n')} allowMedia={allowMedia} />
         </details>,
       );
       index += 1;
@@ -138,7 +151,7 @@ export function MarkdownPreview({ value }: { value: string }) {
     }
 
     const youtubeMatch = trimmed.match(/^@youtube\(([^)]+)\)$/);
-    if (youtubeMatch) {
+    if (youtubeMatch && allowMedia) {
       const embedUrl = getYoutubeEmbedUrl(youtubeMatch[1]);
       if (embedUrl) {
         nodes.push(
@@ -158,13 +171,13 @@ export function MarkdownPreview({ value }: { value: string }) {
     }
 
     if (trimmed.startsWith('### ')) {
-      nodes.push(<h3 key={`h3-${index}`}>{renderInline(trimmed.slice(4))}</h3>);
+      nodes.push(<h3 key={`h3-${index}`}>{renderInline(trimmed.slice(4), allowMedia)}</h3>);
       index += 1;
       continue;
     }
 
     if (trimmed.startsWith('## ')) {
-      nodes.push(<h2 key={`h2-${index}`}>{renderInline(trimmed.slice(3))}</h2>);
+      nodes.push(<h2 key={`h2-${index}`}>{renderInline(trimmed.slice(3), allowMedia)}</h2>);
       index += 1;
       continue;
     }
@@ -177,7 +190,7 @@ export function MarkdownPreview({ value }: { value: string }) {
       }
       nodes.push(
         <blockquote key={`quote-${index}`}>
-          {quote.map(renderInline)}
+          {quote.map((item) => renderInline(item, allowMedia))}
         </blockquote>,
       );
       continue;
@@ -192,7 +205,7 @@ export function MarkdownPreview({ value }: { value: string }) {
       nodes.push(
         <ul key={`ul-${index}`}>
           {items.map((item) => (
-            <li key={item}>{renderInline(item)}</li>
+            <li key={item}>{renderInline(item, allowMedia)}</li>
           ))}
         </ul>,
       );
@@ -208,7 +221,7 @@ export function MarkdownPreview({ value }: { value: string }) {
       nodes.push(
         <ol key={`ol-${index}`}>
           {items.map((item) => (
-            <li key={item}>{renderInline(item)}</li>
+            <li key={item}>{renderInline(item, allowMedia)}</li>
           ))}
         </ol>,
       );
@@ -221,7 +234,7 @@ export function MarkdownPreview({ value }: { value: string }) {
         tableLines.push(lines[index]);
         index += 1;
       }
-      nodes.push(renderTable(tableLines, `table-${index}`));
+      nodes.push(renderTable(tableLines, `table-${index}`, allowMedia));
       continue;
     }
 
@@ -235,7 +248,7 @@ export function MarkdownPreview({ value }: { value: string }) {
       paragraph.push(lines[index].trim());
       index += 1;
     }
-    nodes.push(<p key={`p-${index}`}>{renderInline(paragraph.join(' '))}</p>);
+    nodes.push(<p key={`p-${index}`}>{renderInline(paragraph.join(' '), allowMedia)}</p>);
   }
 
   return <div className="markdown-preview">{nodes}</div>;

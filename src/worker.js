@@ -1691,17 +1691,19 @@ async function handleLeakCandidates(request, env, parts, ctx) {
     );
     const suggestedStatus = normalizeLeakCandidateStatus(body.status || 'слух');
     const sourceType = inferLeakSourceType(sourceUrl);
+    const sourceName = cleanLeakCandidateText(
+      body.sourceName || new URL(sourceUrl).hostname.replace(/^www\./, ''),
+      120,
+    );
+    const language = detectLeakLanguage(`${title} ${excerpt}`);
     const candidate = {
       id: crypto.randomUUID(),
       externalKey: leakCandidateExternalKey(sourceUrl),
       origin: 'user',
-      sourceName: cleanLeakCandidateText(
-        body.sourceName || new URL(sourceUrl).hostname.replace(/^www\./, ''),
-        120,
-      ),
+      sourceName,
       sourceUrl,
       sourceType,
-      language: detectLeakLanguage(`${title} ${excerpt}`),
+      language,
       title,
       excerpt,
       authorName: actor.displayName,
@@ -1712,10 +1714,16 @@ async function handleLeakCandidates(request, env, parts, ctx) {
       submittedBy: actor.id,
       metadata: {
         submittedBy: actor.displayName,
-        translationStatus:
-          detectLeakLanguage(`${title} ${excerpt}`) === 'ru'
-            ? 'не требуется'
-            : 'нужен перевод',
+        translationStatus: language === 'ru' ? 'не требуется' : 'нужен перевод',
+        evidence: [
+          {
+            sourceName,
+            sourceUrl,
+            sourceType,
+            language,
+            trustLevel: 'низкий',
+          },
+        ],
       },
     };
     try {
@@ -1847,6 +1855,14 @@ async function listLeakCandidates(env) {
 function serializeLeakCandidate(row) {
   const metadata = parseJson(row.metadata_json || row.metadataJson, {});
   const language = row.language || 'unknown';
+  const fallbackEvidence = {
+    sourceName: row.source_name || row.sourceName,
+    sourceUrl: row.source_url || row.sourceUrl,
+    sourceType: row.source_type || row.sourceType,
+    language,
+    trustLevel: row.trust_level || row.trustLevel || 'низкий',
+    publishedAt: row.published_at || row.publishedAt || undefined,
+  };
   return {
     id: row.id,
     origin: row.origin,
@@ -1867,6 +1883,10 @@ function serializeLeakCandidate(row) {
       metadata.translationStatus ||
       (language === 'ru' ? 'не требуется' : 'нужен перевод'),
     editorNote: metadata.editorNote || '',
+    evidence:
+      Array.isArray(metadata.evidence) && metadata.evidence.length
+        ? metadata.evidence
+        : [fallbackEvidence],
     createdLeakId: row.created_leak_id || row.createdLeakId || undefined,
     createdAt: row.created_at || row.createdAt || new Date().toISOString(),
     updatedAt: row.updated_at || row.updatedAt || undefined,
@@ -2078,17 +2098,125 @@ function buildDiscoveredLeakCandidate({
       sourceId: source.id,
       requiresTranslation: language !== 'ru',
       translationStatus: language === 'ru' ? 'не требуется' : 'нужен перевод',
+      evidence: [
+        {
+          sourceName: source.name,
+          sourceUrl,
+          sourceType: source.type,
+          language,
+          trustLevel: source.trustLevel,
+          publishedAt: publishedAt || undefined,
+        },
+      ],
     },
   };
 }
 
+const LEAK_FINGERPRINT_STOP_WORDS = new Set([
+  'neverness',
+  'everness',
+  'nte',
+  'leak',
+  'leaks',
+  'rumor',
+  'rumour',
+  'слив',
+  'сливы',
+  'слух',
+  'слухи',
+  'утечка',
+  'утечки',
+  'новости',
+  'обновление',
+]);
+
+function leakCandidateFingerprintTokens(value) {
+  return new Set(
+    (String(value || '').normalize('NFKC').toLocaleLowerCase('ru-RU').match(/[\p{L}\p{N}]{3,}/gu) || [])
+      .filter((token) => !LEAK_FINGERPRINT_STOP_WORDS.has(token))
+      .slice(0, 24),
+  );
+}
+
+function leakCandidatesDescribeSameEvent(left, right) {
+  if (left.externalKey === right.externalKey) return true;
+  if (
+    left.language !== right.language &&
+    left.language !== 'unknown' &&
+    right.language !== 'unknown'
+  ) {
+    return false;
+  }
+  const leftTokens = leakCandidateFingerprintTokens(left.title);
+  const rightTokens = leakCandidateFingerprintTokens(right.title);
+  if (Math.min(leftTokens.size, rightTokens.size) < 3) return false;
+  let shared = 0;
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) shared += 1;
+  }
+  return shared >= 3 && shared / Math.min(leftTokens.size, rightTokens.size) >= 0.78;
+}
+
+function leakTrustWeight(value) {
+  return value === 'высокий' ? 3 : value === 'средний' ? 2 : 1;
+}
+
+function leakCandidateEvidence(candidate) {
+  return {
+    sourceName: candidate.sourceName,
+    sourceUrl: candidate.sourceUrl,
+    sourceType: candidate.sourceType,
+    language: candidate.language,
+    trustLevel: candidate.trustLevel,
+    publishedAt: candidate.publishedAt || undefined,
+  };
+}
+
 function dedupeLeakCandidates(candidates) {
-  const seen = new Set();
-  return candidates.filter((candidate) => {
-    if (!candidate?.externalKey || seen.has(candidate.externalKey))
-      return false;
-    seen.add(candidate.externalKey);
-    return true;
+  const groups = [];
+  for (const candidate of candidates.filter((item) => item?.externalKey)) {
+    const group = groups.find((items) =>
+      items.some((item) => leakCandidatesDescribeSameEvent(item, candidate)),
+    );
+    if (group) group.push(candidate);
+    else groups.push([candidate]);
+  }
+
+  return groups.map((group) => {
+    const ranked = [...group].sort(
+      (left, right) =>
+        leakTrustWeight(right.trustLevel) - leakTrustWeight(left.trustLevel) ||
+        right.confidenceScore - left.confidenceScore ||
+        Date.parse(right.publishedAt || '') - Date.parse(left.publishedAt || ''),
+    );
+    const primary = ranked[0];
+    const evidenceByUrl = new Map();
+    for (const candidate of ranked) {
+      const evidence = candidate.metadata?.evidence?.[0] || leakCandidateEvidence(candidate);
+      evidenceByUrl.set(evidence.sourceUrl, evidence);
+    }
+    const evidence = [...evidenceByUrl.values()];
+    const independentHosts = new Set(
+      evidence.map((item) => {
+        try {
+          return new URL(item.sourceUrl).hostname.replace(/^www\./, '');
+        } catch {
+          return item.sourceName;
+        }
+      }),
+    ).size;
+    return {
+      ...primary,
+      confidenceScore: Math.min(
+        95,
+        primary.confidenceScore + Math.max(0, independentHosts - 1) * 6,
+      ),
+      metadata: {
+        ...(primary.metadata || {}),
+        evidence,
+        independentSourceCount: independentHosts,
+      },
+    };
   });
 }
 
@@ -2109,7 +2237,7 @@ async function upsertLeakCandidates(env, candidates) {
              language = excluded.language,
              published_at = COALESCE(excluded.published_at, leak_candidates.published_at),
              confidence_score = MAX(leak_candidates.confidence_score, excluded.confidence_score),
-             metadata_json = excluded.metadata_json,
+             metadata_json = json_patch(leak_candidates.metadata_json, excluded.metadata_json),
              updated_at = current_timestamp`,
         ).bind(...leakCandidateInsertValues(candidate)),
       ),
@@ -2277,7 +2405,7 @@ async function handleComments(request, env, ctx) {
            WHERE target_type = 'comment'
            GROUP BY target_id
          ) AS comment_reactions ON comment_reactions.target_id = comments.id
-         ORDER BY comments.created_at DESC
+         ORDER BY comments.is_pinned DESC, comments.is_answer DESC, comments.created_at DESC
          LIMIT 200`,
       ).all();
       const activeByComment = await loadActiveCommentReactions(
@@ -2292,8 +2420,8 @@ async function handleComments(request, env, ctx) {
     }
     const orderBy =
       url.searchParams.get('sort') === 'popular'
-        ? 'comments.score DESC, comments.created_at DESC'
-        : 'comments.created_at DESC';
+        ? 'comments.is_pinned DESC, comments.is_answer DESC, comments.score DESC, comments.created_at DESC'
+        : 'comments.is_pinned DESC, comments.is_answer DESC, comments.created_at DESC';
     const rows = await env.DB.prepare(
       `SELECT comments.*, users.display_name AS author_name,
               COALESCE(comment_reactions.likes, 0) AS reaction_likes,
@@ -2400,6 +2528,8 @@ async function handleComments(request, env, ctx) {
           reactions: { likes: 0, dislikes: 0, useful: 0 },
           activeReactions: [],
           status: 'visible',
+          isPinned: false,
+          isAnswer: false,
         },
       },
       201,
@@ -2420,15 +2550,40 @@ async function handleComments(request, env, ctx) {
   }
   const canModerate = ROLE_WEIGHT[actor.role] >= ROLE_WEIGHT.moderator;
   const ownsComment = comment.user_id === actor.id;
+  let patchBody = null;
+  let canManageAnswer = false;
 
-  if (!canModerate && !ownsComment) {
+  if (request.method === 'PATCH') {
+    patchBody = await readJson(request);
+    if (patchBody.isAnswer !== undefined && comment.target_type === 'thread') {
+      const thread = await env.DB.prepare(
+        'SELECT author_id FROM community_threads WHERE id = ? LIMIT 1',
+      )
+        .bind(comment.target_id)
+        .first();
+      canManageAnswer = canModerate || thread?.author_id === actor.id;
+    }
+  }
+
+  if (!canModerate && !ownsComment && !canManageAnswer) {
     return json({ error: 'Недостаточно прав' }, 403);
   }
 
   if (request.method === 'PATCH') {
-    const body = await readJson(request);
+    const body = patchBody;
     const updates = [];
     const values = [];
+
+    if (
+      !canModerate &&
+      !ownsComment &&
+      Object.keys(body).some((field) => field !== 'isAnswer')
+    ) {
+      return json(
+        { error: 'Автор обсуждения может изменить только принятый ответ' },
+        403,
+      );
+    }
 
     if (body.body !== undefined) {
       updates.push('body_markdown = ?');
@@ -2447,6 +2602,43 @@ async function handleComments(request, env, ctx) {
       values.push(status);
     }
 
+    if (body.isPinned !== undefined) {
+      if (!canModerate) {
+        return json(
+          { error: 'Закреплять комментарии может только модератор' },
+          403,
+        );
+      }
+      updates.push('is_pinned = ?');
+      values.push(body.isPinned ? 1 : 0);
+    }
+
+    if (body.isAnswer !== undefined) {
+      if (comment.target_type !== 'thread') {
+        return json(
+          { error: 'Принятый ответ доступен только в обсуждениях' },
+          400,
+        );
+      }
+      if (!canManageAnswer) {
+        return json(
+          { error: 'Принятый ответ выбирает автор обсуждения или модератор' },
+          403,
+        );
+      }
+      if (body.isAnswer) {
+        await env.DB.prepare(
+          `UPDATE comments
+           SET is_answer = 0, updated_at = current_timestamp
+           WHERE target_type = 'thread' AND target_id = ? AND is_answer = 1`,
+        )
+          .bind(comment.target_id)
+          .run();
+      }
+      updates.push('is_answer = ?');
+      values.push(body.isAnswer ? 1 : 0);
+    }
+
     if (updates.length === 0) {
       return json({ error: 'Нет полей для обновления' }, 400);
     }
@@ -2461,6 +2653,8 @@ async function handleComments(request, env, ctx) {
     ctx.waitUntil(
       logAudit(env, actor.id, 'comments.update', match[1], {
         status: body.status,
+        isPinned: body.isPinned,
+        isAnswer: body.isAnswer,
       }),
     );
     return json({ data: { success: true } });
@@ -8991,6 +9185,67 @@ async function fetchFandomMediaLookupSource(items) {
   };
 }
 
+const CHARACTER_IMPORT_COVERAGE_FIELDS = new Map([
+  ['profile.biography', 'Биография'],
+  ['profile.faction', 'Фракция'],
+  ['profile.arcType', 'Тип дуги'],
+  ['profile.roleTags', 'Роли'],
+  ['profile.abilities', 'Способности'],
+  ['profile.awakenings', 'Пробуждения'],
+  ['profile.materials', 'Материалы'],
+  ['profile.baseStats', 'Начальные показатели'],
+  ['profile.voiceActors', 'Актёры озвучки'],
+  ['profile.voiceLines', 'Реплики'],
+  ['profile.skins', 'Гардероб'],
+  ['profile.gifts', 'Любимые подарки'],
+  ['profile.friendship', 'Симпатия'],
+  ['imageUrl', 'Карточка персонажа'],
+  ['splashUrl', 'Splash персонажа'],
+]);
+
+const GUIDE_IMPORT_COVERAGE_FIELDS = new Map([
+  ['guide.summary', 'Краткий вывод'],
+  ['guide.pullAdvice', 'Стоит ли качать'],
+  ['guide.strengths', 'Плюсы'],
+  ['guide.weaknesses', 'Минусы'],
+  ['guide.bestArcs', 'Лучшие дуги'],
+  ['guide.modules', 'Модули'],
+  ['guide.mainStats', 'Основные статы'],
+  ['guide.teams', 'Команды'],
+  ['guide.rotations', 'Ротации'],
+]);
+
+function buildImportCoverage(suggestions, mode) {
+  const fields =
+    mode === 'guide'
+      ? GUIDE_IMPORT_COVERAGE_FIELDS
+      : CHARACTER_IMPORT_COVERAGE_FIELDS;
+  const byField = new Map();
+  for (const suggestion of suggestions) {
+    const current = byField.get(suggestion.field) || [];
+    current.push(suggestion);
+    byField.set(suggestion.field, current);
+  }
+  const coverage = { readyFields: [], reviewFields: [], missingFields: [] };
+  for (const [field, label] of fields) {
+    const variants = byField.get(field) || [];
+    if (!variants.length) {
+      coverage.missingFields.push(label);
+      continue;
+    }
+    const hasCorroboratedVariant = variants.some(
+      (item) =>
+        Number(item.agreementCount || 0) >= 2 ||
+        (item.confidence === 'high' && !item.qualityFlags?.includes('conflict')),
+    );
+    (hasCorroboratedVariant
+      ? coverage.readyFields
+      : coverage.reviewFields
+    ).push(label);
+  }
+  return coverage;
+}
+
 async function handleCharacterImportLookup(request, env) {
   await requireContentPermission(request, env, 'characters', 'edit');
   if (request.method !== 'POST') {
@@ -9079,6 +9334,7 @@ async function handleCharacterImportLookup(request, env) {
       })),
       suggestions,
       fields,
+      coverage: buildImportCoverage(suggestions, 'character'),
     },
   });
 }
@@ -9168,6 +9424,7 @@ async function handleGuideImportLookup(request, env) {
       fields: Object.fromEntries(
         suggestions.map((suggestion) => [suggestion.field, suggestion.value]),
       ),
+      coverage: buildImportCoverage(suggestions, 'guide'),
     },
   });
 }
@@ -9638,6 +9895,8 @@ function serializeComment(row, activeReactions = []) {
     },
     activeReactions,
     status: row.status,
+    isPinned: Boolean(row.is_pinned ?? row.isPinned),
+    isAnswer: Boolean(row.is_answer ?? row.isAnswer),
   };
 }
 

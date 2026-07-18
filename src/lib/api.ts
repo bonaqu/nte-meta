@@ -271,7 +271,12 @@ export async function createComment(
 
 export async function updateComment(
   id: string,
-  payload: { body?: string; status?: Comment['status'] },
+  payload: {
+    body?: string;
+    status?: Comment['status'];
+    isPinned?: boolean;
+    isAnswer?: boolean;
+  },
 ) {
   return request<{ success: boolean }>(`/api/comments/${id}`, {
     method: 'PATCH',

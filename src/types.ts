@@ -318,6 +318,7 @@ export interface LeakDiscoverySource {
   status: 'ok' | 'partial' | 'blocked' | 'failed' | 'timeout' | 'manual';
   message: string;
   foundCount: number;
+  mode: 'automatic' | 'manual';
 }
 
 export interface LeakDiscoveryResult {

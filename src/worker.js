@@ -99,6 +99,7 @@ const tableConfig = {
   },
   teams: {
     table: 'teams',
+    slug: true,
     writable: [
       'slug',
       'guide_id',
@@ -1347,7 +1348,7 @@ async function serializeTierlistWithItems(env, row) {
 async function listTeams(env, includeDrafts = false) {
   const where = includeDrafts ? '1 = 1' : "status = 'published'";
   const rows = await env.DB.prepare(
-    `SELECT * FROM teams WHERE ${where} ORDER BY power DESC, title`,
+    `SELECT * FROM teams WHERE ${where} ORDER BY updated_at DESC, title`,
   ).all();
   return Promise.all(
     rows.results.map((row) => serializeTeamWithMembers(env, row)),
@@ -1560,15 +1561,22 @@ async function handleLeakCandidates(request, env, parts, ctx) {
       sourceResults.flatMap((source) => source.candidates || []),
     ).slice(0, 40);
     await upsertLeakCandidates(env, discovered);
-    await env.DB.batch(
-      sourceResults
-        .filter((source) => !source.referenceOnly)
-        .map((source) =>
-          env.DB.prepare(
-            'UPDATE sources SET last_checked_at = current_timestamp, updated_at = current_timestamp WHERE source_url = ?',
-          ).bind(source.url),
-        ),
-    );
+    const checkedSourceUrls = [
+      ...new Set(
+        sourceResults
+          .filter((source) => !source.referenceOnly)
+          .map((source) => source.url),
+      ),
+    ];
+    if (checkedSourceUrls.length) {
+      await env.DB.prepare(
+        `UPDATE sources
+         SET last_checked_at = current_timestamp, updated_at = current_timestamp
+         WHERE source_url IN (${checkedSourceUrls.map(() => '?').join(', ')})`,
+      )
+        .bind(...checkedSourceUrls)
+        .run();
+    }
     ctx.waitUntil(
       logAudit(env, actor.id, 'leak_candidates.discover', null, {
         query,
@@ -1904,6 +1912,7 @@ function serializeLeakDiscoverySource(source) {
     status: source.status,
     message: source.message,
     foundCount: source.candidates?.length || 0,
+    mode: source.referenceOnly ? 'manual' : 'automatic',
   };
 }
 
@@ -2222,26 +2231,25 @@ function dedupeLeakCandidates(candidates) {
 
 async function upsertLeakCandidates(env, candidates) {
   if (!candidates.length) return;
-  for (const group of chunkItems(candidates, 40)) {
-    await env.DB.batch(
-      group.map((candidate) =>
-        env.DB.prepare(
-          `INSERT INTO leak_candidates
-           (id, external_key, origin, source_name, source_url, source_type, language,
-            title, excerpt, author_name, published_at, trust_level, suggested_status,
-            confidence_score, submitted_by, metadata_json)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(external_key) DO UPDATE SET
-             title = excluded.title,
-             excerpt = excluded.excerpt,
-             language = excluded.language,
-             published_at = COALESCE(excluded.published_at, leak_candidates.published_at),
-             confidence_score = MAX(leak_candidates.confidence_score, excluded.confidence_score),
-             metadata_json = json_patch(leak_candidates.metadata_json, excluded.metadata_json),
-             updated_at = current_timestamp`,
-        ).bind(...leakCandidateInsertValues(candidate)),
-      ),
-    );
+  // Six rows keep every statement below D1's 100 bound-parameter limit.
+  for (const group of chunkItems(candidates, 6)) {
+    await env.DB.prepare(
+      `INSERT INTO leak_candidates
+       (id, external_key, origin, source_name, source_url, source_type, language,
+        title, excerpt, author_name, published_at, trust_level, suggested_status,
+        confidence_score, submitted_by, metadata_json)
+       VALUES ${group.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}
+       ON CONFLICT(external_key) DO UPDATE SET
+         title = excluded.title,
+         excerpt = excluded.excerpt,
+         language = excluded.language,
+         published_at = COALESCE(excluded.published_at, leak_candidates.published_at),
+         confidence_score = MAX(leak_candidates.confidence_score, excluded.confidence_score),
+         metadata_json = json_patch(leak_candidates.metadata_json, excluded.metadata_json),
+         updated_at = current_timestamp`,
+    )
+      .bind(...group.flatMap(leakCandidateInsertValues))
+      .run();
   }
 }
 
@@ -2370,7 +2378,7 @@ function leakCandidateMatchesSource(candidate, source) {
     return false;
   }
   if (source.relevance !== 'future') return true;
-  return /(?:leak|rumou?r|upcoming|roadmap|unreleased|preview|future|datamine|слив|слух|утечк|неофициаль|будущ|предполож|爆料)/i.test(text);
+  return /(?:leak|rumou?r|upcoming|roadmap|unreleased|preview|future|datamine|слив|слух|утечк|неофициаль|будущ|предполож|爆料|内鬼|未来版本|新角色|前瞻|未公开)/i.test(text);
 }
 
 function leakCandidateMatchesQuery(candidate, query) {
@@ -3110,7 +3118,7 @@ const IMPORT_MEDIA_LOOKUP_LIMIT = 6;
 const IMPORT_AUTO_SOURCE_LIMIT = 14;
 const LEAK_DISCOVERY_TIMEOUT_MS = 5500;
 const LEAK_DISCOVERY_MAX_BYTES = 320000;
-const LEAK_DISCOVERY_CONCURRENCY = 3;
+const LEAK_DISCOVERY_CONCURRENCY = 4;
 const LEAK_DISCOVERY_SOURCES = [
   {
     id: 'ntewiki-news',
@@ -3206,6 +3214,26 @@ const LEAK_DISCOVERY_SOURCES = [
     relevance: 'future',
   },
   {
+    id: 'telegram-nte-grace-ru',
+    name: 'NTE Grace / Neverness to Everness RU',
+    url: 'https://t.me/s/Neverness_to_Everness_RU',
+    type: 'telegram',
+    language: 'ru',
+    trustLevel: 'средний',
+    parser: 'telegram',
+    relevance: 'future',
+  },
+  {
+    id: 'telegram-nte-news-ru',
+    name: 'NTE NEWS',
+    url: 'https://t.me/s/NTENews',
+    type: 'telegram',
+    language: 'ru',
+    trustLevel: 'средний',
+    parser: 'telegram',
+    relevance: 'future',
+  },
+  {
     id: 'reddit-nteleaks',
     name: 'Reddit r/NTELeaks',
     url: 'https://www.reddit.com/r/NTELeaks/new/',
@@ -3228,6 +3256,17 @@ const LEAK_DISCOVERY_SOURCES = [
       'Отдельный раздел утечек NTE. Сверяйте автора, дату и исходный китайский материал вручную.',
   },
   {
+    id: 'reddit-neverness-community',
+    name: 'Reddit r/NevernessToEverness',
+    url: 'https://www.reddit.com/r/NevernessToEverness/search/?q=leak&restrict_sr=1&sort=new',
+    type: 'reddit',
+    language: 'en',
+    trustLevel: 'низкий',
+    referenceOnly: true,
+    message:
+      'Основное сообщество игры. Ищите исходную публикацию, а не принимайте обсуждение за подтверждение.',
+  },
+  {
     id: 'bilibili-search',
     name: 'Bilibili: 异环 爆料',
     url: 'https://search.bilibili.com/all?keyword=%E5%BC%82%E7%8E%AF%20%E7%88%86%E6%96%99',
@@ -3237,6 +3276,17 @@ const LEAK_DISCOVERY_SOURCES = [
     referenceOnly: true,
     message:
       'Результаты Bilibili требуют ручного просмотра и перевода редактором.',
+  },
+  {
+    id: 'bilibili-future-search',
+    name: 'Bilibili: 异环 未来版本 / 新角色',
+    url: 'https://search.bilibili.com/all?keyword=%E5%BC%82%E7%8E%AF%20%E6%9C%AA%E6%9D%A5%E7%89%88%E6%9C%AC%20%E6%96%B0%E8%A7%92%E8%89%B2',
+    type: 'bilibili',
+    language: 'zh',
+    trustLevel: 'низкий',
+    referenceOnly: true,
+    message:
+      'Поиск по будущим версиям и персонажам. Нужны ручной перевод, дата и проверка автора.',
   },
   {
     id: 'weibo-leak-search',
@@ -3250,6 +3300,17 @@ const LEAK_DISCOVERY_SOURCES = [
       'Китайский поиск по утечкам. Сверяйте дату, автора и исходное вложение, затем делайте редакционный перевод.',
   },
   {
+    id: 'weibo-future-search',
+    name: 'Weibo: 异环 新角色 / 未公开',
+    url: 'https://s.weibo.com/weibo?q=%E5%BC%82%E7%8E%AF%20%E6%96%B0%E8%A7%92%E8%89%B2%20%E6%9C%AA%E5%85%AC%E5%BC%80',
+    type: 'weibo',
+    language: 'zh',
+    trustLevel: 'низкий',
+    referenceOnly: true,
+    message:
+      'Дополнительный китайский поиск. Перед публикацией сохраните ссылку на исходный пост и контекст.',
+  },
+  {
     id: 'official-cn',
     name: 'NTE China official',
     url: 'https://x.com/NTE_CN',
@@ -3259,6 +3320,17 @@ const LEAK_DISCOVERY_SOURCES = [
     referenceOnly: true,
     message:
       'Официальный канал используется для подтверждения или опровержения.',
+  },
+  {
+    id: 'official-global',
+    name: 'NTE Global official',
+    url: 'https://x.com/NTE_GL',
+    type: 'twitter/x',
+    language: 'en',
+    trustLevel: 'высокий',
+    referenceOnly: true,
+    message:
+      'Официальный глобальный канал: используйте для подтверждения, уточнения дат или опровержения слуха.',
   },
 ];
 const IMPORT_SOURCE_PRIORITY = new Map([
@@ -10079,22 +10151,11 @@ function validateEntityRecord(entity, record, isCreate) {
       'type',
       'attribute',
       'image_url',
-      'short_description',
       'summary',
     ],
     guides: ['slug', 'character_id', 'title', 'summary'],
     rotations: ['character_id', 'title', 'rotation_type', 'purpose', 'logic'],
-    teams: [
-      'slug',
-      'title',
-      'team_type',
-      'budget',
-      'difficulty',
-      'good_at',
-      'weak_at',
-      'synergy',
-      'rotation',
-    ],
+    teams: ['slug', 'title'],
     tierlists: ['slug', 'title', 'tierlist_type', 'patch_version'],
     news: [
       'slug',
@@ -10480,8 +10541,8 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
   }
 
   if (entity === 'teams' && Array.isArray(body.members)) {
-    if (body.members.length > 8)
-      throwHttp('В команде может быть не больше 8 участников', 400);
+    if (body.members.length > 4)
+      throwHttp('В составе может быть не больше четырёх персонажей', 400);
     if (replace)
       statements.push(
         env.DB.prepare('DELETE FROM team_members WHERE team_id = ?').bind(
@@ -10569,6 +10630,9 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
 
 async function validateEntityRelations(env, entity, body, entityId) {
   if (entity === 'teams' && Array.isArray(body.members)) {
+    if (body.members.length < 1 || body.members.length > 4) {
+      throwHttp('Добавьте в состав от одного до четырёх персонажей', 400);
+    }
     const characterIds = body.members.map((member) =>
       cleanString(member.characterId, 1, 80),
     );

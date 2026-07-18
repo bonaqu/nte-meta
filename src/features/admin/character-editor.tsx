@@ -177,7 +177,7 @@ function toDraft(character: Character): CharacterDraft {
       ...emptyProfile(),
       ...profile,
       biography,
-      biographyShort: createBiographyExcerpt(biography),
+      biographyShort: character.shortDescription || profile.biographyShort || '',
       roleTags: profile.roleTags?.length ? profile.roleTags : [character.role],
     },
   };
@@ -734,17 +734,6 @@ function mergeText(current: string, addition: string) {
   return `${current.trim()}\n\n${cleanAddition}`;
 }
 
-function createBiographyExcerpt(value: string, maxLength = 320) {
-  const plain = String(value || '')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-    .replace(/[`#>*_~|-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (plain.length <= maxLength) return plain;
-  return `${plain.slice(0, maxLength - 1).trimEnd()}…`;
-}
-
 function mergeFriendshipLevels(
   current: CharacterFriendshipLevel[],
   imported: CharacterFriendshipLevel[],
@@ -1226,13 +1215,17 @@ export function AdminCharacterEditor({
       setMessage('Заполните биографию персонажа перед сохранением.');
       return;
     }
-    const biographyShort = createBiographyExcerpt(biography);
-    const profile = { ...draft.profile, biography, biographyShort };
+    const shortDescription = draft.shortDescription.trim();
+    const profile = {
+      ...draft.profile,
+      biography,
+      biographyShort: shortDescription,
+    };
     setPending(true);
     setMessage('');
     const payload = {
       ...draft,
-      shortDescription: biographyShort,
+      shortDescription,
       summary: biography,
       status,
       patchVersion: draft.patch,
@@ -1453,6 +1446,21 @@ export function AdminCharacterEditor({
                   patch({ originalName: event.target.value })
                 }
               />
+            </label>
+            <label className="wide-field">
+              Подпись под именем <span className="field-optional">необязательно</span>
+              <textarea
+                value={draft.shortDescription}
+                rows={3}
+                maxLength={320}
+                placeholder="Короткая характерная фраза, которая появится в шапке профиля"
+                onChange={(event) =>
+                  patch({ shortDescription: event.target.value })
+                }
+              />
+              <small>
+                Это отдельная подпись в первом экране профиля, а не сокращённая биография.
+              </small>
             </label>
             <label>
               Адрес страницы

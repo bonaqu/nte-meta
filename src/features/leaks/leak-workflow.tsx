@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  CalendarDays,
   CheckCircle2,
   ExternalLink,
   FilePenLine,
@@ -7,6 +8,7 @@ import {
   Radar,
   Send,
   ShieldCheck,
+  SlidersHorizontal,
   XCircle,
 } from 'lucide-react';
 import { EmptyState, StatusBanner } from '../../components/ui-state';
@@ -47,6 +49,28 @@ const sourceStatusLabels: Record<LeakDiscoverySource['status'], string> = {
   timeout: 'Источник не ответил',
   manual: 'Ручная проверка',
 };
+
+const sourceTypeLabels: Record<LeakCandidate['sourceType'], string> = {
+  telegram: 'Telegram',
+  reddit: 'Reddit',
+  website: 'Сайты',
+  bilibili: 'Bilibili',
+  weibo: 'Weibo',
+  'twitter/x': 'X',
+  manual: 'Ручные',
+};
+
+function candidateTimestamp(candidate: LeakCandidate) {
+  return new Date(candidate.publishedAt || candidate.createdAt).getTime();
+}
+
+function candidateFreshness(candidate: LeakCandidate) {
+  const ageDays = Math.max(0, (Date.now() - candidateTimestamp(candidate)) / 86_400_000);
+  if (ageDays <= 2) return 'Сегодня';
+  if (ageDays <= 7) return 'За неделю';
+  if (ageDays <= 30) return 'За месяц';
+  return 'Архив';
+}
 
 export function LeakSubmissionButton() {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -210,19 +234,61 @@ export function LeakDiscoveryPanel({
   const [filter, setFilter] = useState<LeakCandidateReviewStatus | 'all'>(
     'pending',
   );
+  const [languageFilter, setLanguageFilter] = useState<
+    LeakCandidate['language'] | 'all'
+  >('all');
+  const [sourceTypeFilter, setSourceTypeFilter] = useState<
+    LeakCandidate['sourceType'] | 'all'
+  >('all');
+  const [translationFilter, setTranslationFilter] = useState<
+    LeakCandidate['translationStatus'] | 'all'
+  >('all');
+  const [freshnessFilter, setFreshnessFilter] = useState<'all' | 'week' | 'month'>(
+    'all',
+  );
+  const [queueSort, setQueueSort] = useState<'new' | 'confidence'>('new');
   const [pending, setPending] = useState(false);
   const [actionId, setActionId] = useState('');
   const [editorNotes, setEditorNotes] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
   const [tone, setTone] = useState<'info' | 'danger' | 'success'>('info');
 
-  const visibleCandidates = useMemo(
-    () =>
-      candidates.filter(
-        (candidate) => filter === 'all' || candidate.reviewStatus === filter,
-      ),
-    [candidates, filter],
-  );
+  const visibleCandidates = useMemo(() => {
+    const now = Date.now();
+    return candidates
+      .filter((candidate) => filter === 'all' || candidate.reviewStatus === filter)
+      .filter(
+        (candidate) => languageFilter === 'all' || candidate.language === languageFilter,
+      )
+      .filter(
+        (candidate) =>
+          sourceTypeFilter === 'all' || candidate.sourceType === sourceTypeFilter,
+      )
+      .filter(
+        (candidate) =>
+          translationFilter === 'all' ||
+          candidate.translationStatus === translationFilter,
+      )
+      .filter((candidate) => {
+        if (freshnessFilter === 'all') return true;
+        const age = now - candidateTimestamp(candidate);
+        return age <= (freshnessFilter === 'week' ? 7 : 30) * 86_400_000;
+      })
+      .sort((left, right) =>
+        queueSort === 'confidence'
+          ? right.confidenceScore - left.confidenceScore ||
+            candidateTimestamp(right) - candidateTimestamp(left)
+          : candidateTimestamp(right) - candidateTimestamp(left),
+      );
+  }, [
+    candidates,
+    filter,
+    freshnessFilter,
+    languageFilter,
+    queueSort,
+    sourceTypeFilter,
+    translationFilter,
+  ]);
 
   useEffect(() => {
     let mounted = true;
@@ -418,6 +484,82 @@ export function LeakDiscoveryPanel({
         <span>{visibleCandidates.length} публикаций</span>
       </div>
 
+      <div className="leak-queue-filters" aria-label="Фильтры редакционной очереди">
+        <SlidersHorizontal aria-hidden="true" />
+        <label>
+          Язык
+          <select
+            value={languageFilter}
+            onChange={(event) =>
+              setLanguageFilter(event.target.value as LeakCandidate['language'] | 'all')
+            }
+          >
+            <option value="all">Все языки</option>
+            {Object.entries(languageLabels).map(([value, label]) => (
+              <option value={value} key={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Источник
+          <select
+            value={sourceTypeFilter}
+            onChange={(event) =>
+              setSourceTypeFilter(
+                event.target.value as LeakCandidate['sourceType'] | 'all',
+              )
+            }
+          >
+            <option value="all">Все источники</option>
+            {Object.entries(sourceTypeLabels).map(([value, label]) => (
+              <option value={value} key={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Перевод
+          <select
+            value={translationFilter}
+            onChange={(event) =>
+              setTranslationFilter(
+                event.target.value as LeakCandidate['translationStatus'] | 'all',
+              )
+            }
+          >
+            <option value="all">Любой статус</option>
+            <option value="не требуется">Не требуется</option>
+            <option value="нужен перевод">Нужен перевод</option>
+            <option value="переведено">Переведено</option>
+            <option value="проверено">Проверено</option>
+          </select>
+        </label>
+        <label>
+          Свежесть
+          <select
+            value={freshnessFilter}
+            onChange={(event) =>
+              setFreshnessFilter(event.target.value as 'all' | 'week' | 'month')
+            }
+          >
+            <option value="all">За всё время</option>
+            <option value="week">За 7 дней</option>
+            <option value="month">За 30 дней</option>
+          </select>
+        </label>
+        <label>
+          Сортировка
+          <select
+            value={queueSort}
+            onChange={(event) =>
+              setQueueSort(event.target.value as 'new' | 'confidence')
+            }
+          >
+            <option value="new">Сначала свежие</option>
+            <option value="confidence">По уверенности</option>
+          </select>
+        </label>
+      </div>
+
       <div className="leak-candidate-list">
         {visibleCandidates.length ? (
           visibleCandidates.map((candidate) => (
@@ -433,6 +575,9 @@ export function LeakDiscoveryPanel({
                 <span>Доверие: {candidate.trustLevel}</span>
                 <span>Уверенность: {candidate.confidenceScore}%</span>
                 <span>Перевод: {candidate.translationStatus}</span>
+                <span>
+                  <CalendarDays aria-hidden="true" /> {candidateFreshness(candidate)}
+                </span>
                 {candidate.origin === 'user' ? (
                   <span>Предложено игроком</span>
                 ) : null}

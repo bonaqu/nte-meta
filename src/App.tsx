@@ -18,6 +18,7 @@ import {
   CircleAlert,
   ClipboardList,
   Gamepad2,
+  Flag,
   GripVertical,
   Headphones,
   Home,
@@ -56,6 +57,7 @@ import { emptySiteData, seedData } from './data/seed';
 import {
   changePassword,
   createComment,
+  createCommentReport,
   createUserWarning,
   deleteComment,
   deleteEntity,
@@ -63,6 +65,7 @@ import {
   hasApiBase,
   loadAuthConfig,
   loadComments,
+  loadCommentReports,
   loadAuditLog,
   loadModerationComments,
   loadMyWarnings,
@@ -81,6 +84,7 @@ import {
   saveEntity,
   sendReaction,
   updateComment,
+  updateCommentReport,
   updateProfile,
   updateSettings,
   updateEditorPermissions,
@@ -120,6 +124,8 @@ import type {
   CharacterRoleIcon,
   CharacterVoiceLine,
   Comment,
+  CommentReport,
+  CommentReportReason,
   CommunityThread,
   ContentScope,
   EditorGrade,
@@ -2940,6 +2946,14 @@ function VideoEmbed({
   );
 }
 
+const commentReportReasonLabels: Record<CommentReportReason, string> = {
+  spam: 'Спам или реклама',
+  abuse: 'Оскорбления или травля',
+  misinformation: 'Недостоверная информация',
+  off_topic: 'Не относится к обсуждению',
+  other: 'Другая причина',
+};
+
 function CommentsBlock({
   targetType,
   targetId,
@@ -2963,12 +2977,16 @@ function CommentsBlock({
   const [editBody, setEditBody] = useState('');
   const [actionId, setActionId] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Comment | null>(null);
+  const [reportTarget, setReportTarget] = useState<Comment | null>(null);
+  const [reportReason, setReportReason] = useState<CommentReportReason>('spam');
+  const [reportDetails, setReportDetails] = useState('');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(
     new Set(),
   );
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
+  const reportDialogRef = useRef<HTMLDialogElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const draftKey = `nte-comment-draft:${targetType}:${targetId}`;
   const threadedComments = useMemo(() => {
@@ -3217,6 +3235,31 @@ function CommentsBlock({
     }
   }
 
+  function requestReport(comment: Comment) {
+    setReportTarget(comment);
+    setReportReason('spam');
+    setReportDetails('');
+    reportDialogRef.current?.showModal();
+  }
+
+  async function submitReport(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!reportTarget) return;
+    setActionId(reportTarget.id);
+    const result = await createCommentReport(
+      reportTarget.id,
+      reportReason,
+      reportDetails,
+    );
+    if (result.ok) {
+      setMessage('Жалоба отправлена модераторам. Спасибо за помощь сообществу.');
+      reportDialogRef.current?.close('submitted');
+    } else {
+      setMessage(result.error);
+    }
+    setActionId('');
+  }
+
   return (
     <section className="content-band">
       <div className="panel-title-row">
@@ -3399,6 +3442,17 @@ function CommentsBlock({
                     Ответить
                   </button>
                 ) : null}
+                {user && user.id !== comment.userId ? (
+                  <button
+                    className="text-button comment-report-button"
+                    type="button"
+                    disabled={actionId === comment.id}
+                    onClick={() => requestReport(comment)}
+                  >
+                    <Flag aria-hidden="true" />
+                    Пожаловаться
+                  </button>
+                ) : null}
                 <button
                   className="icon-button comment-link-button"
                   type="button"
@@ -3442,6 +3496,66 @@ function CommentsBlock({
           />
         )}
       </div>
+      <dialog
+        className="confirm-dialog comment-report-dialog"
+        ref={reportDialogRef}
+        onClose={() => {
+          setReportTarget(null);
+          setReportDetails('');
+        }}
+      >
+        <form onSubmit={submitReport}>
+          <h2>Пожаловаться на комментарий</h2>
+          <p>
+            Жалоба не скрывает запись автоматически. Модератор увидит контекст и
+            примет решение.
+          </p>
+          <fieldset className="report-reason-list">
+            <legend>Причина</legend>
+            {(Object.entries(commentReportReasonLabels) as Array<
+              [CommentReportReason, string]
+            >).map(([value, label]) => (
+              <label key={value}>
+                <input
+                  type="radio"
+                  name="reportReason"
+                  value={value}
+                  checked={reportReason === value}
+                  onChange={() => setReportReason(value)}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </fieldset>
+          <label htmlFor={`report-details-${targetType}-${targetId}`}>
+            Пояснение <span className="optional-label">необязательно</span>
+          </label>
+          <textarea
+            id={`report-details-${targetType}-${targetId}`}
+            value={reportDetails}
+            onChange={(event) => setReportDetails(event.target.value)}
+            rows={4}
+            maxLength={1000}
+            placeholder="Что именно стоит проверить модератору"
+          />
+          <div className="button-row">
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => reportDialogRef.current?.close('cancel')}
+            >
+              Отменить
+            </button>
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={!reportTarget || actionId === reportTarget.id}
+            >
+              <Flag aria-hidden="true" /> Отправить жалобу
+            </button>
+          </div>
+        </form>
+      </dialog>
       <dialog
         className="confirm-dialog"
         ref={deleteDialogRef}
@@ -5906,6 +6020,8 @@ function AdminGuides({
                   const variantIndex = fieldVariants.findIndex(
                     (candidate) => candidate.id === suggestion.id,
                   );
+                  const variantCount = suggestion.variantCount || fieldVariants.length || 1;
+                  const agreementCount = suggestion.agreementCount || 1;
                   return (
                   <article
                     className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
@@ -5918,6 +6034,23 @@ function AdminGuides({
                             Вариант {variantIndex + 1} из {fieldVariants.length}
                           </span>
                         ) : null}
+                        <div className="import-quality-badges" aria-label="Качество предложения">
+                          {agreementCount >= 2 ? (
+                            <span className="quality-consensus">
+                              Совпало в {agreementCount} источниках
+                            </span>
+                          ) : null}
+                          {variantCount >= 2 ? (
+                            <span className="quality-conflict">
+                              На выбор: {variantCount} варианта
+                            </span>
+                          ) : null}
+                          {suggestion.qualityFlags?.includes('incomplete') ? (
+                            <span className="quality-review">
+                              Нужна внимательная проверка
+                            </span>
+                          ) : null}
+                        </div>
                         {contextLabel ? <span>{contextLabel}</span> : null}
                       </div>
                       <div className="import-suggestion-value">
@@ -7388,6 +7521,7 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
     })),
   );
   const [loading, setLoading] = useState(hasApiBase());
+  const [reports, setReports] = useState<CommentReport[]>([]);
   const [message, setMessage] = useState('');
   const [actionId, setActionId] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Comment | null>(null);
@@ -7398,15 +7532,19 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
   useEffect(() => {
     if (!hasApiBase()) return;
     let mounted = true;
-    loadModerationComments().then((result) => {
+    Promise.all([loadModerationComments(), loadCommentReports()]).then(
+      ([commentsResult, reportsResult]) => {
       if (!mounted) return;
-      if (result.ok) {
-        setComments(result.data);
+      if (commentsResult.ok) {
+        setComments(commentsResult.data);
       } else {
-        setMessage(result.error);
+        setMessage(commentsResult.error);
       }
+      if (reportsResult.ok) setReports(reportsResult.data);
+      else if (commentsResult.ok) setMessage(reportsResult.error);
       setLoading(false);
-    });
+      },
+    );
     return () => {
       mounted = false;
     };
@@ -7430,6 +7568,27 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
           : status === 'deleted'
             ? 'Комментарий удален.'
             : 'Комментарий скрыт.',
+      );
+    } else {
+      setMessage(result.error);
+    }
+    setActionId('');
+  }
+
+  async function reviewReport(
+    report: CommentReport,
+    status: CommentReport['status'],
+  ) {
+    setActionId(report.id);
+    const result = await updateCommentReport(report.id, status);
+    if (result.ok) {
+      setReports((current) =>
+        current.map((item) =>
+          item.id === report.id ? { ...item, status } : item,
+        ),
+      );
+      setMessage(
+        status === 'resolved' ? 'Жалоба обработана.' : 'Жалоба отклонена.',
       );
     } else {
       setMessage(result.error);
@@ -7472,14 +7631,70 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
       <div className="panel-title-row">
         <div>
           <p className="eyebrow">Модератор: {user.displayName}</p>
-          <h2>Модерация комментариев</h2>
+          <h2>Модерация обсуждений</h2>
         </div>
-        <span>{comments.length} записей</span>
+        <span>
+          {reports.filter((report) => report.status === 'open').length} жалоб ·{' '}
+          {comments.length} комментариев
+        </span>
       </div>
       <p className="form-message" aria-live="polite">
         {loading ? 'Загружаем очередь...' : message}
       </p>
-      <div className="comment-list">
+      {reports.length ? (
+        <section className="moderation-report-queue" aria-labelledby="comment-reports-title">
+          <div className="panel-title-row">
+            <div>
+              <p className="eyebrow">Сигналы сообщества</p>
+              <h3 id="comment-reports-title">Жалобы на комментарии</h3>
+            </div>
+            <span>{reports.filter((report) => report.status === 'open').length} открыто</span>
+          </div>
+          <div className="moderation-report-list">
+            {reports.map((report) => (
+              <article
+                className={`moderation-report status-${report.status}`}
+                key={report.id}
+              >
+                <div className="moderation-report-heading">
+                  <span>{commentReportReasonLabels[report.reason]}</span>
+                  <small>{formatDate(report.createdAt)}</small>
+                </div>
+                <blockquote>{report.commentBody}</blockquote>
+                <p>
+                  Автор: {report.commentAuthor} · пожаловался: {report.reporterName}
+                </p>
+                {report.details ? <p>{report.details}</p> : null}
+                {report.status === 'open' ? (
+                  <div className="button-row">
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      disabled={actionId === report.id}
+                      onClick={() => void reviewReport(report, 'resolved')}
+                    >
+                      <CheckCircle2 aria-hidden="true" /> Обработано
+                    </button>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      disabled={actionId === report.id}
+                      onClick={() => void reviewReport(report, 'dismissed')}
+                    >
+                      <XCircle aria-hidden="true" /> Отклонить
+                    </button>
+                  </div>
+                ) : (
+                  <span className="moderation-report-status">
+                    {report.status === 'resolved' ? 'Обработана' : 'Отклонена'}
+                  </span>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      <div className="comment-list moderation-comment-list">
         {comments.map((comment) => (
           <article
             className={`comment-card status-${comment.status || 'visible'}`}

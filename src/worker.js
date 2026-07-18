@@ -319,6 +319,10 @@ async function router(request, env, ctx) {
     return handleComments(request, env, ctx);
   }
 
+  if (parts[0] === 'comment-reports') {
+    return handleCommentReports(request, env, parts, ctx);
+  }
+
   if (parts[0] === 'reactions') {
     return handleReactions(request, env, parts, ctx);
   }
@@ -2473,6 +2477,122 @@ async function handleComments(request, env, ctx) {
   return json({ error: 'Метод не поддерживается' }, 405);
 }
 
+async function handleCommentReports(request, env, parts, ctx) {
+  const id = parts[1];
+
+  if (request.method === 'GET' && !id) {
+    await requireRole(request, env, 'moderator');
+    const rows = await env.DB.prepare(
+      `SELECT comment_reports.*, comments.body_markdown, comments.target_type,
+              comments.target_id, reporter.display_name AS reporter_name,
+              author.display_name AS comment_author
+       FROM comment_reports
+       JOIN comments ON comments.id = comment_reports.comment_id
+       JOIN users AS reporter ON reporter.id = comment_reports.reporter_id
+       LEFT JOIN users AS author ON author.id = comments.user_id
+       ORDER BY CASE comment_reports.status WHEN 'open' THEN 0 ELSE 1 END,
+                comment_reports.created_at DESC
+       LIMIT 200`,
+    ).all();
+    return json({ data: rows.results.map(serializeCommentReport) });
+  }
+
+  if (request.method === 'POST' && !id) {
+    await rateLimit(request, env, 'comment-report', 8, 24 * 60 * 60);
+    const actor = await requireRole(request, env, 'user');
+    const body = await readJson(request);
+    const commentId = cleanString(body.commentId, 1, 80);
+    const reason = cleanString(body.reason, 1, 40);
+    if (!['spam', 'abuse', 'misinformation', 'off_topic', 'other'].includes(reason)) {
+      return json({ error: 'Выберите причину жалобы' }, 400);
+    }
+    const comment = await env.DB.prepare(
+      `SELECT comments.*, users.display_name AS comment_author
+       FROM comments
+       LEFT JOIN users ON users.id = comments.user_id
+       WHERE comments.id = ? AND comments.status = 'visible'`,
+    )
+      .bind(commentId)
+      .first();
+    if (!comment) return json({ error: 'Комментарий не найден' }, 404);
+    if (comment.user_id === actor.id) {
+      return json({ error: 'Свой комментарий можно изменить или удалить без жалобы' }, 400);
+    }
+    const existing = await env.DB.prepare(
+      'SELECT id FROM comment_reports WHERE comment_id = ? AND reporter_id = ?',
+    )
+      .bind(commentId, actor.id)
+      .first();
+    if (existing) {
+      return json({ error: 'Вы уже отправили жалобу на этот комментарий' }, 409);
+    }
+
+    const reportId = crypto.randomUUID();
+    const details = cleanString(body.details || '', 0, 1000, true);
+    await env.DB.prepare(
+      `INSERT INTO comment_reports
+         (id, comment_id, reporter_id, reason, details)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+      .bind(reportId, commentId, actor.id, reason, details)
+      .run();
+    ctx.waitUntil(
+      logAudit(env, actor.id, 'comment_reports.create', reportId, {
+        commentId,
+        reason,
+      }),
+    );
+    return json(
+      {
+        data: {
+          id: reportId,
+          commentId,
+          reporterId: actor.id,
+          reporterName: actor.displayName,
+          commentAuthor: comment.comment_author || 'Пользователь',
+          commentBody: comment.body_markdown,
+          targetType: comment.target_type,
+          targetId: comment.target_id,
+          reason,
+          details,
+          status: 'open',
+          createdAt: new Date().toISOString(),
+        },
+      },
+      201,
+    );
+  }
+
+  if (request.method === 'PATCH' && id) {
+    const actor = await requireRole(request, env, 'moderator');
+    const body = await readJson(request);
+    const status = cleanString(body.status, 1, 20);
+    if (!['open', 'resolved', 'dismissed'].includes(status)) {
+      return json({ error: 'Неизвестный статус жалобы' }, 400);
+    }
+    const report = await env.DB.prepare(
+      'SELECT id FROM comment_reports WHERE id = ?',
+    )
+      .bind(id)
+      .first();
+    if (!report) return json({ error: 'Жалоба не найдена' }, 404);
+    await env.DB.prepare(
+      `UPDATE comment_reports
+       SET status = ?, reviewed_by = ?, reviewed_at = current_timestamp,
+           updated_at = current_timestamp
+       WHERE id = ?`,
+    )
+      .bind(status, actor.id, id)
+      .run();
+    ctx.waitUntil(
+      logAudit(env, actor.id, 'comment_reports.review', id, { status }),
+    );
+    return json({ data: { success: true } });
+  }
+
+  return json({ error: 'Метод не поддерживается' }, 405);
+}
+
 async function handleThreads(request, env, parts, ctx) {
   const idOrSlug = parts[1];
   if (request.method === 'GET') {
@@ -2807,6 +2927,17 @@ const LEAK_DISCOVERY_SOURCES = [
     trustLevel: 'средний',
     parser: 'ntewiki',
     relevance: 'future',
+  },
+  {
+    id: 'icy-veins-nte-news',
+    name: 'Icy Veins: NTE News',
+    url: 'https://www.icy-veins.com/neverness-to-everness/',
+    type: 'website',
+    language: 'en',
+    trustLevel: 'средний',
+    referenceOnly: true,
+    message:
+      'Редакционные новости и разборы утечек. Всегда переходите к указанному первоисточнику и не используйте пересказ как подтверждение.',
   },
   {
     id: 'telegram-loonaly',
@@ -3351,6 +3482,9 @@ function makeImportSuggestion(
     sourceUrl: source.publicUrl || source.url,
     confidence,
     note,
+    qualityFlags: /(?:image|splash|icon)url/i.test(canonicalField)
+      ? ['media']
+      : [],
   };
 }
 
@@ -8022,6 +8156,46 @@ function importSuggestionScore(item) {
   );
 }
 
+function canonicalImportAgreementValue(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map(canonicalImportAgreementValue)
+      .sort((left, right) =>
+        JSON.stringify(left).localeCompare(JSON.stringify(right)),
+      );
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, canonicalImportAgreementValue(value[key])]),
+    );
+  }
+  if (typeof value === 'string') {
+    return normalizeImportedRuText(value).toLocaleLowerCase('ru-RU');
+  }
+  return value;
+}
+
+function importSuggestionAgreementKey(item) {
+  const parsed = parseImportSuggestionJson(item);
+  if (parsed !== null) {
+    return JSON.stringify(canonicalImportAgreementValue(parsed));
+  }
+  return normalizeImportedRuText(item?.value || '').toLocaleLowerCase('ru-RU');
+}
+
+function importSuggestionQualityFlags(item, agreementCount = 1, variantCount = 1) {
+  const flags = new Set(
+    Array.isArray(item?.qualityFlags) ? item.qualityFlags : [],
+  );
+  if (agreementCount >= 2) flags.add('consensus');
+  if (variantCount >= 2) flags.add('conflict');
+  if (/(?:image|splash|icon)url/i.test(item?.field || '')) flags.add('media');
+  if (item?.confidence === 'low') flags.add('incomplete');
+  return [...flags];
+}
+
 const PROFILE_COLLECTION_MERGE_CONFIGS = [
   {
     field: 'profile.roleTags',
@@ -8140,6 +8314,13 @@ function mergeProfileCollectionImportSuggestions(items, config) {
       id: `preferred:${config.field}:${hashText(cleanValue).slice(0, 10)}`,
       label: config.label,
       value: cleanValue,
+      agreementCount: 1,
+      variantCount: candidates.length,
+      qualityFlags: importSuggestionQualityFlags(
+        best.item,
+        1,
+        candidates.length,
+      ),
       note: [
         best.item.note,
         `Выбран целостный набор из наиболее надёжного источника: ${best.item.sourceName}.`,
@@ -8175,6 +8356,13 @@ function mergeProfileCollectionImportSuggestions(items, config) {
     sourceName: 'Сводка проверенных источников',
     sourceUrl: candidates[0].item.sourceUrl,
     confidence: 'high',
+    agreementCount: sourceNames.length,
+    variantCount: candidates.length,
+    qualityFlags: importSuggestionQualityFlags(
+      candidates[0].item,
+      sourceNames.length,
+      candidates.length,
+    ),
     note: `Источники: ${sourceNames.join(', ')}. Более надёжные значения сохранены, а пустые описания и медиа дополнены. Можно принять блок целиком или проверить строки по одной.`,
   };
 }
@@ -8269,6 +8457,13 @@ function mergeAbilityImportSuggestions(items) {
     sourceName: 'Сводка проверенных источников',
     sourceUrl: base.item.sourceUrl,
     confidence: 'high',
+    agreementCount: cleanCollections.length,
+    variantCount: cleanCollections.length,
+    qualityFlags: importSuggestionQualityFlags(
+      base.item,
+      cleanCollections.length,
+      cleanCollections.length,
+    ),
     note: `За основу взят наиболее полный русскоязычный набор «${base.item.sourceName}». Другие источники используются только для дополнения совпавших описаний и иконок; технические и похожие на текст описания названия отброшены.`,
   };
 }
@@ -8421,12 +8616,13 @@ function dedupeImportSuggestions(items) {
   for (const candidates of variantsByField.values()) {
     const matchingValues = new Map();
     for (const candidate of candidates) {
-      const key = String(candidate.value || '').trim();
+      const key = importSuggestionAgreementKey(candidate);
       if (!key) continue;
       const current = matchingValues.get(key) || [];
       current.push(candidate);
       matchingValues.set(key, current);
     }
+    const variantCount = matchingValues.size;
     variants.push(
       ...[...matchingValues.values()]
         .map((matches) => {
@@ -8450,6 +8646,13 @@ function dedupeImportSuggestions(items) {
             item: {
               ...best,
               confidence: agreement >= 2 ? 'high' : best.confidence,
+              agreementCount: Math.max(1, agreement),
+              variantCount,
+              qualityFlags: importSuggestionQualityFlags(
+                best,
+                Math.max(1, agreement),
+                variantCount,
+              ),
               note: [
                 best.note,
                 agreement >= 2
@@ -8580,16 +8783,26 @@ function dedupeGuideImportSuggestions(items) {
     );
     if (field === 'guide.videoUrl') {
       const seenUrls = new Set();
+      const uniqueVideos = sorted
+        .filter((item) => {
+          if (!isUsefulImportCollectionValue(item.value) || seenUrls.has(item.value)) {
+            return false;
+          }
+          seenUrls.add(item.value);
+          return true;
+        })
+        .slice(0, 3);
       result.push(
-        ...sorted
-          .filter((item) => {
-            if (!isUsefulImportCollectionValue(item.value) || seenUrls.has(item.value)) {
-              return false;
-            }
-            seenUrls.add(item.value);
-            return true;
-          })
-          .slice(0, 3),
+        ...uniqueVideos.map((item) => ({
+          ...item,
+          agreementCount: 1,
+          variantCount: uniqueVideos.length,
+          qualityFlags: importSuggestionQualityFlags(
+            item,
+            1,
+            uniqueVideos.length,
+          ),
+        })),
       );
       continue;
     }
@@ -8630,6 +8843,7 @@ function dedupeGuideImportSuggestions(items) {
     const merged = [...rows.values()].slice(0, limits[field] || 24);
     const cleanValue = JSON.stringify(merged);
     const sourceNames = [...new Set(sorted.map((item) => item.sourceName).filter(Boolean))];
+    const variantCount = new Set(sorted.map(importSuggestionAgreementKey)).size;
     const mergedSuggestion = {
       id: `merged:${field}:${hashText(cleanValue).slice(0, 10)}`,
       field,
@@ -8638,12 +8852,31 @@ function dedupeGuideImportSuggestions(items) {
       sourceName: 'Сводка проверенных источников',
       sourceUrl: sorted[0].sourceUrl,
       confidence: sorted[0].confidence,
+      agreementCount: sourceNames.length,
+      variantCount,
+      qualityFlags: importSuggestionQualityFlags(
+        sorted[0],
+        sourceNames.length,
+        variantCount,
+      ),
       note: `Источники: ${sourceNames.join(', ')}. Добавляйте только подтверждённые строки; место персонажа берётся из единого тир-листа NTE Meta.`,
     };
     const alternatives = sorted
       .filter((item) => item.value !== cleanValue && hasRussianText(item.value))
       .slice(0, 2);
-    result.push(mergedSuggestion, ...alternatives);
+    result.push(
+      mergedSuggestion,
+      ...alternatives.map((item) => ({
+        ...item,
+        agreementCount: item.agreementCount || 1,
+        variantCount,
+        qualityFlags: importSuggestionQualityFlags(
+          item,
+          item.agreementCount || 1,
+          variantCount,
+        ),
+      })),
+    );
   }
   return result;
 }
@@ -9405,6 +9638,24 @@ function serializeComment(row, activeReactions = []) {
     },
     activeReactions,
     status: row.status,
+  };
+}
+
+function serializeCommentReport(row) {
+  return {
+    id: row.id,
+    commentId: row.comment_id,
+    reporterId: row.reporter_id,
+    reporterName: row.reporter_name || 'Пользователь',
+    commentAuthor: row.comment_author || 'Пользователь',
+    commentBody: row.body_markdown || '',
+    targetType: row.target_type,
+    targetId: row.target_id,
+    reason: row.reason,
+    details: row.details || '',
+    status: row.status,
+    createdAt: row.created_at,
+    reviewedAt: row.reviewed_at || undefined,
   };
 }
 

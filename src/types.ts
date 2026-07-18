@@ -350,6 +350,11 @@ export interface CharacterImportSuggestion {
   sourceUrl: string;
   confidence: 'high' | 'medium' | 'low';
   note?: string;
+  agreementCount?: number;
+  variantCount?: number;
+  qualityFlags?: Array<
+    'consensus' | 'conflict' | 'media' | 'translated' | 'incomplete'
+  >;
 }
 
 export interface CharacterImportLookupResult {
@@ -385,6 +390,29 @@ export interface Comment {
   activeReactions?: Array<'like' | 'dislike' | 'useful'>;
   status?: 'visible' | 'moderated' | 'deleted';
   parentId?: string;
+}
+
+export type CommentReportReason =
+  | 'spam'
+  | 'abuse'
+  | 'misinformation'
+  | 'off_topic'
+  | 'other';
+
+export interface CommentReport {
+  id: string;
+  commentId: string;
+  reporterId: string;
+  reporterName: string;
+  commentAuthor: string;
+  commentBody: string;
+  targetType: Comment['targetType'];
+  targetId: string;
+  reason: CommentReportReason;
+  details: string;
+  status: 'open' | 'resolved' | 'dismissed';
+  createdAt: string;
+  reviewedAt?: string;
 }
 
 export interface User {

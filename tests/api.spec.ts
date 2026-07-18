@@ -643,6 +643,12 @@ test.describe('NTE Meta Worker API', () => {
   expect(ownerLookupJson.data.suggestions.length).toBeGreaterThan(0);
   expect(
     ownerLookupJson.data.suggestions.some(
+      (suggestion: { sources?: Array<{ url: string }> }) =>
+        (suggestion.sources?.length || 0) > 1,
+    ),
+  ).toBeTruthy();
+  expect(
+    ownerLookupJson.data.suggestions.some(
       (suggestion: { field: string }) => suggestion.field === 'profile.voiceActors',
     ),
   ).toBeTruthy();
@@ -748,6 +754,12 @@ test.describe('NTE Meta Worker API', () => {
   const guideLookupJson = await guideLookup.json();
   expect(guideLookupJson.data.sources.length).toBeGreaterThan(0);
   expect(Array.isArray(guideLookupJson.data.suggestions)).toBeTruthy();
+  expect(
+    guideLookupJson.data.suggestions.some(
+      (suggestion: { sources?: Array<{ url: string }> }) =>
+        (suggestion.sources?.length || 0) > 1,
+    ),
+  ).toBeTruthy();
   const guideFields = guideLookupJson.data.suggestions.map(
     (suggestion: { field: string }) => suggestion.field,
   );
@@ -1284,7 +1296,7 @@ test.describe('NTE Meta Worker API', () => {
       .getByLabel('Краткое описание')
       .fill('Проверка inline публикации новости.');
     await newsForm
-      .getByLabel('Полный текст Markdown')
+      .getByLabel('Полный текст')
       .fill(
         '## Проверка\nНовая страница должна открыться сразу после публикации.',
       );
@@ -1541,11 +1553,15 @@ await mainInfo
     await newsForm
       .getByLabel('Краткое описание')
       .fill('Проверка inline публикации новости.');
-    await newsForm
-      .getByLabel('Полный текст Markdown')
-      .fill(
-        '## Проверка\nНовость должна открыть отдельную страницу после сохранения.',
-      );
+    const newsBodyEditor = newsForm.getByLabel('Полный текст');
+    await newsBodyEditor.fill(
+      'Новость должна открыть отдельную страницу после сохранения.',
+    );
+    await newsBodyEditor.press('Control+a');
+    await newsForm.getByRole('button', { name: 'Жирный' }).click();
+    await expect(newsBodyEditor.locator('strong')).toContainText(
+      'Новость должна открыть отдельную страницу после сохранения.',
+    );
     await newsForm.getByLabel('Автор').fill('NTE Meta');
     await newsForm.getByLabel('Название источника').fill('Редакционный тест');
     await newsForm
@@ -1572,6 +1588,9 @@ await mainInfo
           },
         ),
     ).toBeVisible();
+    await expect(page.locator('.editorial-body strong')).toContainText(
+      'Новость должна открыть отдельную страницу после сохранения.',
+    );
   });
 
   test('owner публикует слив inline и открывает созданную страницу', async ({
@@ -1608,7 +1627,7 @@ await mainInfo
       .getByLabel('Краткое описание')
       .fill('Проверка inline публикации слива.');
     await leakForm
-      .getByLabel('Полный текст / репост Markdown')
+      .getByLabel('Полный текст или репост')
       .fill(
         '## Проверка\nСлив должен открыть отдельную страницу после сохранения.',
       );

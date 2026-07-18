@@ -358,6 +358,10 @@ export interface CharacterImportSuggestion {
   value: string;
   sourceName: string;
   sourceUrl: string;
+  sources?: Array<{
+    name: string;
+    url: string;
+  }>;
   confidence: 'high' | 'medium' | 'low';
   note?: string;
   agreementCount?: number;

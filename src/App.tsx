@@ -11,6 +11,7 @@ import React, {
 } from 'react';
 import {
   BadgeCheck,
+  ArrowUp,
   BookOpen,
   CheckCircle2,
   ChevronDown,
@@ -95,7 +96,9 @@ import {
   updateUserRole,
   updateWarningStatus,
 } from './lib/api';
-import { applyMarkdownAction, MarkdownPreview } from './lib/markdown';
+import { MarkdownPreview } from './lib/markdown';
+import type { RichTextEditorProps } from './components/rich-text-editor';
+import { ImportSourceLinks } from './components/import-source-links';
 import { normalizeExternalAssetUrl, resolveAssetUrl } from './lib/assets';
 import {
   formatDate,
@@ -181,6 +184,21 @@ const AdminSourcesManager = lazy(() =>
     default: module.AdminSourcesManager,
   })),
 );
+const LazyRichTextEditor = lazy(() => import('./components/rich-text-editor'));
+
+function RichTextEditorField(props: RichTextEditorProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="rich-text-editor rich-text-editor__loading" aria-busy="true">
+          Загружаем визуальный редактор...
+        </div>
+      }
+    >
+      <LazyRichTextEditor {...props} />
+    </Suspense>
+  );
+}
 const navItems = [
   { label: 'Главная', href: '#/', icon: Home },
   { label: 'Гайды', href: '#/guides', icon: BookOpen },
@@ -590,7 +608,45 @@ function App() {
         {page}
       </main>
       <Footer />
+      <BackToTopButton />
     </>
+  );
+}
+
+function BackToTopButton() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => setVisible(window.scrollY > 720));
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', update);
+    };
+  }, []);
+
+  return (
+    <button
+      className={`back-to-top${visible ? ' is-visible' : ''}`}
+      type="button"
+      aria-label="Вернуться в начало страницы"
+      title="Наверх"
+      onClick={() =>
+        window.scrollTo({
+          top: 0,
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? 'auto'
+            : 'smooth',
+        })
+      }
+    >
+      <ArrowUp aria-hidden="true" />
+    </button>
   );
 }
 
@@ -776,11 +832,13 @@ function HomePage({
               href={`#/characters/${character.slug}`}
             >
               <img
-                src={resolveAssetUrl(character.imageUrl)}
+                src={resolveAssetUrl(character.splashUrl || character.imageUrl)}
                 alt={character.name}
                 width="280"
                 height="360"
                 loading={index === 0 ? 'eager' : 'lazy'}
+                fetchPriority={index === 0 ? 'high' : 'auto'}
+                decoding="async"
                 referrerPolicy="no-referrer"
               />
               <span>{character.name}</span>
@@ -1114,7 +1172,6 @@ function ThreadEditor({
   const [status, setStatus] = useState<CommunityThread['status']>(thread?.status || 'open');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const threadBaseline = useMemo(
     () => ({
       title: thread?.title || '',
@@ -1221,19 +1278,14 @@ function ThreadEditor({
             required
           />
           <label htmlFor="thread-body">Текст треда</label>
-          <MarkdownToolbar
-            textareaRef={textareaRef}
+          <RichTextEditorField
+            id="thread-body"
             value={body}
             onChange={setBody}
-          />
-          <textarea
-            id="thread-body"
-            ref={textareaRef}
-            value={body}
-            rows={14}
             maxLength={12000}
-            onChange={(event) => setBody(event.target.value)}
-            required
+            minHeight={340}
+            placeholder="Сформулируйте тему, добавьте детали и вопросы для обсуждения..."
+            ariaLabel="Текст треда"
           />
           <label htmlFor="thread-tags">Теги</label>
           <input
@@ -1401,6 +1453,7 @@ function MetricsStrip({ data }: { data: SiteData }) {
 
 function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
   const updatedGuide = data.guides[0];
+  const focusCharacter = updatedGuide ? getGuideCharacter(data, updatedGuide) : undefined;
   const pendingLeaks = data.leaks.filter((leak) => !leak.approved).length;
   const sourceCount = data.sources.length;
   const sourceMetric = sourceCount
@@ -1441,13 +1494,31 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
     },
   ];
 
+  function updateSpotlight(event: React.PointerEvent<HTMLElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    event.currentTarget.style.setProperty('--spot-x', `${event.clientX - rect.left}px`);
+    event.currentTarget.style.setProperty('--spot-y', `${event.clientY - rect.top}px`);
+  }
+
   return (
     <section className="home-focus-panel" aria-label="Редакционный пульс">
-      <a className="home-focus-lead" href={leadHref}>
-        <span className="home-focus-lead__icon">
-          <BookOpen aria-hidden="true" />
-        </span>
-        <span>
+      <a className="home-focus-lead spotlight-surface" href={leadHref} onPointerMove={updateSpotlight}>
+        {focusCharacter ? (
+          <img
+            className="home-focus-lead__art"
+            src={resolveAssetUrl(focusCharacter.splashUrl || focusCharacter.imageUrl)}
+            alt=""
+            width="720"
+            height="560"
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+          />
+        ) : null}
+        <span className="home-focus-lead__content">
+          <span className="home-focus-lead__icon">
+            <BookOpen aria-hidden="true" />
+          </span>
           <small>Приоритет редакции</small>
           <strong>{leadTitle}</strong>
           <em>{leadText}</em>
@@ -1458,11 +1529,18 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
         {focusItems.map((item) => {
           const Icon = item.icon;
           return (
-            <a className="home-focus-card" href={item.href} key={item.title}>
-              <Icon aria-hidden="true" />
-              <span>{item.title}</span>
+            <a
+              className="home-focus-card spotlight-surface"
+              href={item.href}
+              key={item.title}
+              onPointerMove={updateSpotlight}
+            >
+              <span className="home-focus-card__heading">
+                <Icon aria-hidden="true" />
+                <span>{item.title}</span>
+              </span>
               <strong>{item.value}</strong>
-              <small>{item.text}</small>
+              <p>{item.text}</p>
             </a>
           );
         })}
@@ -1537,13 +1615,14 @@ function GuideCard({
   return (
     <article className="guide-card">
       <img
-        src={resolveAssetUrl(character?.imageUrl || 'assets/logo.svg')}
+        src={resolveAssetUrl(character?.splashUrl || character?.imageUrl || 'assets/logo.svg')}
         alt={character?.name || guide.title}
         width="460"
         height="280"
-          loading="lazy"
-          referrerPolicy="no-referrer"
-        />
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+      />
       <div>
         <p className="eyebrow">
           {character?.name || 'Гайд'} · патч {guide.patch}
@@ -1693,52 +1772,6 @@ function Tags({
           </span>
         );
       })}
-    </div>
-  );
-}
-
-function MarkdownToolbar({
-  textareaRef,
-  value,
-  onChange,
-  actions = ['bold', 'italic', 'h2', 'list', 'quote', 'link', 'youtube'],
-}: {
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-  value: string;
-  onChange: (value: string) => void;
-  actions?: string[];
-}) {
-  const actionLabels: Record<string, string> = {
-    bold: 'B',
-    italic: 'I',
-    h2: 'H2',
-    h3: 'H3',
-    list: '•',
-    quote: 'Цитата',
-    link: 'Ссылка',
-    spoiler: 'Спойлер',
-    youtube: 'YouTube',
-  };
-
-  function apply(action: string) {
-    const textarea = textareaRef.current;
-    const next = applyMarkdownAction(
-      value,
-      textarea?.selectionStart || 0,
-      textarea?.selectionEnd || 0,
-      action,
-    );
-    onChange(next);
-    window.requestAnimationFrame(() => textarea?.focus());
-  }
-
-  return (
-    <div className="toolbar" aria-label="Панель форматирования текста">
-      {actions.map((action) => (
-        <button key={action} type="button" onClick={() => apply(action)}>
-          {actionLabels[action] || action}
-        </button>
-      ))}
     </div>
   );
 }
@@ -3118,13 +3151,11 @@ function CommentsBlock({
   const [reportDetails, setReportDetails] = useState('');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(
     new Set(),
   );
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const reportDialogRef = useRef<HTMLDialogElement>(null);
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const draftKey = `nte-comment-draft:${targetType}:${targetId}`;
   const canModerateComments = Boolean(
     user && ['moderator', 'admin', 'owner'].includes(user.role),
@@ -3206,7 +3237,7 @@ function CommentsBlock({
 
   useEffect(() => {
     if (!replyTo) return;
-    bodyRef.current?.focus();
+    document.getElementById('comment-body')?.focus();
   }, [replyTo]);
 
   useEffect(() => {
@@ -3472,48 +3503,22 @@ function CommentsBlock({
             </button>
           </div>
         ) : null}
-        <div className="comment-composer-toolbar">
-          <MarkdownToolbar
-            textareaRef={bodyRef}
-            value={body}
-            onChange={setBody}
-            actions={['bold', 'italic', 'list', 'quote', 'link', 'spoiler']}
-          />
-          <button
-            className="text-button"
-            type="button"
-            aria-pressed={previewOpen}
-            onClick={() => setPreviewOpen((current) => !current)}
-          >
-            {previewOpen ? 'Скрыть предпросмотр' : 'Предпросмотр'}
-          </button>
-        </div>
-        <textarea
-          ref={bodyRef}
+        <RichTextEditorField
           id="comment-body"
-          name="body"
           value={body}
-          onChange={(event) => setBody(event.target.value)}
+          onChange={setBody}
+          actions={['bold', 'italic', 'underline', 'strike', 'list', 'quote', 'link']}
           placeholder={
             user
               ? 'Поделитесь опытом, ротацией или уточнением...'
               : 'Войдите, чтобы оставить комментарий...'
           }
-          rows={4}
+          ariaLabel="Комментарий"
           maxLength={4000}
+          minHeight={132}
+          compact
           disabled={!user || pending}
-          aria-describedby="comment-status"
         />
-        {previewOpen ? (
-          <div className="comment-markdown-preview" aria-label="Предпросмотр комментария">
-            {body.trim() ? (
-              <MarkdownPreview value={body} allowMedia={false} />
-            ) : (
-              <p>Начните писать, чтобы увидеть форматирование.</p>
-            )}
-          </div>
-        ) : null}
-        <small className="character-counter">{body.length} / 4000</small>
         <button
           className="primary-button"
           type="submit"
@@ -5336,7 +5341,6 @@ function AdminGuides({
     videoUrl: guide?.videoUrl || '',
     status: guide?.status || 'draft',
   });
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const selectedSectionIdRef = useRef(selectedSectionId);
   const createGuideDialogRef = useRef<HTMLDialogElement>(null);
   const deleteGuideDialogRef = useRef<HTMLDialogElement>(null);
@@ -5608,20 +5612,6 @@ function AdminGuides({
     setMarkdown(nextSection.content);
   }
 
-  function applyAction(action: string) {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      return;
-    }
-    const next = applyMarkdownAction(
-      markdown,
-      textarea.selectionStart,
-      textarea.selectionEnd,
-      action,
-    );
-    updateSelectedMarkdown(next);
-  }
-
   function insertSectionImage() {
     const rawUrl = sectionImageUrl.trim();
     if (!rawUrl) {
@@ -5640,16 +5630,7 @@ function AdminGuides({
       .replaceAll('[', '')
       .replaceAll(']', '');
     const snippet = `![${altText}](${rawUrl})`;
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      updateSelectedMarkdown(`${markdown}\n\n${snippet}`);
-    } else {
-      const before = markdown.slice(0, textarea.selectionStart);
-      const after = markdown.slice(textarea.selectionEnd);
-      const needsLead = before.trim().length ? '\n\n' : '';
-      const needsTail = after.trim().length ? '\n\n' : '';
-      updateSelectedMarkdown(`${before}${needsLead}${snippet}${needsTail}${after}`);
-    }
+    updateSelectedMarkdown(`${markdown.trimEnd()}${markdown.trim() ? '\n\n' : ''}${snippet}`);
     setSectionImageUrl('');
     setSectionImageAlt('');
     setMessage('Изображение добавлено в текущую секцию. Сохраните раздел.');
@@ -6435,9 +6416,7 @@ function AdminGuides({
                     {suggestion.note ? ` · ${suggestion.note}` : ''}
                   </small>
                   <div className="import-suggestion-actions">
-                    <a href={suggestion.sourceUrl} target="_blank" rel="noreferrer">
-                      Источник
-                    </a>
+                    <ImportSourceLinks suggestion={suggestion} />
                     <button
                         className="icon-button success"
                         type="button"
@@ -6641,29 +6620,6 @@ function AdminGuides({
               </select>
             </label>
           </div>
-          <div className="toolbar" aria-label="Панель форматирования текста">
-            {[
-              ['h2', 'H2'],
-              ['h3', 'H3'],
-              ['bold', 'B'],
-              ['italic', 'I'],
-              ['list', 'Список'],
-              ['quote', 'Цитата'],
-              ['spoiler', 'Спойлер'],
-              ['table', 'Таблица'],
-              ['link', 'Ссылка'],
-              ['image', 'Изображение'],
-              ['youtube', 'YouTube'],
-            ].map(([action, label]) => (
-              <button
-                key={action}
-                type="button"
-                onClick={() => applyAction(action)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
           <div className="guide-image-insert" aria-label="Вставка изображения в секцию">
             <label htmlFor="guide-section-image-url">
               Ссылка на изображение для секции
@@ -6689,16 +6645,16 @@ function AdminGuides({
               <ImageIcon aria-hidden="true" /> Вставить изображение
             </button>
           </div>
-          <label htmlFor="markdown-editor">Текст раздела</label>
-          <textarea
+          <label id="markdown-editor-label" htmlFor="markdown-editor">Текст раздела</label>
+          <RichTextEditorField
             id="markdown-editor"
-            ref={textareaRef}
             value={markdown}
-            onChange={(event) => updateSelectedMarkdown(event.target.value)}
-            rows={12}
+            onChange={updateSelectedMarkdown}
+            minHeight={360}
+            maxLength={24000}
+            placeholder="Добавьте практический разбор, списки, команды и пояснения..."
+            ariaLabel="Текст раздела гайда"
           />
-          <h3>Предпросмотр</h3>
-          <MarkdownPreview value={markdown} />
         </div>
       </div>
 

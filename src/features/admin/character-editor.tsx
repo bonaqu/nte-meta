@@ -15,7 +15,8 @@ import {
   lookupCharacterInfo,
   saveEntity,
 } from '../../lib/api';
-import { applyMarkdownAction, MarkdownPreview } from '../../lib/markdown';
+import { RichTextEditor } from '../../components/rich-text-editor';
+import { ImportSourceLinks } from '../../components/import-source-links';
 import { normalizeExternalAssetUrl, resolveAssetUrl } from '../../lib/assets';
 import type {
   Character,
@@ -193,52 +194,18 @@ function MarkdownField({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-
-  function format(action: string) {
-    const textarea = ref.current;
-    if (!textarea) return;
-    onChange(
-      applyMarkdownAction(
-        value,
-        textarea.selectionStart,
-        textarea.selectionEnd,
-        action,
-      ),
-    );
-  }
-
   return (
     <div className="character-markdown-field">
       <label htmlFor={id}>{label}</label>
-      <div className="toolbar" aria-label={`Форматирование: ${label}`}>
-        {[
-          ['h2', 'H2'],
-          ['h3', 'H3'],
-          ['bold', 'Жирный'],
-          ['italic', 'Курсив'],
-          ['list', 'Список'],
-          ['quote', 'Цитата'],
-          ['link', 'Ссылка'],
-        ].map(([action, text]) => (
-          <button key={action} type="button" onClick={() => format(action)}>
-            {text}
-          </button>
-        ))}
-      </div>
-      <textarea
+      <RichTextEditor
         id={id}
-        ref={ref}
-        rows={10}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={onChange}
+        minHeight={260}
+        maxLength={16000}
+        placeholder={`Заполните поле «${label}»...`}
+        ariaLabel={label}
       />
-      {value ? (
-        <details className="inline-preview">
-          <summary>Предпросмотр</summary>
-          <MarkdownPreview value={value} />
-        </details>
-      ) : null}
     </div>
   );
 }
@@ -447,9 +414,7 @@ function ImportSuggestionList({
                 {suggestion.note ? ` · ${suggestion.note}` : ''}
               </small>
               <div className="import-suggestion-actions">
-                <a href={suggestion.sourceUrl} target="_blank" rel="noreferrer">
-                  Источник
-                </a>
+                <ImportSourceLinks suggestion={suggestion} />
                 <button
                   className="icon-button success"
                   type="button"

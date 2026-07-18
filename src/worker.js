@@ -8488,6 +8488,22 @@ function mergeImportCollectionEntry(primary, fallback) {
   return merged;
 }
 
+function importSuggestionSourceRefs(candidates, limit = 10) {
+  const refs = [];
+  const seen = new Set();
+  for (const candidate of candidates) {
+    const item = candidate?.item || candidate;
+    const name = String(item?.sourceName || '').trim();
+    const url = String(item?.sourceUrl || '').trim();
+    const key = `${name}\n${url}`;
+    if (!name || !url || seen.has(key)) continue;
+    seen.add(key);
+    refs.push({ name, url });
+    if (refs.length >= limit) break;
+  }
+  return refs;
+}
+
 function mergeProfileCollectionImportSuggestions(items, config) {
   const candidates = items
     .filter((item) => item?.field === config.field)
@@ -8515,6 +8531,7 @@ function mergeProfileCollectionImportSuggestions(items, config) {
         1,
         candidates.length,
       ),
+      sources: importSuggestionSourceRefs(candidates),
       note: [
         best.item.note,
         `Выбран целостный набор из наиболее надёжного источника: ${best.item.sourceName}.`,
@@ -8542,6 +8559,7 @@ function mergeProfileCollectionImportSuggestions(items, config) {
   const sourceNames = [...new Set(
     candidates.map(({ item }) => item.sourceName).filter(Boolean),
   )];
+  const sources = importSuggestionSourceRefs(candidates);
   return {
     id: `merged:${config.field}:${hashText(cleanValue).slice(0, 10)}`,
     field: config.field,
@@ -8549,6 +8567,7 @@ function mergeProfileCollectionImportSuggestions(items, config) {
     value: cleanValue,
     sourceName: 'Сводка проверенных источников',
     sourceUrl: candidates[0].item.sourceUrl,
+    sources,
     confidence: 'high',
     agreementCount: sourceNames.length,
     variantCount: candidates.length,
@@ -8650,6 +8669,7 @@ function mergeAbilityImportSuggestions(items) {
     value: JSON.stringify(merged),
     sourceName: 'Сводка проверенных источников',
     sourceUrl: base.item.sourceUrl,
+    sources: importSuggestionSourceRefs(cleanCollections),
     confidence: 'high',
     agreementCount: cleanCollections.length,
     variantCount: cleanCollections.length,
@@ -9037,6 +9057,7 @@ function dedupeGuideImportSuggestions(items) {
     const merged = [...rows.values()].slice(0, limits[field] || 24);
     const cleanValue = JSON.stringify(merged);
     const sourceNames = [...new Set(sorted.map((item) => item.sourceName).filter(Boolean))];
+    const sources = importSuggestionSourceRefs(sorted);
     const variantCount = new Set(sorted.map(importSuggestionAgreementKey)).size;
     const mergedSuggestion = {
       id: `merged:${field}:${hashText(cleanValue).slice(0, 10)}`,
@@ -9045,6 +9066,7 @@ function dedupeGuideImportSuggestions(items) {
       value: cleanValue,
       sourceName: 'Сводка проверенных источников',
       sourceUrl: sorted[0].sourceUrl,
+      sources,
       confidence: sorted[0].confidence,
       agreementCount: sourceNames.length,
       variantCount,

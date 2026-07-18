@@ -18,6 +18,7 @@ import {
 import { EmptyState, StatusBanner } from '../../components/ui-state';
 import { deleteEntity, hasApiBase, saveEntity } from '../../lib/api';
 import { MarkdownPreview } from '../../lib/markdown';
+import { RichTextEditor } from '../../components/rich-text-editor';
 import type { LeakItem, NewsItem, Source, TeamMember } from '../../types';
 
 type EditorValues = Record<string, unknown>;
@@ -268,6 +269,25 @@ function FieldControl({
     );
   }
 
+  if (field.kind === 'markdown') {
+    return (
+      <div className="cms-rich-field">
+        <label id={`${id}-label`} htmlFor={id}>{field.label}</label>
+        <RichTextEditor
+          id={id}
+          value={textValue(values, field.name)}
+          onChange={(value) => setValue(field.name, value)}
+          disabled={disabled}
+          minHeight={280}
+          maxLength={24000}
+          placeholder="Напишите материал и оформите его визуально..."
+          ariaLabel={field.label}
+        />
+        {field.help ? <small id={describedBy}>{field.help}</small> : null}
+      </div>
+    );
+  }
+
   return (
     <label htmlFor={id}>
       {field.label}
@@ -287,16 +307,14 @@ function FieldControl({
             </option>
           ))}
         </select>
-      ) : field.kind === 'textarea' ||
-        field.kind === 'markdown' ||
-        field.kind === 'lines' ? (
+      ) : field.kind === 'textarea' || field.kind === 'lines' ? (
         <textarea
           id={id}
           name={field.name}
           value={textValue(values, field.name)}
           required={field.required}
           disabled={disabled}
-          rows={field.rows || (field.kind === 'markdown' ? 12 : 5)}
+          rows={field.rows || 5}
           aria-describedby={describedBy}
           onChange={(event) => setValue(field.name, event.target.value)}
         />
@@ -779,7 +797,7 @@ export function AdminNewsManager({
         },
         {
           name: 'body',
-          label: 'Полный текст Markdown',
+          label: 'Полный текст',
           kind: 'markdown',
           required: true,
         },
@@ -908,7 +926,7 @@ export function AdminLeaksManager({
         { name: 'summary', label: 'Краткое описание', kind: 'textarea' },
         {
           name: 'body',
-          label: 'Полный текст / репост Markdown',
+          label: 'Полный текст или репост',
           kind: 'markdown',
           required: true,
         },

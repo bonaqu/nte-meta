@@ -1,11 +1,10 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { Placeholder } from '@tiptap/extensions';
 import { Markdown } from '@tiptap/markdown';
 import StarterKit from '@tiptap/starter-kit';
 import {
   Bold,
-  Code2,
   Heading2,
   Heading3,
   Italic,
@@ -89,7 +88,6 @@ export function RichTextEditor({
   const generatedId = useId();
   const editorId = id || `rich-text-${generatedId.replace(/:/g, '')}`;
   const lastEmittedValue = useRef(value);
-  const [sourceMode, setSourceMode] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -129,7 +127,7 @@ export function RichTextEditor({
   }, [disabled, editor]);
 
   useEffect(() => {
-    if (!editor || sourceMode || value === lastEmittedValue.current) return;
+    if (!editor || value === lastEmittedValue.current) return;
     const currentValue = editor.getMarkdown();
     if (currentValue === value) return;
     editor.commands.setContent(value || '', {
@@ -137,7 +135,7 @@ export function RichTextEditor({
       emitUpdate: false,
     });
     lastEmittedValue.current = value;
-  }, [editor, sourceMode, value]);
+  }, [editor, value]);
 
   function runAction(action: RichTextAction) {
     if (!editor) return;
@@ -176,17 +174,6 @@ export function RichTextEditor({
     return editor.isActive(action);
   }
 
-  function toggleSourceMode() {
-    if (sourceMode && editor) {
-      editor.commands.setContent(value || '', {
-        contentType: 'markdown',
-        emitUpdate: false,
-      });
-      lastEmittedValue.current = value;
-    }
-    setSourceMode((current) => !current);
-  }
-
   const overLimit = maxLength !== undefined && value.length > maxLength;
 
   return (
@@ -207,7 +194,7 @@ export function RichTextEditor({
                 type="button"
                 className={isActive(action) ? 'is-active' : ''}
                 onClick={() => runAction(action)}
-                disabled={disabled || sourceMode}
+                disabled={disabled}
                 aria-label={meta.label}
                 aria-pressed={isActive(action)}
                 title={meta.label}
@@ -220,7 +207,7 @@ export function RichTextEditor({
           <button
             type="button"
             onClick={() => editor?.chain().focus().undo().run()}
-            disabled={disabled || sourceMode || !editor?.can().undo()}
+            disabled={disabled || !editor?.can().undo()}
             aria-label="Отменить"
             title="Отменить"
           >
@@ -229,42 +216,15 @@ export function RichTextEditor({
           <button
             type="button"
             onClick={() => editor?.chain().focus().redo().run()}
-            disabled={disabled || sourceMode || !editor?.can().redo()}
+            disabled={disabled || !editor?.can().redo()}
             aria-label="Повторить"
             title="Повторить"
           >
             <Redo2 aria-hidden="true" />
           </button>
         </div>
-        <button
-          className={sourceMode ? 'is-active rich-text-editor__source' : 'rich-text-editor__source'}
-          type="button"
-          onClick={toggleSourceMode}
-          disabled={disabled}
-          aria-pressed={sourceMode}
-          title="Режим Markdown для служебной разметки"
-        >
-          <Code2 aria-hidden="true" />
-          <span>{sourceMode ? 'Визуально' : 'Markdown'}</span>
-        </button>
       </div>
-
-      {sourceMode ? (
-        <textarea
-          id={editorId}
-          className="rich-text-editor__source-field"
-          value={value}
-          onChange={(event) => {
-            lastEmittedValue.current = event.target.value;
-            onChange(event.target.value);
-          }}
-          placeholder={placeholder}
-          aria-label={`${ariaLabel}: исходный Markdown`}
-          disabled={disabled}
-        />
-      ) : (
-        <EditorContent editor={editor} />
-      )}
+      <EditorContent editor={editor} />
 
       {maxLength !== undefined ? (
         <div className="rich-text-editor__status" aria-live="polite">

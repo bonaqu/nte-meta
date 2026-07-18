@@ -1705,7 +1705,10 @@ await mainInfo
       await card.getByRole('checkbox', { name: 'Выбрать публикацию' }).check();
     }
 
-    await discovery.getByRole('button', { name: 'Отклонить выбранные' }).click();
+    await discovery.getByLabel('Действие').selectOption('review:rejected');
+    await discovery
+      .getByRole('button', { name: 'Применить к выбранным' })
+      .click();
     const confirmDialog = page.locator('dialog[open].confirm-dialog');
     await confirmDialog.getByRole('button', { name: 'Подтвердить' }).click();
     await expect(discovery.getByText('Отклонено публикаций: 2.')).toBeVisible();

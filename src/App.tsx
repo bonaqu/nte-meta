@@ -1597,7 +1597,7 @@ tierPlacement
           <p>
             {character.role} · {character.attribute} · {character.rarity}
           </p>
-          <span>{character.shortDescription}</span>
+          {character.shortDescription ? <span>{character.shortDescription}</span> : null}
           <Tags tags={cardTags} />
         </div>
       </a>
@@ -2176,7 +2176,7 @@ function CharacterDetailPage({
             {character.originalName} · {profile.faction || 'Фракция уточняется'}
           </p>
           <h1>{character.name}</h1>
-          <p>{character.shortDescription}</p>
+          {character.shortDescription ? <p>{character.shortDescription}</p> : null}
           <dl className="guide-facts character-profile-facts">
           <div>
             <dt>День рождения</dt>
@@ -2713,10 +2713,12 @@ function GuidePage({
   );
 }
 
-function CharacterHero({
+function GuideHero({
+  guide,
   character,
   tierPlacement,
 }: {
+  guide: Guide;
   character: Character;
   tierPlacement: ReturnType<typeof getCharacterTierPlacement>;
 }) {
@@ -2732,10 +2734,10 @@ function CharacterHero({
       />
       <div>
         <p className="eyebrow">
-          {character.originalName} · {character.attribute}
+          Гайд на {character.name} · патч {guide.patch}
         </p>
-        <h1>{character.name}</h1>
-        <p>{character.summary}</p>
+        <h1>{guide.title}</h1>
+        <p className="guide-hero-summary">{guide.summary}</p>
         <dl className="guide-facts">
           <div>
             <dt>Роль</dt>
@@ -2749,26 +2751,16 @@ function CharacterHero({
             <dt>Редкость</dt>
             <dd>{character.rarity}</dd>
           </div>
-        <div>
-          <dt>Тир</dt>
-          <dd>
-            {tierPlacement ? (
-              <>
-                <strong>
-                  {tierPlacement.tier}
-                </strong>
-                <span>
-                  из тир-листа · патч {tierPlacement.patch} ·{' '}
-                  {formatDate(tierPlacement.updatedAt)}
-                </span>
-              </>
-            ) : (
-              'Не задан'
-            )}
-          </dd>
-        </div>
+          <div>
+            <dt>Тир-лист</dt>
+            <dd>{tierPlacement?.tier || 'Не задан'}</dd>
+          </div>
         </dl>
         <Tags tags={character.tags} />
+        <div className="guide-hero-byline">
+          <span>Автор: {guide.author}</span>
+          <span>Обновлено {formatDate(guide.updatedAt)}</span>
+        </div>
       </div>
     </section>
   );
@@ -2793,8 +2785,10 @@ function GuideDetail({
   const relatedTeams = data.teams.filter(
     (team) =>
       team.guideId === guide.id ||
-      team.members.some((member) => member.characterId === character.id),
+      (!team.guideId &&
+        team.members.some((member) => member.characterId === character.id)),
   );
+  const hasStructuredTeams = relatedTeams.length > 0;
   const tierPlacement = getCharacterTierPlacement(data, character.id);
   const orderedSections = useMemo(
     () =>
@@ -2804,11 +2798,15 @@ function GuideDetail({
           const title = section.title.trim();
           return (
             !['source', 'sources', 'references', 'actuality'].includes(type) &&
+            (!hasStructuredTeams ||
+              !['team', 'teams', 'rotation', 'rotations'].includes(type)) &&
+            (!hasStructuredTeams ||
+              !/(?:лучш(?:ие|ая)\s+команд|отряд|ротаци)/i.test(title)) &&
             !/^источники(?:\s+и\s+актуальность)?$/i.test(title)
           );
         })
         .sort((a, b) => a.position - b.position),
-    [guide.sections],
+    [guide.sections, hasStructuredTeams],
   );
 
   useEffect(() => {
@@ -2832,11 +2830,11 @@ function GuideDetail({
 
   return (
     <div className="page-stack">
-      <CharacterHero character={character} tierPlacement={tierPlacement} />
+      <GuideHero guide={guide} character={character} tierPlacement={tierPlacement} />
       <section className="guide-toolbar">
         <div>
-          <p>Гайд · патч {guide.patch}</p>
-          <strong>{guide.title}</strong>
+          <p>Проверенный материал редакции</p>
+          <strong>{character.name} · {character.attribute} · {character.role}</strong>
         </div>
         <div className="guide-toolbar-actions">
           <a className="ghost-button" href={`#/characters/${character.slug}`}>
@@ -3051,11 +3049,11 @@ function TeamCard({
 }) {
   return (
     <article className="team-card">
-      <p className="eyebrow">
-        {team.type} · {team.budget} · сила {team.power}
-      </p>
-      <h3>{team.title}</h3>
-      <p>{team.synergy}</p>
+      <div className="team-card-heading">
+        <span className="team-card-kicker"><Users aria-hidden="true" /> Состав</span>
+        <h3>{team.title}</h3>
+        {team.synergy ? <p>{team.synergy}</p> : null}
+      </div>
       <div className="team-members">
         {team.members.map((member) => {
           const character = getCharacter(data, member.characterId);
@@ -3082,7 +3080,7 @@ function TeamCard({
               </span>
               <span className="team-member-copy">
                 <strong>{character.name}</strong>
-                <small>{member.role}</small>
+                <small>{member.role || character.role}</small>
               </span>
             </a>
           ) : null;
@@ -3111,17 +3109,6 @@ function TeamCard({
           </div>
         </div>
       ) : null}
-      <dl className="team-details">
-        <div>
-          <dt>Где хороша</dt>
-          <dd>{team.goodAt}</dd>
-        </div>
-        <div>
-          <dt>Где слаба</dt>
-          <dd>{team.weakAt}</dd>
-        </div>
-      </dl>
-      <span className="team-difficulty">Сложность: {team.difficulty}</span>
     </article>
   );
 }
@@ -3287,7 +3274,9 @@ function CommentsBlock({
 
   useEffect(() => {
     if (!replyTo) return;
-    document.getElementById('comment-body')?.focus();
+    window.requestAnimationFrame(() => {
+      document.getElementById(`comment-reply-${replyTo.id}`)?.focus();
+    });
   }, [replyTo]);
 
   useEffect(() => {
@@ -3522,6 +3511,63 @@ function CommentsBlock({
     setActionId('');
   }
 
+  function renderCommentComposer(context?: Comment) {
+    const editorId = context ? `comment-reply-${context.id}` : 'comment-body';
+    return (
+      <form
+        className={`comment-form${context ? ' inline-reply-composer' : ''}`}
+        onSubmit={submitComment}
+      >
+        <div className="reply-context">
+          <label htmlFor={editorId}>
+            {context ? `Ответ для ${context.author}` : 'Комментарий'}
+          </label>
+          {context ? (
+            <button className="text-button" type="button" onClick={() => setReplyTo(null)}>
+              <X aria-hidden="true" /> Отменить ответ
+            </button>
+          ) : null}
+        </div>
+        <RichTextEditorField
+          id={editorId}
+          value={body}
+          onChange={setBody}
+          actions={[
+            'bold',
+            'italic',
+            'underline',
+            'strike',
+            'list',
+            'ordered-list',
+            'quote',
+            'link',
+          ]}
+          placeholder={
+            user
+              ? context
+                ? `Ответьте ${context.author}...`
+                : 'Поделитесь опытом, ротацией или уточнением...'
+              : 'Войдите, чтобы оставить комментарий...'
+          }
+          ariaLabel={context ? `Ответ для ${context.author}` : 'Комментарий'}
+          maxLength={4000}
+          minHeight={context ? 108 : 132}
+          compact
+          disabled={!user || pending}
+        />
+        <div className="comment-composer-footer">
+          <p id="comment-status" className="inline-status" aria-live="polite">
+            {message}
+          </p>
+          <button className="primary-button" type="submit" disabled={!user || pending}>
+            <MessageCircle aria-hidden="true" />
+            {pending ? 'Отправляем...' : context ? 'Ответить' : 'Отправить'}
+          </button>
+        </div>
+      </form>
+    );
+  }
+
   return (
     <section className="content-band">
       <div className="panel-title-row">
@@ -3539,48 +3585,7 @@ function CommentsBlock({
           </select>
         </label>
       </div>
-      <form className="comment-form" onSubmit={submitComment}>
-        <label htmlFor="comment-body">Комментарий</label>
-        {replyTo ? (
-          <div className="reply-context">
-            <span>Ответ для {replyTo.author}</span>
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => setReplyTo(null)}
-            >
-              Отменить
-            </button>
-          </div>
-        ) : null}
-        <RichTextEditorField
-          id="comment-body"
-          value={body}
-          onChange={setBody}
-          actions={['bold', 'italic', 'underline', 'strike', 'list', 'quote', 'link']}
-          placeholder={
-            user
-              ? 'Поделитесь опытом, ротацией или уточнением...'
-              : 'Войдите, чтобы оставить комментарий...'
-          }
-          ariaLabel="Комментарий"
-          maxLength={4000}
-          minHeight={132}
-          compact
-          disabled={!user || pending}
-        />
-        <button
-          className="primary-button"
-          type="submit"
-          disabled={!user || pending}
-        >
-          <MessageCircle aria-hidden="true" />
-          {pending ? 'Отправляем...' : 'Отправить'}
-        </button>
-        <p id="comment-status" className="inline-status" aria-live="polite">
-          {message}
-        </p>
-      </form>
+      {!replyTo ? renderCommentComposer() : null}
       <div className="comment-list">
         {threadedComments.length ? (
           threadedComments.map(({ comment, depth, parentAuthor, rootId }) =>
@@ -3625,12 +3630,24 @@ function CommentsBlock({
                   <label htmlFor={`edit-${comment.id}`}>
                     Изменить комментарий
                   </label>
-                  <textarea
+                  <RichTextEditorField
                     id={`edit-${comment.id}`}
                     value={editBody}
-                    onChange={(event) => setEditBody(event.target.value)}
-                    rows={3}
+                    onChange={setEditBody}
+                    actions={[
+                      'bold',
+                      'italic',
+                      'underline',
+                      'strike',
+                      'list',
+                      'ordered-list',
+                      'quote',
+                      'link',
+                    ]}
+                    ariaLabel="Изменить комментарий"
                     maxLength={4000}
+                    minHeight={108}
+                    compact
                   />
                   <div className="button-row">
                     <button
@@ -3653,6 +3670,7 @@ function CommentsBlock({
               ) : (
                 <MarkdownPreview value={comment.body} allowMedia={false} />
               )}
+              {replyTo?.id === comment.id ? renderCommentComposer(comment) : null}
               {depth === 0 && (branchReplyCounts.get(comment.id) || 0) > 0 ? (
                 <button
                   className="comment-branch-toggle"
@@ -5469,6 +5487,12 @@ function AdminGuides({
   }, [guide]);
 
   const activeGuide = guide;
+  const activeGuideCharacter = activeGuide
+    ? getGuideCharacter(data, activeGuide)
+    : undefined;
+  const activeGuideTier = activeGuideCharacter
+    ? getCharacterTierPlacement(data, activeGuideCharacter.id)
+    : undefined;
   const guideDraftKey = `nte-guide-draft:${activeGuide?.id || selectedGuideId}`;
   const baselineGuideState = useMemo(() => {
     if (!activeGuide) return null;
@@ -6169,6 +6193,34 @@ function AdminGuides({
             </option>
           ))}
         </select>
+        {activeGuideCharacter ? (
+          <div className="guide-character-source-panel">
+            <div>
+              <img
+                src={resolveAssetUrl(activeGuideCharacter.imageUrl)}
+                alt=""
+                width="64"
+                height="64"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+              <span>
+                <small>Данные персонажа</small>
+                <strong>{activeGuideCharacter.name}</strong>
+              </span>
+            </div>
+            <dl>
+              <div><dt>Роль</dt><dd>{activeGuideCharacter.role}</dd></div>
+              <div><dt>Тип</dt><dd>{activeGuideCharacter.type}</dd></div>
+              <div><dt>Редкость</dt><dd>{activeGuideCharacter.rarity}</dd></div>
+              <div><dt>Тир-лист</dt><dd>{activeGuideTier?.tier || 'Не задан'}</dd></div>
+            </dl>
+            <p>
+              Эти данные берутся из страницы персонажа и единого тир-листа. Здесь они
+              показаны для проверки и не дублируются в форме гайда.
+            </p>
+          </div>
+        ) : null}
         <div className="guide-meta-fields">
           <label>
             Заголовок
@@ -6819,7 +6871,7 @@ function GuideTeamsEditor({
   );
   const [selectedId, setSelectedId] = useState(relatedTeams[0]?.id || 'new');
   const [draft, setDraft] = useState<Team>(
-    () => relatedTeams[0] || createGuideTeamDraft(guide),
+    () => relatedTeams[0] || createGuideTeamDraft(guide, data),
   );
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
@@ -6828,8 +6880,8 @@ function GuideTeamsEditor({
 
   useEffect(() => {
     const next = relatedTeams.find((team) => team.id === selectedId);
-    setDraft(next || createGuideTeamDraft(guide));
-  }, [guide, relatedTeams, selectedId]);
+    setDraft(next || createGuideTeamDraft(guide, data));
+  }, [data, guide, relatedTeams, selectedId]);
 
   useEffect(() => {
     if (selectedId === 'new') return;
@@ -6852,6 +6904,15 @@ function GuideTeamsEditor({
 
   async function saveTeam(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const members = draft.members.filter((member) => member.characterId.trim());
+    if (!draft.title.trim()) {
+      setMessage('Введите название состава или ротации.');
+      return;
+    }
+    if (!members.length || members.length > 4) {
+      setMessage('Выберите от одного до четырёх персонажей состава.');
+      return;
+    }
     setPending(true);
     setMessage('');
     const rotationSteps = (draft.rotationSteps || []).filter((step) =>
@@ -6862,6 +6923,7 @@ function GuideTeamsEditor({
       {
         ...draft,
         guideId: guide.id,
+        members,
         rotation: rotationSteps.join('\n'),
         rotationStepsJson: rotationSteps,
         ...(canPublish || !selected ? { status: draft.status || 'draft' } : {}),
@@ -6914,9 +6976,7 @@ function GuideTeamsEditor({
               <Users aria-hidden="true" />
               <span>
                 <strong>{team.title}</strong>
-                <small>
-                  {team.budget} · {team.type}
-                </small>
+                <small>{team.members.length} из 4 персонажей</small>
               </span>
             </button>
           ))}
@@ -6933,7 +6993,7 @@ function GuideTeamsEditor({
         <form className="embedded-team-form" onSubmit={saveTeam}>
           <div className="editor-field-grid">
             <label>
-              Название отряда
+              Название состава или ротации
               <input
                 required
                 value={draft.title}
@@ -6941,64 +7001,6 @@ function GuideTeamsEditor({
                   setDraft((current) => ({
                     ...current,
                     title: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Тип
-              <input
-                required
-                value={draft.type}
-                placeholder="Burst, Bossing, AoE..."
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    type: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Бюджет
-              <select
-                value={draft.budget}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    budget: event.target.value as Team['budget'],
-                  }))
-                }
-              >
-                <option>F2P</option>
-                <option>Mixed</option>
-                <option>Premium</option>
-              </select>
-            </label>
-            <label>
-              Сложность
-              <input
-                required
-                value={draft.difficulty}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    difficulty: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Сила, 0-100
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={draft.power}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    power: Number(event.target.value),
                   }))
                 }
               />
@@ -7021,41 +7023,15 @@ function GuideTeamsEditor({
               </select>
             </label>
             <label className="wide-field">
-              Почему состав работает
+              Описание <span className="field-optional">необязательно</span>
               <textarea
                 rows={4}
-                required
                 value={draft.synergy}
+                placeholder="Коротко объясните идею состава или особенности цикла"
                 onChange={(event) =>
                   setDraft((current) => ({
                     ...current,
                     synergy: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Где хорош
-              <input
-                required
-                value={draft.goodAt}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    goodAt: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Где слаб
-              <input
-                required
-                value={draft.weakAt}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    weakAt: event.target.value,
                   }))
                 }
               />
@@ -7074,6 +7050,10 @@ function GuideTeamsEditor({
                       updateMember(index, {
                         ...member,
                         characterId: event.target.value,
+                        role:
+                          data.characters.find(
+                            (character) => character.id === event.target.value,
+                          )?.role || '',
                       })
                     }
                   >
@@ -7117,13 +7097,13 @@ function GuideTeamsEditor({
             <button
               className="ghost-button"
               type="button"
-              disabled={draft.members.length >= 8}
+              disabled={draft.members.length >= 4}
               onClick={() =>
                 setDraft((current) => ({
                   ...current,
                   members: [
                     ...current.members,
-                    { characterId: '', role: 'Support' },
+                    { characterId: '', role: '' },
                   ],
                 }))
               }
@@ -7135,7 +7115,7 @@ function GuideTeamsEditor({
           <fieldset className="rotation-step-editor">
             <legend>Пошаговая ротация всей команды</legend>
             <p>
-              Одна строка — одно переключение персонажа или применение навыка.
+              Одна строка — одно действие. После последнего шага цикл возвращается к первому.
             </p>
             {(draft.rotationSteps || []).map((step, index) => (
               <div key={`${selectedId}-rotation-${index}`}>
@@ -7218,22 +7198,27 @@ function GuideTeamsEditor({
   );
 }
 
-function createGuideTeamDraft(guide: Guide): Team {
+function createGuideTeamDraft(guide: Guide, data: SiteData): Team {
   return {
     id: 'new',
     slug: '',
     guideId: guide.id,
     title: '',
-    type: 'Burst',
+    type: '',
     budget: 'Mixed',
-    difficulty: 'Средняя',
-    power: 70,
+    difficulty: '',
+    power: 0,
     goodAt: '',
     weakAt: '',
     synergy: '',
     rotation: '',
     rotationSteps: [''],
-    members: [{ characterId: guide.characterId, role: 'Main DPS' }],
+    members: [
+      {
+        characterId: guide.characterId,
+        role: getCharacter(data, guide.characterId)?.role || '',
+      },
+    ],
     status: 'draft',
   };
 }

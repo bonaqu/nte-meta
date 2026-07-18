@@ -60,6 +60,44 @@ const sourceTypeLabels: Record<LeakCandidate['sourceType'], string> = {
   manual: 'Ручные',
 };
 
+type LeakBulkAction =
+  | 'review:pending'
+  | 'review:rejected'
+  | 'review:duplicate'
+  | 'status:слух'
+  | 'status:слив'
+  | 'status:подтверждено'
+  | 'status:опровергнуто'
+  | 'translation:нужен перевод'
+  | 'translation:переведено'
+  | 'translation:проверено';
+
+const bulkActionLabels: Record<LeakBulkAction, string> = {
+  'review:pending': 'Вернуть на проверку',
+  'review:rejected': 'Отклонить публикации',
+  'review:duplicate': 'Отметить дубликатами',
+  'status:слух': 'Указать тип: слух',
+  'status:слив': 'Указать тип: слив',
+  'status:подтверждено': 'Указать тип: подтверждено',
+  'status:опровергнуто': 'Указать тип: опровергнуто',
+  'translation:нужен перевод': 'Нужен перевод на русский',
+  'translation:переведено': 'Отметить переведёнными',
+  'translation:проверено': 'Отметить перевод проверенным',
+};
+
+const bulkSuccessLabels: Record<LeakBulkAction, string> = {
+  'review:pending': 'Возвращено на проверку',
+  'review:rejected': 'Отклонено публикаций',
+  'review:duplicate': 'Отмечено дубликатами',
+  'status:слух': 'Отмечено как слух',
+  'status:слив': 'Отмечено как слив',
+  'status:подтверждено': 'Отмечено как подтверждённое',
+  'status:опровергнуто': 'Отмечено как опровергнутое',
+  'translation:нужен перевод': 'Отправлено на перевод',
+  'translation:переведено': 'Отмечено переведёнными',
+  'translation:проверено': 'Перевод отмечен проверенным',
+};
+
 function candidateTimestamp(candidate: LeakCandidate) {
   return new Date(candidate.publishedAt || candidate.createdAt).getTime();
 }
@@ -250,9 +288,8 @@ export function LeakDiscoveryPanel({
   const [pending, setPending] = useState(false);
   const [actionId, setActionId] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkAction, setBulkAction] = useState<
-    'rejected' | 'duplicate' | null
-  >(null);
+  const [bulkChoice, setBulkChoice] = useState<LeakBulkAction>('review:rejected');
+  const [bulkAction, setBulkAction] = useState<LeakBulkAction | null>(null);
   const [editorNotes, setEditorNotes] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
   const [tone, setTone] = useState<'info' | 'danger' | 'success'>('info');
@@ -294,16 +331,24 @@ export function LeakDiscoveryPanel({
     sourceTypeFilter,
     translationFilter,
   ]);
-  const selectableCandidates = visibleCandidates.filter(
-    (candidate) => candidate.reviewStatus === 'pending',
-  );
-  const selectedCandidates = candidates.filter(
-    (candidate) =>
-      candidate.reviewStatus === 'pending' && selectedIds.has(candidate.id),
+  const selectableCandidates = visibleCandidates;
+  const selectedCandidates = candidates.filter((candidate) =>
+    selectedIds.has(candidate.id),
   );
   const allVisibleSelected =
     selectableCandidates.length > 0 &&
     selectableCandidates.every((candidate) => selectedIds.has(candidate.id));
+  const sourceSummary = useMemo(
+    () => ({
+      total: sources.length,
+      automatic: sources.filter((source) => source.mode === 'automatic').length,
+      manual: sources.filter((source) => source.mode === 'manual').length,
+      ru: sources.filter((source) => source.language === 'ru').length,
+      en: sources.filter((source) => source.language === 'en').length,
+      zh: sources.filter((source) => source.language === 'zh').length,
+    }),
+    [sources],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -431,7 +476,7 @@ export function LeakDiscoveryPanel({
     });
   }
 
-  function requestBulkAction(action: 'rejected' | 'duplicate') {
+  function requestBulkAction(action: LeakBulkAction) {
     if (!selectedCandidates.length) return;
     setBulkAction(action);
     bulkDialogRef.current?.showModal();
@@ -450,7 +495,22 @@ export function LeakDiscoveryPanel({
       const results = await Promise.all(
         batch.map(async (candidate) => ({
           id: candidate.id,
-          result: await reviewLeakCandidate(candidate.id, bulkAction),
+          result: bulkAction.startsWith('review:')
+            ? await reviewLeakCandidate(
+                candidate.id,
+                bulkAction.slice('review:'.length) as
+                  | 'pending'
+                  | 'rejected'
+                  | 'duplicate',
+              )
+            : bulkAction.startsWith('status:')
+              ? await updateLeakCandidateEditorial(candidate.id, {
+                  suggestedStatus: bulkAction.slice('status:'.length) as LeakStatus,
+                })
+              : await updateLeakCandidateEditorial(candidate.id, {
+                  translationStatus: bulkAction.slice('translation:'.length) as
+                    LeakCandidate['translationStatus'],
+                }),
         })),
       );
       results.forEach(({ id, result }) => {
@@ -460,11 +520,27 @@ export function LeakDiscoveryPanel({
     }
 
     setCandidates((current) =>
-      current.map((candidate) =>
-        successfulIds.has(candidate.id)
-          ? { ...candidate, reviewStatus: bulkAction }
-          : candidate,
-      ),
+      current.map((candidate) => {
+        if (!successfulIds.has(candidate.id)) return candidate;
+        if (bulkAction.startsWith('review:')) {
+          return {
+            ...candidate,
+            reviewStatus: bulkAction.slice('review:'.length) as
+              LeakCandidateReviewStatus,
+          };
+        }
+        if (bulkAction.startsWith('status:')) {
+          return {
+            ...candidate,
+            suggestedStatus: bulkAction.slice('status:'.length) as LeakStatus,
+          };
+        }
+        return {
+          ...candidate,
+          translationStatus: bulkAction.slice('translation:'.length) as
+            LeakCandidate['translationStatus'],
+        };
+      }),
     );
     setSelectedIds((current) => {
       const next = new Set(current);
@@ -475,9 +551,7 @@ export function LeakDiscoveryPanel({
     setMessage(
       failedCount
         ? `Обработано: ${successfulIds.size}. Не удалось обработать: ${failedCount}.`
-        : bulkAction === 'rejected'
-          ? `Отклонено публикаций: ${successfulIds.size}.`
-          : `Отмечено дубликатами: ${successfulIds.size}.`,
+        : `${bulkSuccessLabels[bulkAction]}: ${successfulIds.size}.`,
     );
     setBulkAction(null);
     setActionId('');
@@ -507,6 +581,63 @@ export function LeakDiscoveryPanel({
       setMessage(result.error);
     }
     setActionId('');
+  }
+
+  function renderBulkToolbar() {
+    if (!selectedCandidates.length) return null;
+    return (
+      <div className="leak-bulk-toolbar" aria-label="Групповые действия">
+        <div className="leak-bulk-count">
+          <CheckCircle2 aria-hidden="true" />
+          <span><strong>{selectedCandidates.length}</strong> выбрано</span>
+        </div>
+        <label>
+          Действие
+          <select
+            value={bulkChoice}
+            disabled={actionId === 'bulk'}
+            onChange={(event) => setBulkChoice(event.target.value as LeakBulkAction)}
+          >
+            <optgroup label="Решение очереди">
+              <option value="review:pending">Вернуть на проверку</option>
+              <option value="review:rejected">Отклонить</option>
+              <option value="review:duplicate">Дубликат</option>
+            </optgroup>
+            <optgroup label="Тип публикации">
+              <option value="status:слух">Слух</option>
+              <option value="status:слив">Слив</option>
+              <option value="status:подтверждено">Подтверждено</option>
+              <option value="status:опровергнуто">Опровергнуто</option>
+            </optgroup>
+            <optgroup label="Перевод">
+              <option value="translation:нужен перевод">Нужен перевод</option>
+              <option value="translation:переведено">Переведено</option>
+              <option value="translation:проверено">Перевод проверен</option>
+            </optgroup>
+          </select>
+        </label>
+        <div className="leak-bulk-actions">
+          <button
+            className="primary-button"
+            type="button"
+            disabled={actionId === 'bulk'}
+            onClick={() => requestBulkAction(bulkChoice)}
+          >
+            Применить к выбранным
+          </button>
+          <button
+            className="icon-button"
+            type="button"
+            title="Снять выбор"
+            aria-label="Снять выбор со всех публикаций"
+            disabled={actionId === 'bulk'}
+            onClick={() => setSelectedIds(new Set())}
+          >
+            <XCircle aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -541,21 +672,36 @@ export function LeakDiscoveryPanel({
       </form>
 
       {sources.length ? (
-        <div className="leak-source-grid" aria-label="Состояние источников">
-          {sources.map((source) => (
-            <article
-              className={`leak-source-status status-${source.status}`}
-              key={source.id}
-            >
-              <span>{sourceStatusLabels[source.status]}</span>
-              <strong>{source.name}</strong>
-              <small>{source.message}</small>
-              <a href={source.url} target="_blank" rel="noreferrer">
-                Открыть <ExternalLink aria-hidden="true" />
-              </a>
-            </article>
-          ))}
-        </div>
+        <section className="leak-source-report" aria-label="Состояние источников">
+          <div className="leak-source-overview">
+            <div><strong>{sourceSummary.total}</strong><span>источников</span></div>
+            <div><strong>{sourceSummary.automatic}</strong><span>проверяются автоматически</span></div>
+            <div><strong>{sourceSummary.manual}</strong><span>открываются для ручной сверки</span></div>
+            <div>
+              <strong>{sourceSummary.ru} RU · {sourceSummary.en} EN · {sourceSummary.zh} CN</strong>
+              <span>языковой охват</span>
+            </div>
+          </div>
+          <div className="leak-source-grid">
+            {sources.map((source) => (
+              <article
+                className={`leak-source-status status-${source.status}`}
+                key={source.id}
+              >
+                <span>{sourceStatusLabels[source.status]}</span>
+                <strong>{source.name}</strong>
+                <small>
+                  {source.mode === 'automatic' ? 'Автопроверка' : 'Ручная сверка'} ·{' '}
+                  {languageLabels[source.language]}
+                </small>
+                <small>{source.message}</small>
+                <a href={source.url} target="_blank" rel="noreferrer">
+                  Открыть <ExternalLink aria-hidden="true" />
+                </a>
+              </article>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       {message ? <StatusBanner tone={tone} text={message} /> : null}
@@ -580,36 +726,16 @@ export function LeakDiscoveryPanel({
       </div>
 
       {selectableCandidates.length ? (
-        <div className="leak-bulk-toolbar" aria-label="Групповые действия">
+        <div className="leak-selection-row">
           <label className="leak-select-all">
-            <input
-              type="checkbox"
-              checked={allVisibleSelected}
-              onChange={toggleVisibleCandidates}
-            />
-            {allVisibleSelected ? 'Снять выбор' : 'Выбрать все на экране'}
+            <input type="checkbox" checked={allVisibleSelected} onChange={toggleVisibleCandidates} />
+            {allVisibleSelected ? 'Снять выбор со всех на экране' : 'Выбрать все на экране'}
           </label>
-          <strong>{selectedCandidates.length} выбрано</strong>
-          <div className="leak-bulk-actions">
-            <button
-              className="ghost-button"
-              type="button"
-              disabled={!selectedCandidates.length || actionId === 'bulk'}
-              onClick={() => requestBulkAction('duplicate')}
-            >
-              Отметить дубликатами
-            </button>
-            <button
-              className="ghost-button danger"
-              type="button"
-              disabled={!selectedCandidates.length || actionId === 'bulk'}
-              onClick={() => requestBulkAction('rejected')}
-            >
-              <XCircle aria-hidden="true" /> Отклонить выбранные
-            </button>
-          </div>
+          <span>После выбора появится панель групповых действий.</span>
         </div>
       ) : null}
+
+      {renderBulkToolbar()}
 
       <div className="leak-queue-filters" aria-label="Фильтры редакционной очереди">
         <SlidersHorizontal aria-hidden="true" />
@@ -694,17 +820,15 @@ export function LeakDiscoveryPanel({
               className={`leak-candidate ${selectedIds.has(candidate.id) ? 'is-selected' : ''}`}
               key={candidate.id}
             >
-              {candidate.reviewStatus === 'pending' ? (
-                <label className="leak-candidate-select">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(candidate.id)}
-                    disabled={actionId === 'bulk'}
-                    onChange={() => toggleCandidate(candidate.id)}
-                  />
-                  <span>Выбрать публикацию</span>
-                </label>
-              ) : null}
+              <label className="leak-candidate-select">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(candidate.id)}
+                  disabled={actionId === 'bulk'}
+                  onChange={() => toggleCandidate(candidate.id)}
+                />
+                <span>Выбрать публикацию</span>
+              </label>
               <div className="leak-candidate-meta">
                 <span className={`leak-status ${candidate.suggestedStatus}`}>
                   {candidate.suggestedStatus}
@@ -900,9 +1024,7 @@ export function LeakDiscoveryPanel({
       <dialog className="confirm-dialog" ref={bulkDialogRef}>
         <form method="dialog">
           <h2>
-            {bulkAction === 'rejected'
-              ? 'Отклонить выбранные публикации?'
-              : 'Отметить выбранное дубликатами?'}
+            {bulkAction ? bulkActionLabels[bulkAction] : 'Групповое действие'}?
           </h2>
           <p>
             Будет обработано публикаций: {selectedCandidates.length}. Это решение
@@ -910,7 +1032,7 @@ export function LeakDiscoveryPanel({
           </p>
           <div className="button-row">
             <button
-              className={bulkAction === 'rejected' ? 'danger-button' : 'primary-button'}
+              className={bulkAction === 'review:rejected' ? 'danger-button' : 'primary-button'}
               type="button"
               onClick={() => void applyBulkAction()}
             >

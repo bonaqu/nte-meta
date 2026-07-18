@@ -1,4 +1,4 @@
-@layer reset, tokens, base, layout, components, pages, responsive;
+@layer reset, tokens, base, layout, components, pages, responsive, polish;
 
 @layer reset {
   *,
@@ -1494,17 +1494,7 @@
   background: var(--border);
 }
 
-.rich-text-editor__source {
-  display: inline-flex !important;
-  grid-auto-flow: column;
-  gap: 7px;
-  inline-size: auto !important;
-  min-inline-size: fit-content !important;
-  padding-inline: 10px !important;
-}
-
-.rich-text-editor .tiptap,
-.rich-text-editor__source-field {
+.rich-text-editor .tiptap {
   min-block-size: var(--rich-editor-min-height, 220px);
   inline-size: 100%;
   padding: 16px 18px;
@@ -1514,6 +1504,26 @@
   color: var(--text);
   line-height: 1.68;
   resize: vertical;
+}
+
+.rich-text-editor .tiptap :is(ul, ol) {
+  display: grid;
+  gap: 0.42rem;
+  margin-block: 0.75rem;
+  padding-inline-start: 1.55rem;
+}
+
+.rich-text-editor .tiptap ol {
+  list-style: decimal;
+}
+
+.rich-text-editor .tiptap ul {
+  list-style: disc;
+}
+
+.rich-text-editor .tiptap li::marker {
+  color: var(--cyan);
+  font-weight: 850;
 }
 
 .rich-text-editor .tiptap > :first-child {
@@ -7047,6 +7057,419 @@
 
     .voice-language-tabs button {
       min-inline-size: 116px;
+    }
+  }
+}
+@layer polish {
+  .field-optional {
+    color: var(--soft);
+    font-size: 0.74rem;
+    font-weight: 650;
+  }
+
+  .guide-hero {
+    position: relative;
+    isolation: isolate;
+    min-block-size: min(610px, 76vh);
+    grid-template-columns: minmax(320px, 0.78fr) minmax(0, 1.22fr);
+    gap: clamp(28px, 5vw, 70px);
+    overflow: hidden;
+    align-items: center;
+    border-color: color-mix(in srgb, var(--cyan) 24%, var(--border));
+    background:
+      linear-gradient(100deg, rgb(38 217 255 / 0.08), transparent 38%),
+      linear-gradient(165deg, #111827, #0c101c 68%);
+    box-shadow: 0 26px 70px rgb(0 0 0 / 0.28);
+  }
+
+  .guide-hero::after {
+    position: absolute;
+    z-index: -1;
+    inset: auto -18% -52% 42%;
+    block-size: 72%;
+    border-block-start: 1px solid rgb(255 78 173 / 0.18);
+    background: linear-gradient(135deg, transparent 34%, rgb(255 78 173 / 0.06));
+    content: '';
+    transform: skewY(-7deg);
+  }
+
+  .guide-hero > img {
+    block-size: min(570px, 70vh);
+    aspect-ratio: 4 / 5;
+    border: 0;
+    background: transparent;
+    object-fit: contain;
+    object-position: center bottom;
+    filter: drop-shadow(0 26px 24px rgb(0 0 0 / 0.36));
+  }
+
+  .guide-hero > div {
+    align-content: center;
+    gap: 18px;
+    min-inline-size: 0;
+  }
+
+  .guide-hero h1 {
+    max-inline-size: 18ch;
+    font-size: clamp(2.45rem, 5vw, 4.8rem);
+    line-height: 0.98;
+    overflow-wrap: anywhere;
+  }
+
+  .guide-hero-summary {
+    max-inline-size: 70ch;
+    color: color-mix(in srgb, var(--text) 82%, var(--muted));
+    font-size: 1.05rem;
+    line-height: 1.65;
+  }
+
+  .guide-hero .guide-facts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0;
+  }
+
+  .guide-hero .guide-facts > div {
+    min-inline-size: 0;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: rgb(255 255 255 / 0.04);
+  }
+
+  .guide-hero .guide-facts dt {
+    color: var(--cyan);
+    font-size: 0.7rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .guide-hero .guide-facts dd {
+    margin: 6px 0 0;
+    color: var(--text);
+    font-weight: 850;
+    overflow-wrap: anywhere;
+  }
+
+  .guide-hero-byline {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 8px 18px !important;
+    color: var(--soft);
+    font-size: 0.8rem;
+  }
+
+  .guide-toolbar {
+    border-color: color-mix(in srgb, var(--cyan) 18%, var(--border));
+    box-shadow: 0 12px 30px rgb(0 0 0 / 0.16);
+  }
+
+  .guide-section-card {
+    position: relative;
+    overflow: hidden;
+    padding-inline-start: clamp(24px, 4vw, 38px);
+    border-color: color-mix(in srgb, var(--cyan) 16%, var(--border));
+    background: linear-gradient(110deg, rgb(38 217 255 / 0.035), transparent 36%), var(--surface);
+    box-shadow: 0 16px 34px rgb(0 0 0 / 0.12);
+  }
+
+  .guide-section-card::before {
+    position: absolute;
+    inset-block: 18px;
+    inset-inline-start: 0;
+    inline-size: 3px;
+    background: linear-gradient(var(--cyan), var(--pink));
+    content: '';
+  }
+
+  .guide-section-card h2 {
+    font-size: clamp(1.45rem, 2.5vw, 2rem);
+  }
+
+  .team-grid {
+    gap: 18px;
+  }
+
+  .team-card {
+    display: grid;
+    gap: 20px;
+    padding: clamp(20px, 3vw, 30px);
+    border-color: color-mix(in srgb, var(--cyan) 22%, var(--border));
+    background: linear-gradient(145deg, rgb(38 217 255 / 0.055), transparent 38%), var(--surface);
+    box-shadow: 0 20px 46px rgb(0 0 0 / 0.18);
+  }
+
+  .team-card-heading {
+    display: grid;
+    gap: 8px;
+  }
+
+  .team-card-heading h3 {
+    font-size: clamp(1.45rem, 3vw, 2rem);
+  }
+
+  .team-card-heading p {
+    max-inline-size: 78ch;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .team-card-kicker {
+    display: inline-flex;
+    gap: 7px;
+    align-items: center;
+    color: var(--cyan);
+    font-size: 0.72rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .team-card-kicker svg {
+    inline-size: 16px;
+    block-size: 16px;
+  }
+
+  .guide-character-source-panel {
+    display: grid;
+    grid-template-columns: minmax(180px, auto) minmax(0, 1fr);
+    gap: 14px 22px;
+    align-items: center;
+    margin-block: 16px;
+    padding: 16px;
+    border: 1px solid color-mix(in srgb, var(--cyan) 26%, var(--border));
+    border-radius: var(--radius-sm);
+    background: rgb(38 217 255 / 0.045);
+  }
+
+  .guide-character-source-panel > div:first-child {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .guide-character-source-panel img {
+    inline-size: 64px;
+    block-size: 64px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    object-position: top center;
+  }
+
+  .guide-character-source-panel span,
+  .guide-character-source-panel dl > div {
+    display: grid;
+    gap: 3px;
+  }
+
+  .guide-character-source-panel dl {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0;
+  }
+
+  .guide-character-source-panel :is(dt, small) {
+    color: var(--soft);
+    font-size: 0.7rem;
+  }
+
+  .guide-character-source-panel dd {
+    margin: 0;
+    font-weight: 800;
+  }
+
+  .guide-character-source-panel > p {
+    grid-column: 1 / -1;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .embedded-team-form .editor-field-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(190px, 0.34fr);
+  }
+
+  .inline-reply-composer {
+    margin-block: 12px 4px;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--cyan) 35%, var(--border));
+    border-inline-start: 3px solid var(--cyan);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--panel) 94%, #082534);
+    box-shadow: 0 14px 34px rgb(0 0 0 / 0.2);
+    animation: reply-composer-in 170ms ease-out both;
+  }
+
+  .reply-context,
+  .comment-composer-footer {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .reply-context label {
+    color: var(--text);
+    font-weight: 850;
+  }
+
+  .comment-composer-footer .inline-status {
+    flex: 1 1 auto;
+  }
+
+  @keyframes reply-composer-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .leak-source-report {
+    display: grid;
+    gap: 14px;
+  }
+
+  .leak-source-overview {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .leak-source-overview > div {
+    display: grid;
+    gap: 4px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: rgb(255 255 255 / 0.035);
+  }
+
+  .leak-source-overview strong {
+    color: var(--text);
+    font-size: 1.05rem;
+  }
+
+  .leak-source-overview span,
+  .leak-selection-row > span {
+    color: var(--soft);
+    font-size: 0.75rem;
+  }
+
+  .leak-selection-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 13px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: rgb(255 255 255 / 0.03);
+  }
+
+  .leak-bulk-toolbar {
+    position: sticky;
+    z-index: 12;
+    inset-block-start: 10px;
+    display: grid;
+    grid-template-columns: auto minmax(240px, 1fr) auto;
+    gap: 14px;
+    align-items: end;
+    padding: 14px 16px;
+    border: 1px solid color-mix(in srgb, var(--cyan) 46%, var(--border));
+    border-radius: var(--radius);
+    background: color-mix(in srgb, #101722 94%, transparent);
+    box-shadow: 0 18px 48px rgb(0 0 0 / 0.42), 0 0 0 1px rgb(38 217 255 / 0.08);
+    backdrop-filter: blur(18px);
+  }
+
+  .leak-bulk-count {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    min-block-size: 44px;
+    color: var(--cyan);
+    white-space: nowrap;
+  }
+
+  .leak-bulk-count svg {
+    inline-size: 20px;
+    block-size: 20px;
+  }
+
+  .leak-bulk-toolbar > label {
+    display: grid;
+    gap: 5px;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+
+  .leak-bulk-toolbar select {
+    min-block-size: 44px;
+  }
+
+  @media (max-width: 900px) {
+    .guide-hero {
+      min-block-size: 0;
+      grid-template-columns: minmax(220px, 0.68fr) minmax(0, 1fr);
+    }
+
+    .guide-hero .guide-facts,
+    .guide-character-source-panel dl,
+    .leak-source-overview {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .guide-character-source-panel,
+    .leak-bulk-toolbar {
+      grid-template-columns: 1fr;
+    }
+
+  }
+
+  @media (max-width: 640px) {
+    .guide-hero {
+      grid-template-columns: 1fr;
+      padding: 18px;
+    }
+
+    .guide-hero > img {
+      block-size: min(410px, 54vh);
+    }
+
+    .guide-hero h1 {
+      font-size: 2.45rem;
+    }
+
+    .guide-hero .guide-facts,
+    .guide-character-source-panel dl,
+    .leak-source-overview,
+    .embedded-team-form .editor-field-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .comment-composer-footer,
+    .reply-context {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .comment-composer-footer .primary-button,
+    .leak-bulk-actions,
+    .leak-bulk-actions .primary-button {
+      inline-size: 100%;
+    }
+
+    .leak-bulk-toolbar {
+      max-block-size: min(76vh, 360px);
+      overflow-y: auto;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .inline-reply-composer,
+    .rotation-cycle-end svg {
+      animation: none;
     }
   }
 }

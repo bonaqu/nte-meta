@@ -1656,6 +1656,61 @@ await mainInfo
     ).toBeVisible();
   });
 
+  test('owner снимает реакцию и массово отклоняет публикации', async ({
+    page,
+  }) => {
+    const candidateTitles = [
+      `Групповая проверка A ${runId}`,
+      `Групповая проверка B ${runId}`,
+    ];
+
+    for (const [index, title] of candidateTitles.entries()) {
+      const submitted = await owner.post('/api/leak-candidates', {
+        data: {
+          title,
+          sourceUrl: `https://example.com/leak-bulk-${index}-${encodeURIComponent(runId)}`,
+          sourceName: 'Редакционный тест',
+          note: 'Проверка группового решения редактора.',
+          status: 'слух',
+        },
+      });
+      expect(submitted.status()).toBe(201);
+    }
+
+    await page.goto('/#/profile');
+    await page.getByLabel('Логин').fill(ownerUsername);
+    await page.getByLabel('Пароль').fill(ownerPassword);
+    await page.getByRole('button', { name: 'Войти', exact: true }).click();
+
+    await page.goto('/#/guides/hotori-burst-guide');
+    const likeButton = page
+      .locator('.rating-bar')
+      .getByRole('button', { name: /Нравится:/ });
+    await likeButton.click();
+    await expect(likeButton).toHaveAttribute('aria-pressed', 'true');
+    await likeButton.click();
+    await expect(likeButton).toHaveAttribute('aria-pressed', 'false');
+
+    await page.goto('/#/');
+    await expect(page.getByRole('heading', { name: 'NTE Meta' })).toBeVisible();
+    await page.getByRole('button', { name: 'Добавить слив' }).click();
+    const leakDialog = page.locator('dialog[open]').filter({
+      has: page.getByRole('heading', { name: 'Добавить слив', level: 1 }),
+    });
+    const discovery = leakDialog.locator('.leak-discovery');
+
+    for (const title of candidateTitles) {
+      const card = discovery.locator('.leak-candidate').filter({ hasText: title });
+      await expect(card).toBeVisible();
+      await card.getByRole('checkbox', { name: 'Выбрать публикацию' }).check();
+    }
+
+    await discovery.getByRole('button', { name: 'Отклонить выбранные' }).click();
+    const confirmDialog = page.locator('dialog[open].confirm-dialog');
+    await confirmDialog.getByRole('button', { name: 'Подтвердить' }).click();
+    await expect(discovery.getByText('Отклонено публикаций: 2.')).toBeVisible();
+  });
+
   test('смена пароля отзывает сессии, login и logout работают', async () => {
     const nextPassword = 'Playwright-New-Strong-84!';
     const changed = await owner.post('/api/auth/change-password', {

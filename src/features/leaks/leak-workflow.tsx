@@ -249,9 +249,14 @@ export function LeakDiscoveryPanel({
   const [queueSort, setQueueSort] = useState<'new' | 'confidence'>('new');
   const [pending, setPending] = useState(false);
   const [actionId, setActionId] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<
+    'rejected' | 'duplicate' | null
+  >(null);
   const [editorNotes, setEditorNotes] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
   const [tone, setTone] = useState<'info' | 'danger' | 'success'>('info');
+  const bulkDialogRef = useRef<HTMLDialogElement>(null);
 
   const visibleCandidates = useMemo(() => {
     const now = Date.now();
@@ -289,6 +294,16 @@ export function LeakDiscoveryPanel({
     sourceTypeFilter,
     translationFilter,
   ]);
+  const selectableCandidates = visibleCandidates.filter(
+    (candidate) => candidate.reviewStatus === 'pending',
+  );
+  const selectedCandidates = candidates.filter(
+    (candidate) =>
+      candidate.reviewStatus === 'pending' && selectedIds.has(candidate.id),
+  );
+  const allVisibleSelected =
+    selectableCandidates.length > 0 &&
+    selectableCandidates.every((candidate) => selectedIds.has(candidate.id));
 
   useEffect(() => {
     let mounted = true;
@@ -296,6 +311,7 @@ export function LeakDiscoveryPanel({
       if (!mounted) return;
       if (result.ok) {
         setCandidates(result.data);
+        setSelectedIds(new Set());
         setEditorNotes(
           Object.fromEntries(result.data.map((item) => [item.id, item.editorNote || ''])),
         );
@@ -317,6 +333,7 @@ export function LeakDiscoveryPanel({
     const result = await discoverLeakCandidates(query);
     if (result.ok) {
       setCandidates(result.data.candidates);
+      setSelectedIds(new Set());
       setEditorNotes(
         Object.fromEntries(
           result.data.candidates.map((item) => [item.id, item.editorNote || '']),
@@ -348,6 +365,11 @@ export function LeakDiscoveryPanel({
           item.id === candidate.id ? { ...item, reviewStatus } : item,
         ),
       );
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        next.delete(candidate.id);
+        return next;
+      });
       setTone('success');
       setMessage(
         reviewStatus === 'duplicate'
@@ -385,6 +407,79 @@ export function LeakDiscoveryPanel({
       setTone('danger');
       setMessage(result.error);
     }
+    setActionId('');
+  }
+
+  function toggleCandidate(candidateId: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(candidateId)) next.delete(candidateId);
+      else next.add(candidateId);
+      return next;
+    });
+  }
+
+  function toggleVisibleCandidates() {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (allVisibleSelected) {
+        selectableCandidates.forEach((candidate) => next.delete(candidate.id));
+      } else {
+        selectableCandidates.forEach((candidate) => next.add(candidate.id));
+      }
+      return next;
+    });
+  }
+
+  function requestBulkAction(action: 'rejected' | 'duplicate') {
+    if (!selectedCandidates.length) return;
+    setBulkAction(action);
+    bulkDialogRef.current?.showModal();
+  }
+
+  async function applyBulkAction() {
+    if (!bulkAction || !selectedCandidates.length) return;
+    bulkDialogRef.current?.close();
+    setActionId('bulk');
+    setMessage('');
+    const successfulIds = new Set<string>();
+    let failedCount = 0;
+
+    for (let index = 0; index < selectedCandidates.length; index += 4) {
+      const batch = selectedCandidates.slice(index, index + 4);
+      const results = await Promise.all(
+        batch.map(async (candidate) => ({
+          id: candidate.id,
+          result: await reviewLeakCandidate(candidate.id, bulkAction),
+        })),
+      );
+      results.forEach(({ id, result }) => {
+        if (result.ok) successfulIds.add(id);
+        else failedCount += 1;
+      });
+    }
+
+    setCandidates((current) =>
+      current.map((candidate) =>
+        successfulIds.has(candidate.id)
+          ? { ...candidate, reviewStatus: bulkAction }
+          : candidate,
+      ),
+    );
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      successfulIds.forEach((id) => next.delete(id));
+      return next;
+    });
+    setTone(failedCount ? 'danger' : 'success');
+    setMessage(
+      failedCount
+        ? `Обработано: ${successfulIds.size}. Не удалось обработать: ${failedCount}.`
+        : bulkAction === 'rejected'
+          ? `Отклонено публикаций: ${successfulIds.size}.`
+          : `Отмечено дубликатами: ${successfulIds.size}.`,
+    );
+    setBulkAction(null);
     setActionId('');
   }
 
@@ -484,6 +579,38 @@ export function LeakDiscoveryPanel({
         <span>{visibleCandidates.length} публикаций</span>
       </div>
 
+      {selectableCandidates.length ? (
+        <div className="leak-bulk-toolbar" aria-label="Групповые действия">
+          <label className="leak-select-all">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={toggleVisibleCandidates}
+            />
+            {allVisibleSelected ? 'Снять выбор' : 'Выбрать все на экране'}
+          </label>
+          <strong>{selectedCandidates.length} выбрано</strong>
+          <div className="leak-bulk-actions">
+            <button
+              className="ghost-button"
+              type="button"
+              disabled={!selectedCandidates.length || actionId === 'bulk'}
+              onClick={() => requestBulkAction('duplicate')}
+            >
+              Отметить дубликатами
+            </button>
+            <button
+              className="ghost-button danger"
+              type="button"
+              disabled={!selectedCandidates.length || actionId === 'bulk'}
+              onClick={() => requestBulkAction('rejected')}
+            >
+              <XCircle aria-hidden="true" /> Отклонить выбранные
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="leak-queue-filters" aria-label="Фильтры редакционной очереди">
         <SlidersHorizontal aria-hidden="true" />
         <label>
@@ -563,7 +690,21 @@ export function LeakDiscoveryPanel({
       <div className="leak-candidate-list">
         {visibleCandidates.length ? (
           visibleCandidates.map((candidate) => (
-            <article className="leak-candidate" key={candidate.id}>
+            <article
+              className={`leak-candidate ${selectedIds.has(candidate.id) ? 'is-selected' : ''}`}
+              key={candidate.id}
+            >
+              {candidate.reviewStatus === 'pending' ? (
+                <label className="leak-candidate-select">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(candidate.id)}
+                    disabled={actionId === 'bulk'}
+                    onChange={() => toggleCandidate(candidate.id)}
+                  />
+                  <span>Выбрать публикацию</span>
+                </label>
+              ) : null}
               <div className="leak-candidate-meta">
                 <span className={`leak-status ${candidate.suggestedStatus}`}>
                   {candidate.suggestedStatus}
@@ -635,7 +776,7 @@ export function LeakDiscoveryPanel({
                     Тип публикации
                     <select
                       value={candidate.suggestedStatus}
-                      disabled={actionId === candidate.id}
+                      disabled={actionId === candidate.id || actionId === 'bulk'}
                       onChange={(event) =>
                         void updateEditorial(candidate, {
                           suggestedStatus: event.target.value as LeakStatus,
@@ -652,7 +793,7 @@ export function LeakDiscoveryPanel({
                     Доверие к источнику
                     <select
                       value={candidate.trustLevel}
-                      disabled={actionId === candidate.id}
+                      disabled={actionId === candidate.id || actionId === 'bulk'}
                       onChange={(event) =>
                         void updateEditorial(candidate, {
                           trustLevel: event.target
@@ -669,7 +810,7 @@ export function LeakDiscoveryPanel({
                     Статус перевода
                     <select
                       value={candidate.translationStatus}
-                      disabled={actionId === candidate.id}
+                      disabled={actionId === candidate.id || actionId === 'bulk'}
                       onChange={(event) =>
                         void updateEditorial(candidate, {
                           translationStatus: event.target
@@ -701,7 +842,7 @@ export function LeakDiscoveryPanel({
                   <button
                     className="ghost-button"
                     type="button"
-                    disabled={actionId === candidate.id}
+                    disabled={actionId === candidate.id || actionId === 'bulk'}
                     onClick={() =>
                       void updateEditorial(candidate, {
                         editorNote: editorNotes[candidate.id] || '',
@@ -718,7 +859,7 @@ export function LeakDiscoveryPanel({
                     <button
                       className="primary-button"
                       type="button"
-                      disabled={actionId === candidate.id}
+                      disabled={actionId === candidate.id || actionId === 'bulk'}
                       onClick={() => void promote(candidate)}
                     >
                       <FilePenLine aria-hidden="true" /> В черновик
@@ -726,7 +867,7 @@ export function LeakDiscoveryPanel({
                     <button
                       className="ghost-button"
                       type="button"
-                      disabled={actionId === candidate.id}
+                      disabled={actionId === candidate.id || actionId === 'bulk'}
                       onClick={() => void review(candidate, 'duplicate')}
                     >
                       Дубликат
@@ -734,7 +875,7 @@ export function LeakDiscoveryPanel({
                     <button
                       className="text-button danger"
                       type="button"
-                      disabled={actionId === candidate.id}
+                      disabled={actionId === candidate.id || actionId === 'bulk'}
                       onClick={() => void review(candidate, 'rejected')}
                     >
                       <XCircle aria-hidden="true" /> Отклонить
@@ -756,6 +897,38 @@ export function LeakDiscoveryPanel({
           />
         )}
       </div>
+      <dialog className="confirm-dialog" ref={bulkDialogRef}>
+        <form method="dialog">
+          <h2>
+            {bulkAction === 'rejected'
+              ? 'Отклонить выбранные публикации?'
+              : 'Отметить выбранное дубликатами?'}
+          </h2>
+          <p>
+            Будет обработано публикаций: {selectedCandidates.length}. Это решение
+            можно позже изменить в общей очереди.
+          </p>
+          <div className="button-row">
+            <button
+              className={bulkAction === 'rejected' ? 'danger-button' : 'primary-button'}
+              type="button"
+              onClick={() => void applyBulkAction()}
+            >
+              Подтвердить
+            </button>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => {
+                setBulkAction(null);
+                bulkDialogRef.current?.close();
+              }}
+            >
+              Отмена
+            </button>
+          </div>
+        </form>
+      </dialog>
     </section>
   );
 }

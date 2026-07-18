@@ -1808,6 +1808,11 @@ function CharactersPage({
     () => getAttributeOptions(data.characters),
     [data.characters],
   );
+  const hasActiveFilters =
+    Boolean(query.trim()) ||
+    rarity !== 'Любая редкость' ||
+    tier !== 'Любой тир' ||
+    attribute !== anyAttributeOption;
 
   const filtered = useMemo(() => {
     const normalizedQuery = normalizeSearchText(deferredQuery);
@@ -1833,6 +1838,13 @@ function CharactersPage({
         includePrivate: Boolean(user && roleWeight[user.role] >= roleWeight.editor),
       }),
     );
+  }
+
+  function resetFilters() {
+    setQuery('');
+    setRarity('Любая редкость');
+    setTier('Любой тир');
+    setAttribute(anyAttributeOption);
   }
 
   return (
@@ -1880,13 +1892,20 @@ function CharactersPage({
           options={rarityOptions}
         />
       </section>
-      <p
-        id="character-results-count"
-        className="filter-summary"
-        aria-live="polite"
-      >
-        Найдено: {filtered.length} из {data.characters.length}
-      </p>
+      <div className="filter-results-row">
+        <p
+          id="character-results-count"
+          className="filter-summary"
+          aria-live="polite"
+        >
+          Найдено: {filtered.length} из {data.characters.length}
+        </p>
+        {hasActiveFilters ? (
+          <button className="ghost-button filter-reset-button" type="button" onClick={resetFilters}>
+            <RotateCw aria-hidden="true" /> Сбросить фильтры
+          </button>
+        ) : null}
+      </div>
       {filtered.length ? (
         <section className="character-grid">
           {filtered.map((character) => (
@@ -3918,6 +3937,11 @@ function GuidesPage({
     () => getAttributeOptions(data.characters),
     [data.characters],
   );
+  const hasActiveFilters =
+    Boolean(query.trim()) ||
+    rarity !== 'Любая редкость' ||
+    tier !== 'Любой тир' ||
+    attribute !== anyAttributeOption;
   const filtered = useMemo(() => {
     const needle = normalizeSearchText(deferredQuery);
     return data.guides.filter((guide) => {
@@ -3935,6 +3959,13 @@ function GuidesPage({
       );
     });
   }, [attribute, data, deferredQuery, rarity, tier]);
+
+  function resetFilters() {
+    setQuery('');
+    setRarity('Любая редкость');
+    setTier('Любой тир');
+    setAttribute(anyAttributeOption);
+  }
 
   return (
     <div className="page-stack">
@@ -3982,9 +4013,16 @@ function GuidesPage({
           options={rarityOptions}
         />
       </search>
-      <p id="guide-results-count" className="filter-summary" aria-live="polite">
-        Найдено: {filtered.length} из {data.guides.length}
-      </p>
+      <div className="filter-results-row">
+        <p id="guide-results-count" className="filter-summary" aria-live="polite">
+          Найдено: {filtered.length} из {data.guides.length}
+        </p>
+        {hasActiveFilters ? (
+          <button className="ghost-button filter-reset-button" type="button" onClick={resetFilters}>
+            <RotateCw aria-hidden="true" /> Сбросить фильтры
+          </button>
+        ) : null}
+      </div>
       {filtered.length ? (
         <section className="guide-grid">
           {filtered.map((guide) => (
@@ -4058,9 +4096,9 @@ function TierListsPage({
         <p className="eyebrow">S · A · B · C · D</p>
         <h1>Тир-листы</h1>
         <p>
-          Единый редакционный список S, A, B, C и D. Позиции отражают
-          практическую ценность персонажа для большинства игроков и требуют
-          ручного подтверждения редакцией.
+          Единый редакционный список S, A, B, C и D. Тиры отражают
+          практическую ценность персонажей для большинства игроков, а внутри
+          одного тира все персонажи считаются равноценными.
         </p>
         {canManageContent(user, 'tierlists', 'edit') ? (
           <button
@@ -4094,7 +4132,7 @@ function TierListsPage({
         open={editorOpen}
         title="Редактировать тир-лист"
         eyebrow="Единый S · A · B · C · D"
-        description="Перемещайте персонажей между тирами, меняйте позицию и заметки без отдельной CMS-страницы."
+        description="Перемещайте персонажей между тирами, меняйте порядок карточек и заметки без отдельной CMS-страницы."
         dirty={editorDirty}
         onClose={() => {
           setEditorDirty(false);
@@ -7581,7 +7619,7 @@ function AdminTierlists({
                       dropPlacement ? `is-drop-${dropPlacement}` : ''
                     }`}
                     title={`${character.name}: перетащить или переставить в строке ${tier}`}
-                    aria-label={`${character.name}, ${tier}, позиция ${index + 1}`}
+                    aria-label={`${character.name}, тир ${tier}`}
                     data-drop-placement={dropPlacement || undefined}
                     onDragStart={(event) => {
                       event.dataTransfer.effectAllowed = 'move';

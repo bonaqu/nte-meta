@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { Placeholder } from '@tiptap/extensions';
 import { Markdown } from '@tiptap/markdown';
@@ -15,6 +15,7 @@ import {
   Redo2,
   RemoveFormatting,
   Strikethrough,
+  Unlink,
   Underline,
   Undo2,
 } from 'lucide-react';
@@ -88,6 +89,11 @@ export function RichTextEditor({
   const generatedId = useId();
   const editorId = id || `rich-text-${generatedId.replace(/:/g, '')}`;
   const lastEmittedValue = useRef(value);
+  const linkDialogRef = useRef<HTMLDialogElement>(null);
+  const linkTitleId = useId();
+  const [linkHref, setLinkHref] = useState('');
+  const [linkError, setLinkError] = useState('');
+  const [editingLink, setEditingLink] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -152,14 +158,48 @@ export function RichTextEditor({
     if (action === 'clear') chain.unsetAllMarks().clearNodes().run();
     if (action === 'link') {
       const currentHref = editor.getAttributes('link').href as string | undefined;
-      const href = window.prompt('Введите ссылку', currentHref || 'https://');
-      if (href === null) return;
-      if (!href.trim()) {
-        chain.extendMarkRange('link').unsetLink().run();
-        return;
-      }
-      chain.extendMarkRange('link').setLink({ href: href.trim() }).run();
+      setLinkHref(currentHref || '');
+      setEditingLink(Boolean(currentHref));
+      setLinkError('');
+      linkDialogRef.current?.showModal();
     }
+  }
+
+  function normalizeLinkHref(rawHref: string) {
+    const href = rawHref.trim();
+    if (!href) return '';
+    if (href.startsWith('#') || href.startsWith('/')) return href;
+    const candidate = /^[a-z][a-z\d+.-]*:/i.test(href)
+      ? href
+      : `https://${href}`;
+    try {
+      const url = new URL(candidate, window.location.href);
+      return ['http:', 'https:', 'mailto:'].includes(url.protocol)
+        ? candidate
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function applyLink() {
+    if (!editor) return;
+    const href = normalizeLinkHref(linkHref);
+    if (href === null) {
+      setLinkError('Проверьте адрес. Разрешены ссылки http(s), email и переходы внутри сайта.');
+      return;
+    }
+    if (!href) {
+      setLinkError('Введите адрес ссылки или выберите «Удалить ссылку».');
+      return;
+    }
+    editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+    linkDialogRef.current?.close();
+  }
+
+  function removeLink() {
+    editor?.chain().focus().extendMarkRange('link').unsetLink().run();
+    linkDialogRef.current?.close();
   }
 
   function isActive(action: RichTextAction) {
@@ -232,6 +272,66 @@ export function RichTextEditor({
           <span>{value.length.toLocaleString('ru-RU')} / {maxLength.toLocaleString('ru-RU')}</span>
         </div>
       ) : null}
+      <dialog
+        className="confirm-dialog rich-text-link-dialog"
+        ref={linkDialogRef}
+        aria-labelledby={linkTitleId}
+        onCancel={(event) => {
+          event.preventDefault();
+          linkDialogRef.current?.close();
+        }}
+        onClose={() => editor?.commands.focus()}
+      >
+        <div className="confirm-dialog__content">
+          <div>
+            <p className="eyebrow">Форматирование</p>
+            <h2 id={linkTitleId}>{editingLink ? 'Изменить ссылку' : 'Добавить ссылку'}</h2>
+          </div>
+          <label>
+            Адрес
+            <input
+              value={linkHref}
+              type="text"
+              inputMode="url"
+              autoComplete="url"
+              placeholder="https://example.com"
+              autoFocus
+              aria-invalid={Boolean(linkError)}
+              aria-describedby={linkError ? `${editorId}-link-error` : undefined}
+              onChange={(event) => {
+                setLinkHref(event.target.value);
+                setLinkError('');
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  applyLink();
+                }
+              }}
+            />
+          </label>
+          <p id={`${editorId}-link-error`} className="form-message" aria-live="polite">
+            {linkError || 'Можно вставить полный адрес или ссылку на раздел этого сайта.'}
+          </p>
+          <div className="button-row">
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => linkDialogRef.current?.close()}
+            >
+              Отменить
+            </button>
+            {editingLink ? (
+              <button className="ghost-button danger" type="button" onClick={removeLink}>
+                <Unlink aria-hidden="true" /> Удалить ссылку
+              </button>
+            ) : null}
+            <button className="primary-button" type="button" onClick={applyLink}>
+              <Link2 aria-hidden="true" /> Применить
+            </button>
+          </div>
+        </div>
+      </dialog>
     </div>
   );
 }

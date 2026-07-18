@@ -268,6 +268,15 @@ export type LeakCandidateReviewStatus =
   | 'rejected'
   | 'duplicate';
 
+export interface LeakCandidateEvidence {
+  sourceName: string;
+  sourceUrl: string;
+  sourceType: LeakCandidate['sourceType'];
+  language: LeakCandidate['language'];
+  trustLevel: TrustLevel;
+  publishedAt?: string;
+}
+
 export interface LeakCandidate {
   id: string;
   origin: 'discovery' | 'user';
@@ -293,6 +302,7 @@ export interface LeakCandidate {
   reviewStatus: LeakCandidateReviewStatus;
   translationStatus: 'не требуется' | 'нужен перевод' | 'переведено' | 'проверено';
   editorNote?: string;
+  evidence?: LeakCandidateEvidence[];
   createdLeakId?: string;
   createdAt: string;
   updatedAt?: string;
@@ -363,6 +373,11 @@ export interface CharacterImportLookupResult {
   sources: CharacterImportSource[];
   suggestions: CharacterImportSuggestion[];
   fields: Record<string, string>;
+  coverage?: {
+    readyFields: string[];
+    reviewFields: string[];
+    missingFields: string[];
+  };
 }
 
 export interface Comment {
@@ -390,6 +405,8 @@ export interface Comment {
   activeReactions?: Array<'like' | 'dislike' | 'useful'>;
   status?: 'visible' | 'moderated' | 'deleted';
   parentId?: string;
+  isPinned?: boolean;
+  isAnswer?: boolean;
 }
 
 export type CommentReportReason =

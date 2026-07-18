@@ -246,6 +246,54 @@ test.describe('NTE Meta Worker API', () => {
       data: { useful: 0 },
     });
 
+    const thread = await reporter.post('/api/threads', {
+      data: {
+        title: `Вопрос по механике ${runId}`,
+        summary: 'Проверка принятого ответа и закрепления.',
+        body: 'Подскажите, как работает эта механика в текущем патче?',
+        tags: ['вопрос'],
+      },
+    });
+    expect(thread.status()).toBe(201);
+    const threadId = (await thread.json()).data.id;
+    const threadAnswer = await owner.post('/api/comments', {
+      data: {
+        targetType: 'thread',
+        targetId: threadId,
+        body: 'Проверенный ответ с пояснением для автора треда.',
+      },
+    });
+    expect(threadAnswer.status()).toBe(201);
+    const threadAnswerId = (await threadAnswer.json()).data.id;
+    expect(
+      (
+        await reporter.patch(`/api/comments/${threadAnswerId}`, {
+          data: { isAnswer: true },
+        })
+      ).ok(),
+    ).toBeTruthy();
+    expect(
+      (
+        await owner.patch(`/api/comments/${threadAnswerId}`, {
+          data: { isPinned: true },
+        })
+      ).ok(),
+    ).toBeTruthy();
+    const threadComments = await guest.get(
+      `/api/comments?targetType=thread&targetId=${threadId}`,
+    );
+    expect(threadComments.ok()).toBeTruthy();
+    expect((await threadComments.json()).data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: threadAnswerId,
+          isAnswer: true,
+          isPinned: true,
+        }),
+      ]),
+    );
+    expect((await reporter.delete(`/api/threads/${threadId}`)).ok()).toBeTruthy();
+
     const comments = await guest.get(
       '/api/comments?targetType=site&targetId=community&sort=popular',
     );

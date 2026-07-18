@@ -12,6 +12,11 @@ on:
         required: false
         default: false
         type: boolean
+      import_audit:
+        description: Audit character and guide imports against the published catalog
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -44,11 +49,14 @@ jobs:
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
       - name: Test two browser flows and one editorial API contract
-        if: github.event.inputs.full_suite != 'true'
+        if: github.event.inputs.full_suite != 'true' && github.event.inputs.import_audit != 'true'
         run: npm run test:ci
       - name: Full manually requested regression
         if: github.event.inputs.full_suite == 'true'
         run: npm run test:full
+      - name: Manually requested import catalog audit
+        if: github.event.inputs.import_audit == 'true'
+        run: npm run test:imports
       - name: Verify production API
         run: |
           test -n "$VITE_API_BASE_URL"

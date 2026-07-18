@@ -10,6 +10,7 @@ import React, {
   useState,
 } from 'react';
 import {
+  BadgeCheck,
   BookOpen,
   CheckCircle2,
   ChevronDown,
@@ -28,11 +29,13 @@ import {
   LockKeyhole,
   LogOut,
   Menu,
+  Maximize2,
   MessageCircle,
   MessageSquare,
   Newspaper,
   PanelLeft,
   Pencil,
+  Pin,
   Plus,
   Reply,
   Search,
@@ -120,6 +123,7 @@ import type {
   AuditLogEntry,
   AppSettings,
   Character,
+  CharacterImportLookupResult,
   CharacterImportSuggestion,
   CharacterRoleIcon,
   CharacterVoiceLine,
@@ -1697,20 +1701,24 @@ function MarkdownToolbar({
   textareaRef,
   value,
   onChange,
+  actions = ['bold', 'italic', 'h2', 'list', 'quote', 'link', 'youtube'],
 }: {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   value: string;
   onChange: (value: string) => void;
+  actions?: string[];
 }) {
-  const actions = [
-    ['bold', 'B'],
-    ['italic', 'I'],
-    ['h2', 'H2'],
-    ['list', '•'],
-    ['quote', 'Цитата'],
-    ['link', 'Ссылка'],
-    ['youtube', 'YouTube'],
-  ];
+  const actionLabels: Record<string, string> = {
+    bold: 'B',
+    italic: 'I',
+    h2: 'H2',
+    h3: 'H3',
+    list: '•',
+    quote: 'Цитата',
+    link: 'Ссылка',
+    spoiler: 'Спойлер',
+    youtube: 'YouTube',
+  };
 
   function apply(action: string) {
     const textarea = textareaRef.current;
@@ -1726,9 +1734,9 @@ function MarkdownToolbar({
 
   return (
     <div className="toolbar" aria-label="Панель форматирования текста">
-      {actions.map(([action, label]) => (
+      {actions.map((action) => (
         <button key={action} type="button" onClick={() => apply(action)}>
-          {label}
+          {actionLabels[action] || action}
         </button>
       ))}
     </div>
@@ -2026,6 +2034,15 @@ function CharacterDetailPage({
   const [guideEditorOpen, setGuideEditorOpen] = useState(false);
   const [characterEditorDirty, setCharacterEditorDirty] = useState(false);
   const [guideEditorDirty, setGuideEditorDirty] = useState(false);
+  const [activeCharacterSection, setActiveCharacterSection] = useState(
+    'character-biography',
+  );
+  const [activeSkin, setActiveSkin] = useState<{
+    name: string;
+    imageUrl: string;
+    description: string;
+  } | null>(null);
+  const skinDialogRef = useRef<HTMLDialogElement>(null);
   const scrollToCharacterSection = useCallback(
     (id: string, behavior: ScrollBehavior = 'smooth') => {
       const target = document.getElementById(id);
@@ -2034,6 +2051,39 @@ function CharacterDetailPage({
     },
     [],
   );
+
+  useEffect(() => {
+    const sectionIds = [
+      'character-biography',
+      'character-abilities',
+      'character-awakenings',
+      'character-progression',
+      'character-wardrobe',
+      'character-voice',
+    ];
+    const sections = sectionIds
+      .map((id) => document.getElementById(id))
+      .filter((section): section is HTMLElement => Boolean(section));
+    if (!sections.length || !('IntersectionObserver' in window)) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top);
+        if (visible[0]?.target.id) setActiveCharacterSection(visible[0].target.id);
+      },
+      { rootMargin: '-150px 0px -58% 0px', threshold: [0, 0.12, 0.4] },
+    );
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, [slug]);
+
+  useEffect(() => {
+    const dialog = skinDialogRef.current;
+    if (!dialog) return;
+    if (activeSkin && !dialog.open) dialog.showModal();
+    if (!activeSkin && dialog.open) dialog.close();
+  }, [activeSkin]);
 
   if (!character) {
     return (
@@ -2163,12 +2213,20 @@ function CharacterDetailPage({
           ['character-abilities', 'Способности'],
           ['character-awakenings', 'Пробуждения'],
           ['character-progression', 'Прокачка'],
+          ...(profile.skins.length
+            ? [['character-wardrobe', 'Гардероб']]
+            : []),
           ['character-voice', 'Озвучка'],
         ].map(([id, label]) => (
           <button
             type="button"
             key={id}
-            onClick={() => scrollToCharacterSection(id)}
+            className={activeCharacterSection === id ? 'active' : ''}
+            aria-current={activeCharacterSection === id ? 'location' : undefined}
+            onClick={() => {
+              setActiveCharacterSection(id);
+              scrollToCharacterSection(id);
+            }}
           >
             {label}
           </button>
@@ -2386,13 +2444,24 @@ function CharacterDetailPage({
       </section>
 
       {profile.skins.length ? (
-        <section className="character-detail-section">
+        <section className="character-detail-section" id="character-wardrobe">
           <SectionHeader title="Гардероб" />
           <div className="skin-grid">
             {profile.skins.map((skin) => (
               <article key={skin.id}>
                 {skin.imageUrl ? (
-                  <div className="skin-media">
+                  <button
+                    className="skin-media"
+                    type="button"
+                    aria-label={`Открыть изображение «${skin.name}» целиком`}
+                    onClick={() =>
+                      setActiveSkin({
+                        name: skin.name,
+                        imageUrl: skin.imageUrl,
+                        description: skin.description,
+                      })
+                    }
+                  >
                     <img
                       src={resolveAssetUrl(skin.imageUrl)}
                       alt={skin.name}
@@ -2401,7 +2470,10 @@ function CharacterDetailPage({
                       loading="lazy"
                       referrerPolicy="no-referrer"
                     />
-                  </div>
+                    <span className="skin-media-action">
+                      <Maximize2 aria-hidden="true" /> Посмотреть целиком
+                    </span>
+                  </button>
                 ) : null}
                 <h3>{skin.name}</h3>
                 <p>{skin.description}</p>
@@ -2467,6 +2539,36 @@ function CharacterDetailPage({
           <MarkdownPreview value={profile.trivia} />
         </section>
       ) : null}
+      <dialog
+        className="skin-lightbox"
+        ref={skinDialogRef}
+        onClose={() => setActiveSkin(null)}
+        aria-label={activeSkin ? `Гардероб: ${activeSkin.name}` : 'Гардероб'}
+      >
+        {activeSkin ? (
+          <div className="skin-lightbox-layout">
+            <button
+              className="icon-button skin-lightbox-close"
+              type="button"
+              aria-label="Закрыть полноразмерное изображение"
+              onClick={() => setActiveSkin(null)}
+            >
+              <X aria-hidden="true" />
+            </button>
+            <img
+              src={resolveAssetUrl(activeSkin.imageUrl)}
+              alt={activeSkin.name}
+              loading="eager"
+              referrerPolicy="no-referrer"
+            />
+            <div>
+              <p className="eyebrow">Гардероб</p>
+              <h2>{activeSkin.name}</h2>
+              {activeSkin.description ? <p>{activeSkin.description}</p> : null}
+            </div>
+          </div>
+        ) : null}
+      </dialog>
       <CommentsBlock
         targetType="character"
         targetId={character.id}
@@ -2650,15 +2752,36 @@ function GuideDetail({
 }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorDirty, setEditorDirty] = useState(false);
+  const [activeGuideSection, setActiveGuideSection] = useState('');
   const relatedTeams = data.teams.filter(
     (team) =>
       team.guideId === guide.id ||
       team.members.some((member) => member.characterId === character.id),
   );
   const tierPlacement = getCharacterTierPlacement(data, character.id);
-  const orderedSections = [...guide.sections].sort(
-    (a, b) => a.position - b.position,
+  const orderedSections = useMemo(
+    () => [...guide.sections].sort((a, b) => a.position - b.position),
+    [guide.sections],
   );
+
+  useEffect(() => {
+    const sections = orderedSections
+      .map((section) => document.getElementById(section.id))
+      .filter((section): section is HTMLElement => Boolean(section));
+    if (!sections.length || !('IntersectionObserver' in window)) return;
+    setActiveGuideSection((current) => current || sections[0].id);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top);
+        if (visible[0]?.target.id) setActiveGuideSection(visible[0].target.id);
+      },
+      { rootMargin: '-120px 0px -62% 0px', threshold: [0, 0.15, 0.5] },
+    );
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, [orderedSections]);
 
   return (
     <div className="page-stack">
@@ -2684,9 +2807,20 @@ function GuideDetail({
         <aside className="toc" aria-label="Навигация по гайду">
           <strong>Разделы</strong>
           {orderedSections.map((section) => (
-            <a key={section.id} href={`#${section.id}`}>
+            <button
+              type="button"
+              key={section.id}
+              className={activeGuideSection === section.id ? 'active' : ''}
+              aria-current={activeGuideSection === section.id ? 'location' : undefined}
+              onClick={() => {
+                setActiveGuideSection(section.id);
+                document
+                  .getElementById(section.id)
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+            >
               {section.title}
-            </a>
+            </button>
           ))}
         </aside>
         <div className="guide-section-list">
@@ -2811,8 +2945,8 @@ function RatingBar({
   }
 
   return (
-    <div>
-      <div className="rating-bar" aria-label="Оценка гайда">
+    <div className="rating-control">
+      <div className="rating-bar" aria-label="Оценка материала">
         <button
           type="button"
           disabled={pending}
@@ -2837,9 +2971,11 @@ function RatingBar({
           <CheckCircle2 aria-hidden="true" /> Полезно {score.useful}
         </button>
       </div>
-      <p className="inline-status" aria-live="polite">
-        {message}
-      </p>
+      {message ? (
+        <p className="inline-status rating-status" aria-live="polite">
+          {message}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -2982,6 +3118,7 @@ function CommentsBlock({
   const [reportDetails, setReportDetails] = useState('');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(
     new Set(),
   );
@@ -2989,6 +3126,15 @@ function CommentsBlock({
   const reportDialogRef = useRef<HTMLDialogElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const draftKey = `nte-comment-draft:${targetType}:${targetId}`;
+  const canModerateComments = Boolean(
+    user && ['moderator', 'admin', 'owner'].includes(user.role),
+  );
+  const canChooseAnswer = Boolean(
+    targetType === 'thread' &&
+      user &&
+      (canModerateComments ||
+        data.threads.find((thread) => thread.id === targetId)?.authorId === user.id),
+  );
   const threadedComments = useMemo(() => {
     const byParent = new Map<string, Comment[]>();
     const roots: Comment[] = [];
@@ -3235,6 +3381,41 @@ function CommentsBlock({
     }
   }
 
+  async function toggleCommentMarker(
+    comment: Comment,
+    marker: 'isPinned' | 'isAnswer',
+  ) {
+    setActionId(comment.id);
+    const nextValue = !comment[marker];
+    const result = await updateComment(
+      comment.id,
+      marker === 'isPinned'
+        ? { isPinned: nextValue }
+        : { isAnswer: nextValue },
+    );
+    if (result.ok) {
+      setComments((current) =>
+        current.map((item) => ({
+          ...item,
+          ...(marker === 'isAnswer' && nextValue ? { isAnswer: false } : {}),
+          ...(item.id === comment.id ? { [marker]: nextValue } : {}),
+        })),
+      );
+      setMessage(
+        marker === 'isPinned'
+          ? nextValue
+            ? 'Комментарий закреплён.'
+            : 'Комментарий откреплён.'
+          : nextValue
+            ? 'Ответ отмечен как принятый.'
+            : 'Отметка принятого ответа снята.',
+      );
+    } else {
+      setMessage(result.error);
+    }
+    setActionId('');
+  }
+
   function requestReport(comment: Comment) {
     setReportTarget(comment);
     setReportReason('spam');
@@ -3291,6 +3472,22 @@ function CommentsBlock({
             </button>
           </div>
         ) : null}
+        <div className="comment-composer-toolbar">
+          <MarkdownToolbar
+            textareaRef={bodyRef}
+            value={body}
+            onChange={setBody}
+            actions={['bold', 'italic', 'list', 'quote', 'link', 'spoiler']}
+          />
+          <button
+            className="text-button"
+            type="button"
+            aria-pressed={previewOpen}
+            onClick={() => setPreviewOpen((current) => !current)}
+          >
+            {previewOpen ? 'Скрыть предпросмотр' : 'Предпросмотр'}
+          </button>
+        </div>
         <textarea
           ref={bodyRef}
           id="comment-body"
@@ -3307,6 +3504,15 @@ function CommentsBlock({
           disabled={!user || pending}
           aria-describedby="comment-status"
         />
+        {previewOpen ? (
+          <div className="comment-markdown-preview" aria-label="Предпросмотр комментария">
+            {body.trim() ? (
+              <MarkdownPreview value={body} allowMedia={false} />
+            ) : (
+              <p>Начните писать, чтобы увидеть форматирование.</p>
+            )}
+          </div>
+        ) : null}
         <small className="character-counter">{body.length} / 4000</small>
         <button
           className="primary-button"
@@ -3334,7 +3540,19 @@ function CommentsBlock({
               key={comment.id}
             >
               <div className="comment-heading">
-                <strong>{comment.author}</strong>
+                <div className="comment-author-line">
+                  <strong>{comment.author}</strong>
+                  {comment.isPinned ? (
+                    <span className="comment-marker is-pinned">
+                      <Pin aria-hidden="true" /> Закреплено
+                    </span>
+                  ) : null}
+                  {comment.isAnswer ? (
+                    <span className="comment-marker is-answer">
+                      <BadgeCheck aria-hidden="true" /> Принятый ответ
+                    </span>
+                  ) : null}
+                </div>
                 <span>
                   {formatDate(comment.createdAt)}
                   {comment.updatedAt && comment.updatedAt !== comment.createdAt
@@ -3378,7 +3596,7 @@ function CommentsBlock({
                   </div>
                 </div>
               ) : (
-                <p>{comment.body}</p>
+                <MarkdownPreview value={comment.body} allowMedia={false} />
               )}
               {depth === 0 && (branchReplyCounts.get(comment.id) || 0) > 0 ? (
                 <button
@@ -3485,6 +3703,30 @@ function CommentsBlock({
                       Удалить
                     </button>
                   </>
+                ) : null}
+                {canModerateComments ? (
+                  <button
+                    className={`text-button ${comment.isPinned ? 'is-active' : ''}`}
+                    type="button"
+                    aria-pressed={comment.isPinned || false}
+                    disabled={actionId === comment.id}
+                    onClick={() => void toggleCommentMarker(comment, 'isPinned')}
+                  >
+                    <Pin aria-hidden="true" />
+                    {comment.isPinned ? 'Открепить' : 'Закрепить'}
+                  </button>
+                ) : null}
+                {canChooseAnswer ? (
+                  <button
+                    className={`text-button ${comment.isAnswer ? 'is-active' : ''}`}
+                    type="button"
+                    aria-pressed={comment.isAnswer || false}
+                    disabled={actionId === comment.id}
+                    onClick={() => void toggleCommentMarker(comment, 'isAnswer')}
+                  >
+                    <BadgeCheck aria-hidden="true" />
+                    {comment.isAnswer ? 'Снять ответ' : 'Принять ответ'}
+                  </button>
                 ) : null}
               </div>
             </article>
@@ -5084,6 +5326,9 @@ function AdminGuides({
   const [guideImportDecisions, setGuideImportDecisions] = useState<
     Record<string, 'accepted' | 'rejected'>
   >({});
+  const [guideImportCoverage, setGuideImportCoverage] = useState<
+    CharacterImportLookupResult['coverage']
+  >();
   const [guideMeta, setGuideMeta] = useState({
     title: guide?.title || '',
     summary: guide?.summary || '',
@@ -5129,6 +5374,10 @@ function AdminGuides({
     if (!guide) {
       return;
     }
+
+    setGuideImportSuggestions([]);
+    setGuideImportDecisions({});
+    setGuideImportCoverage(undefined);
 
     const nextSections = [...guide.sections].sort(
       (a, b) => a.position - b.position,
@@ -5418,6 +5667,7 @@ function AdminGuides({
     if (result.ok) {
       setGuideImportSuggestions(result.data.suggestions || []);
       setGuideImportDecisions({});
+      setGuideImportCoverage(result.data.coverage);
       setMessage(result.data.message);
     } else {
       setMessage(result.error);
@@ -6003,6 +6253,22 @@ function AdminGuides({
         >
           <Search aria-hidden="true" /> Найти источники гайда
         </button>
+        {guideImportCoverage ? (
+          <div className="import-coverage">
+            <div>
+              <strong>Можно сверять</strong>
+              <span>{guideImportCoverage.readyFields.join(', ') || 'Нет'}</span>
+            </div>
+            <div>
+              <strong>Нужна ручная проверка</strong>
+              <span>{guideImportCoverage.reviewFields.join(', ') || 'Нет'}</span>
+            </div>
+            <div>
+              <strong>Не найдено</strong>
+              <span>{guideImportCoverage.missingFields.join(', ') || 'Нет'}</span>
+            </div>
+          </div>
+        ) : null}
         {guideImportSuggestions.length ? (
             <div className="import-suggestion-list">
                 {guideImportSuggestions.map((suggestion) => {

@@ -12,6 +12,7 @@ const ownerPassword = 'Playwright-Strong-42!';
 
 let owner: APIRequestContext;
 let guest: APIRequestContext;
+let reporter: APIRequestContext;
 let communityCommentId = '';
 let ownerId = '';
 
@@ -21,6 +22,7 @@ test.describe('NTE Meta Worker API', () => {
   test.beforeAll(async () => {
     owner = await createRequestContext.newContext({ baseURL: apiBase });
     guest = await createRequestContext.newContext({ baseURL: apiBase });
+    reporter = await createRequestContext.newContext({ baseURL: apiBase });
 
     const register = await owner.post('/api/auth/register', {
       data: {
@@ -39,7 +41,7 @@ test.describe('NTE Meta Worker API', () => {
   });
 
   test.afterAll(async () => {
-    await Promise.all([owner.dispose(), guest.dispose()]);
+    await Promise.all([owner.dispose(), guest.dispose(), reporter.dispose()]);
   });
 
   test('публичные коллекции доступны с безопасными заголовками', async () => {
@@ -148,6 +150,40 @@ test.describe('NTE Meta Worker API', () => {
     });
     expect(comment.status()).toBe(201);
     communityCommentId = (await comment.json()).data.id;
+
+    const reporterUsername = `reporter_${runId}`;
+    const reporterRegister = await reporter.post('/api/auth/register', {
+      data: {
+        username: reporterUsername,
+        password: ownerPassword,
+        confirmPassword: ownerPassword,
+      },
+    });
+    expect(reporterRegister.status()).toBe(201);
+    const report = await reporter.post('/api/comment-reports', {
+      data: {
+        commentId: communityCommentId,
+        reason: 'misinformation',
+        details: 'Нужно проверить утверждение по первоисточнику.',
+      },
+    });
+    expect(report.status()).toBe(201);
+    const reportId = (await report.json()).data.id;
+    const moderationReports = await owner.get('/api/comment-reports');
+    expect(moderationReports.ok()).toBeTruthy();
+    expect(
+      (await moderationReports.json()).data.some(
+        (item: { id: string; status: string }) =>
+          item.id === reportId && item.status === 'open',
+      ),
+    ).toBeTruthy();
+    expect(
+      (
+        await owner.patch(`/api/comment-reports/${reportId}`, {
+          data: { status: 'resolved' },
+        })
+      ).ok(),
+    ).toBeTruthy();
 
     const reply = await owner.post('/api/comments', {
       data: {

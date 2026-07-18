@@ -5,6 +5,8 @@ import type {
   AppSettings,
   CharacterImportLookupResult,
   Comment,
+  CommentReport,
+  CommentReportReason,
   CommunityThread,
   EditorPermissions,
   LeakCandidate,
@@ -285,6 +287,31 @@ export async function deleteComment(id: string) {
 
 export async function loadModerationComments() {
   return request<Comment[]>('/api/comments');
+}
+
+export async function createCommentReport(
+  commentId: string,
+  reason: CommentReportReason,
+  details = '',
+) {
+  return request<CommentReport>('/api/comment-reports', {
+    method: 'POST',
+    body: JSON.stringify({ commentId, reason, details }),
+  });
+}
+
+export async function loadCommentReports() {
+  return request<CommentReport[]>('/api/comment-reports');
+}
+
+export async function updateCommentReport(
+  id: string,
+  status: CommentReport['status'],
+) {
+  return request<{ success: boolean }>(`/api/comment-reports/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
 }
 
 export async function loadUsers() {

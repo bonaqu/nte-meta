@@ -292,6 +292,8 @@ function ImportSuggestionList({
           );
           const rowSuggestions = getImportSuggestionRows(suggestion);
           const variant = variantPosition.get(suggestion.id);
+          const variantCount = suggestion.variantCount || variant?.total || 1;
+          const agreementCount = suggestion.agreementCount || 1;
           return (
             <article
               className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
@@ -304,6 +306,21 @@ function ImportSuggestionList({
                     Вариант {variant.index} из {variant.total}
                   </span>
                 ) : null}
+                <div className="import-quality-badges" aria-label="Качество предложения">
+                  {agreementCount >= 2 ? (
+                    <span className="quality-consensus">
+                      Совпало в {agreementCount} источниках
+                    </span>
+                  ) : null}
+                  {variantCount >= 2 ? (
+                    <span className="quality-conflict">
+                      На выбор: {variantCount} варианта
+                    </span>
+                  ) : null}
+                  {suggestion.qualityFlags?.includes('incomplete') ? (
+                    <span className="quality-review">Нужна внимательная проверка</span>
+                  ) : null}
+                </div>
                 {suggestionContext ? <span>{suggestionContext}</span> : null}
               </div>
               <div className="import-suggestion-value">

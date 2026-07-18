@@ -38,7 +38,9 @@ import {
   Pencil,
   Pin,
   Plus,
+  Play,
   Reply,
+  RotateCw,
   Search,
   Settings,
   ShieldCheck,
@@ -96,6 +98,7 @@ import {
   updateUserRole,
   updateWarningStatus,
 } from './lib/api';
+import type { ReactionSummary } from './lib/api';
 import { MarkdownPreview } from './lib/markdown';
 import type { RichTextEditorProps } from './components/rich-text-editor';
 import { ImportSourceLinks } from './components/import-source-links';
@@ -359,6 +362,7 @@ function App() {
 
   useEffect(() => {
     setMobileOpen(false);
+    window.scrollTo({ top: 0, behavior: 'auto' });
   }, [route]);
 
   useEffect(() => {
@@ -882,7 +886,7 @@ function HomePage({
       </section>
 
       <section className="split-band">
-        <div>
+        <div className="home-news-column">
           <SectionHeader
             eyebrow="Редакция"
             title="Свежие новости"
@@ -912,7 +916,7 @@ function HomePage({
             ))}
           </div>
         </div>
-        <div>
+        <div className="home-leaks-column">
           <SectionHeader
             eyebrow="Отдельно от фактов"
             title="Сливы / слухи"
@@ -979,7 +983,7 @@ function HomePage({
       </section>
 
       <section className="community-band">
-        <div>
+        <div className="community-band__intro">
           <h2>Треды и обсуждения игроков</h2>
           <p>
             Создавайте треды с вопросами по отрядам, ротациям, ресурсам и
@@ -2793,7 +2797,17 @@ function GuideDetail({
   );
   const tierPlacement = getCharacterTierPlacement(data, character.id);
   const orderedSections = useMemo(
-    () => [...guide.sections].sort((a, b) => a.position - b.position),
+    () =>
+      [...guide.sections]
+        .filter((section) => {
+          const type = section.type.trim().toLocaleLowerCase('ru-RU');
+          const title = section.title.trim();
+          return (
+            !['source', 'sources', 'references', 'actuality'].includes(type) &&
+            !/^источники(?:\s+и\s+актуальность)?$/i.test(title)
+          );
+        })
+        .sort((a, b) => a.position - b.position),
     [guide.sections],
   );
 
@@ -2945,7 +2959,12 @@ function RatingBar({
   targetId: string;
   user: User | null;
 }) {
-  const [score, setScore] = useState({ likes: 0, dislikes: 0, useful: 0 });
+  const [score, setScore] = useState<ReactionSummary>({
+    likes: 0,
+    dislikes: 0,
+    useful: 0,
+    active: [],
+  });
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -2967,10 +2986,13 @@ function RatingBar({
     }
     setPending(true);
     setMessage('');
-    const result = await sendReaction(targetType, targetId, reactionType);
+    const isActive = score.active.includes(reactionType);
+    const result = isActive
+      ? await removeReaction(targetType, targetId, reactionType)
+      : await sendReaction(targetType, targetId, reactionType);
     if (result.ok) {
       setScore(result.data);
-      setMessage('Оценка сохранена.');
+      setMessage('');
     } else {
       setMessage(result.error);
     }
@@ -2981,25 +3003,32 @@ function RatingBar({
     <div className="rating-control">
       <div className="rating-bar" aria-label="Оценка материала">
         <button
+          className={score.active.includes('like') ? 'is-active' : ''}
           type="button"
           disabled={pending}
           onClick={() => react('like')}
           aria-label={`Нравится: ${score.likes}`}
+          aria-pressed={score.active.includes('like')}
         >
           <ThumbsUp aria-hidden="true" /> {score.likes}
         </button>
         <button
+          className={score.active.includes('dislike') ? 'is-active' : ''}
           type="button"
           disabled={pending}
           onClick={() => react('dislike')}
           aria-label={`Не нравится: ${score.dislikes}`}
+          aria-pressed={score.active.includes('dislike')}
         >
           <ThumbsDown aria-hidden="true" /> {score.dislikes}
         </button>
         <button
+          className={score.active.includes('useful') ? 'is-active' : ''}
           type="button"
           disabled={pending}
           onClick={() => react('useful')}
+          aria-label={`Полезно: ${score.useful}`}
+          aria-pressed={score.active.includes('useful')}
         >
           <CheckCircle2 aria-hidden="true" /> Полезно {score.useful}
         </button>
@@ -3035,30 +3064,51 @@ function TeamCard({
               key={`${team.id}-${member.characterId}`}
               href={`#/characters/${character.slug}`}
             >
-              <img
-                src={resolveAssetUrl(character.imageUrl)}
-                alt={character.name}
-                width="54"
-                height="54"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-              />
-              <span>{member.role}</span>
+              <span className="team-member-avatar" aria-hidden="true">
+                <UserCircle />
+                {character.imageUrl ? (
+                  <img
+                    src={resolveAssetUrl(character.imageUrl)}
+                    alt=""
+                    width="54"
+                    height="54"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={(event) => {
+                      event.currentTarget.style.display = 'none';
+                    }}
+                  />
+                ) : null}
+              </span>
+              <span className="team-member-copy">
+                <strong>{character.name}</strong>
+                <small>{member.role}</small>
+              </span>
             </a>
           ) : null;
         })}
       </div>
       {team.rotationSteps?.length || team.rotation ? (
         <div className="team-rotation-sequence">
-          <strong>Командная ротация</strong>
+          <div className="rotation-sequence-heading">
+            <span><Play aria-hidden="true" /> Старт</span>
+            <strong>Командная ротация</strong>
+          </div>
           <ol>
             {(team.rotationSteps?.length
               ? team.rotationSteps
               : team.rotation.split('\n').filter(Boolean)
             ).map((step, index) => (
-              <li key={`${team.id}-step-${index}`}>{step}</li>
+              <li key={`${team.id}-step-${index}`}>
+                <span className="rotation-step-index">{index + 1}</span>
+                <span>{step}</span>
+              </li>
             ))}
           </ol>
+          <div className="rotation-cycle-end">
+            <RotateCw aria-hidden="true" />
+            <span>Конец цепочки · повторить цикл с первого шага</span>
+          </div>
         </div>
       ) : null}
       <dl className="team-details">

@@ -1413,6 +1413,10 @@ test('owner создаёт персонажа inline и открывает со�
     const uiCharacterSlug = `ui-character-${runId}`;
     const uiCharacterName = `UI персонаж ${runId}`;
     const uiCharacterGuideSlug = `ui-character-guide-${runId}`;
+    const longBiography = `## Биография
+
+${'Проверенная редакционная биография остаётся в полном профиле персонажа и не переполняет краткий вывод. '.repeat(92)}`;
+    expect(longBiography.length).toBeGreaterThan(8_000);
     await page.goto('/#/profile');
     await page.getByLabel('Логин').fill(ownerUsername);
     await page.getByLabel('Пароль').fill(ownerPassword);
@@ -1463,9 +1467,7 @@ await mainInfo
       .fill('/assets/characters/Hotori.webp');
     await characterDialog
       .getByRole('textbox', { name: 'Биография', exact: true })
-      .fill(
-        '## Биография\nПерсонаж создан автотестом без выдуманной игровой меты.',
-      );
+      .fill(longBiography);
     await mainInfo.getByLabel('Теги, через запятую').fill('ui, персонаж');
     await characterDialog.getByRole('button', { name: 'Опубликовать' }).click();
 

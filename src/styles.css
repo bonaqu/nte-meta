@@ -3919,10 +3919,10 @@
 
   @keyframes signal-sweep {
     from {
-      transform: translateX(-140%) skewX(-18deg);
+      transform: translateX(-120%) skewX(-18deg);
     }
     to {
-      transform: translateX(420%) skewX(-18deg);
+      transform: translateX(400%) skewX(-18deg);
     }
   }
 
@@ -3950,14 +3950,14 @@
   .news-card::after {
     position: absolute;
     inset-block: -40%;
-    inset-inline-start: -35%;
+    inset-inline-start: -55%;
     z-index: 2;
-    inline-size: 18%;
+    inline-size: 42%;
     background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.16), transparent);
     content: '';
     opacity: 0;
     pointer-events: none;
-    transform: translateX(-140%) skewX(-18deg);
+    transform: translateX(-120%) skewX(-18deg);
   }
 
   .primary-button:is(:hover, :focus-visible)::after,
@@ -4748,14 +4748,14 @@
     inset-block-start: 76px;
     z-index: 12;
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
+    justify-content: center;
     padding: 8px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: rgb(8 10 18 / 0.9);
-    overflow-x: auto;
     backdrop-filter: blur(16px);
-    scrollbar-width: thin;
   }
 
 .character-section-nav button {
@@ -4847,6 +4847,48 @@
   block-size: 56px;
   border-radius: var(--radius-sm);
   object-fit: cover;
+}
+
+.character-detail-fallback-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 56px;
+  block-size: 56px;
+  border: 1px solid color-mix(in srgb, var(--cyan) 38%, var(--border));
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgb(38 217 255 / 0.18), transparent 68%),
+    var(--surface);
+  color: var(--cyan);
+}
+
+.character-detail-fallback-icon svg {
+  inline-size: 24px;
+  block-size: 24px;
+}
+
+.character-detail-card-copy {
+  min-inline-size: 0;
+}
+
+.character-detail-card-copy :is(h3, p, .markdown-preview) {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .character-section-nav {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-padding-inline: 8px;
+    scroll-snap-type: inline proximity;
+    scrollbar-width: thin;
+  }
+
+  .character-section-nav button {
+    scroll-snap-align: start;
+  }
 }
 
   .ability-list article {

@@ -5,6 +5,7 @@ import React, {
   useDeferredValue,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -78,6 +79,7 @@ import {
   loadReactionSummary,
   loadSettings,
   loadSiteData,
+  loadSources,
   loadSystemStatus,
   loadUsers,
   loadWarnings,
@@ -318,19 +320,15 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [error, setError] = useState('');
+  const loadedPrivateSourcesForRef = useRef('');
 
   useEffect(() => {
     let mounted = true;
 
     async function init() {
       setLoading(true);
-      const currentUser = await me();
+      const [currentUser, siteData] = await Promise.all([me(), loadSiteData()]);
       const viewer = currentUser.ok ? currentUser.data : null;
-      const siteData = await loadSiteData({
-        includePrivate: Boolean(
-          viewer && roleWeight[viewer.role] >= roleWeight.editor,
-        ),
-      });
 
       if (!mounted) {
         return;
@@ -356,13 +354,34 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!user || roleWeight[user.role] < roleWeight.editor) return;
-    loadSiteData({ includePrivate: true }).then(setData);
+    const staffId =
+      user && roleWeight[user.role] >= roleWeight.editor ? user.id : '';
+    if (!staffId) {
+      loadedPrivateSourcesForRef.current = '';
+      return;
+    }
+    if (loadedPrivateSourcesForRef.current === staffId) return;
+
+    let mounted = true;
+    loadedPrivateSourcesForRef.current = staffId;
+    loadSources().then((result) => {
+      if (!mounted || !result.ok) {
+        if (!result.ok) loadedPrivateSourcesForRef.current = '';
+        return;
+      }
+      setData((current) => ({ ...current, sources: result.data }));
+    });
+    return () => {
+      mounted = false;
+    };
   }, [user]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setMobileOpen(false);
-    window.scrollTo({ top: 0, behavior: 'auto' });
+    const resetScroll = () => window.scrollTo({ top: 0, behavior: 'auto' });
+    resetScroll();
+    const frame = window.requestAnimationFrame(resetScroll);
+    return () => window.cancelAnimationFrame(frame);
   }, [route]);
 
   useEffect(() => {
@@ -2375,16 +2394,20 @@ function CharacterDetailPage({
                       loading="lazy"
                       referrerPolicy="no-referrer"
                     />
-                  ) : null}
-                  <div>
-                  <p className="eyebrow">
-                    {awakening.level > 0
-                      ? `Пробуждение ${awakening.level}`
-                      : 'Без пробуждений'}
-                  </p>
-                  <h3>
-                    {awakening.name || `Пробуждение ${awakening.level}`}
-                  </h3>
+                  ) : (
+                    <span className="character-detail-fallback-icon" aria-hidden="true">
+                      <Star />
+                    </span>
+                  )}
+                  <div className="character-detail-card-copy">
+                    <p className="eyebrow">
+                      {awakening.level > 0
+                        ? `Пробуждение ${awakening.level}`
+                        : 'Без пробуждений'}
+                    </p>
+                    <h3>
+                      {awakening.name || `Пробуждение ${awakening.level}`}
+                    </h3>
                     <MarkdownPreview value={awakening.description} />
                   </div>
                 </article>
@@ -2416,8 +2439,12 @@ function CharacterDetailPage({
                     loading="lazy"
                     referrerPolicy="no-referrer"
                   />
-                ) : null}
-                <div>
+                ) : (
+                  <span className="character-detail-fallback-icon" aria-hidden="true">
+                    <ImageIcon />
+                  </span>
+                )}
+                <div className="character-detail-card-copy">
                   <h3>{material.name}</h3>
                   <strong>{material.amount}</strong>
                   <p>{material.source}</p>
@@ -2488,8 +2515,12 @@ function CharacterDetailPage({
                     loading="lazy"
                     referrerPolicy="no-referrer"
                   />
-                ) : null}
-                <div>
+                ) : (
+                  <span className="character-detail-fallback-icon" aria-hidden="true">
+                    <Star />
+                  </span>
+                )}
+                <div className="character-detail-card-copy">
                   <h3>{gift.name}</h3>
                   <p>{gift.effect}</p>
                 </div>
@@ -5150,10 +5181,30 @@ function formatGuideImportValue(value: string) {
   }
 }
 
+const GUIDE_SUMMARY_MAX_LENGTH = 8000;
+
+function limitEditorialText(value: string, maxLength: number) {
+  const normalized = value.trim().replace(/\n{3,}/g, '\n\n');
+  if (normalized.length <= maxLength) return normalized;
+  const candidate = normalized.slice(0, maxLength - 1);
+  const lastWordBoundary = Math.max(
+    candidate.lastIndexOf(' '),
+    candidate.lastIndexOf('\n'),
+  );
+  const safeEnd =
+    lastWordBoundary >= Math.floor(maxLength * 0.72)
+      ? lastWordBoundary
+      : candidate.length;
+  return `${candidate.slice(0, safeEnd).trimEnd()}…`;
+}
+
 function mergeGuideImportText(current: string, imported: string) {
   const next = imported.trim();
   if (!next || current.includes(next)) return current;
-  return current.trim() ? `${current.trim()}\n\n${next}` : next;
+  return limitEditorialText(
+    current.trim() ? `${current.trim()}\n\n${next}` : next,
+    GUIDE_SUMMARY_MAX_LENGTH,
+  );
 }
 
 function getGuideImportFieldLabel(field: string) {
@@ -5377,7 +5428,14 @@ function GuideCreateFields({
       </label>
       <label htmlFor={`${fieldId}-summary`}>
         Краткое описание
-        <textarea id={`${fieldId}-summary`} name="summary" rows={4} required />
+        <textarea
+          id={`${fieldId}-summary`}
+          name="summary"
+          rows={4}
+          maxLength={GUIDE_SUMMARY_MAX_LENGTH}
+          required
+        />
+        <small>Короткий вывод до {GUIDE_SUMMARY_MAX_LENGTH} знаков. Подробности добавляются секциями.</small>
       </label>
       <label htmlFor={`${fieldId}-patch`}>
         Патч
@@ -6334,17 +6392,21 @@ function AdminGuides({
             ) : null}
             <label className="wide-field">
               Краткое описание
-            <textarea
-              rows={4}
-              value={guideMeta.summary}
-              onChange={(event) =>
-                setGuideMeta((current) => ({
-                  ...current,
-                  summary: event.target.value,
-                }))
-              }
-            />
-          </label>
+              <textarea
+                rows={4}
+                maxLength={GUIDE_SUMMARY_MAX_LENGTH}
+                value={guideMeta.summary}
+                onChange={(event) =>
+                  setGuideMeta((current) => ({
+                    ...current,
+                    summary: event.target.value,
+                  }))
+                }
+              />
+              <small>
+                {guideMeta.summary.length}/{GUIDE_SUMMARY_MAX_LENGTH}. Подробный текст хранится в секциях ниже.
+              </small>
+            </label>
         </div>
         <button
           className="primary-button"

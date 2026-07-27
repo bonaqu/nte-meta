@@ -118,6 +118,34 @@ function withFriendshipRewards(
   };
 }
 
+const CHARACTER_SUMMARY_MAX_LENGTH = 1000;
+
+function makePlainTextExcerpt(value: string, maxLength: number) {
+  const normalized = value
+    .replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[`*_>#~|-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (normalized.length <= maxLength) return normalized;
+  const candidate = normalized.slice(0, maxLength - 1);
+  const lastWordBoundary = candidate.lastIndexOf(' ');
+  const safeEnd =
+    lastWordBoundary >= Math.floor(maxLength * 0.72)
+      ? lastWordBoundary
+      : candidate.length;
+  return `${candidate.slice(0, safeEnd).trimEnd()}…`;
+}
+
+function makeCharacterSummary(shortDescription: string, biography: string) {
+  return makePlainTextExcerpt(
+    shortDescription || biography,
+    CHARACTER_SUMMARY_MAX_LENGTH,
+  );
+}
+
 function emptyProfile(): CharacterProfile {
   return {
     faction: '',
@@ -1216,17 +1244,18 @@ export function AdminCharacterEditor({
       return;
     }
     const shortDescription = draft.shortDescription.trim();
+    const summary = makeCharacterSummary(shortDescription, biography);
     const profile = {
       ...draft.profile,
       biography,
-      biographyShort: shortDescription,
+      biographyShort: shortDescription || summary,
     };
     setPending(true);
     setMessage('');
     const payload = {
       ...draft,
       shortDescription,
-      summary: biography,
+      summary,
       status,
       patchVersion: draft.patch,
       tagsJson: draft.tags,

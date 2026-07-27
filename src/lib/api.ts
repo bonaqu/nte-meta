@@ -15,12 +15,16 @@ import type {
   LeakStatus,
   Role,
   SiteData,
+  Source,
   SystemStatus,
   User,
   UserWarning,
 } from '../types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const API_REQUEST_TIMEOUT_MS = 15_000;
+const IMPORT_REQUEST_TIMEOUT_MS = 55_000;
+const DISCOVERY_REQUEST_TIMEOUT_MS = 25_000;
 let sessionToken = '';
 
 type ApiResult<T> =
@@ -44,6 +48,7 @@ export function hasApiBase() {
 async function request<T>(
   path: string,
   init: RequestInit = {},
+  options: { timeoutMs?: number } = {},
 ): Promise<ApiResult<T>> {
   if (!API_BASE) {
     return {
@@ -63,11 +68,25 @@ async function request<T>(
     headers.set('Authorization', `Bearer ${sessionToken}`);
   }
 
+  const controller = new AbortController();
+  let timedOut = false;
+  const abortFromCaller = () => controller.abort(init.signal?.reason);
+  if (init.signal?.aborted) {
+    abortFromCaller();
+  } else {
+    init.signal?.addEventListener('abort', abortFromCaller, { once: true });
+  }
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, options.timeoutMs ?? API_REQUEST_TIMEOUT_MS);
+
   try {
     const response = await fetch(`${API_BASE}${path}`, {
       ...init,
       headers,
       credentials: 'include',
+      signal: controller.signal,
     });
     const payload = (await response.json().catch(() => ({}))) as {
       data?: T;
@@ -89,10 +108,16 @@ async function request<T>(
   } catch (error) {
     return {
       ok: false,
-      error:
-        error instanceof Error ? error.message : 'Не удалось выполнить запрос',
+      error: timedOut
+        ? 'Сервер слишком долго отвечает. Проверьте соединение и повторите попытку.'
+        : error instanceof Error
+          ? error.message
+          : 'Не удалось выполнить запрос',
       status: 0,
     };
+  } finally {
+    clearTimeout(timeout);
+    init.signal?.removeEventListener('abort', abortFromCaller);
   }
 }
 
@@ -162,6 +187,10 @@ export async function loadSiteData(
 
 export async function loadEntityCollection<T>(path: string) {
   return request<T[]>(path);
+}
+
+export async function loadSources() {
+  return request<Source[]>('/api/sources');
 }
 
 export async function login(username: string, password: string) {
@@ -384,20 +413,28 @@ export async function loadSystemStatus() {
 }
 
 export async function lookupCharacterInfo(query: string) {
-  return request<CharacterImportLookupResult>('/api/character-import/lookup', {
-    method: 'POST',
-    body: JSON.stringify({ query }),
-  });
+  return request<CharacterImportLookupResult>(
+    '/api/character-import/lookup',
+    {
+      method: 'POST',
+      body: JSON.stringify({ query }),
+    },
+    { timeoutMs: IMPORT_REQUEST_TIMEOUT_MS },
+  );
 }
 
 export async function lookupGuideInfo(payload: {
   guideId?: string;
   query?: string;
 }) {
-  return request<CharacterImportLookupResult>('/api/guide-import/lookup', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  return request<CharacterImportLookupResult>(
+    '/api/guide-import/lookup',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    { timeoutMs: IMPORT_REQUEST_TIMEOUT_MS },
+  );
 }
 
 export async function loadLeakCandidates() {
@@ -405,10 +442,14 @@ export async function loadLeakCandidates() {
 }
 
 export async function discoverLeakCandidates(query = '') {
-  return request<LeakDiscoveryResult>('/api/leak-candidates/discover', {
-    method: 'POST',
-    body: JSON.stringify({ query }),
-  });
+  return request<LeakDiscoveryResult>(
+    '/api/leak-candidates/discover',
+    {
+      method: 'POST',
+      body: JSON.stringify({ query }),
+    },
+    { timeoutMs: DISCOVERY_REQUEST_TIMEOUT_MS },
+  );
 }
 
 export async function submitLeakCandidate(payload: {

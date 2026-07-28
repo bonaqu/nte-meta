@@ -152,6 +152,7 @@ function emptyProfile(): CharacterProfile {
     arcType: '',
     birthday: '',
     releaseDate: '',
+    releaseVersion: '',
     biographyShort: '',
     biography: '',
     trivia: '',
@@ -249,22 +250,31 @@ function ImportSuggestionList({
   onAccept: (suggestion: CharacterImportSuggestion) => void;
   onReject: (suggestion: CharacterImportSuggestion) => void;
 }) {
-  if (!suggestions.length) return null;
-  const suggestionsByField = new Map<string, CharacterImportSuggestion[]>();
-  for (const suggestion of suggestions) {
-    const variants = suggestionsByField.get(suggestion.field) || [];
-    variants.push(suggestion);
-    suggestionsByField.set(suggestion.field, variants);
-  }
-  const variantPosition = new Map<string, { index: number; total: number }>();
-  for (const variants of suggestionsByField.values()) {
-    variants.forEach((suggestion, index) => {
-      variantPosition.set(suggestion.id, {
-        index: index + 1,
-        total: variants.length,
+  const preparedSuggestions = useMemo(() => {
+    const suggestionsByField = new Map<string, CharacterImportSuggestion[]>();
+    for (const suggestion of suggestions) {
+      const variants = suggestionsByField.get(suggestion.field) || [];
+      variants.push(suggestion);
+      suggestionsByField.set(suggestion.field, variants);
+    }
+    const variantPosition = new Map<string, { index: number; total: number }>();
+    for (const variants of suggestionsByField.values()) {
+      variants.forEach((suggestion, index) => {
+        variantPosition.set(suggestion.id, {
+          index: index + 1,
+          total: variants.length,
+        });
       });
-    });
-  }
+    }
+    return suggestions.map((suggestion) => ({
+      suggestion,
+      previewUrls: getSuggestionPreviewUrls(suggestion),
+      fieldLabel: getSuggestionFieldLabel(suggestion),
+      rowSuggestions: getImportSuggestionRows(suggestion),
+      variant: variantPosition.get(suggestion.id),
+    }));
+  }, [suggestions]);
+  if (!suggestions.length) return null;
 
   return (
     <section className="import-review-panel" aria-label="Предложения автоимпорта">
@@ -278,16 +288,19 @@ function ImportSuggestionList({
         </p>
       </div>
       <div className="import-suggestion-list">
-        {suggestions.map((suggestion) => {
+        {preparedSuggestions.map((prepared) => {
+          const {
+            suggestion,
+            previewUrls,
+            fieldLabel,
+            rowSuggestions,
+            variant,
+          } = prepared;
           const decision = decisions[suggestion.id];
-          const previewUrls = getSuggestionPreviewUrls(suggestion);
-          const fieldLabel = getSuggestionFieldLabel(suggestion);
           const suggestionContext = getSuggestionContextLabel(
             suggestion,
             fieldLabel,
           );
-          const rowSuggestions = getImportSuggestionRows(suggestion);
-          const variant = variantPosition.get(suggestion.id);
           const variantCount = suggestion.variantCount || variant?.total || 1;
           const agreementCount = suggestion.agreementCount || 1;
           return (
@@ -581,6 +594,7 @@ function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {
     'profile.arcType': 'Тип дуги',
     'profile.birthday': 'День рождения',
     'profile.releaseDate': 'Дата релиза',
+    'profile.releaseVersion': 'Версия появления',
     'profile.faction': 'Фракция',
     'profile.biographyShort': 'Биография',
     'profile.biography': 'Биография',
@@ -696,6 +710,7 @@ function formatEditorError(error: string) {
       .replace(/profile\.faction/g, 'Фракция')
       .replace(/profile\.birthday/g, 'День рождения')
       .replace(/profile\.releaseDate/g, 'Дата релиза')
+      .replace(/profile\.releaseVersion/g, 'Версия появления')
       .replace(/Поле\s+/g, '');
   }
   return text;
@@ -980,7 +995,12 @@ export function AdminCharacterEditor({
     () => (selected ? toDraft(selected) : emptyDraft()),
     [selected],
   );
-  const isDirty = JSON.stringify(draft) !== JSON.stringify(baselineDraft);
+  const baselineDraftSignature = useMemo(
+    () => JSON.stringify(baselineDraft),
+    [baselineDraft],
+  );
+  const draftSignature = useMemo(() => JSON.stringify(draft), [draft]);
+  const isDirty = draftSignature !== baselineDraftSignature;
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('ru-RU');
@@ -1009,12 +1029,21 @@ export function AdminCharacterEditor({
       skipNextDraftSaveRef.current = false;
       return;
     }
-    if (isDirty) {
-      localStorage.setItem(draftKey, JSON.stringify(draft));
-    } else {
-      localStorage.removeItem(draftKey);
+    const saveDraft = () => {
+      try {
+        if (isDirty) localStorage.setItem(draftKey, draftSignature);
+        else localStorage.removeItem(draftKey);
+      } catch {
+        // The editor remains usable when private browsing blocks storage.
+      }
+    };
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(saveDraft, { timeout: 1200 });
+      return () => window.cancelIdleCallback(idleId);
     }
-  }, [draft, draftKey, isDirty]);
+    const timeoutId = globalThis.setTimeout(saveDraft, 350);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [draftKey, draftSignature, isDirty]);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -1104,6 +1133,8 @@ export function AdminCharacterEditor({
         next.profile.birthday = String(parsed);
       } else if (suggestion.field === 'profile.releaseDate') {
         next.profile.releaseDate = String(parsed);
+      } else if (suggestion.field === 'profile.releaseVersion') {
+        next.profile.releaseVersion = String(parsed);
       } else if (
         suggestion.field === 'profile.biography' ||
         suggestion.field === 'profile.biographyShort'
@@ -1541,6 +1572,17 @@ export function AdminCharacterEditor({
               patchProfile({ releaseDate: event.target.value })
             }
           />
+        </label>
+        <label>
+          Версия появления <span className="field-optional">необязательно</span>
+          <input
+            value={profile.releaseVersion || ''}
+            placeholder="Например, 1.2"
+            onChange={(event) =>
+              patchProfile({ releaseVersion: event.target.value })
+            }
+          />
+          <small>Версия игры, в которой персонаж стал доступен или заявлен.</small>
         </label>
         <label>
               Атрибут

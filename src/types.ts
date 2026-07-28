@@ -112,6 +112,7 @@ export interface CharacterProfile {
   arcType: string;
   birthday: string;
   releaseDate: string;
+  releaseVersion?: string;
   biographyShort: string;
   biography: string;
   trivia: string;

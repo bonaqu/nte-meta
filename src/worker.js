@@ -1218,6 +1218,7 @@ function characterProfileSelect() {
     character_profiles.arc_type AS profile_arc_type,
     character_profiles.birthday AS profile_birthday,
     character_profiles.release_date AS profile_release_date,
+    character_profiles.release_version AS profile_release_version,
     character_profiles.biography_short AS profile_biography_short,
     character_profiles.biography_markdown AS profile_biography_markdown,
     character_profiles.trivia_markdown AS profile_trivia_markdown,
@@ -3337,6 +3338,7 @@ const IMPORT_SOURCE_PRIORITY = new Map([
   ['official-ru', 100],
   ['fandom-ru-api', 98],
   ['wotpack-character-search-ru', 97],
+  ['icy-veins-character-profile', 95],
   ['ntewiki-ru', 96],
   ['gamewith-detail-ru', 94],
   ['interactivemap-profile-ru', 92],
@@ -3352,6 +3354,8 @@ const IMPORT_SOURCE_PRIORITY = new Map([
   ['dubbing-wiki', 76],
   ['fandom-character', 74],
   ['wotpack-guide-search-ru', 97],
+  ['icy-veins-build-guide', 95],
+  ['icy-veins-team-guide', 94],
   ['kaiden-character-guide', 96],
 ]);
 
@@ -3921,6 +3925,8 @@ function nevernessAppCharacterCode(character) {
     ['nanally', 'nanally'],
     ['sakiri', 'sagiri'],
     ['shinku', 'shinku'],
+    ['iroy', 'iroi'],
+    ['iroi', 'iroi'],
     ['skia', 'skia'],
     ['zero', 'zero'],
   ]);
@@ -3969,6 +3975,8 @@ function characterImportSources(slug, character = {}) {
   const fandomRuImagePrefix = encodeURIComponent(
     String(character.name || character.originalName || slug || '').trim() || slug,
   );
+  const pathSlugs = characterPathSlugCandidates({ ...character, slug });
+  const urlsFor = (buildUrl) => pathSlugs.map(buildUrl);
   const nevernessCode = nevernessAppCharacterCode({ ...character, slug });
   const interactiveMapId = interactiveMapEsperId({ ...character, slug });
 
@@ -4033,10 +4041,26 @@ function characterImportSources(slug, character = {}) {
       id: 'gamewith-detail-ru',
       name: 'GameWith NTE RU: страница персонажа',
       trust: 'high',
-      url: `https://gamewith.ai/nte/ru/character/${slug}`,
+      url: `https://gamewith.ai/nte/ru/character/${pathSlugs[0]}`,
+      urlCandidates: urlsFor(
+        (pathSlug) => `https://gamewith.ai/nte/ru/character/${pathSlug}`,
+      ),
       parser: parseGameWithCharacterDetailImport,
       extractImages: true,
       raw: true,
+    },
+    {
+      id: 'icy-veins-character-profile',
+      name: 'Icy Veins: профиль и озвучка',
+      trust: 'high',
+      url: `https://www.icy-veins.com/neverness-to-everness/${pathSlugs[0]}-profile-skills`,
+      urlCandidates: urlsFor(
+        (pathSlug) =>
+          `https://www.icy-veins.com/neverness-to-everness/${pathSlug}-profile-skills`,
+      ),
+      parser: parseIcyVeinsCharacterImport,
+      raw: true,
+      cacheTtl: 1800,
     },
     {
       id: 'game8-skins',
@@ -4079,7 +4103,7 @@ function characterImportSources(slug, character = {}) {
       id: 'zeroluck-voice-reference',
       name: 'ZeroLuck: каталог реплик',
       trust: 'medium',
-      url: `https://zeroluck.gg/nte/characters/${slug}/`,
+      url: `https://zeroluck.gg/nte/characters/${pathSlugs[0]}/`,
       referenceOnly: true,
       referenceMessage:
         'Источник содержит текст и внутренние audio-event ID, но не прямые аудиофайлы и не русскую локализацию. Автозаполнение реплик отключено, чтобы не публиковать английский текст как русский.',
@@ -4088,7 +4112,10 @@ function characterImportSources(slug, character = {}) {
       id: 'ntewiki-ru',
       name: 'NTE Wiki RU',
       trust: 'high',
-      url: `https://ntewiki.org/ru/characters/${slug}/`,
+      url: `https://ntewiki.org/ru/characters/${pathSlugs[0]}/`,
+      urlCandidates: urlsFor(
+        (pathSlug) => `https://ntewiki.org/ru/characters/${pathSlug}/`,
+      ),
       parser: parseNteWikiImport,
       extractImages: true,
     },
@@ -4110,7 +4137,11 @@ function characterImportSources(slug, character = {}) {
       id: 'genshin-builds-ru',
       name: 'GenshinBuilds NTE RU',
       trust: 'high',
-      url: `https://genshin-builds.com/ru/neverness-to-everness/characters/${slug}`,
+      url: `https://genshin-builds.com/ru/neverness-to-everness/characters/${pathSlugs[0]}`,
+      urlCandidates: urlsFor(
+        (pathSlug) =>
+          `https://genshin-builds.com/ru/neverness-to-everness/characters/${pathSlug}`,
+      ),
       parser: parseGenshinBuildsImport,
       extractImages: true,
     },
@@ -4317,6 +4348,32 @@ function guideImportSources(slug, character = {}) {
       referenceOnly: true,
       referenceMessage:
         'Источник защищён от автоматических запросов. Откройте страницу вручную для дополнительной сверки.',
+    },
+    {
+      id: 'icy-veins-build-guide',
+      name: 'Icy Veins: билд и приоритеты',
+      trust: 'high',
+      url: `https://www.icy-veins.com/neverness-to-everness/${pathSlugs[0]}-guide-best-builds`,
+      urlCandidates: urlsFor(
+        (pathSlug) =>
+          `https://www.icy-veins.com/neverness-to-everness/${pathSlug}-guide-best-builds`,
+      ),
+      parser: parseIcyVeinsGuideImport,
+      raw: true,
+      cacheTtl: 1800,
+    },
+    {
+      id: 'icy-veins-team-guide',
+      name: 'Icy Veins: команды и синергии',
+      trust: 'high',
+      url: `https://www.icy-veins.com/neverness-to-everness/${pathSlugs[0]}-teams`,
+      urlCandidates: urlsFor(
+        (pathSlug) =>
+          `https://www.icy-veins.com/neverness-to-everness/${pathSlug}-teams`,
+      ),
+      parser: parseIcyVeinsGuideImport,
+      raw: true,
+      cacheTtl: 1800,
     },
     ...additionalGuides,
   ].map((source) => ({ ...source, character }));
@@ -5291,6 +5348,14 @@ function parseFandomRuApiImport(text, source) {
       'profile.releaseDate',
       'Дата релиза',
       formatRuImportDate(readWikiParam(content, 'releaseDate')),
+      source,
+      'medium',
+    ),
+    makeImportSuggestion(
+      'profile.releaseVersion',
+      'Версия появления',
+      readWikiParam(content, 'version') ||
+        readWikiParam(content, 'releaseVersion'),
       source,
       'medium',
     ),
@@ -6616,6 +6681,116 @@ function parseGenshinBuildsImport(text, source, character) {
   return suggestions;
 }
 
+function parseIcyVeinsCharacterImport(html, source, character) {
+  const plainText = htmlToPlainText(html);
+  const lines = compactImportLines(plainText);
+  if (!lines.some((line) => lineMatchesCharacter(line, character))) return [];
+
+  const names = [character.originalName, character.name, character.slug]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length);
+  const profileMatch = names
+    .map((name) =>
+      plainText.match(
+        new RegExp(
+          `${escapeRegExp(name)}\\s+is\\s+an?\\s+([SA])-Rank\\s+([A-Za-z]+)\\s+([A-Za-z]+)\\s+character`,
+          'i',
+        ),
+      ),
+    )
+    .find(Boolean);
+  const suggestions = [];
+
+  if (profileMatch) {
+    suggestions.push(
+      makeImportSuggestion(
+        'rarity',
+        'Редкость',
+        profileMatch[1].toUpperCase(),
+        source,
+        'high',
+        'Ранг взят из профильной строки персонажа, а не из внешнего тир-листа.',
+      ),
+      makeImportSuggestion(
+        'attribute',
+        'Атрибут',
+        profileMatch[2],
+        source,
+        'high',
+      ),
+      makeImportSuggestion(
+        'profile.arcType',
+        'Тип дуги',
+        profileMatch[3],
+        source,
+        'high',
+      ),
+    );
+  }
+
+  const voiceHeading = names
+    .map((name) => `${name} Voice Actors`)
+    .find((heading) => plainText.toLocaleLowerCase('en-US').includes(heading.toLocaleLowerCase('en-US')));
+  if (voiceHeading) {
+    const start = plainText.toLocaleLowerCase('en-US').indexOf(
+      voiceHeading.toLocaleLowerCase('en-US'),
+    );
+    const voiceWindow = plainText.slice(start + voiceHeading.length, start + 900);
+    const stopNames = names.map(escapeRegExp).join('|');
+    const stopPattern = stopNames
+      ? `|\\s+(?:${stopNames})\\s+(?:Guide|Best Builds)`
+      : '';
+    const languageMap = new Map([
+      ['EN', 'Английский'],
+      ['JP', 'Японский'],
+      ['CN', 'Китайский'],
+      ['KR', 'Корейский'],
+    ]);
+    const voiceActors = [];
+    const expression = new RegExp(
+      `\\b(EN|JP|CN|KR)\\s+(.+?)(?=\\s+\\b(?:EN|JP|CN|KR)\\b${stopPattern}|\\s+Changelog|$)`,
+      'gi',
+    );
+    for (const match of voiceWindow.matchAll(expression)) {
+      const language = languageMap.get(match[1].toUpperCase());
+      const name = normalizeImportedRuText(match[2])
+        .replace(/\s+(?:Guide|Best Builds).*$/i, '')
+        .trim()
+        .slice(0, 160);
+      if (language && name) voiceActors.push({ language, name });
+    }
+    suggestions.push(
+      makeImportSuggestion(
+        'profile.voiceActors',
+        'Озвучка: актёры',
+        voiceActors,
+        source,
+        'high',
+        'Имена актёров оставлены в опубликованном источником написании.',
+      ),
+    );
+  }
+
+  const previewVersion = plainText.match(
+    /content showcased in the\s+(\d+(?:\.\d+)?)\s+Live Stream/i,
+  )?.[1];
+  if (previewVersion) {
+    suggestions.push(
+      makeImportSuggestion(
+        'profile.releaseVersion',
+        'Версия появления',
+        previewVersion,
+        source,
+        'medium',
+        'Версия найдена в анонсе персонажа. Для ещё не вышедшего персонажа подтвердите её после официального расписания.',
+      ),
+    );
+  }
+
+  return suggestions.filter(Boolean);
+}
+
 function extractGuideHeadingBlocks(html) {
   const blocks = [];
   const expression = /<h([2-4])\b[^>]*>([\s\S]*?)<\/h\1>([\s\S]*?)(?=<h[2-4]\b|$)/gi;
@@ -6990,9 +7165,15 @@ function localizeImportedGuideText(value) {
     ['CRIT DMG', 'крит. урон'],
     ['CRIT Rate', 'шанс крит.'],
     ['Cosmos DMG', 'урон Космосом'],
+    ['Anima Damage', 'урон Анимой'],
+    ['Healing bonus', 'бонус лечения'],
+    ['Universal DMG', 'универсальный урон'],
+    ['Flat ATK', 'плоская АТК'],
     ['ATK%', 'АТК%'],
     ['DPS', 'ДД'],
     ['ATK', 'АТК'],
+    ['Basic Attack', 'базовая атака'],
+    ['Support Skill', 'навык поддержки'],
     ['Ultimate', 'сверхспособность'],
     ['Skill', 'навык'],
   ]);
@@ -7001,6 +7182,154 @@ function localizeImportedGuideText(value) {
     result = result.replace(new RegExp(`\\b${escapeRegExp(source)}\\b`, 'gi'), target);
   }
   return result.trim();
+}
+
+function parseIcyVeinsGuideImport(html, source, character) {
+  const plainText = htmlToPlainText(html);
+  if (!compactImportLines(plainText).some((line) => lineMatchesCharacter(line, character))) {
+    return [];
+  }
+
+  const suggestions = [];
+  const blocks = extractGuideHeadingBlocks(html);
+  const findBlock = (pattern) =>
+    blocks.find((block) => pattern.test(normalizeImportSearch(block.heading)));
+
+  const arcBlock = findBlock(/best arcs?|лучш.*дуг/);
+  if (arcBlock) {
+    const arcs = [];
+    const seen = new Set();
+    for (const match of arcBlock.html.matchAll(
+      /<details\b[\s\S]*?<img[^>]+class=["'][^"']*details-block__image[^"']*["'][^>]+src=["']([^"']+)["'][\s\S]*?<span[^>]+class=["'][^"']*details-block__title[^"']*["'][\s\S]*?<span[^>]+class=["'][^"']*nte_tooltip_text[^"']*["'][^>]*>([^<]+)<\/span>/gi,
+    )) {
+      const sourceName = normalizeImportedRuText(match[2]).trim();
+      const key = normalizeImportSearch(sourceName);
+      if (!sourceName || !key || seen.has(key)) continue;
+      seen.add(key);
+      arcs.push({
+        name: `Дуга: ${sourceName}`,
+        imageUrl: normalizeExternalImageUrl(match[1]),
+        description:
+          'Название и позиция найдены в актуальном гайде. Перед публикацией замените название на официальную русскую локализацию, если она доступна.',
+      });
+      if (arcs.length >= 6) break;
+    }
+    suggestions.push(
+      makeImportSuggestion(
+        'guide.bestArcs',
+        'Лучшие дуги',
+        arcs,
+        source,
+        'medium',
+        'Источник помогает сверить порядок дуг; русские названия подтверждает редактор.',
+      ),
+    );
+  }
+
+  const statBlock = findBlock(/stat priority|приоритет.*(?:стат|характерист)/);
+  if (statBlock) {
+    const statText = htmlToPlainText(statBlock.html);
+    const mainStats = statText.match(
+      /(?:Cartridge\s+)?Mainstat Priority:\s*(.+?)(?=\s+Substat Priority:|$)/i,
+    )?.[1];
+    const subStats = statText.match(
+      /Substat Priority:\s*(.+?)(?=\s+[A-Z][^.]{4,80}\s+(?:is|are|both)\b|$)/i,
+    )?.[1];
+    const toPriorityRows = (value) =>
+      localizeImportedGuideText(value || '')
+        .split(/\s*(?:>|=)\s*/)
+        .map((item) => normalizeImportedRuText(item))
+        .filter(Boolean)
+        .slice(0, 8)
+        .map((item, index) => ({
+          title: `${index + 1}. ${item}`,
+          description: 'Приоритет характеристики по данным актуального гайда.',
+        }));
+    suggestions.push(
+      makeImportSuggestion(
+        'guide.mainStats',
+        'Основные статы',
+        toPriorityRows(mainStats),
+        source,
+        'high',
+      ),
+      makeImportSuggestion(
+        'guide.subStats',
+        'Саб-статы',
+        toPriorityRows(subStats),
+        source,
+        'high',
+      ),
+    );
+  }
+
+  const skillBlock = findBlock(/skill priority|приоритет.*навык/);
+  if (skillBlock) {
+    const priorityLine = compactImportLines(htmlToPlainText(skillBlock.html)).find(
+      (line) =>
+        (line.match(/(?:>|=)/g) || []).length >= 2 &&
+        /skill|ultimate|attack/i.test(line),
+    );
+    const rows = localizeImportedGuideText(priorityLine || '')
+      .split(/\s*(?:>|=)\s*/)
+      .map((item) => normalizeImportedRuText(item))
+      .filter(Boolean)
+      .slice(0, 8)
+      .map((item, index) => ({
+        title: `${index + 1}. ${item}`,
+        description: 'Порядок прокачки навыков по данным актуального гайда.',
+      }));
+    suggestions.push(
+      makeImportSuggestion(
+        'guide.skillPriority',
+        'Приоритет навыков',
+        rows,
+        source,
+        'high',
+      ),
+    );
+  }
+
+  const teamBlock = findBlock(/best teams?|лучш.*команд/);
+  if (teamBlock) {
+    const teams = [];
+    const seen = new Set();
+    const teamChunks = teamBlock.html.split(
+      /<div[^>]+class=["'][^"']*\bhoyo-block\b[^"']*\bteam-block\b[^"']*["'][^>]*>/i,
+    );
+    for (const chunk of teamChunks.slice(1)) {
+      const members = [...chunk.slice(0, 9000).matchAll(
+        /<span[^>]+class=["'][^"']*nte_portrait_text[^"']*["'][^>]*>([^<]+)<\/span>/gi,
+      )]
+        .map((match) => localizeImportedGuideText(htmlToPlainText(match[1])))
+        .filter(Boolean)
+        .filter((name, index, values) => values.indexOf(name) === index)
+        .slice(0, 4);
+      if (members.length !== 4) continue;
+      const title = members.join(' + ');
+      const key = normalizeImportSearch(title);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      teams.push({
+        title,
+        description:
+          'Состав извлечён из актуальной таблицы команд. Добавьте русское объяснение синергии и ротацию перед публикацией.',
+      });
+      if (teams.length >= 8) break;
+    }
+    suggestions.push(
+      makeImportSuggestion(
+        'guide.teams',
+        'Лучшие команды',
+        teams,
+        source,
+        'high',
+        'Составы извлечены из структурированных карточек персонажей, без машинного перевода описаний.',
+      ),
+    );
+  }
+
+  return suggestions.filter(Boolean);
 }
 
 function parseKaidenGuideImport(html, source, character) {
@@ -8861,6 +9190,7 @@ function dedupeImportSuggestions(items) {
     'profile.arcType',
     'profile.birthday',
     'profile.releaseDate',
+    'profile.releaseVersion',
     'profile.faction',
     'profile.biography',
     'profile.baseStats',
@@ -9283,6 +9613,7 @@ const CHARACTER_IMPORT_COVERAGE_FIELDS = new Map([
   ['profile.biography', 'Биография'],
   ['profile.faction', 'Фракция'],
   ['profile.arcType', 'Тип дуги'],
+  ['profile.releaseVersion', 'Версия появления'],
   ['profile.roleTags', 'Роли'],
   ['profile.abilities', 'Способности'],
   ['profile.awakenings', 'Пробуждения'],
@@ -9808,6 +10139,9 @@ function serializeCharacter(row) {
       birthday: normalizeImportedRuText(row.profile_birthday || ''),
       releaseDate: formatRuImportDate(
         normalizeImportedRuText(row.profile_release_date || ''),
+      ),
+      releaseVersion: normalizeImportedRuText(
+        row.profile_release_version || '',
       ),
       biographyShort: profileBiographyShort || shortDescription,
       biography: normalizeImportedRuText(
@@ -10380,6 +10714,7 @@ function normalizeCharacterProfile(value) {
     arcType: text(value.arcType, 120),
     birthday: text(value.birthday, 80),
     releaseDate: text(value.releaseDate, 80),
+    releaseVersion: text(value.releaseVersion, 40),
     biographyShort: text(value.biographyShort, 1000),
     biography: text(value.biography, 60000),
     trivia: text(value.trivia, 60000),
@@ -10490,17 +10825,18 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
     statements.push(
       env.DB.prepare(
         `INSERT INTO character_profiles (
-        character_id, faction, arc_type, birthday, release_date, biography_short,
+        character_id, faction, arc_type, birthday, release_date, release_version, biography_short,
         biography_markdown, trivia_markdown, role_tags_json, role_icons_json,
         voice_actors_json, materials_json, base_stats_json,
         abilities_json, skins_json, friendship_json, gifts_json,
         voice_lines_json, awakenings_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(character_id) DO UPDATE SET
         faction = excluded.faction,
         arc_type = excluded.arc_type,
         birthday = excluded.birthday,
         release_date = excluded.release_date,
+        release_version = excluded.release_version,
         biography_short = excluded.biography_short,
            biography_markdown = excluded.biography_markdown,
            trivia_markdown = excluded.trivia_markdown,
@@ -10522,6 +10858,7 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
         profile.arcType,
         profile.birthday,
         profile.releaseDate,
+        profile.releaseVersion,
         profile.biographyShort,
         profile.biography,
         profile.trivia,

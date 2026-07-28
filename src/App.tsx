@@ -1262,12 +1262,10 @@ function ThreadEditor({
 
   return (
     <form className="editor-form thread-editor" onSubmit={saveThread}>
-      <div className="editor-form__tabs" role="tablist" aria-label="Разделы редактора треда">
-        <span className="active">Материал</span>
-        <span>Предпросмотр</span>
-      </div>
-      <div className="editor-form__grid">
-        <section className="admin-panel entity-form">
+      <p className="editor-form__wysiwyg-note">
+        Текст в редакторе сразу выглядит так же, как после публикации.
+      </p>
+      <section className="admin-panel entity-form thread-editor__form">
           <label htmlFor="thread-title">Заголовок</label>
           <input
             id="thread-title"
@@ -1329,15 +1327,7 @@ function ThreadEditor({
               <option value="hidden">Скрыт</option>
             ) : null}
           </select>
-        </section>
-        <section className="admin-panel preview-panel">
-          <p className="eyebrow">Предпросмотр</p>
-          <h2>{title || 'Новый тред'}</h2>
-          <p>{summary || 'Краткое описание появится здесь.'}</p>
-          <Tags tags={parseTags(tags)} />
-          <MarkdownPreview value={body || '_Текст треда пока пуст._'} />
-        </section>
-      </div>
+      </section>
       <div className="editor-shell__footer">
         <button className="primary-button" type="submit" disabled={pending}>
           <CheckCircle2 aria-hidden="true" />
@@ -1579,44 +1569,47 @@ function CharacterCard({
   character: Character;
   data: SiteData;
 }) {
-const cardTags = character.profile?.arcType
-? [`Дуга: ${character.profile.arcType}`, ...character.tags]
-: character.tags;
-const tierPlacement = getCharacterTierPlacement(data, character.id);
-const tierLabel = tierPlacement
-? tierPlacement.tier
-: 'Тир-лист';
+  const cardTags = character.profile?.arcType
+    ? [`Дуга: ${character.profile.arcType}`, ...character.tags]
+    : character.tags;
+  const tierPlacement = getCharacterTierPlacement(data, character.id);
+  const tierLabel = tierPlacement ? tierPlacement.tier : '—';
 
-return (
-<article className="character-card">
+  return (
+    <article className="character-card">
       <a
         href={`#/characters/${character.slug}`}
         aria-label={`Открыть страницу персонажа ${character.name}`}
       >
-        <img
-          src={resolveAssetUrl(character.imageUrl)}
-          alt={character.name}
-          width="360"
-          height="460"
-loading="lazy"
-referrerPolicy="no-referrer"
-/>
-<span
-className="tier-badge"
-title={
-tierPlacement
-? `Ранг единого тир-листа, патч ${tierPlacement.patch}`
-: 'Персонаж ещё не добавлен в единый тир-лист'
-}
->
-{tierLabel}
-</span>
-<div>
+        <span className="character-card__media">
+          <img
+            src={resolveAssetUrl(character.imageUrl)}
+            alt={character.name}
+            width="320"
+            height="320"
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+          />
+        </span>
+        <span
+          className="tier-badge"
+          title={
+            tierPlacement
+              ? `Ранг единого тир-листа, патч ${tierPlacement.patch}`
+              : 'Персонаж ещё не добавлен в единый тир-лист'
+          }
+        >
+          {tierLabel}
+        </span>
+        <div>
           <h3>{character.name}</h3>
-          <p>
+          <p className="character-card__meta">
             {character.role} · {character.attribute} · {character.rarity}
           </p>
-          {character.shortDescription ? <span>{character.shortDescription}</span> : null}
+          {character.shortDescription ? (
+            <p className="character-card__summary">{character.shortDescription}</p>
+          ) : null}
           <Tags tags={cardTags} />
         </div>
       </a>
@@ -1646,12 +1639,12 @@ function GuideCard({
         decoding="async"
         referrerPolicy="no-referrer"
       />
-      <div>
+      <div className="guide-card__body">
         <p className="eyebrow">
           {character?.name || 'Гайд'} · патч {guide.patch}
         </p>
         <h3>{guide.title}</h3>
-        <p>{guide.summary}</p>
+        <p className="guide-card__summary">{guide.summary}</p>
         <dl className="meta-row">
           <div>
             <dt>Автор</dt>
@@ -1662,14 +1655,16 @@ function GuideCard({
             <dd>{formatDate(guide.updatedAt)}</dd>
           </div>
         </dl>
-        <a className="text-button" href={`#/guides/${guide.slug}`}>
-          Читать гайд <ChevronRight aria-hidden="true" />
-        </a>
-        {onEdit ? (
-          <button className="text-button" type="button" onClick={onEdit}>
-            <Pencil aria-hidden="true" /> Редактировать
-          </button>
-        ) : null}
+        <div className="guide-card__actions">
+          <a className="text-button" href={`#/guides/${guide.slug}`}>
+            Читать гайд <ChevronRight aria-hidden="true" />
+          </a>
+          {onEdit ? (
+            <button className="text-button" type="button" onClick={onEdit}>
+              <Pencil aria-hidden="true" /> Редактировать
+            </button>
+          ) : null}
+        </div>
       </div>
     </article>
   );
@@ -2227,6 +2222,10 @@ function CharacterDetailPage({
                 ? formatProfileDate(profile.releaseDate)
                 : 'Не указана'}
             </dd>
+          </div>
+          <div>
+            <dt>Версия появления</dt>
+            <dd>{profile.releaseVersion || 'Не указана'}</dd>
           </div>
           <div>
               <dt>Атрибут</dt>
@@ -3243,6 +3242,7 @@ function CommentsBlock({
   );
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const reportDialogRef = useRef<HTMLDialogElement>(null);
+  const handledLinkedCommentRef = useRef('');
   const draftKey = `nte-comment-draft:${targetType}:${targetId}`;
   const canModerateComments = Boolean(
     user && ['moderator', 'admin', 'owner'].includes(user.role),
@@ -3350,12 +3350,15 @@ function CommentsBlock({
     const commentId = new URL(window.location.href).searchParams.get('comment');
     if (!commentId || !comments.some((comment) => comment.id === commentId))
       return;
+    const linkedCommentKey = `${targetType}:${targetId}:${commentId}`;
+    if (handledLinkedCommentRef.current === linkedCommentKey) return;
+    handledLinkedCommentRef.current = linkedCommentKey;
     window.requestAnimationFrame(() => {
       document
         .getElementById(`comment-${commentId}`)
         ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
-  }, [comments]);
+  }, [comments, targetId, targetType]);
 
   async function submitComment(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -5181,7 +5184,7 @@ function formatGuideImportValue(value: string) {
   }
 }
 
-const GUIDE_SUMMARY_MAX_LENGTH = 8000;
+const GUIDE_SUMMARY_MAX_LENGTH = 2000;
 
 function limitEditorialText(value: string, maxLength: number) {
   const normalized = value.trim().replace(/\n{3,}/g, '\n\n');
@@ -5198,13 +5201,9 @@ function limitEditorialText(value: string, maxLength: number) {
   return `${candidate.slice(0, safeEnd).trimEnd()}…`;
 }
 
-function mergeGuideImportText(current: string, imported: string) {
+function prepareGuideImportSummary(imported: string) {
   const next = imported.trim();
-  if (!next || current.includes(next)) return current;
-  return limitEditorialText(
-    current.trim() ? `${current.trim()}\n\n${next}` : next,
-    GUIDE_SUMMARY_MAX_LENGTH,
-  );
+  return next ? limitEditorialText(next, GUIDE_SUMMARY_MAX_LENGTH) : '';
 }
 
 function getGuideImportFieldLabel(field: string) {
@@ -5603,9 +5602,16 @@ function AdminGuides({
       sections: [...activeGuide.sections].sort((a, b) => a.position - b.position),
     };
   }, [activeGuide]);
+  const baselineGuideSignature = useMemo(
+    () => (baselineGuideState ? JSON.stringify(baselineGuideState) : ''),
+    [baselineGuideState],
+  );
+  const guideDraftSignature = useMemo(
+    () => JSON.stringify({ guideMeta, sections }),
+    [guideMeta, sections],
+  );
   const isGuideDirty = Boolean(
-    baselineGuideState &&
-      JSON.stringify({ guideMeta, sections }) !== JSON.stringify(baselineGuideState),
+    baselineGuideState && guideDraftSignature !== baselineGuideSignature,
   );
 
   useEffect(() => {
@@ -5614,14 +5620,26 @@ function AdminGuides({
       skipNextGuideDraftSaveRef.current = false;
       return;
     }
-    if (isGuideDirty) {
-      localStorage.setItem(
-        guideDraftKey,
-        JSON.stringify({ guideMeta, sections, selectedSectionId, markdown }),
-      );
-    } else {
-      localStorage.removeItem(guideDraftKey);
+    const saveDraft = () => {
+      try {
+        if (isGuideDirty) {
+          localStorage.setItem(
+            guideDraftKey,
+            JSON.stringify({ guideMeta, sections, selectedSectionId, markdown }),
+          );
+        } else {
+          localStorage.removeItem(guideDraftKey);
+        }
+      } catch {
+        // Editing remains available in private browsing without local storage.
+      }
+    };
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(saveDraft, { timeout: 1200 });
+      return () => window.cancelIdleCallback(idleId);
     }
+    const timeoutId = globalThis.setTimeout(saveDraft, 350);
+    return () => globalThis.clearTimeout(timeoutId);
   }, [
     activeGuide,
     guideDraftKey,
@@ -5854,10 +5872,10 @@ function AdminGuides({
     if (suggestion.field === 'guide.summary') {
       setGuideMeta((current) => ({
         ...current,
-        summary: mergeGuideImportText(current.summary, suggestion.value),
+        summary: prepareGuideImportSummary(suggestion.value),
       }));
       acceptGuideImportDecision(suggestion);
-      setMessage('Краткий вывод добавлен в параметры гайда. Проверьте текст и сохраните.');
+      setMessage('Выбранный краткий вывод добавлен в гайд. Проверьте текст и сохраните.');
       return;
     }
     if (suggestion.field === 'guide.videoUrl') {
@@ -6209,7 +6227,7 @@ function AdminGuides({
         <h2>Создать гайд</h2>
         <p>
           После создания появятся разделы, билд, отряды, командные ротации,
-          видео и предпросмотр.
+          видео и полноценный редактор материала.
         </p>
         <GuideCreateFields
           characters={availableGuideCharacters}

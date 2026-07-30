@@ -11,11 +11,13 @@ import React, {
   useState,
 } from 'react';
 import {
+  Archive,
   BadgeCheck,
   ArrowUp,
   BookOpen,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronUp,
   CircleAlert,
@@ -131,6 +133,8 @@ import type {
   AuditLogEntry,
   AppSettings,
   Character,
+  CharacterAbility,
+  CharacterAbilityAttribute,
   CharacterImportLookupResult,
   CharacterImportSuggestion,
   CharacterRoleIcon,
@@ -268,16 +272,140 @@ function guideSectionTypeLabel(value: string) {
   );
 }
 
-function makeSlug(value: string) {
+const russianSlugMap: Record<string, string> = {
+  а: 'a',
+  б: 'b',
+  в: 'v',
+  г: 'g',
+  д: 'd',
+  е: 'e',
+  ё: 'e',
+  ж: 'zh',
+  з: 'z',
+  и: 'i',
+  й: 'y',
+  к: 'k',
+  л: 'l',
+  м: 'm',
+  н: 'n',
+  о: 'o',
+  п: 'p',
+  р: 'r',
+  с: 's',
+  т: 't',
+  у: 'u',
+  ф: 'f',
+  х: 'h',
+  ц: 'ts',
+  ч: 'ch',
+  ш: 'sh',
+  щ: 'sch',
+  ъ: '',
+  ы: 'y',
+  ь: '',
+  э: 'e',
+  ю: 'yu',
+  я: 'ya',
+};
+
+function makeSlug(value: string, fallback = 'material') {
+  const transliterated = value
+    .trim()
+    .toLocaleLowerCase('ru-RU')
+    .split('')
+    .map((character) => russianSlugMap[character] ?? character)
+    .join('');
+
   return (
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/ё/g, 'e')
+    transliterated
+      .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9а-я]+/gi, '-')
-      .replace(/^-+|-+$/g, '') || `thread-${Date.now()}`
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || fallback
   );
+}
+
+const abilityAttributeLabels = [
+  'Коэфф. 1-го экземпляра',
+  'Коэфф. 2-го экземпляра',
+  'Коэфф. 3-го экземпляра',
+  'Коэфф. 4-го экземпляра',
+  'Коэфф. 5-го экземпляра',
+  'Коэффициент урона пике',
+  'Коэфф. атаки ответвления',
+  'Показатель критического контрудара',
+  'Коэфф. призрачного шага',
+  'Энергия циклов',
+];
+
+function abilityAttributeId(label: string, index: number) {
+  return `${label.toLocaleLowerCase('ru-RU').replace(/[^a-zа-яё0-9]+/gi, '-')}-${index}`;
+}
+
+function splitAbilityPresentation(ability: CharacterAbility) {
+  const explicitAttributes = (ability.attributes || [])
+    .map((attribute, index) => ({
+      id: attribute.id || abilityAttributeId(attribute.label, index),
+      label: attribute.label.trim(),
+      value: attribute.value.trim(),
+    }))
+    .filter((attribute) => attribute.label && attribute.value);
+
+  if (explicitAttributes.length) {
+    return {
+      description: ability.description.trim(),
+      attributes: explicitAttributes,
+    };
+  }
+
+  const normalized = ability.description.replace(/\r\n?/g, '\n').trim();
+  const marker = /\n*\s*(?:Базовые значения|Атрибуты)\s*:?\s*\n?/i;
+  const markerMatch = marker.exec(normalized);
+  const description = markerMatch
+    ? normalized.slice(0, markerMatch.index).trim()
+    : normalized;
+  const source = markerMatch
+    ? normalized.slice(markerMatch.index + markerMatch[0].length).trim()
+    : '';
+  const attributes: CharacterAbilityAttribute[] = [];
+
+  source
+    .split('\n')
+    .map((line) => line.replace(/^[•*\-\s]+/, '').trim())
+    .filter(Boolean)
+    .forEach((line, index) => {
+      const match = line.match(/^([^:]{2,90}):\s*(.+)$/);
+      if (!match) return;
+      attributes.push({
+        id: abilityAttributeId(match[1], index),
+        label: match[1].trim(),
+        value: match[2].trim(),
+      });
+    });
+
+  if (!attributes.length && source) {
+    const labelPattern = abilityAttributeLabels
+      .map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|');
+    const inlinePattern = new RegExp(
+      `(${labelPattern})\\s*:\\s*(.+?)(?=(?:${labelPattern})\\s*:|$)`,
+      'gi',
+    );
+    let match = inlinePattern.exec(source);
+    while (match) {
+      attributes.push({
+        id: abilityAttributeId(match[1], attributes.length),
+        label: match[1].trim(),
+        value: match[2].trim(),
+      });
+      match = inlinePattern.exec(source);
+    }
+  }
+
+  return {
+    description: description || normalized,
+    attributes,
+  };
 }
 
 function useHashRoute() {
@@ -573,7 +701,7 @@ function App() {
     page = slug ? (
       <ThreadPage data={data} slug={slug} user={user} setData={setData} />
     ) : (
-      <HomePage data={data} loading={loading} user={user} setData={setData} />
+      <ThreadsPage data={data} user={user} setData={setData} />
     );
   } else if (section === 'profile') {
     page = <ProfilePage user={user} setUser={setUser} />;
@@ -790,7 +918,7 @@ function HomePage({
   user: User | null;
   setData: React.Dispatch<React.SetStateAction<SiteData>>;
 }) {
-  const latestGuides = data.guides.slice(0, 3);
+  const latestGuides = data.guides.slice(0, 5);
   const latestNews = data.news.slice(0, 2);
   const latestLeaks = data.leaks.filter((leak) => leak.approved).slice(0, 2);
   const { grouped } = groupTierItems(data);
@@ -800,10 +928,17 @@ function HomePage({
   >(null);
   const [homeEditorItemId, setHomeEditorItemId] = useState('new');
   const [homeEditorDirty, setHomeEditorDirty] = useState(false);
+  const [latestGuideIndex, setLatestGuideIndex] = useState(0);
   const canCreateGuide = canManageContent(user, 'guides', 'create');
   const canCreateNews = canManageContent(user, 'news', 'create');
   const canCreateLeak = canManageContent(user, 'leaks', 'create');
   const canCreateThread = Boolean(user);
+
+  useEffect(() => {
+    setLatestGuideIndex((current) =>
+      Math.min(current, Math.max(0, latestGuides.length - 1)),
+    );
+  }, [latestGuides.length]);
 
   async function refreshContent() {
     setData(
@@ -827,11 +962,6 @@ function HomePage({
             Neverness to Everness · русскоязычный meta-hub
           </p>
           <h1>NTE Meta</h1>
-          <p>
-            Не вики обо всем, а рабочий центр меты: тир-листы, глубокие ротации,
-            команды, ошибки новичков, новости, сливы с пометкой доверия и
-            комьюнити-разборы.
-          </p>
           <div className="button-row">
             <a className="primary-button" href="#/tierlists">
               <Star aria-hidden="true" />
@@ -879,7 +1009,6 @@ function HomePage({
         <SectionHeader
           eyebrow="Обновляется редакцией"
           title="Последние гайды"
-          text="Карточки показывают персонажа, патч, автора и краткий практический вывод."
           action={
             <div className="section-actions">
               {canCreateGuide ? (
@@ -897,10 +1026,58 @@ function HomePage({
             </div>
           }
         />
-        <div className="guide-grid">
-          {latestGuides.map((guide) => (
-            <GuideCard key={guide.id} guide={guide} data={data} />
-          ))}
+        <div
+          className="home-guide-carousel"
+          aria-roledescription="карусель"
+          aria-label="Последние гайды"
+        >
+          <button
+            className="icon-button home-guide-carousel__arrow"
+            type="button"
+            aria-label="Предыдущий гайд"
+            disabled={latestGuides.length < 2}
+            onClick={() =>
+              setLatestGuideIndex((current) =>
+                latestGuides.length
+                  ? (current - 1 + latestGuides.length) % latestGuides.length
+                  : 0,
+              )
+            }
+          >
+            <ChevronLeft aria-hidden="true" />
+          </button>
+          <div className="guide-grid home-guide-carousel__track">
+            {latestGuides[latestGuideIndex] ? (
+              <GuideCard
+                key={latestGuides[latestGuideIndex].id}
+                guide={latestGuides[latestGuideIndex]}
+                data={data}
+              />
+            ) : (
+              <EmptyState
+                title="Гайдов пока нет"
+                text="Первый опубликованный гайд появится здесь."
+              />
+            )}
+          </div>
+          <button
+            className="icon-button home-guide-carousel__arrow"
+            type="button"
+            aria-label="Следующий гайд"
+            disabled={latestGuides.length < 2}
+            onClick={() =>
+              setLatestGuideIndex((current) =>
+                latestGuides.length ? (current + 1) % latestGuides.length : 0,
+              )
+            }
+          >
+            <ChevronRight aria-hidden="true" />
+          </button>
+          {latestGuides.length > 1 ? (
+            <span className="home-guide-carousel__status" aria-live="polite">
+              {latestGuideIndex + 1} / {latestGuides.length}
+            </span>
+          ) : null}
         </div>
       </section>
 
@@ -1008,25 +1185,35 @@ function HomePage({
             Создавайте треды с вопросами по отрядам, ротациям, ресурсам и
             патчам. Комментарии под материалами остаются там же, где контекст.
           </p>
-          {canCreateThread ? (
-            <button
-              className="primary-button"
-              type="button"
-              onClick={() => setHomeEditor('thread')}
-            >
-              <MessageCircle aria-hidden="true" /> Создать тред
-            </button>
-          ) : (
-            <a className="ghost-button" href="#/profile">
-              <UserCircle aria-hidden="true" /> Войти для треда
+          <div className="button-row">
+            {canCreateThread ? (
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => setHomeEditor('thread')}
+              >
+                <MessageCircle aria-hidden="true" /> Создать тред
+              </button>
+            ) : (
+              <a className="ghost-button" href="#/profile">
+                <UserCircle aria-hidden="true" /> Войти для треда
+              </a>
+            )}
+            <a className="ghost-button" href="#/threads">
+              <MessageSquare aria-hidden="true" /> Все треды
             </a>
-          )}
+          </div>
         </div>
         <div className="comment-preview">
           {data.threads.length ? (
             data.threads.slice(0, 3).map((thread) => (
               <article key={thread.id}>
                 <strong>{thread.title}</strong>
+                {thread.status === 'closed' ? (
+                  <span className="thread-status is-archived">
+                    <Archive aria-hidden="true" /> Архив
+                  </span>
+                ) : null}
                 <p>{thread.summary}</p>
                 <span>
                   {thread.commentsCount || 0} комментариев ·{' '}
@@ -1193,6 +1380,9 @@ function ThreadEditor({
   const [body, setBody] = useState(storedDraft.body || thread?.body || '');
   const [tags, setTags] = useState((storedDraft.tags || thread?.tags || []).join(', '));
   const [status, setStatus] = useState<CommunityThread['status']>(thread?.status || 'open');
+  const [slugTouched, setSlugTouched] = useState(
+    Boolean(thread?.slug || storedDraft.slug),
+  );
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const threadBaseline = useMemo(
@@ -1225,7 +1415,12 @@ function ThreadEditor({
 
   function updateTitle(value: string) {
     setTitle(value);
-    if (!thread && !slug.trim()) setSlug(makeSlug(value));
+    if (!slugTouched) setSlug(makeSlug(value, 'thread'));
+  }
+
+  function updateSlug(value: string) {
+    setSlugTouched(true);
+    setSlug(makeSlug(value, 'thread'));
   }
 
   async function saveThread(event: React.FormEvent<HTMLFormElement>) {
@@ -1239,7 +1434,7 @@ function ThreadEditor({
     setMessage('');
     const payload = {
       title: title.trim(),
-      slug: makeSlug(slug || title),
+      slug: makeSlug(slug || title, 'thread'),
       summary: summary.trim(),
       body: body.trim(),
       tags: parseTags(tags),
@@ -1281,7 +1476,7 @@ function ThreadEditor({
               id="thread-slug"
               value={slug}
               maxLength={140}
-              onChange={(event) => setSlug(makeSlug(event.target.value))}
+              onChange={(event) => updateSlug(event.target.value)}
               required
               aria-describedby="thread-slug-help"
             />
@@ -1315,18 +1510,24 @@ function ThreadEditor({
             placeholder="вопрос, ротация, патч"
             onChange={(event) => setTags(event.target.value)}
           />
-          <label htmlFor="thread-status">Статус</label>
-          <select
-            id="thread-status"
-            value={status}
-            onChange={(event) => setStatus(event.target.value as CommunityThread['status'])}
-          >
-            <option value="open">Открыт</option>
-            <option value="closed">Закрыт</option>
-            {roleWeight[user.role] >= roleWeight.moderator ? (
-              <option value="hidden">Скрыт</option>
-            ) : null}
-          </select>
+          {roleWeight[user.role] >= roleWeight.editor ? (
+            <>
+              <label htmlFor="thread-status">Статус обсуждения</label>
+              <select
+                id="thread-status"
+                value={status}
+                onChange={(event) =>
+                  setStatus(event.target.value as CommunityThread['status'])
+                }
+              >
+                <option value="open">Открыт для обсуждения</option>
+                <option value="closed">В архиве · только чтение</option>
+                {roleWeight[user.role] >= roleWeight.moderator ? (
+                  <option value="hidden">Скрыт модерацией</option>
+                ) : null}
+              </select>
+            </>
+          ) : null}
       </section>
       <div className="editor-shell__footer">
         <button className="primary-button" type="submit" disabled={pending}>
@@ -1338,6 +1539,190 @@ function ThreadEditor({
         </span>
       </div>
     </form>
+  );
+}
+
+function ThreadsPage({
+  data,
+  user,
+  setData,
+}: {
+  data: SiteData;
+  user: User | null;
+  setData: SiteDataSetter;
+}) {
+  const [view, setView] = useState<'open' | 'archived' | 'all'>('open');
+  const [query, setQuery] = useState('');
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorDirty, setEditorDirty] = useState(false);
+  const normalizedQuery = normalizeSearchText(query);
+  const visibleThreads = data.threads
+    .filter((thread) => thread.status !== 'hidden')
+    .filter((thread) => {
+      if (view === 'open') return thread.status === 'open';
+      if (view === 'archived') return thread.status === 'closed';
+      return true;
+    })
+    .filter((thread) =>
+      normalizedQuery
+        ? normalizeSearchText(
+            `${thread.title} ${thread.summary} ${thread.tags.join(' ')}`,
+          ).includes(normalizedQuery)
+        : true,
+    )
+    .sort(
+      (left, right) =>
+        new Date(right.updatedAt || right.createdAt).getTime() -
+        new Date(left.updatedAt || left.createdAt).getTime(),
+    );
+
+  async function refreshContent() {
+    setData(
+      await loadSiteData({
+        includePrivate: Boolean(
+          user && roleWeight[user.role] >= roleWeight.editor,
+        ),
+      }),
+    );
+  }
+
+  return (
+    <div className="page-stack threads-page">
+      <section className="page-hero">
+        <p className="eyebrow">Комьюнити NTE Meta</p>
+        <h1>Треды и обсуждения</h1>
+        <p>
+          Вопросы по персонажам, ресурсам, отрядам и механикам собраны в
+          отдельных обсуждениях.
+        </p>
+        {user ? (
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => setEditorOpen(true)}
+          >
+            <MessageCircle aria-hidden="true" /> Создать тред
+          </button>
+        ) : (
+          <a className="ghost-button" href="#/profile">
+            <UserCircle aria-hidden="true" /> Войти для публикации
+          </a>
+        )}
+      </section>
+
+      <section className="content-band">
+        <div className="threads-page__toolbar">
+          <label className="search-field">
+            <Search aria-hidden="true" />
+            <span className="sr-only">Поиск по тредам</span>
+            <input
+              type="search"
+              value={query}
+              placeholder="Тема, описание или тег..."
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          <div className="segmented-control" aria-label="Статус тредов">
+            <button
+              type="button"
+              aria-pressed={view === 'open'}
+              onClick={() => setView('open')}
+            >
+              Активные
+            </button>
+            <button
+              type="button"
+              aria-pressed={view === 'archived'}
+              onClick={() => setView('archived')}
+            >
+              Архив
+            </button>
+            <button
+              type="button"
+              aria-pressed={view === 'all'}
+              onClick={() => setView('all')}
+            >
+              Все
+            </button>
+          </div>
+        </div>
+
+        <div className="thread-list">
+          {visibleThreads.length ? (
+            visibleThreads.map((thread) => (
+              <article className="thread-list-card" key={thread.id}>
+                <div className="thread-list-card__heading">
+                  <div>
+                    <p className="eyebrow">
+                      {thread.author} · {formatDate(thread.updatedAt || thread.createdAt)}
+                    </p>
+                    <h2>{thread.title}</h2>
+                  </div>
+                  <span
+                    className={`thread-status${
+                      thread.status === 'closed' ? ' is-archived' : ''
+                    }`}
+                  >
+                    {thread.status === 'closed' ? (
+                      <Archive aria-hidden="true" />
+                    ) : (
+                      <MessageCircle aria-hidden="true" />
+                    )}
+                    {thread.status === 'closed' ? 'Архив' : 'Обсуждается'}
+                  </span>
+                </div>
+                <p>{thread.summary}</p>
+                <div className="thread-list-card__footer">
+                  <Tags tags={thread.tags} />
+                  <span>{thread.commentsCount || 0} комментариев</span>
+                  <a
+                    className="text-button"
+                    href={`#/threads/${thread.slug}`}
+                  >
+                    Открыть <ChevronRight aria-hidden="true" />
+                  </a>
+                </div>
+              </article>
+            ))
+          ) : (
+            <EmptyState
+              title={query ? 'Треды не найдены' : 'Здесь пока нет тредов'}
+              text={
+                query
+                  ? 'Измените запрос или переключите статус обсуждений.'
+                  : view === 'archived'
+                    ? 'Архивные обсуждения появятся после закрытия тредов редакцией.'
+                    : 'Создайте первое обсуждение по игре.'
+              }
+            />
+          )}
+        </div>
+      </section>
+
+      <EditorShell
+        open={editorOpen}
+        title="Создать тред"
+        eyebrow="Обсуждения"
+        dirty={editorDirty}
+        onClose={() => {
+          setEditorDirty(false);
+          setEditorOpen(false);
+        }}
+      >
+        {user ? (
+          <ThreadEditor
+            user={user}
+            onDirtyChange={setEditorDirty}
+            onSaved={async (savedThread) => {
+              await refreshContent();
+              setEditorDirty(false);
+              setEditorOpen(false);
+              window.location.hash = `#/threads/${savedThread.slug}`;
+            }}
+          />
+        ) : null}
+      </EditorShell>
+    </div>
   );
 }
 
@@ -1375,7 +1760,7 @@ function ThreadPage({
 
   const canEditThread =
     Boolean(user && thread.authorId === user.id) ||
-    Boolean(user && roleWeight[user.role] >= roleWeight.moderator);
+    Boolean(user && roleWeight[user.role] >= roleWeight.editor);
 
   return (
     <div className="page-stack">
@@ -1386,6 +1771,11 @@ function ThreadPage({
           </p>
           <h1>{thread.title}</h1>
           <p>{thread.summary}</p>
+          {thread.status === 'closed' ? (
+            <span className="thread-status is-archived">
+              <Archive aria-hidden="true" /> Архив · только чтение
+            </span>
+          ) : null}
           <Tags tags={thread.tags} />
           {canEditThread ? (
             <button className="ghost-button" type="button" onClick={() => setEditorOpen(true)}>
@@ -1404,7 +1794,19 @@ function ThreadPage({
         </div>
         <RatingBar targetType="thread" targetId={thread.id} user={user} />
       </section>
-      <CommentsBlock targetType="thread" targetId={thread.id} data={data} user={user} />
+      {thread.status === 'closed' ? (
+        <StatusBanner
+          tone="info"
+          text="Обсуждение находится в архиве. Тред доступен для чтения, но новые ответы и реакции на комментарии отключены."
+        />
+      ) : null}
+      <CommentsBlock
+        targetType="thread"
+        targetId={thread.id}
+        data={data}
+        user={user}
+        readOnly={thread.status === 'closed'}
+      />
       <EditorShell
         open={editorOpen}
         title="Редактировать тред"
@@ -1485,24 +1887,19 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
     {
       title: 'Проверка источников',
       value: sourceMetric,
-      text: 'Автоимпорт предлагает строки только с ссылкой на источник и ручным подтверждением.',
       href: canAccessAdmin(user) ? '#/admin/sources' : '#/guides',
       icon: Search,
     },
     {
       title: 'Сливы на модерации',
       value: `${pendingLeaks}`,
-      text: 'Неподтверждённые слухи должны быть явно помечены и не смешиваться с новостями.',
       href: '#/',
       icon: CircleAlert,
     },
     {
       title: 'Свежий тред',
       value: recentThread ? recentThread.title : 'Создайте первый тред',
-      text: recentThread
-        ? `${recentThread.commentsCount || 0} комментариев`
-        : 'Вопросы игроков лучше жить в тредах и комментариях рядом с контекстом.',
-      href: recentThread ? `#/threads/${recentThread.slug}` : '#/',
+      href: recentThread ? `#/threads/${recentThread.slug}` : '#/threads',
       icon: MessageSquare,
     },
   ];
@@ -1553,7 +1950,6 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
                 <span>{item.title}</span>
               </span>
               <strong>{item.value}</strong>
-              <p>{item.text}</p>
             </a>
           );
         })}
@@ -2005,6 +2401,44 @@ const voiceLanguageOrder: CharacterVoiceLine['language'][] = [
   'Китайский',
 ];
 
+function VoiceLinePlayer({ line }: { line: CharacterVoiceLine }) {
+  const [audioFailed, setAudioFailed] = useState(false);
+  const audioUrl = resolveAssetUrl(line.audioUrl);
+
+  if (canPlayDirectAudio(line.audioUrl) && !audioFailed) {
+    return (
+      <audio
+        controls
+        preload="none"
+        src={audioUrl}
+        onError={() => setAudioFailed(true)}
+      >
+        Ваш браузер не поддерживает аудио.
+      </audio>
+    );
+  }
+
+  if (line.sourceUrl) {
+    return (
+      <a
+        className="ghost-button"
+        href={line.sourceUrl}
+        target="_blank"
+        rel="noreferrer"
+      >
+        <Headphones aria-hidden="true" /> Открыть источник записи
+      </a>
+    );
+  }
+
+  return (
+    <span className="audio-placeholder">
+      <Headphones aria-hidden="true" />
+      {audioFailed ? 'Запись недоступна' : 'Прямой аудиофайл не добавлен'}
+    </span>
+  );
+}
+
 function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
   const languages = useMemo(
     () =>
@@ -2016,6 +2450,7 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
   const [activeLanguage, setActiveLanguage] = useState<
     CharacterVoiceLine['language']
   >(languages[0] || 'Японский');
+  const [visibleCount, setVisibleCount] = useState(8);
   const panelId = `${useId().replace(/:/g, '')}-voice-lines`;
 
   useEffect(() => {
@@ -2024,7 +2459,10 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
     }
   }, [activeLanguage, languages]);
 
-  const visibleLines = lines.filter((line) => line.language === activeLanguage);
+  useEffect(() => setVisibleCount(8), [activeLanguage]);
+
+  const languageLines = lines.filter((line) => line.language === activeLanguage);
+  const visibleLines = languageLines.slice(0, visibleCount);
 
   return (
     <div className="voice-library">
@@ -2062,29 +2500,112 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
             </div>
             <div className="voice-line-media">
               {line.description ? <p>{line.description}</p> : null}
-              {canPlayDirectAudio(line.audioUrl) ? (
-                <audio controls preload="none" src={line.audioUrl}>
-                  Ваш браузер не поддерживает аудио.
-                </audio>
-              ) : line.sourceUrl ? (
-                <a
-                  className="ghost-button"
-                  href={line.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <Headphones aria-hidden="true" /> Открыть источник записи
-                </a>
-              ) : (
-                <span className="audio-placeholder">
-                  <Headphones aria-hidden="true" /> Прямой аудиофайл не добавлен
-                </span>
-              )}
+              <VoiceLinePlayer line={line} />
             </div>
           </article>
         ))}
+        {visibleLines.length < languageLines.length ? (
+          <button
+            className="ghost-button voice-library__more"
+            type="button"
+            onClick={() => setVisibleCount((count) => count + 8)}
+          >
+            Показать ещё
+            <span>
+              {Math.min(8, languageLines.length - visibleLines.length)} из{' '}
+              {languageLines.length - visibleLines.length}
+            </span>
+          </button>
+        ) : null}
       </div>
     </div>
+  );
+}
+
+function CharacterAbilityCard({
+  ability,
+  defaultOpen,
+}: {
+  ability: CharacterAbility;
+  defaultOpen: boolean;
+}) {
+  const { description, attributes } = useMemo(
+    () => splitAbilityPresentation(ability),
+    [ability],
+  );
+  const [activePane, setActivePane] = useState<'description' | 'attributes'>(
+    'description',
+  );
+
+  return (
+    <details className="ability-card" open={defaultOpen || undefined}>
+      <summary>
+        <span className="ability-card__icon" aria-hidden="true">
+          {ability.iconUrl ? (
+            <img
+              src={resolveAssetUrl(ability.iconUrl)}
+              alt=""
+              width="64"
+              height="64"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <BookOpen aria-hidden="true" />
+          )}
+        </span>
+        <span className="ability-card__meta">
+          <span className="eyebrow">{ability.type || 'Навык'}</span>
+          <strong>{ability.name || 'Без названия'}</strong>
+        </span>
+        <ChevronDown aria-hidden="true" />
+      </summary>
+      <div className="ability-card__body">
+        {attributes.length ? (
+          <div
+            className="ability-card__tabs"
+            role="tablist"
+            aria-label={`Данные навыка «${ability.name}»`}
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePane === 'description'}
+              className={activePane === 'description' ? 'active' : ''}
+              onClick={() => setActivePane('description')}
+            >
+              Описание
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePane === 'attributes'}
+              className={activePane === 'attributes' ? 'active' : ''}
+              onClick={() => setActivePane('attributes')}
+            >
+              Атрибуты
+              <span>{attributes.length}</span>
+            </button>
+          </div>
+        ) : null}
+        {activePane === 'attributes' && attributes.length ? (
+          <dl className="ability-attribute-grid">
+            {attributes.map((attribute) => (
+              <div key={attribute.id}>
+                <dt>{attribute.label}</dt>
+                <dd>{attribute.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <div className="ability-card__description">
+            <MarkdownPreview
+              value={description || 'Описание навыка требует проверки.'}
+            />
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -2333,36 +2854,11 @@ function CharacterDetailPage({
         {profile.abilities.length ? (
           <div className="ability-list ability-list--profile">
             {profile.abilities.map((ability, index) => (
-              <details
-                className="ability-card"
+              <CharacterAbilityCard
                 key={ability.id}
-                  open={index === 0}
-              >
-                <summary tabIndex={0}>
-                  <span className="ability-card__icon" aria-hidden="true">
-                    {ability.iconUrl ? (
-                      <img
-                        src={resolveAssetUrl(ability.iconUrl)}
-                        alt=""
-                        width="64"
-                        height="64"
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <BookOpen aria-hidden="true" />
-                    )}
-                  </span>
-                  <span className="ability-card__meta">
-                    <span className="eyebrow">{ability.type || 'Навык'}</span>
-                    <strong>{ability.name || 'Без названия'}</strong>
-                  </span>
-                  <ChevronDown aria-hidden="true" />
-                </summary>
-                <div className="ability-card__body">
-                  <MarkdownPreview value={ability.description} />
-                </div>
-              </details>
+                ability={ability}
+                defaultOpen={index === 0}
+              />
             ))}
           </div>
         ) : (
@@ -2379,25 +2875,34 @@ function CharacterDetailPage({
           text="Каждый уровень показан отдельно, чтобы сравнение было прозрачным."
         />
         {profile.awakenings.length ? (
-          <div className="awakening-grid">
+          <div className="awakening-grid awakening-path">
             {[...profile.awakenings]
               .sort((a, b) => a.level - b.level)
               .map((awakening) => (
-                <article key={`${awakening.level}-${awakening.name}`}>
-                  {awakening.iconUrl ? (
-                    <img
-                      src={resolveAssetUrl(awakening.iconUrl)}
-                      alt=""
-                      width="58"
-                      height="58"
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <span className="character-detail-fallback-icon" aria-hidden="true">
+                <article
+                  className="awakening-card"
+                  key={`${awakening.level}-${awakening.name}`}
+                >
+                  <span
+                    className="awakening-card__level"
+                    aria-label={`Уровень ${awakening.level}`}
+                  >
+                    {awakening.level}
+                  </span>
+                  <span className="awakening-card__icon" aria-hidden="true">
+                    {awakening.iconUrl ? (
+                      <img
+                        src={resolveAssetUrl(awakening.iconUrl)}
+                        alt=""
+                        width="58"
+                        height="58"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
                       <Star />
-                    </span>
-                  )}
+                    )}
+                  </span>
                   <div className="character-detail-card-copy">
                     <p className="eyebrow">
                       {awakening.level > 0
@@ -2857,9 +3362,19 @@ function GuideDetail({
         .sort((a, b) => a.position - b.position),
     [guide.sections, hasStructuredTeams],
   );
+  const guideNavigation = useMemo(
+    () => [
+      ...orderedSections.map((section) => ({
+        id: section.id,
+        title: section.title,
+      })),
+      { id: 'guide-teams', title: 'Отряды и ротации' },
+    ],
+    [orderedSections],
+  );
 
   useEffect(() => {
-    const sections = orderedSections
+    const sections = guideNavigation
       .map((section) => document.getElementById(section.id))
       .filter((section): section is HTMLElement => Boolean(section));
     if (!sections.length || !('IntersectionObserver' in window)) return;
@@ -2875,7 +3390,7 @@ function GuideDetail({
     );
     sections.forEach((section) => observer.observe(section));
     return () => observer.disconnect();
-  }, [orderedSections]);
+  }, [guideNavigation]);
 
   return (
     <div className="page-stack">
@@ -2900,7 +3415,7 @@ function GuideDetail({
       <section className="guide-layout">
         <aside className="toc" aria-label="Навигация по гайду">
           <strong>Разделы</strong>
-          {orderedSections.map((section) => (
+          {guideNavigation.map((section) => (
             <button
               type="button"
               key={section.id}
@@ -2928,25 +3443,28 @@ function GuideDetail({
               <MarkdownPreview value={section.content} />
             </article>
           ))}
-        </div>
-      </section>
-      <section className="content-band">
-        <SectionHeader
-          eyebrow="Внутри гайда"
-          title={`Лучшие отряды и ротации для ${character.name}`}
-          text="У каждого состава своя последовательность переключений персонажей и навыков."
-        />
-        <div className="team-grid">
-          {relatedTeams.length ? (
-            relatedTeams.map((team) => (
-              <TeamCard key={team.id} team={team} data={data} />
-            ))
-          ) : (
-            <EmptyState
-              title="Отряды пока не добавлены"
-              text="Редактор сможет собрать состав и расписать его ротацию прямо в этом гайде."
+          <article
+            className="guide-section-card guide-teams-section"
+            id="guide-teams"
+          >
+            <SectionHeader
+              eyebrow="Внутри гайда"
+              title={`Лучшие отряды и ротации для ${character.name}`}
+              text="Состав, роли и последовательность действий собраны в одном месте."
             />
-          )}
+            <div className="team-grid">
+              {relatedTeams.length ? (
+                relatedTeams.map((team) => (
+                  <TeamCard key={team.id} team={team} data={data} />
+                ))
+              ) : (
+                <EmptyState
+                  title="Отряды пока не добавлены"
+                  text="Редактор сможет собрать состав и расписать его ротацию прямо в этом гайде."
+                />
+              )}
+            </div>
+          </article>
         </div>
       </section>
       {guide.videoUrl ? (
@@ -3096,8 +3614,13 @@ function TeamCard({
   team: import('./types').Team;
   data: SiteData;
 }) {
+  const rotationSteps = team.rotationSteps?.length
+    ? team.rotationSteps
+    : team.rotation.split('\n').filter(Boolean);
+  const hasRotation = rotationSteps.length > 0;
+
   return (
-    <article className="team-card">
+    <article className={`team-card ${hasRotation ? 'has-rotation' : 'without-rotation'}`}>
       <div className="team-card-heading">
         <span className="team-card-kicker"><Users aria-hidden="true" /> Состав</span>
         <h3>{team.title}</h3>
@@ -3135,17 +3658,14 @@ function TeamCard({
           ) : null;
         })}
       </div>
-      {team.rotationSteps?.length || team.rotation ? (
+      {hasRotation ? (
         <div className="team-rotation-sequence">
           <div className="rotation-sequence-heading">
             <span><Play aria-hidden="true" /> Старт</span>
             <strong>Командная ротация</strong>
           </div>
           <ol>
-            {(team.rotationSteps?.length
-              ? team.rotationSteps
-              : team.rotation.split('\n').filter(Boolean)
-            ).map((step, index) => (
+            {rotationSteps.map((step, index) => (
               <li key={`${team.id}-step-${index}`}>
                 <span className="rotation-step-index">{index + 1}</span>
                 <span>{step}</span>
@@ -3214,11 +3734,13 @@ function CommentsBlock({
   targetId,
   data,
   user,
+  readOnly = false,
 }: {
   targetType: Comment['targetType'];
   targetId: string;
   data: SiteData;
   user: User | null;
+  readOnly?: boolean;
 }) {
   const fallbackComments = data.comments.filter(
     (comment) =>
@@ -3565,6 +4087,7 @@ function CommentsBlock({
   }
 
   function renderCommentComposer(context?: Comment) {
+    if (readOnly) return null;
     const editorId = context ? `comment-reply-${context.id}` : 'comment-body';
     return (
       <form
@@ -3723,7 +4246,9 @@ function CommentsBlock({
               ) : (
                 <MarkdownPreview value={comment.body} allowMedia={false} />
               )}
-              {replyTo?.id === comment.id ? renderCommentComposer(comment) : null}
+              {!readOnly && replyTo?.id === comment.id
+                ? renderCommentComposer(comment)
+                : null}
               {depth === 0 && (branchReplyCounts.get(comment.id) || 0) > 0 ? (
                 <button
                   className="comment-branch-toggle"
@@ -3744,37 +4269,41 @@ function CommentsBlock({
                 </button>
               ) : null}
               <div className="comment-actions">
-                <button
-                  className={`text-button ${comment.activeReactions?.includes('like') ? 'is-active' : ''}`}
-                  type="button"
-                  aria-pressed={comment.activeReactions?.includes('like') || false}
-                  disabled={actionId === comment.id}
-                  onClick={() => void reactToComment(comment, 'like')}
-                >
-                  <ThumbsUp aria-hidden="true" />
-                  Поддержать {comment.reactions?.likes || 0}
-                </button>
-                <button
-                  className={`text-button ${comment.activeReactions?.includes('dislike') ? 'is-active' : ''}`}
-                  type="button"
-                  aria-pressed={comment.activeReactions?.includes('dislike') || false}
-                  disabled={actionId === comment.id}
-                  onClick={() => void reactToComment(comment, 'dislike')}
-                >
-                  <ThumbsDown aria-hidden="true" />
-                  Не согласен {comment.reactions?.dislikes || 0}
-                </button>
-                <button
-                  className={`text-button ${comment.activeReactions?.includes('useful') ? 'is-active' : ''}`}
-                  type="button"
-                  aria-pressed={comment.activeReactions?.includes('useful') || false}
-                  disabled={actionId === comment.id}
-                  onClick={() => void reactToComment(comment, 'useful')}
-                >
-                  <CheckCircle2 aria-hidden="true" />
-                  Полезно {comment.reactions?.useful ?? comment.score}
-                </button>
-                {user ? (
+                {!readOnly ? (
+                  <>
+                    <button
+                      className={`text-button ${comment.activeReactions?.includes('like') ? 'is-active' : ''}`}
+                      type="button"
+                      aria-pressed={comment.activeReactions?.includes('like') || false}
+                      disabled={actionId === comment.id}
+                      onClick={() => void reactToComment(comment, 'like')}
+                    >
+                      <ThumbsUp aria-hidden="true" />
+                      Поддержать {comment.reactions?.likes || 0}
+                    </button>
+                    <button
+                      className={`text-button ${comment.activeReactions?.includes('dislike') ? 'is-active' : ''}`}
+                      type="button"
+                      aria-pressed={comment.activeReactions?.includes('dislike') || false}
+                      disabled={actionId === comment.id}
+                      onClick={() => void reactToComment(comment, 'dislike')}
+                    >
+                      <ThumbsDown aria-hidden="true" />
+                      Не согласен {comment.reactions?.dislikes || 0}
+                    </button>
+                    <button
+                      className={`text-button ${comment.activeReactions?.includes('useful') ? 'is-active' : ''}`}
+                      type="button"
+                      aria-pressed={comment.activeReactions?.includes('useful') || false}
+                      disabled={actionId === comment.id}
+                      onClick={() => void reactToComment(comment, 'useful')}
+                    >
+                      <CheckCircle2 aria-hidden="true" />
+                      Полезно {comment.reactions?.useful ?? comment.score}
+                    </button>
+                  </>
+                ) : null}
+                {user && !readOnly ? (
                   <button
                     className="text-button"
                     type="button"
@@ -3806,7 +4335,7 @@ function CommentsBlock({
                 >
                   <Link2 aria-hidden="true" />
                 </button>
-                {user?.id === comment.userId ? (
+                {user?.id === comment.userId && !readOnly ? (
                   <>
                     <button
                       className="text-button"

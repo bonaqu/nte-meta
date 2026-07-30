@@ -21,6 +21,7 @@ import { normalizeExternalAssetUrl, resolveAssetUrl } from '../../lib/assets';
 import type {
   Character,
   CharacterAbility,
+  CharacterAbilityAttribute,
   CharacterAwakening,
   CharacterFriendshipLevel,
   CharacterFriendshipReward,
@@ -84,6 +85,35 @@ function readCharacterDraft(key: string) {
 
 function rowId() {
   return crypto.randomUUID();
+}
+
+function formatAbilityAttributes(
+  attributes: CharacterAbilityAttribute[] | undefined,
+) {
+  return (attributes || [])
+    .map((attribute) =>
+      [attribute.label.trim(), attribute.value.trim()]
+        .filter(Boolean)
+        .join(' — '),
+    )
+    .filter(Boolean)
+    .join('\n');
+}
+
+function parseAbilityAttributes(value: string): CharacterAbilityAttribute[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 80)
+    .map((line) => {
+      const separator = line.match(/^(.{1,160}?)(?:\s+[—–-]\s+|:\s*)(.+)$/);
+      return {
+        id: rowId(),
+        label: (separator?.[1] || line).trim(),
+        value: (separator?.[2] || '').trim(),
+      };
+    });
 }
 
 function friendshipRewards(item: CharacterFriendshipLevel) {
@@ -1876,6 +1906,7 @@ export function AdminCharacterEditor({
               type: 'Базовая атака',
               iconUrl: '',
               description: '',
+              attributes: [],
             })}
             onChange={(abilities) => patchProfile({ abilities })}
             render={(item, _index, update) => (
@@ -1956,6 +1987,23 @@ export function AdminCharacterEditor({
                       update({ ...item, description: event.target.value })
                     }
                   />
+                </label>
+                <label className="wide-field">
+                  Атрибуты
+                  <textarea
+                    rows={6}
+                    placeholder={'Коэфф. урона 1-го удара — 16,7 %\nЭнергия циклов — 33'}
+                    value={formatAbilityAttributes(item.attributes)}
+                    onChange={(event) =>
+                      update({
+                        ...item,
+                        attributes: parseAbilityAttributes(event.target.value),
+                      })
+                    }
+                  />
+                  <small>
+                    Один показатель на строку: название, тире и значение.
+                  </small>
                 </label>
               </>
             )}

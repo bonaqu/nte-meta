@@ -80,7 +80,12 @@ export function EditorShell({
               <h1 id={titleId}>{title}</h1>
               {description ? <p>{description}</p> : null}
             </div>
-            <button className="icon-button" type="button" aria-label="Закрыть редактор" onClick={requestClose}>
+            <button
+              className="icon-button editor-shell__close-button"
+              type="button"
+              aria-label="Закрыть редактор"
+              onClick={requestClose}
+            >
               <X aria-hidden="true" />
             </button>
           </header>
@@ -102,15 +107,19 @@ export function EditorShell({
             <h2 id={closeTitleId}>Закрыть редактор?</h2>
           </div>
           <p>Изменения, которые ещё не были сохранены, будут потеряны.</p>
-          <div className="button-row">
+          <div className="button-row editor-shell__close-actions">
             <button
-              className="ghost-button"
+              className="primary-button editor-shell__continue-button"
               type="button"
               onClick={() => closeDialogRef.current?.close()}
             >
               Продолжить редактирование
             </button>
-            <button className="danger-button" type="button" onClick={discardChanges}>
+            <button
+              className="danger-button editor-shell__discard-button"
+              type="button"
+              onClick={discardChanges}
+            >
               Закрыть без сохранения
             </button>
           </div>

@@ -49,6 +49,13 @@ export interface CharacterAbility {
   type: string;
   iconUrl: string;
   description: string;
+  attributes?: CharacterAbilityAttribute[];
+}
+
+export interface CharacterAbilityAttribute {
+  id: string;
+  label: string;
+  value: string;
 }
 
 export interface CharacterStat {

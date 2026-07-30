@@ -74,15 +74,53 @@ function stableStringify(value: unknown) {
   return JSON.stringify(value);
 }
 
-function makeLocalSlug(value: string) {
+const CYRILLIC_SLUG_MAP: Record<string, string> = {
+  а: 'a',
+  б: 'b',
+  в: 'v',
+  г: 'g',
+  д: 'd',
+  е: 'e',
+  ё: 'e',
+  ж: 'zh',
+  з: 'z',
+  и: 'i',
+  й: 'y',
+  к: 'k',
+  л: 'l',
+  м: 'm',
+  н: 'n',
+  о: 'o',
+  п: 'p',
+  р: 'r',
+  с: 's',
+  т: 't',
+  у: 'u',
+  ф: 'f',
+  х: 'h',
+  ц: 'ts',
+  ч: 'ch',
+  ш: 'sh',
+  щ: 'sch',
+  ъ: '',
+  ы: 'y',
+  ь: '',
+  э: 'e',
+  ю: 'yu',
+  я: 'ya',
+};
+
+function makeLocalSlug(value: string, fallback = 'material') {
+  const transliterated = Array.from(value.toLocaleLowerCase('ru-RU'))
+    .map((character) => CYRILLIC_SLUG_MAP[character] ?? character)
+    .join('');
+
   return (
-    value
-      .toLocaleLowerCase('ru-RU')
-      .trim()
-      .replace(/ё/g, 'e')
+    transliterated
+      .normalize('NFKD')
       .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9а-я]+/gi, '-')
-      .replace(/^-+|-+$/g, '') || `item-${Date.now()}`
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || fallback
   );
 }
 
@@ -395,6 +433,7 @@ export function ContentManager<T extends ManagedItem>({
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const configRef = useRef(config);
   const skipNextDraftSaveRef = useRef(false);
+  const slugTouchedRef = useRef(initialId !== 'new');
   configRef.current = config;
 
   const selectedItem = items.find((item) => item.id === selectedId);
@@ -419,8 +458,12 @@ export function ContentManager<T extends ManagedItem>({
     const item = items.find((candidate) => candidate.id === selectedId);
     const currentConfig = configRef.current;
     const nextValues = item ? currentConfig.fromItem(item) : currentConfig.empty();
+    const restoredValues = readDraft<EditorValues>(draftKey);
     skipNextDraftSaveRef.current = true;
-    setValues(readDraft<EditorValues>(draftKey) || nextValues);
+    slugTouchedRef.current = Boolean(
+      item || String(restoredValues?.slug || '').trim(),
+    );
+    setValues(restoredValues || nextValues);
     setPreviewOpen(false);
   }, [draftKey, items, selectedId]);
 
@@ -459,6 +502,7 @@ export function ContentManager<T extends ManagedItem>({
   }, [initialSelectedId]);
 
   function setValue(name: string, value: unknown) {
+    if (name === 'slug') slugTouchedRef.current = true;
     setValues((current) => {
       const next = { ...current, [name]: value };
       const hasSlugField = configRef.current.fields.some(
@@ -467,15 +511,19 @@ export function ContentManager<T extends ManagedItem>({
       if (
         name === 'title' &&
         hasSlugField &&
-        !String(current.slug || '').trim()
+        !slugTouchedRef.current
       ) {
-        next.slug = makeLocalSlug(String(value || ''));
+        next.slug = makeLocalSlug(
+          String(value || ''),
+          configRef.current.singular.toLocaleLowerCase('ru-RU'),
+        );
       }
       return next;
     });
   }
 
   function startCreate() {
+    slugTouchedRef.current = false;
     setSelectedId('new');
     setValues(config.empty());
     setPreviewOpen(false);

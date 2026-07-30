@@ -7711,12 +7711,28 @@ function parseEscapedGameWithJsonObject(text, key) {
 }
 
 function gameWithSkillDescription(entry) {
-  const effect = gameWithLocaleText(entry?.effect);
-  const initialStat = gameWithLocaleText(entry?.initialStat);
-  return [effect, initialStat ? 'Базовые значения:\n' + initialStat : '']
+  return gameWithLocaleText(entry?.effect).trim();
+}
+
+function gameWithSkillAttributes(entry) {
+  const value = normalizeImportedRuText(gameWithLocaleText(entry?.initialStat));
+  if (!value) return [];
+  return value
+    .split(/\n+/)
+    .map((line) => line.replace(/^[•·*-]\s*/, '').trim())
     .filter(Boolean)
-    .join('\n\n')
-    .trim();
+    .slice(0, 80)
+    .map((line, index) => {
+      const parts = line.match(/^(.{1,160}?)(?:[：:]|\s+[—–-]\s+)\s*(.+)$/);
+      const label = normalizeImportedRuText(parts?.[1] || `Показатель ${index + 1}`);
+      const value = normalizeImportedRuText(parts?.[2] || line);
+      return {
+        id: `ability-attribute-${hashText(`${label}:${value}`).slice(0, 20)}`,
+        label,
+        value,
+      };
+    })
+    .filter((attribute) => attribute.label && attribute.value);
 }
 
 function isImportPlaceholderText(value) {
@@ -7749,6 +7765,7 @@ function gameWithAbility(entry, type) {
     name,
     type,
     iconUrl: normalizeExternalImageUrl(entry?.iconUrl || ''),
+    attributes: gameWithSkillAttributes(entry),
     description:
       !isImportPlaceholderText(description) && hasRussianText(description)
         ? description
@@ -7800,6 +7817,7 @@ function parseGameWithStructuredAbilities(item) {
       type: 'Повседневный навык',
       iconUrl: '',
       description: 'В проверенных источниках не найден второй повседневный навык.',
+      attributes: [],
     });
   }
 
@@ -8675,12 +8693,30 @@ function cleanImportedAbility(entry) {
   const name = normalizeImportedRuText(entry.name || '');
   if (!isCleanImportedAbilityName(name)) return null;
   const description = normalizeImportedRuText(entry.description || '');
+  const attributes = Array.isArray(entry.attributes)
+    ? entry.attributes
+        .slice(0, 80)
+        .map((attribute, index) => {
+          const label = normalizeImportedRuText(attribute?.label || '');
+          const value = normalizeImportedRuText(attribute?.value || '');
+          if (!label || !value) return null;
+          return {
+            id:
+              attribute?.id ||
+              `ability-attribute-${hashText(`${name}:${label}:${index}`).slice(0, 20)}`,
+            label,
+            value,
+          };
+        })
+        .filter(Boolean)
+    : [];
   return {
     ...entry,
     id: entry.id || `ability-${hashText(`${entry.type}:${name}`).slice(0, 20)}`,
     name,
     type: normalizedAbilityType(entry.type),
     iconUrl: normalizeExternalImageUrl(entry.iconUrl || ''),
+    attributes,
     description:
       description && hasRussianText(description)
         ? description
@@ -10741,13 +10777,23 @@ function normalizeCharacterProfile(value) {
       label: text(item.label, 120),
       value: text(item.value, 120),
     })),
-    abilities: collection('abilities', 30, (item) => ({
-      id: id(item.id),
-      name: text(item.name, 160),
-      type: text(item.type, 80),
-      iconUrl: url(item.iconUrl),
-      description: text(item.description, 8000),
-    })),
+    abilities: collection('abilities', 30, (item) => {
+      const attributes = Array.isArray(item.attributes)
+        ? item.attributes.slice(0, 80).map((attribute) => ({
+            id: id(attribute?.id),
+            label: text(attribute?.label, 160),
+            value: text(attribute?.value, 500),
+          }))
+        : [];
+      return {
+        id: id(item.id),
+        name: text(item.name, 160),
+        type: text(item.type, 80),
+        iconUrl: url(item.iconUrl),
+        description: text(item.description, 8000),
+        attributes,
+      };
+    }),
     skins: collection('skins', 30, (item) => ({
       id: id(item.id),
       name: text(item.name, 160),

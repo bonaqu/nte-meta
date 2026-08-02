@@ -11,7 +11,7 @@
     "test:ui": "playwright test",
     "test:ci": "playwright test tests/smoke.spec.ts tests/portal.spec.ts tests/api.spec.ts --grep \"renders starter app|главная показывает живой meta-dashboard без ошибок|очередь слухов создаёт только непубличный редакционный черновик\"",
     "test:imports": "playwright test tests/import-audit.spec.ts",
-    "test:full": "playwright test",
+    "test:full": "playwright test tests/smoke.spec.ts tests/portal.spec.ts tests/api.spec.ts tests/quality.spec.ts tests/import-ui.spec.ts",
     "test:prepare-db": "node scripts/prepare-test-db.mjs",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy",

@@ -185,7 +185,9 @@ const sourceTypeOptions: FieldOption[] = [
 
 function sourceTypeLabel(value: unknown) {
   const type = String(value || 'manual');
-  return sourceTypeOptions.find((option) => option.value === type)?.label || type;
+  return (
+    sourceTypeOptions.find((option) => option.value === type)?.label || type
+  );
 }
 
 function sourceHostLabel(value: unknown) {
@@ -310,7 +312,9 @@ function FieldControl({
   if (field.kind === 'markdown') {
     return (
       <div className="cms-rich-field">
-        <label id={`${id}-label`} htmlFor={id}>{field.label}</label>
+        <label id={`${id}-label`} htmlFor={id}>
+          {field.label}
+        </label>
         <RichTextEditor
           id={id}
           value={textValue(values, field.name)}
@@ -357,13 +361,11 @@ function FieldControl({
           onChange={(event) => setValue(field.name, event.target.value)}
         />
       ) : (
-      <input
-            id={id}
-            name={field.name}
-            type={
-              field.kind === 'number' ? 'number' : 'text'
-            }
-            inputMode={field.kind === 'url' ? 'url' : undefined}
+        <input
+          id={id}
+          name={field.name}
+          type={field.kind === 'number' ? 'number' : 'text'}
+          inputMode={field.kind === 'url' ? 'url' : undefined}
           value={
             field.kind === 'number'
               ? numberValue(values, field.name)
@@ -420,7 +422,8 @@ export function ContentManager<T extends ManagedItem>({
   const [selectedId, setSelectedId] = useState(initialId);
   const [values, setValues] = useState<EditorValues>(() => {
     if (initialId === 'new') return config.empty();
-    const item = items.find((candidate) => candidate.id === initialId) || items[0];
+    const item =
+      items.find((candidate) => candidate.id === initialId) || items[0];
     return item ? config.fromItem(item) : config.empty();
   });
   const [query, setQuery] = useState('');
@@ -442,8 +445,7 @@ export function ContentManager<T extends ManagedItem>({
     () => (selectedItem ? config.fromItem(selectedItem) : config.empty()),
     [config, selectedItem],
   );
-  const isDirty =
-    stableStringify(values) !== stableStringify(baselineValues);
+  const isDirty = stableStringify(values) !== stableStringify(baselineValues);
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('ru-RU');
     if (!normalized) return items;
@@ -457,7 +459,9 @@ export function ContentManager<T extends ManagedItem>({
   useEffect(() => {
     const item = items.find((candidate) => candidate.id === selectedId);
     const currentConfig = configRef.current;
-    const nextValues = item ? currentConfig.fromItem(item) : currentConfig.empty();
+    const nextValues = item
+      ? currentConfig.fromItem(item)
+      : currentConfig.empty();
     const restoredValues = readDraft<EditorValues>(draftKey);
     skipNextDraftSaveRef.current = true;
     slugTouchedRef.current = Boolean(
@@ -508,11 +512,7 @@ export function ContentManager<T extends ManagedItem>({
       const hasSlugField = configRef.current.fields.some(
         (field) => field.name === 'slug',
       );
-      if (
-        name === 'title' &&
-        hasSlugField &&
-        !slugTouchedRef.current
-      ) {
+      if (name === 'title' && hasSlugField && !slugTouchedRef.current) {
         next.slug = makeLocalSlug(
           String(value || ''),
           configRef.current.singular.toLocaleLowerCase('ru-RU'),

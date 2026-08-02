@@ -16,6 +16,38 @@ let reporter: APIRequestContext;
 let communityCommentId = '';
 let ownerId = '';
 
+type FocusedImportPayload = {
+  found: boolean;
+  message: string;
+  sources: Array<{
+    id: string;
+    name: string;
+    status: string;
+  }>;
+  suggestions: Array<{
+    id: string;
+    field: string;
+    label: string;
+    value: string;
+    sourceName: string;
+    sourceUrl: string;
+    confidence: string;
+    note: string;
+    qualityFlags: string[];
+    sources?: Array<{ name: string; url: string }>;
+  }>;
+  coverage: {
+    readyFields: string[];
+    reviewFields: string[];
+    missingFields: string[];
+  };
+  timing: {
+    budgetMs: number;
+    elapsedMs: number;
+    deadlineReached: boolean;
+  };
+};
+
 test.describe('NTE Meta Worker API', () => {
   test.describe.configure({ mode: 'serial' });
 
@@ -292,7 +324,9 @@ test.describe('NTE Meta Worker API', () => {
         }),
       ]),
     );
-    expect((await reporter.delete(`/api/threads/${threadId}`)).ok()).toBeTruthy();
+    expect(
+      (await reporter.delete(`/api/threads/${threadId}`)).ok(),
+    ).toBeTruthy();
 
     const comments = await guest.get(
       '/api/comments?targetType=site&targetId=community&sort=popular',
@@ -327,7 +361,8 @@ test.describe('NTE Meta Worker API', () => {
             name: 'Тестовый навык',
             type: 'Навык',
             iconUrl: longMediaUrl,
-            description: 'Проверяет безопасную нормализацию длинного имени медиа.',
+            description:
+              'Проверяет безопасную нормализацию длинного имени медиа.',
           },
         ],
       },
@@ -618,181 +653,209 @@ test.describe('NTE Meta Worker API', () => {
         })
       ).status(),
     ).toBe(403);
-  expect(
-    (
-      await member.post('/api/character-import/lookup', {
-        data: { query: 'Хотори' },
-      })
-    ).status(),
-  ).toBe(403);
-  expect(
-    (
-      await member.post('/api/guide-import/lookup', {
-        data: { query: 'Хотори' },
-      })
-    ).status(),
-  ).toBe(403);
+    expect(
+      (
+        await member.post('/api/character-import/lookup', {
+          data: { query: 'Хотори' },
+        })
+      ).status(),
+    ).toBe(403);
+    expect(
+      (
+        await member.post('/api/guide-import/lookup', {
+          data: { query: 'Хотори' },
+        })
+      ).status(),
+    ).toBe(403);
 
-  const ownerLookup = await owner.post('/api/character-import/lookup', {
-    data: { query: 'Байканг' },
-  });
-  expect(ownerLookup.ok()).toBeTruthy();
-  const ownerLookupJson = await ownerLookup.json();
-  expect(ownerLookupJson.data.sources.length).toBeGreaterThan(0);
-  expect(Array.isArray(ownerLookupJson.data.suggestions)).toBeTruthy();
-  expect(ownerLookupJson.data.suggestions.length).toBeGreaterThan(0);
-  expect(
-    ownerLookupJson.data.suggestions.some(
-      (suggestion: { sources?: Array<{ url: string }> }) =>
-        (suggestion.sources?.length || 0) > 1,
-    ),
-  ).toBeTruthy();
-  expect(
-    ownerLookupJson.data.suggestions.some(
-      (suggestion: { field: string }) => suggestion.field === 'profile.voiceActors',
-    ),
-  ).toBeTruthy();
-  expect(
-    ownerLookupJson.data.suggestions.some(
-      (suggestion: { field: string; value: string }) =>
-        suggestion.field === 'profile.arcType' && suggestion.value === 'Гибридный',
-    ),
-  ).toBeTruthy();
-  const roleSuggestion = ownerLookupJson.data.suggestions.find(
-    (suggestion: { field: string }) => suggestion.field === 'profile.roleTags',
-  ) as { value: string } | undefined;
-  expect(roleSuggestion).toBeTruthy();
-  expect(JSON.parse(roleSuggestion?.value || '[]')).toEqual([
-    'Урон',
-    'Основной ДД',
-    'Периодический урон',
-  ]);
-  const voiceActorSuggestion = ownerLookupJson.data.suggestions.find(
-    (suggestion: { field: string }) => suggestion.field === 'profile.voiceActors',
-  ) as { value: string } | undefined;
-  expect(voiceActorSuggestion?.value).not.toContain('[[wp:');
-  expect(voiceActorSuggestion?.value).not.toMatch(/"(?:name|language)":"\s*=/);
-  const abilitySuggestion = ownerLookupJson.data.suggestions.find(
-    (suggestion: { field: string }) => suggestion.field === 'profile.abilities',
-  ) as { value: string } | undefined;
-  const importedAbilities = JSON.parse(abilitySuggestion?.value || '[]') as Array<{
-    name?: string;
-    type?: string;
-  }>;
-  expect(importedAbilities).toHaveLength(8);
-  expect(importedAbilities.slice(6)).toMatchObject([
-    { name: 'Цветение в зените', type: 'Повседневный навык' },
-    { name: 'Не введено', type: 'Повседневный навык' },
-  ]);
-  const giftSuggestion = ownerLookupJson.data.suggestions.find(
-    (suggestion: { field: string }) => suggestion.field === 'profile.gifts',
-  ) as { value: string } | undefined;
-  const importedGifts = JSON.parse(giftSuggestion?.value || '[]') as Array<{
-    name?: string;
-    iconUrl?: string;
-  }>;
-  expect(importedGifts.every((gift) => !/^\d+$/.test(gift.name || ''))).toBeTruthy();
-  expect(
-    importedGifts.every((gift) => {
-      const media = decodeURIComponent(gift.iconUrl || '');
-      return !/(?:роль|role|редкость|rarity)[_.\s/-]/i.test(media);
-    }),
-  ).toBeTruthy();
-  const roleIconSuggestion = ownerLookupJson.data.suggestions.find(
-    (suggestion: { field: string }) => suggestion.field === 'profile.roleIcons',
-  ) as { value: string } | undefined;
-  if (roleIconSuggestion) {
-    const importedRoleIcons = JSON.parse(roleIconSuggestion.value) as Array<{
+    const ownerLookup = await owner.post('/api/character-import/lookup', {
+      data: { query: 'Байканг' },
+    });
+    expect(ownerLookup.ok()).toBeTruthy();
+    const ownerLookupJson = await ownerLookup.json();
+    expect(ownerLookupJson.data.sources.length).toBeGreaterThan(0);
+    expect(Array.isArray(ownerLookupJson.data.suggestions)).toBeTruthy();
+    expect(ownerLookupJson.data.suggestions.length).toBeGreaterThan(0);
+    expect(
+      ownerLookupJson.data.suggestions.some(
+        (suggestion: { sources?: Array<{ url: string }> }) =>
+          (suggestion.sources?.length || 0) > 1,
+      ),
+    ).toBeTruthy();
+    expect(
+      ownerLookupJson.data.suggestions.some(
+        (suggestion: { field: string }) =>
+          suggestion.field === 'profile.voiceActors',
+      ),
+    ).toBeTruthy();
+    expect(
+      ownerLookupJson.data.suggestions.some(
+        (suggestion: { field: string; value: string }) =>
+          suggestion.field === 'profile.arcType' &&
+          suggestion.value === 'Гибридный',
+      ),
+    ).toBeTruthy();
+    const roleSuggestion = ownerLookupJson.data.suggestions.find(
+      (suggestion: { field: string }) =>
+        suggestion.field === 'profile.roleTags',
+    ) as { value: string } | undefined;
+    expect(roleSuggestion).toBeTruthy();
+    expect(JSON.parse(roleSuggestion?.value || '[]')).toEqual([
+      'Урон',
+      'Основной ДД',
+      'Периодический урон',
+    ]);
+    const voiceActorSuggestion = ownerLookupJson.data.suggestions.find(
+      (suggestion: { field: string }) =>
+        suggestion.field === 'profile.voiceActors',
+    ) as { value: string } | undefined;
+    expect(voiceActorSuggestion?.value).not.toContain('[[wp:');
+    expect(voiceActorSuggestion?.value).not.toMatch(
+      /"(?:name|language)":"\s*=/,
+    );
+    const abilitySuggestion = ownerLookupJson.data.suggestions.find(
+      (suggestion: { field: string }) =>
+        suggestion.field === 'profile.abilities',
+    ) as { value: string } | undefined;
+    const importedAbilities = JSON.parse(
+      abilitySuggestion?.value || '[]',
+    ) as Array<{
+      name?: string;
+      type?: string;
+    }>;
+    expect(importedAbilities).toHaveLength(8);
+    expect(importedAbilities.slice(6)).toMatchObject([
+      { name: 'Цветение в зените', type: 'Повседневный навык' },
+      { name: 'Не введено', type: 'Повседневный навык' },
+    ]);
+    const giftSuggestion = ownerLookupJson.data.suggestions.find(
+      (suggestion: { field: string }) => suggestion.field === 'profile.gifts',
+    ) as { value: string } | undefined;
+    const importedGifts = JSON.parse(giftSuggestion?.value || '[]') as Array<{
       name?: string;
       iconUrl?: string;
     }>;
     expect(
-      importedRoleIcons.every((icon) => icon.name && /^https:\/\//.test(icon.iconUrl || '')),
+      importedGifts.every((gift) => !/^\d+$/.test(gift.name || '')),
     ).toBeTruthy();
-  }
-  expect(
-    ownerLookupJson.data.suggestions
-      .filter((suggestion: { field: string }) =>
-        ['profile.biography', 'profile.biographyShort'].includes(suggestion.field),
-      )
-      .every(
-        (suggestion: { value: string }) =>
-          !/указан в базе|эта страница предназначена|ищет гайд/i.test(suggestion.value),
+    expect(
+      importedGifts.every((gift) => {
+        const media = decodeURIComponent(gift.iconUrl || '');
+        return !/(?:роль|role|редкость|rarity)[_.\s/-]/i.test(media);
+      }),
+    ).toBeTruthy();
+    const roleIconSuggestion = ownerLookupJson.data.suggestions.find(
+      (suggestion: { field: string }) =>
+        suggestion.field === 'profile.roleIcons',
+    ) as { value: string } | undefined;
+    if (roleIconSuggestion) {
+      const importedRoleIcons = JSON.parse(roleIconSuggestion.value) as Array<{
+        name?: string;
+        iconUrl?: string;
+      }>;
+      expect(
+        importedRoleIcons.every(
+          (icon) => icon.name && /^https:\/\//.test(icon.iconUrl || ''),
+        ),
+      ).toBeTruthy();
+    }
+    expect(
+      ownerLookupJson.data.suggestions
+        .filter((suggestion: { field: string }) =>
+          ['profile.biography', 'profile.biographyShort'].includes(
+            suggestion.field,
+          ),
+        )
+        .every(
+          (suggestion: { value: string }) =>
+            !/указан в базе|эта страница предназначена|ищет гайд/i.test(
+              suggestion.value,
+            ),
+        ),
+    ).toBeTruthy();
+    expect(
+      ownerLookupJson.data.suggestions.some(
+        (suggestion: { field: string }) => suggestion.field === '__imageMap',
       ),
-  ).toBeTruthy();
-  expect(
-    ownerLookupJson.data.suggestions.some(
-      (suggestion: { field: string }) => suggestion.field === '__imageMap',
-    ),
-  ).toBeFalsy();
-  const materialsSuggestion = ownerLookupJson.data.suggestions.find(
-    (suggestion: { field: string }) => suggestion.field === 'profile.materials',
-  ) as { value: string } | undefined;
-  if (materialsSuggestion) {
-    const importedMaterials = JSON.parse(materialsSuggestion.value) as Array<{
-      name?: string;
-      amount?: string;
-    }>;
-    expect(importedMaterials.some((material) => material.name && material.amount)).toBeTruthy();
-  }
-  const baseStatsSuggestion = ownerLookupJson.data.suggestions.find(
-    (suggestion: { field: string }) => suggestion.field === 'profile.baseStats',
-  ) as { value: string } | undefined;
-  if (baseStatsSuggestion) {
-    const importedStats = JSON.parse(baseStatsSuggestion.value) as Array<{ label?: string }>;
-    const statLabels = importedStats.map((stat) => stat.label).filter(Boolean);
-    expect(new Set(statLabels).size).toBe(statLabels.length);
-    expect(statLabels).not.toEqual(
-      expect.arrayContaining(['HP', 'ATK', 'DEF', 'Crit', 'CDMG']),
-    );
-  }
+    ).toBeFalsy();
+    const materialsSuggestion = ownerLookupJson.data.suggestions.find(
+      (suggestion: { field: string }) =>
+        suggestion.field === 'profile.materials',
+    ) as { value: string } | undefined;
+    if (materialsSuggestion) {
+      const importedMaterials = JSON.parse(materialsSuggestion.value) as Array<{
+        name?: string;
+        amount?: string;
+      }>;
+      expect(
+        importedMaterials.some((material) => material.name && material.amount),
+      ).toBeTruthy();
+    }
+    const baseStatsSuggestion = ownerLookupJson.data.suggestions.find(
+      (suggestion: { field: string }) =>
+        suggestion.field === 'profile.baseStats',
+    ) as { value: string } | undefined;
+    if (baseStatsSuggestion) {
+      const importedStats = JSON.parse(baseStatsSuggestion.value) as Array<{
+        label?: string;
+      }>;
+      const statLabels = importedStats
+        .map((stat) => stat.label)
+        .filter(Boolean);
+      expect(new Set(statLabels).size).toBe(statLabels.length);
+      expect(statLabels).not.toEqual(
+        expect.arrayContaining(['HP', 'ATK', 'DEF', 'Crit', 'CDMG']),
+      );
+    }
 
-  const guideLookup = await owner.post('/api/guide-import/lookup', {
-    data: { query: 'Хотори' },
-  });
-  expect(guideLookup.ok()).toBeTruthy();
-  const guideLookupJson = await guideLookup.json();
-  expect(guideLookupJson.data.sources.length).toBeGreaterThan(0);
-  expect(Array.isArray(guideLookupJson.data.suggestions)).toBeTruthy();
-  expect(
-    guideLookupJson.data.suggestions.some(
-      (suggestion: { sources?: Array<{ url: string }> }) =>
-        (suggestion.sources?.length || 0) > 1,
-    ),
-  ).toBeTruthy();
-  const guideFields = guideLookupJson.data.suggestions.map(
-    (suggestion: { field: string }) => suggestion.field,
-  );
-  expect(guideFields).toEqual(
-    expect.arrayContaining([
-      'guide.strengths',
-      'guide.weaknesses',
-      'guide.bestArcs',
-      'guide.teams',
-      'guide.rotations',
-    ]),
-  );
-  expect(
-    guideLookupJson.data.suggestions.some((suggestion: { field: string }) =>
-      [
-        'guide.summary',
-        'guide.pullAdvice',
+    const guideLookup = await owner.post('/api/guide-import/lookup', {
+      data: { query: 'Хотори' },
+    });
+    expect(guideLookup.ok()).toBeTruthy();
+    const guideLookupJson = await guideLookup.json();
+    expect(guideLookupJson.data.sources.length).toBeGreaterThan(0);
+    expect(Array.isArray(guideLookupJson.data.suggestions)).toBeTruthy();
+    expect(
+      guideLookupJson.data.suggestions.some(
+        (suggestion: { sources?: Array<{ url: string }> }) =>
+          (suggestion.sources?.length || 0) > 1,
+      ),
+    ).toBeTruthy();
+    const guideFields = guideLookupJson.data.suggestions.map(
+      (suggestion: { field: string }) => suggestion.field,
+    );
+    expect(guideFields).toEqual(
+      expect.arrayContaining([
+        'guide.strengths',
+        'guide.weaknesses',
         'guide.bestArcs',
-        'guide.alternativeArcs',
         'guide.teams',
         'guide.rotations',
-        'guide.tips',
-      ].includes(suggestion.field),
-    ),
-  ).toBeTruthy();
-  for (const suggestion of guideLookupJson.data.suggestions) {
-    expect(suggestion.field === 'tier' || suggestion.field.startsWith('guide.')).toBeTruthy();
-    expect(suggestion.sourceUrl).toContain('https://');
-  }
+      ]),
+    );
+    expect(
+      guideLookupJson.data.suggestions.some((suggestion: { field: string }) =>
+        [
+          'guide.summary',
+          'guide.pullAdvice',
+          'guide.bestArcs',
+          'guide.alternativeArcs',
+          'guide.teams',
+          'guide.rotations',
+          'guide.tips',
+        ].includes(suggestion.field),
+      ),
+    ).toBeTruthy();
+    for (const suggestion of guideLookupJson.data.suggestions) {
+      expect(
+        suggestion.field === 'tier' || suggestion.field.startsWith('guide.'),
+      ).toBeTruthy();
+      expect(suggestion.sourceUrl).toContain('https://');
+    }
 
-  await owner.patch(`/api/users/${memberId}/role`, {
-    data: { role: 'editor' },
-  });
+    await owner.patch(`/api/users/${memberId}/role`, {
+      data: { role: 'editor' },
+    });
     const editorCharacter = await member.post('/api/characters', {
       data: {
         slug: `editor-character-${runId}`,
@@ -1052,6 +1115,111 @@ test.describe('NTE Meta Worker API', () => {
     expect(oversized.status()).toBe(400);
   });
 
+  test('автоимпорт персонажа и гайда возвращает схему и время ответа', async ({
+    request,
+  }, testInfo) => {
+    void request;
+    test.setTimeout(130_000);
+    const allowedSourceStatuses = new Set([
+      'ok',
+      'partial',
+      'failed',
+      'blocked',
+      'reference',
+      'timeout',
+    ]);
+
+    async function lookup(endpoint: 'character-import' | 'guide-import') {
+      const startedAt = performance.now();
+      const response = await owner.post(`/api/${endpoint}/lookup`, {
+        data: { query: 'Хотори' },
+        timeout: 60_000,
+      });
+      const durationMs = Math.round(performance.now() - startedAt);
+      expect(
+        response.ok(),
+        `${endpoint}: HTTP ${response.status()}`,
+      ).toBeTruthy();
+      const payload = (await response.json()).data as FocusedImportPayload;
+
+      expect(typeof payload.found).toBe('boolean');
+      expect(payload.message).toEqual(expect.any(String));
+      expect(payload.sources.length).toBeGreaterThan(0);
+      expect(payload.suggestions.length).toBeGreaterThan(0);
+      expect(payload.coverage).toEqual({
+        readyFields: expect.any(Array),
+        reviewFields: expect.any(Array),
+        missingFields: expect.any(Array),
+      });
+      expect(payload.timing).toEqual({
+        budgetMs: 45_000,
+        elapsedMs: expect.any(Number),
+        deadlineReached: expect.any(Boolean),
+      });
+      expect(payload.timing.budgetMs).toBeLessThan(55_000);
+      expect(payload.timing.elapsedMs).toBeLessThan(55_000);
+      const sourceStatuses: Record<string, number> = {};
+      for (const source of payload.sources) {
+        expect(source.id).toEqual(expect.any(String));
+        expect(source.name).toEqual(expect.any(String));
+        expect(
+          allowedSourceStatuses.has(source.status),
+          `${endpoint}: неизвестный статус ${source.status}`,
+        ).toBeTruthy();
+        sourceStatuses[source.status] =
+          (sourceStatuses[source.status] || 0) + 1;
+      }
+      expect(sourceStatuses.ok || 0).toBeGreaterThan(0);
+      expect(
+        payload.sources.length - (sourceStatuses.ok || 0),
+        `${endpoint}: ожидается частичный или терминальный статус хотя бы одного sibling-источника`,
+      ).toBeGreaterThan(0);
+      for (const suggestion of payload.suggestions) {
+        expect(suggestion).toMatchObject({
+          id: expect.any(String),
+          field: expect.any(String),
+          label: expect.any(String),
+          value: expect.any(String),
+          sourceName: expect.any(String),
+          sourceUrl: expect.any(String),
+          confidence: expect.any(String),
+          note: expect.any(String),
+          qualityFlags: expect.any(Array),
+        });
+        if (suggestion.sources)
+          expect(suggestion.sources).toEqual(expect.any(Array));
+      }
+      expect(durationMs, `${endpoint}: превышен клиентский лимит`).toBeLessThan(
+        55_000,
+      );
+      return {
+        durationMs,
+        sourceCount: payload.sources.length,
+        sourceStatuses,
+        serverTiming: payload.timing,
+      };
+    }
+
+    const character = await lookup('character-import');
+    const guide = await lookup('guide-import');
+    const timing = {
+      characterDurationMs: character.durationMs,
+      guideDurationMs: guide.durationMs,
+      totalDurationMs: character.durationMs + guide.durationMs,
+      characterSources: character.sourceCount,
+      guideSources: guide.sourceCount,
+      characterSourceStatuses: character.sourceStatuses,
+      guideSourceStatuses: guide.sourceStatuses,
+      characterServerTiming: character.serverTiming,
+      guideServerTiming: guide.serverTiming,
+    };
+    await testInfo.attach('focused-import-timing.json', {
+      body: Buffer.from(JSON.stringify(timing, null, 2), 'utf8'),
+      contentType: 'application/json',
+    });
+    process.stdout.write(`[focused-import-timing] ${JSON.stringify(timing)}\n`);
+  });
+
   test('owner проходит UI-вход и открывает inline-редактор гайда', async ({
     page,
   }) => {
@@ -1097,76 +1265,76 @@ test.describe('NTE Meta Worker API', () => {
     await expect(
       sidebar.getByRole('link', { name: 'Видео-гайды', exact: true }),
     ).toHaveCount(0);
-  await expect(sidebar.getByRole('link', { name: 'Команды' })).toHaveCount(0);
-  await expect(sidebar.getByRole('link', { name: 'Ротации' })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: 'Команды' })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: 'Ротации' })).toHaveCount(0);
 
-  await page.goto('/#/guides/hotori-burst-guide');
-  await page.getByRole('button', { name: 'Редактировать гайд' }).click();
-  const existingGuideDialog = page.locator('dialog[open]');
-  await expect(
-    existingGuideDialog.getByRole('heading', {
-      name: 'Редактировать гайд: Хотори',
-      level: 1,
-    }),
-  ).toBeVisible();
-  const sectionButtons = existingGuideDialog.locator(
-    '.section-sorter button[draggable="true"]',
-  );
-  await expect(sectionButtons.nth(1)).toBeVisible();
-  const firstSectionName = (
-    await sectionButtons.nth(0).locator('span').textContent()
-  )?.trim();
-  const secondSectionName = (
-    await sectionButtons.nth(1).locator('span').textContent()
-  )?.trim();
-  expect(firstSectionName).toBeTruthy();
-  expect(secondSectionName).toBeTruthy();
-  const sectionTransfer = await page.evaluateHandle(() => new DataTransfer());
-  await sectionButtons.nth(0).dispatchEvent('dragstart', {
-    dataTransfer: sectionTransfer,
-  });
-  await expect(sectionButtons.nth(0)).toHaveClass(/is-dragging/);
-  const sectionTargetBox = await sectionButtons.nth(1).boundingBox();
-  if (!sectionTargetBox) {
-    throw new Error('Не удалось получить координаты секции гайда.');
-  }
-  await sectionButtons.nth(1).dispatchEvent('dragover', {
-    dataTransfer: sectionTransfer,
-    clientX: sectionTargetBox.x + sectionTargetBox.width / 2,
-    clientY: sectionTargetBox.y + sectionTargetBox.height - 2,
-  });
-  await expect(sectionButtons.nth(1)).toHaveAttribute(
-    'data-drop-placement',
-    'after',
-  );
-  await sectionButtons.nth(1).dispatchEvent('drop', {
-    dataTransfer: sectionTransfer,
-    clientX: sectionTargetBox.x + sectionTargetBox.width / 2,
-    clientY: sectionTargetBox.y + sectionTargetBox.height - 2,
-  });
-  await expect(sectionButtons.nth(0).locator('span')).toHaveText(
-    secondSectionName || '',
-  );
-  await expect(sectionButtons.nth(1).locator('span')).toHaveText(
-    firstSectionName || '',
-  );
-  await sectionButtons.nth(1).dispatchEvent('dragend', {
-    dataTransfer: sectionTransfer,
-  });
-  await sectionTransfer.dispose();
-  await existingGuideDialog
-    .getByRole('button', { name: 'Сохранить секции' })
-    .click();
-  await expect(
-    existingGuideDialog.getByText('Секции гайда сохранены в D1.'),
-  ).toBeVisible();
-  await existingGuideDialog
-    .getByRole('button', { name: 'Закрыть редактор' })
-    .click();
+    await page.goto('/#/guides/hotori-burst-guide');
+    await page.getByRole('button', { name: 'Редактировать гайд' }).click();
+    const existingGuideDialog = page.locator('dialog[open]');
+    await expect(
+      existingGuideDialog.getByRole('heading', {
+        name: 'Редактировать гайд: Хотори',
+        level: 1,
+      }),
+    ).toBeVisible();
+    const sectionButtons = existingGuideDialog.locator(
+      '.section-sorter button[draggable="true"]',
+    );
+    await expect(sectionButtons.nth(1)).toBeVisible();
+    const firstSectionName = (
+      await sectionButtons.nth(0).locator('span').textContent()
+    )?.trim();
+    const secondSectionName = (
+      await sectionButtons.nth(1).locator('span').textContent()
+    )?.trim();
+    expect(firstSectionName).toBeTruthy();
+    expect(secondSectionName).toBeTruthy();
+    const sectionTransfer = await page.evaluateHandle(() => new DataTransfer());
+    await sectionButtons.nth(0).dispatchEvent('dragstart', {
+      dataTransfer: sectionTransfer,
+    });
+    await expect(sectionButtons.nth(0)).toHaveClass(/is-dragging/);
+    const sectionTargetBox = await sectionButtons.nth(1).boundingBox();
+    if (!sectionTargetBox) {
+      throw new Error('Не удалось получить координаты секции гайда.');
+    }
+    await sectionButtons.nth(1).dispatchEvent('dragover', {
+      dataTransfer: sectionTransfer,
+      clientX: sectionTargetBox.x + sectionTargetBox.width / 2,
+      clientY: sectionTargetBox.y + sectionTargetBox.height - 2,
+    });
+    await expect(sectionButtons.nth(1)).toHaveAttribute(
+      'data-drop-placement',
+      'after',
+    );
+    await sectionButtons.nth(1).dispatchEvent('drop', {
+      dataTransfer: sectionTransfer,
+      clientX: sectionTargetBox.x + sectionTargetBox.width / 2,
+      clientY: sectionTargetBox.y + sectionTargetBox.height - 2,
+    });
+    await expect(sectionButtons.nth(0).locator('span')).toHaveText(
+      secondSectionName || '',
+    );
+    await expect(sectionButtons.nth(1).locator('span')).toHaveText(
+      firstSectionName || '',
+    );
+    await sectionButtons.nth(1).dispatchEvent('dragend', {
+      dataTransfer: sectionTransfer,
+    });
+    await sectionTransfer.dispose();
+    await existingGuideDialog
+      .getByRole('button', { name: 'Сохранить секции' })
+      .click();
+    await expect(
+      existingGuideDialog.getByText('Секции гайда сохранены в D1.'),
+    ).toBeVisible();
+    await existingGuideDialog
+      .getByRole('button', { name: 'Закрыть редактор' })
+      .click();
 
-  await page
-    .getByRole('navigation', { name: 'Основная навигация' })
-    .getByRole('link', { name: 'Гайды', exact: true })
+    await page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .getByRole('link', { name: 'Гайды', exact: true })
       .click();
     await expect(
       page.getByRole('heading', { name: 'Гайды NTE Meta', exact: true }),
@@ -1187,18 +1355,18 @@ test.describe('NTE Meta Worker API', () => {
       .getByLabel('Заголовок')
       .fill(`Гайд ${uiGuideCharacterName}`);
     await guideCreateForm.getByLabel('Адрес страницы').fill(uiGuideSlug);
-    await expect(
-      guideCreateForm.getByLabel('Адрес страницы'),
-    ).toHaveValue(uiGuideSlug);
+    await expect(guideCreateForm.getByLabel('Адрес страницы')).toHaveValue(
+      uiGuideSlug,
+    );
     await guideCreateForm
       .getByLabel('Краткое описание')
       .fill(
         'Гайд создан из публичного раздела и должен открыть detail-страницу.',
       );
     await guideCreateForm.getByLabel('Патч').fill('ui-test');
-    await expect(
-      guideCreateForm.getByLabel('Адрес страницы'),
-    ).toHaveValue(uiGuideSlug);
+    await expect(guideCreateForm.getByLabel('Адрес страницы')).toHaveValue(
+      uiGuideSlug,
+    );
     const guideCreateRequest = page.waitForRequest(
       (request) =>
         request.method() === 'POST' && request.url().endsWith('/api/guides'),
@@ -1272,11 +1440,19 @@ test.describe('NTE Meta Worker API', () => {
     await tierCards.nth(1).dispatchEvent('dragend', { dataTransfer });
     await dataTransfer.dispose();
     await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
-    page.once('dialog', (dialog) => {
-      expect(dialog.message()).toContain('Закрыть редактор');
-      void dialog.accept();
-    });
     await page.getByRole('button', { name: 'Закрыть редактор' }).click();
+    const discardTierlistChanges = page.locator(
+      'dialog.editor-shell__close-dialog[open]',
+    );
+    await expect(
+      discardTierlistChanges.getByRole('heading', {
+        name: 'Закрыть редактор?',
+      }),
+    ).toBeVisible();
+    await discardTierlistChanges
+      .getByRole('button', { name: 'Закрыть без сохранения' })
+      .click();
+    await expect(discardTierlistChanges).toHaveCount(0);
 
     const uiNewsSlug = `ui-news-${runId}`;
     await page
@@ -1354,62 +1530,64 @@ test.describe('NTE Meta Worker API', () => {
       page.getByRole('link', { name: 'Открыть админку' }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Выйти' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Вход в NTE Meta' }),
-  ).toBeVisible();
-});
-
-test('owner отменяет предупреждение пользователю без зависшей модалки', async ({
-  page,
-}) => {
-  const moderatedCommentBody = `Комментарий для warning cancel ${runId}`;
-  const comment = await owner.post('/api/comments', {
-    data: {
-      targetType: 'site',
-      targetId: 'community',
-      body: moderatedCommentBody,
-    },
+    await expect(
+      page.getByRole('heading', { name: 'Вход в NTE Meta' }),
+    ).toBeVisible();
   });
-  expect(comment.status()).toBe(201);
 
-  await page.goto('/#/profile');
-  await page.getByLabel('Логин').fill(ownerUsername);
-  await page.getByLabel('Пароль').fill(ownerPassword);
-  await page.getByRole('button', { name: 'Войти' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Профиль', level: 1 }),
-  ).toBeVisible();
+  test('owner отменяет предупреждение пользователю без зависшей модалки', async ({
+    page,
+  }) => {
+    const moderatedCommentBody = `Комментарий для warning cancel ${runId}`;
+    const comment = await owner.post('/api/comments', {
+      data: {
+        targetType: 'site',
+        targetId: 'community',
+        body: moderatedCommentBody,
+      },
+    });
+    expect(comment.status()).toBe(201);
 
-  await page.goto('/#/admin/comments');
-  await expect(
-    page.getByRole('heading', { name: 'Модерация комментариев' }),
-  ).toBeVisible();
-  const commentCard = page
-    .locator('.comment-card')
-    .filter({ hasText: moderatedCommentBody });
-  await expect(commentCard).toBeVisible({ timeout: 15_000 });
-  await commentCard.getByRole('button', { name: 'Предупредить' }).click();
-  const warningDialog = page.locator('dialog[open]').filter({
-    has: page.getByRole('heading', { name: 'Предупреждение пользователю' }),
+    await page.goto('/#/profile');
+    await page.getByLabel('Логин').fill(ownerUsername);
+    await page.getByLabel('Пароль').fill(ownerPassword);
+    await page.getByRole('button', { name: 'Войти' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Профиль', level: 1 }),
+    ).toBeVisible();
+
+    await page.goto('/#/admin/comments');
+    await expect(
+      page.getByRole('heading', { name: 'Модерация обсуждений' }),
+    ).toBeVisible();
+    const commentCard = page
+      .locator('.comment-card')
+      .filter({ hasText: moderatedCommentBody });
+    await expect(commentCard).toBeVisible({ timeout: 15_000 });
+    await commentCard.getByRole('button', { name: 'Предупредить' }).click();
+    const warningDialog = page.locator('dialog[open]').filter({
+      has: page.getByRole('heading', { name: 'Предупреждение пользователю' }),
+    });
+    await expect(warningDialog).toBeVisible();
+    await warningDialog
+      .getByLabel('Причина')
+      .fill('Проверяем, что отмена предупреждения закрывает окно.');
+    await warningDialog.getByRole('button', { name: 'Отменить' }).click();
+    await expect(warningDialog).toBeHidden();
+
+    await commentCard.getByRole('button', { name: 'Предупредить' }).click();
+    const reopenedWarningDialog = page.locator('dialog[open]').filter({
+      has: page.getByRole('heading', { name: 'Предупреждение пользователю' }),
+    });
+    await expect(reopenedWarningDialog.getByLabel('Причина')).toHaveValue('');
+    await reopenedWarningDialog
+      .getByRole('button', { name: 'Отменить' })
+      .click();
   });
-  await expect(warningDialog).toBeVisible();
-  await warningDialog
-    .getByLabel('Причина')
-    .fill('Проверяем, что отмена предупреждения закрывает окно.');
-  await warningDialog.getByRole('button', { name: 'Отменить' }).click();
-  await expect(warningDialog).toBeHidden();
 
-  await commentCard.getByRole('button', { name: 'Предупредить' }).click();
-  const reopenedWarningDialog = page.locator('dialog[open]').filter({
-    has: page.getByRole('heading', { name: 'Предупреждение пользователю' }),
-  });
-  await expect(reopenedWarningDialog.getByLabel('Причина')).toHaveValue('');
-  await reopenedWarningDialog.getByRole('button', { name: 'Отменить' }).click();
-});
-
-test('owner создаёт персонажа inline и открывает созданную страницу', async ({
-  page,
-}) => {
+  test('owner создаёт персонажа inline и открывает созданную страницу', async ({
+    page,
+  }) => {
     const uiCharacterSlug = `ui-character-${runId}`;
     const uiCharacterName = `UI персонаж ${runId}`;
     const uiCharacterGuideSlug = `ui-character-guide-${runId}`;
@@ -1453,14 +1631,14 @@ ${'Проверенная редакционная биография остаё
     await mainInfo.getByLabel('Адрес страницы').fill(uiCharacterSlug);
     await mainInfo.getByLabel('Фракция').fill('Редакционный тест');
     await mainInfo.getByLabel('Тип дуги').fill('Тестовая дуга');
-await mainInfo.getByLabel('Атрибут').fill('Тест');
-await mainInfo.getByLabel('Основная роль').fill('DD');
-await mainInfo.getByLabel('Роли в отряде, через запятую').fill('DD, тест');
-await expect(
-  mainInfo.getByText('Тир персонажа редактируется в разделе «Тир-листы».'),
-).toBeVisible();
-await mainInfo
-.getByLabel('URL иконки')
+    await mainInfo.getByLabel('Атрибут').fill('Тест');
+    await mainInfo.getByLabel('Основная роль').fill('DD');
+    await mainInfo.getByLabel('Роли в отряде, через запятую').fill('DD, тест');
+    await expect(
+      mainInfo.getByText('Тир персонажа редактируется в разделе «Тир-листы».'),
+    ).toBeVisible();
+    await mainInfo
+      .getByLabel('URL иконки')
       .fill('/assets/characters/Hotori.webp');
     await mainInfo
       .getByLabel('URL splash art')
@@ -1702,7 +1880,9 @@ await mainInfo
     const discovery = leakDialog.locator('.leak-discovery');
 
     for (const title of candidateTitles) {
-      const card = discovery.locator('.leak-candidate').filter({ hasText: title });
+      const card = discovery
+        .locator('.leak-candidate')
+        .filter({ hasText: title });
       await expect(card).toBeVisible();
       await card.getByRole('checkbox', { name: 'Выбрать публикацию' }).check();
     }

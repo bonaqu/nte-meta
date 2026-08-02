@@ -157,7 +157,9 @@ export function RichTextEditor({
     if (action === 'quote') chain.toggleBlockquote().run();
     if (action === 'clear') chain.unsetAllMarks().clearNodes().run();
     if (action === 'link') {
-      const currentHref = editor.getAttributes('link').href as string | undefined;
+      const currentHref = editor.getAttributes('link').href as
+        | string
+        | undefined;
       setLinkHref(currentHref || '');
       setEditingLink(Boolean(currentHref));
       setLinkError('');
@@ -186,7 +188,9 @@ export function RichTextEditor({
     if (!editor) return;
     const href = normalizeLinkHref(linkHref);
     if (href === null) {
-      setLinkError('Проверьте адрес. Разрешены ссылки http(s), email и переходы внутри сайта.');
+      setLinkError(
+        'Проверьте адрес. Разрешены ссылки http(s), email и переходы внутри сайта.',
+      );
       return;
     }
     if (!href) {
@@ -221,9 +225,15 @@ export function RichTextEditor({
       className={`rich-text-editor${compact ? ' rich-text-editor--compact' : ''}${
         disabled ? ' is-disabled' : ''
       }${overLimit ? ' is-invalid' : ''}`}
-      style={{ '--rich-editor-min-height': `${minHeight}px` } as React.CSSProperties}
+      style={
+        { '--rich-editor-min-height': `${minHeight}px` } as React.CSSProperties
+      }
     >
-      <div className="rich-text-editor__toolbar" role="toolbar" aria-label="Форматирование">
+      <div
+        className="rich-text-editor__toolbar"
+        role="toolbar"
+        aria-label="Форматирование"
+      >
         <div className="rich-text-editor__tools">
           {actions.map((action) => {
             const meta = actionMeta[action];
@@ -268,8 +278,15 @@ export function RichTextEditor({
 
       {maxLength !== undefined ? (
         <div className="rich-text-editor__status" aria-live="polite">
-          <span>{overLimit ? `Сократите текст на ${value.length - maxLength} симв.` : ''}</span>
-          <span>{value.length.toLocaleString('ru-RU')} / {maxLength.toLocaleString('ru-RU')}</span>
+          <span>
+            {overLimit
+              ? `Сократите текст на ${value.length - maxLength} симв.`
+              : ''}
+          </span>
+          <span>
+            {value.length.toLocaleString('ru-RU')} /{' '}
+            {maxLength.toLocaleString('ru-RU')}
+          </span>
         </div>
       ) : null}
       <dialog
@@ -285,7 +302,9 @@ export function RichTextEditor({
         <div className="confirm-dialog__content">
           <div>
             <p className="eyebrow">Форматирование</p>
-            <h2 id={linkTitleId}>{editingLink ? 'Изменить ссылку' : 'Добавить ссылку'}</h2>
+            <h2 id={linkTitleId}>
+              {editingLink ? 'Изменить ссылку' : 'Добавить ссылку'}
+            </h2>
           </div>
           <label>
             Адрес
@@ -297,7 +316,9 @@ export function RichTextEditor({
               placeholder="https://example.com"
               autoFocus
               aria-invalid={Boolean(linkError)}
-              aria-describedby={linkError ? `${editorId}-link-error` : undefined}
+              aria-describedby={
+                linkError ? `${editorId}-link-error` : undefined
+              }
               onChange={(event) => {
                 setLinkHref(event.target.value);
                 setLinkError('');
@@ -310,8 +331,13 @@ export function RichTextEditor({
               }}
             />
           </label>
-          <p id={`${editorId}-link-error`} className="form-message" aria-live="polite">
-            {linkError || 'Можно вставить полный адрес или ссылку на раздел этого сайта.'}
+          <p
+            id={`${editorId}-link-error`}
+            className="form-message"
+            aria-live="polite"
+          >
+            {linkError ||
+              'Можно вставить полный адрес или ссылку на раздел этого сайта.'}
           </p>
           <div className="button-row">
             <button
@@ -322,11 +348,19 @@ export function RichTextEditor({
               Отменить
             </button>
             {editingLink ? (
-              <button className="ghost-button danger" type="button" onClick={removeLink}>
+              <button
+                className="ghost-button danger"
+                type="button"
+                onClick={removeLink}
+              >
                 <Unlink aria-hidden="true" /> Удалить ссылку
               </button>
             ) : null}
-            <button className="primary-button" type="button" onClick={applyLink}>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={applyLink}
+            >
               <Link2 aria-hidden="true" /> Применить
             </button>
           </div>

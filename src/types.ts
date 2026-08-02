@@ -308,7 +308,11 @@ export interface LeakCandidate {
   suggestedStatus: LeakStatus;
   confidenceScore: number;
   reviewStatus: LeakCandidateReviewStatus;
-  translationStatus: 'не требуется' | 'нужен перевод' | 'переведено' | 'проверено';
+  translationStatus:
+    | 'не требуется'
+    | 'нужен перевод'
+    | 'переведено'
+    | 'проверено';
   editorNote?: string;
   evidence?: LeakCandidateEvidence[];
   createdLeakId?: string;
@@ -356,7 +360,7 @@ export interface CharacterImportSource {
   name: string;
   url: string;
   trust: 'official' | 'high' | 'medium' | 'low';
-  status: 'ok' | 'partial' | 'blocked' | 'failed';
+  status: 'ok' | 'partial' | 'blocked' | 'failed' | 'reference' | 'timeout';
   message?: string;
 }
 
@@ -390,6 +394,11 @@ export interface CharacterImportLookupResult {
     readyFields: string[];
     reviewFields: string[];
     missingFields: string[];
+  };
+  timing?: {
+    budgetMs: number;
+    elapsedMs: number;
+    deadlineReached: boolean;
   };
 }
 

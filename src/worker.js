@@ -1780,7 +1780,9 @@ async function handleLeakCandidates(request, env, parts, ctx) {
     }
 
     if (body.suggestedStatus !== undefined) {
-      const suggestedStatus = normalizeLeakCandidateStatus(body.suggestedStatus);
+      const suggestedStatus = normalizeLeakCandidateStatus(
+        body.suggestedStatus,
+      );
       updates.push('suggested_status = ?');
       values.push(suggestedStatus);
       audit.suggestedStatus = suggestedStatus;
@@ -1809,9 +1811,12 @@ async function handleLeakCandidates(request, env, parts, ctx) {
       if (body.translationStatus !== undefined) {
         const translationStatus = cleanString(body.translationStatus, 1, 30);
         if (
-          !['не требуется', 'нужен перевод', 'переведено', 'проверено'].includes(
-            translationStatus,
-          )
+          ![
+            'не требуется',
+            'нужен перевод',
+            'переведено',
+            'проверено',
+          ].includes(translationStatus)
         ) {
           return json({ error: 'Выберите корректный статус перевода' }, 400);
         }
@@ -1839,9 +1844,7 @@ async function handleLeakCandidates(request, env, parts, ctx) {
     if (!result.meta.changes) {
       return json({ error: 'Публикация в очереди не найдена' }, 404);
     }
-    ctx.waitUntil(
-      logAudit(env, actor.id, 'leak_candidates.review', id, audit),
-    );
+    ctx.waitUntil(logAudit(env, actor.id, 'leak_candidates.review', id, audit));
     return json({ data: { success: true } });
   }
 
@@ -2142,7 +2145,12 @@ const LEAK_FINGERPRINT_STOP_WORDS = new Set([
 
 function leakCandidateFingerprintTokens(value) {
   return new Set(
-    (String(value || '').normalize('NFKC').toLocaleLowerCase('ru-RU').match(/[\p{L}\p{N}]{3,}/gu) || [])
+    (
+      String(value || '')
+        .normalize('NFKC')
+        .toLocaleLowerCase('ru-RU')
+        .match(/[\p{L}\p{N}]{3,}/gu) || []
+    )
       .filter((token) => !LEAK_FINGERPRINT_STOP_WORDS.has(token))
       .slice(0, 24),
   );
@@ -2164,7 +2172,9 @@ function leakCandidatesDescribeSameEvent(left, right) {
   for (const token of leftTokens) {
     if (rightTokens.has(token)) shared += 1;
   }
-  return shared >= 3 && shared / Math.min(leftTokens.size, rightTokens.size) >= 0.78;
+  return (
+    shared >= 3 && shared / Math.min(leftTokens.size, rightTokens.size) >= 0.78
+  );
 }
 
 function leakTrustWeight(value) {
@@ -2197,12 +2207,14 @@ function dedupeLeakCandidates(candidates) {
       (left, right) =>
         leakTrustWeight(right.trustLevel) - leakTrustWeight(left.trustLevel) ||
         right.confidenceScore - left.confidenceScore ||
-        Date.parse(right.publishedAt || '') - Date.parse(left.publishedAt || ''),
+        Date.parse(right.publishedAt || '') -
+          Date.parse(left.publishedAt || ''),
     );
     const primary = ranked[0];
     const evidenceByUrl = new Map();
     for (const candidate of ranked) {
-      const evidence = candidate.metadata?.evidence?.[0] || leakCandidateEvidence(candidate);
+      const evidence =
+        candidate.metadata?.evidence?.[0] || leakCandidateEvidence(candidate);
       evidenceByUrl.set(evidence.sourceUrl, evidence);
     }
     const evidence = [...evidenceByUrl.values()];
@@ -2379,7 +2391,9 @@ function leakCandidateMatchesSource(candidate, source) {
     return false;
   }
   if (source.relevance !== 'future') return true;
-  return /(?:leak|rumou?r|upcoming|roadmap|unreleased|preview|future|datamine|слив|слух|утечк|неофициаль|будущ|предполож|爆料|内鬼|未来版本|新角色|前瞻|未公开)/i.test(text);
+  return /(?:leak|rumou?r|upcoming|roadmap|unreleased|preview|future|datamine|слив|слух|утечк|неофициаль|будущ|предполож|爆料|内鬼|未来版本|新角色|前瞻|未公开)/i.test(
+    text,
+  );
 }
 
 function leakCandidateMatchesQuery(candidate, query) {
@@ -2417,10 +2431,7 @@ async function handleComments(request, env, ctx) {
          ORDER BY comments.is_pinned DESC, comments.is_answer DESC, comments.created_at DESC
          LIMIT 200`,
       ).all();
-      const activeByComment = await loadActiveCommentReactions(
-        env,
-        actor.id,
-      );
+      const activeByComment = await loadActiveCommentReactions(env, actor.id);
       return json({
         data: rows.results.map((row) =>
           serializeComment(row, activeByComment.get(row.id)),
@@ -2706,7 +2717,11 @@ async function handleCommentReports(request, env, parts, ctx) {
     const body = await readJson(request);
     const commentId = cleanString(body.commentId, 1, 80);
     const reason = cleanString(body.reason, 1, 40);
-    if (!['spam', 'abuse', 'misinformation', 'off_topic', 'other'].includes(reason)) {
+    if (
+      !['spam', 'abuse', 'misinformation', 'off_topic', 'other'].includes(
+        reason,
+      )
+    ) {
       return json({ error: 'Выберите причину жалобы' }, 400);
     }
     const comment = await env.DB.prepare(
@@ -2719,7 +2734,10 @@ async function handleCommentReports(request, env, parts, ctx) {
       .first();
     if (!comment) return json({ error: 'Комментарий не найден' }, 404);
     if (comment.user_id === actor.id) {
-      return json({ error: 'Свой комментарий можно изменить или удалить без жалобы' }, 400);
+      return json(
+        { error: 'Свой комментарий можно изменить или удалить без жалобы' },
+        400,
+      );
     }
     const existing = await env.DB.prepare(
       'SELECT id FROM comment_reports WHERE comment_id = ? AND reporter_id = ?',
@@ -2727,7 +2745,10 @@ async function handleCommentReports(request, env, parts, ctx) {
       .bind(commentId, actor.id)
       .first();
     if (existing) {
-      return json({ error: 'Вы уже отправили жалобу на этот комментарий' }, 409);
+      return json(
+        { error: 'Вы уже отправили жалобу на этот комментарий' },
+        409,
+      );
     }
 
     const reportId = crypto.randomUUID();
@@ -2800,7 +2821,8 @@ async function handleThreads(request, env, parts, ctx) {
   const idOrSlug = parts[1];
   if (request.method === 'GET') {
     const includeHidden =
-      ROLE_WEIGHT[(await getAuthUser(request, env))?.role] >= ROLE_WEIGHT.moderator;
+      ROLE_WEIGHT[(await getAuthUser(request, env))?.role] >=
+      ROLE_WEIGHT.moderator;
     const data = idOrSlug
       ? await getThread(env, idOrSlug, includeHidden)
       : await listThreads(env, includeHidden);
@@ -2909,12 +2931,7 @@ async function handleReactions(request, env, parts, ctx) {
     const targetId = cleanString(url.searchParams.get('targetId'), 1, 80);
     const actor = await getAuthUser(request, env);
     return json({
-      data: await buildReactionSummary(
-        env,
-        targetType,
-        targetId,
-        actor?.id,
-      ),
+      data: await buildReactionSummary(env, targetType, targetId, actor?.id),
     });
   }
 
@@ -3063,8 +3080,7 @@ async function buildReactionSummary(env, targetType, targetId, userId) {
     if (row.reaction_type === 'like') summary.likes = Number(row.total || 0);
     if (row.reaction_type === 'dislike')
       summary.dislikes = Number(row.total || 0);
-    if (row.reaction_type === 'useful')
-      summary.useful = Number(row.total || 0);
+    if (row.reaction_type === 'useful') summary.useful = Number(row.total || 0);
   }
   if (userId) {
     const active = await env.DB.prepare(
@@ -3081,27 +3097,24 @@ async function buildReactionSummary(env, targetType, targetId, userId) {
   return summary;
 }
 
-async function loadActiveCommentReactions(
-  env,
-  userId,
-  targetType,
-  targetId,
-) {
-  const query = targetType && targetId
-    ? `SELECT reactions.target_id, reactions.reaction_type
+async function loadActiveCommentReactions(env, userId, targetType, targetId) {
+  const query =
+    targetType && targetId
+      ? `SELECT reactions.target_id, reactions.reaction_type
        FROM reactions
        JOIN comments ON comments.id = reactions.target_id
        WHERE reactions.user_id = ?
          AND reactions.target_type = 'comment'
          AND comments.target_type = ?
          AND comments.target_id = ?`
-    : `SELECT target_id, reaction_type
+      : `SELECT target_id, reaction_type
        FROM reactions
        WHERE user_id = ? AND target_type = 'comment'`;
   const statement = env.DB.prepare(query);
-  const rows = targetType && targetId
-    ? await statement.bind(userId, targetType, targetId).all()
-    : await statement.bind(userId).all();
+  const rows =
+    targetType && targetId
+      ? await statement.bind(userId, targetType, targetId).all()
+      : await statement.bind(userId).all();
   const byComment = new Map();
   for (const row of rows.results) {
     const current = byComment.get(row.target_id) || [];
@@ -3112,11 +3125,85 @@ async function loadActiveCommentReactions(
 }
 
 const IMPORT_SOURCE_TIMEOUT_MS = 7000;
+const IMPORT_REQUEST_BUDGET_MS = 45000;
 const IMPORT_MAX_HTML_BYTES = 600000;
 const IMPORT_FETCH_CONCURRENCY = 4;
 const IMPORT_MEDIA_FETCH_CONCURRENCY = 3;
 const IMPORT_MEDIA_LOOKUP_LIMIT = 6;
 const IMPORT_AUTO_SOURCE_LIMIT = 14;
+
+function createLinkedImportTimeout(parentSignal, timeoutMs) {
+  const controller = new AbortController();
+  let timedOut = false;
+  let listeningToParent = false;
+  let timeout;
+  const abortFromParent = () => controller.abort(parentSignal?.reason);
+
+  if (parentSignal?.aborted) {
+    abortFromParent();
+  } else if (parentSignal) {
+    parentSignal.addEventListener('abort', abortFromParent, { once: true });
+    listeningToParent = true;
+  }
+
+  if (!controller.signal.aborted) {
+    if (timeoutMs <= 0) {
+      timedOut = true;
+      controller.abort();
+    } else {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, timeoutMs);
+    }
+  }
+
+  return {
+    signal: controller.signal,
+    timedOut: () => timedOut,
+    dispose() {
+      if (timeout !== undefined) clearTimeout(timeout);
+      if (listeningToParent) {
+        parentSignal.removeEventListener('abort', abortFromParent);
+      }
+    },
+  };
+}
+
+function createImportDeadline(requestSignal) {
+  const startedAt = Date.now();
+  const linkedTimeout = createLinkedImportTimeout(
+    requestSignal,
+    IMPORT_REQUEST_BUDGET_MS,
+  );
+  return {
+    ...linkedTimeout,
+    budgetMs: IMPORT_REQUEST_BUDGET_MS,
+    elapsedMs: () => Date.now() - startedAt,
+    remainingMs: () =>
+      Math.max(0, IMPORT_REQUEST_BUDGET_MS - (Date.now() - startedAt)),
+    deadlineReached: linkedTimeout.timedOut,
+  };
+}
+
+async function withImportDeadline(requestSignal, callback) {
+  const deadline = createImportDeadline(requestSignal);
+  try {
+    return await callback(deadline);
+  } finally {
+    deadline.dispose();
+  }
+}
+
+function importTimeoutSource(source, message) {
+  return {
+    ...source,
+    status: 'timeout',
+    message: message || 'Общий лимит времени автоимпорта исчерпан.',
+    suggestions: [],
+  };
+}
+
 const LEAK_DISCOVERY_TIMEOUT_MS = 5500;
 const LEAK_DISCOVERY_MAX_BYTES = 320000;
 const LEAK_DISCOVERY_CONCURRENCY = 4;
@@ -3457,7 +3544,8 @@ function extractYoutubeUrls(text) {
 
 function nextImportLine(lines, label) {
   const index = lines.findIndex(
-    (line) => line.toLocaleLowerCase('ru-RU') === label.toLocaleLowerCase('ru-RU'),
+    (line) =>
+      line.toLocaleLowerCase('ru-RU') === label.toLocaleLowerCase('ru-RU'),
   );
   return index >= 0 ? lines[index + 1] || '' : '';
 }
@@ -3625,10 +3713,10 @@ function normalizeGuideImportRows(field, value) {
       'purpose',
       'note',
       'rotation',
-      ]) {
+    ]) {
       if (typeof next[key] === 'string') {
         const localized = localizeImportedGuideText(next[key]);
-  if (['name', 'title', 'label'].includes(key)) {
+        if (['name', 'title', 'label'].includes(key)) {
           const [heading, ...details] = localized
             .split('\n')
             .map((part) => part.replace(/\s+/g, ' ').trim())
@@ -3645,12 +3733,12 @@ function normalizeGuideImportRows(field, value) {
     for (const key of ['imageUrl', 'iconUrl']) {
       if (typeof next[key] === 'string') {
         next[key] = normalizeExternalImageUrl(next[key]);
-  if (isPlaceholderImportImage(next[key])) next[key] = '';
-  }
+        if (isPlaceholderImportImage(next[key])) next[key] = '';
+      }
     }
     const primary =
       next.name || next.title || next.label || next.description || '';
-  const key = normalizeImportSearch(
+    const key = normalizeImportSearch(
       `${field}:${primary}:${next.description || next.rotation || ''}`,
     );
     if (!key || !hasRussianText(primary) || seen.has(key)) continue;
@@ -3759,7 +3847,9 @@ function makeImportSuggestion(
 }
 
 function normalizeExternalImageUrl(value) {
-  const url = String(value || '').trim().replace(/&amp;/g, '&');
+  const url = String(value || '')
+    .trim()
+    .replace(/&amp;/g, '&');
   if (!url) return '';
   if (/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) {
     try {
@@ -3792,7 +3882,9 @@ function isPlaceholderImportImage(value, title = '') {
 }
 
 function normalizeExternalAudioUrl(value) {
-  const url = String(value || '').trim().replace(/&amp;/g, '&');
+  const url = String(value || '')
+    .trim()
+    .replace(/&amp;/g, '&');
   if (!url) return '';
   if (!/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) return url;
   try {
@@ -3880,7 +3972,9 @@ function characterNameCandidates(character) {
     nevernessAppCharacterCode(character),
   ];
   return Array.from(
-    new Set(sourceValues.map((value) => normalizeImportSearch(value)).filter(Boolean)),
+    new Set(
+      sourceValues.map((value) => normalizeImportSearch(value)).filter(Boolean),
+    ),
   );
 }
 
@@ -3933,7 +4027,9 @@ function nevernessAppCharacterCode(character) {
   const candidates = [character.slug, character.originalName, character.name]
     .map((value) => normalizeImportSlug(value))
     .filter(Boolean);
-  return candidates.map((candidate) => codes.get(candidate)).find(Boolean) || '';
+  return (
+    candidates.map((candidate) => codes.get(candidate)).find(Boolean) || ''
+  );
 }
 
 function interactiveMapEsperId(character) {
@@ -3973,7 +4069,8 @@ function characterImportSources(slug, character = {}) {
       .replace(/\s+/g, '_') || slug,
   );
   const fandomRuImagePrefix = encodeURIComponent(
-    String(character.name || character.originalName || slug || '').trim() || slug,
+    String(character.name || character.originalName || slug || '').trim() ||
+      slug,
   );
   const pathSlugs = characterPathSlugCandidates({ ...character, slug });
   const urlsFor = (buildUrl) => pathSlugs.map(buildUrl);
@@ -4033,7 +4130,9 @@ function characterImportSources(slug, character = {}) {
       trust: 'medium',
       url: `https://neverness-to-everness.fandom.com/api.php?action=query&generator=images&gimlimit=max&prop=imageinfo&iiprop=url|mime|size&format=json&formatversion=2&titles=${fandomTitle}%2FVoice-Overs&origin=*`,
       publicUrl: `https://neverness-to-everness.fandom.com/wiki/${fandomTitle}/Voice-Overs`,
-      voiceRoot: String(character.originalName || character.name || slug || '').trim(),
+      voiceRoot: String(
+        character.originalName || character.name || slug || '',
+      ).trim(),
       parser: parseFandomVoiceMediaImport,
       raw: true,
     },
@@ -4318,7 +4417,8 @@ function guideImportSources(slug, character = {}) {
       trust: 'high',
       url: `https://ntewiki.org/ru/blog/${pathSlugs[0]}-build-guide-2026/`,
       urlCandidates: urlsFor(
-        (pathSlug) => `https://ntewiki.org/ru/blog/${pathSlug}-build-guide-2026/`,
+        (pathSlug) =>
+          `https://ntewiki.org/ru/blog/${pathSlug}-build-guide-2026/`,
       ),
       parser: parseEditorialGuideImport,
       extractImages: true,
@@ -4388,7 +4488,9 @@ function buildKnownAffinitySource(character) {
     trust: 'medium',
     url: `https://www.neverness.app/codex/characters/${code}`,
   };
-  const levelRequirements = [100, 500, 1000, 2000, 3500, 5000, 7000, 9000, 12000, 16000];
+  const levelRequirements = [
+    100, 500, 1000, 2000, 3500, 5000, 7000, 9000, 12000, 16000,
+  ];
   const friendship = levelRequirements.map((points, index) => ({
     level: index + 1,
     rewardName: '',
@@ -4655,7 +4757,7 @@ function buildKnownVoiceActorSource(character) {
   };
 }
 
-async function fetchImportSource(source, character) {
+async function fetchImportSource(source, character, deadline) {
   if (source.referenceOnly) {
     return {
       ...source,
@@ -4667,15 +4769,22 @@ async function fetchImportSource(source, character) {
     };
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), IMPORT_SOURCE_TIMEOUT_MS);
+  if (deadline.signal.aborted || deadline.remainingMs() <= 0) {
+    return importTimeoutSource(source);
+  }
+
+  const linkedTimeout = createLinkedImportTimeout(
+    deadline.signal,
+    Math.min(IMPORT_SOURCE_TIMEOUT_MS, deadline.remainingMs()),
+  );
   try {
     const fetchOptions = {
       headers: {
         accept: 'text/html,application/xhtml+xml,application/json',
-        'user-agent': 'NTE-Meta-Editorial/1.0 (+https://bonaqu.github.io/nte-meta/)',
+        'user-agent':
+          'NTE-Meta-Editorial/1.0 (+https://bonaqu.github.io/nte-meta/)',
       },
-      signal: controller.signal,
+      signal: linkedTimeout.signal,
     };
     if (source.cacheTtl) {
       fetchOptions.cf = {
@@ -4695,14 +4804,26 @@ async function fetchImportSource(source, character) {
       };
     }
     const candidateUrls = Array.from(
-      new Set([activeSource.url, ...(activeSource.urlCandidates || [])].filter(Boolean)),
+      new Set(
+        [activeSource.url, ...(activeSource.urlCandidates || [])].filter(
+          Boolean,
+        ),
+      ),
     ).slice(0, 3);
     let response;
     let resolvedSource = activeSource;
     for (const [index, candidateUrl] of candidateUrls.entries()) {
       response = await fetch(candidateUrl, fetchOptions);
-      if (response.ok || response.status !== 404 || index === candidateUrls.length - 1) {
-        resolvedSource = { ...activeSource, url: candidateUrl, publicUrl: candidateUrl };
+      if (
+        response.ok ||
+        response.status !== 404 ||
+        index === candidateUrls.length - 1
+      ) {
+        resolvedSource = {
+          ...activeSource,
+          url: candidateUrl,
+          publicUrl: candidateUrl,
+        };
         break;
       }
       await discardResponseBody(response);
@@ -4757,17 +4878,21 @@ async function fetchImportSource(source, character) {
   } catch (error) {
     return {
       ...source,
-      status: 'failed',
+      status:
+        linkedTimeout.signal.aborted || error?.name === 'AbortError'
+          ? 'timeout'
+          : 'failed',
       message:
         error instanceof Error && error.message === 'IMPORT_SOURCE_TOO_LARGE'
           ? 'Страница слишком большая для безопасного автоимпорта.'
-          : error instanceof Error && error.name === 'AbortError'
-          ? 'Источник не ответил вовремя.'
-          : 'Источник временно недоступен.',
+          : linkedTimeout.signal.aborted ||
+              (error instanceof Error && error.name === 'AbortError')
+            ? 'Источник не ответил вовремя.'
+            : 'Источник временно недоступен.',
       suggestions: [],
     };
   } finally {
-    clearTimeout(timeout);
+    linkedTimeout.dispose();
   }
 }
 
@@ -4788,7 +4913,9 @@ const KNOWN_WOTPACK_GUIDE_URLS = new Map([
 
 async function resolveWotpackGuideSource(source, character, fetchOptions) {
   const knownUrl = KNOWN_WOTPACK_GUIDE_URLS.get(
-    normalizeImportSlug(character?.slug || character?.originalName || character?.name),
+    normalizeImportSlug(
+      character?.slug || character?.originalName || character?.name,
+    ),
   );
   if (knownUrl) {
     return {
@@ -5105,6 +5232,11 @@ function normalizeProfileCollectionRows(field, value) {
           return null;
         return { ...item, name };
       }
+      if (field === 'profile.gifts') {
+        const name = normalizeImportedRuText(item.name || '');
+        if (!name || /^\d+$/.test(name)) return null;
+        return { ...item, name };
+      }
       return item;
     })
     .filter(Boolean);
@@ -5410,9 +5542,7 @@ function parseFandomRuImagesImport(text, source, character) {
         width: page.imageinfo?.[0]?.width || 0,
         height: page.imageinfo?.[0]?.height || 0,
       }))
-      .filter(
-        (image) => isUsableCharacterImportImage(image),
-      );
+      .filter((image) => isUsableCharacterImportImage(image));
     const ownImages = images.filter((image) =>
       normalizeImportSearch(image.title).includes(characterName),
     );
@@ -5420,7 +5550,9 @@ function parseFandomRuImagesImport(text, source, character) {
       isUsableCharacterImportImage(image, 'card'),
     );
     const card =
-      cardImages.find((image) => /(^|\s)иконка(?:\.|\s|$)/i.test(image.title)) ||
+      cardImages.find((image) =>
+        /(^|\s)иконка(?:\.|\s|$)/i.test(image.title),
+      ) ||
       cardImages.find((image) =>
         /представление|портрет|portrait/i.test(image.title),
       ) ||
@@ -5532,9 +5664,12 @@ function buildImportImageMap(images, character = {}) {
         if (alias) aliases.add(alias);
       }
       const prefixPattern = new RegExp(
-        `^${escapeRegExp(characterName)}\\s+`, 'i');
+        `^${escapeRegExp(characterName)}\\s+`,
+        'i',
+      );
       const withoutCharacter = title.replace(prefixPattern, '').trim();
-      if (withoutCharacter && withoutCharacter !== title) aliases.add(withoutCharacter);
+      if (withoutCharacter && withoutCharacter !== title)
+        aliases.add(withoutCharacter);
     }
 
     for (const alias of importImageNameAliases(title)) aliases.add(alias);
@@ -5558,9 +5693,7 @@ function parseFandomRuAllImagesImport(text, source, character) {
         height: image.height || 0,
         size: image.size || 0,
       }))
-      .filter(
-        (image) => isUsableCharacterImportImage(image),
-      );
+      .filter((image) => isUsableCharacterImportImage(image));
     const characterNames = characterNameCandidates(character);
     const ownImages = images.filter((image) => {
       const title = normalizeImportSearch(cleanImportImageTitle(image.title));
@@ -5570,8 +5703,12 @@ function parseFandomRuAllImagesImport(text, source, character) {
       isUsableCharacterImportImage(image, 'card'),
     );
     const icon =
-      cardImages.find((image) => /(^|\s)иконка($|\s)/i.test(cleanImportImageTitle(image.title))) ||
-      cardImages.find((image) => /аватар/i.test(cleanImportImageTitle(image.title)));
+      cardImages.find((image) =>
+        /(^|\s)иконка($|\s)/i.test(cleanImportImageTitle(image.title)),
+      ) ||
+      cardImages.find((image) =>
+        /аватар/i.test(cleanImportImageTitle(image.title)),
+      );
     const presentation = ownImages.find((image) =>
       /представление|карточка/i.test(cleanImportImageTitle(image.title)),
     );
@@ -5597,7 +5734,13 @@ function parseFandomRuAllImagesImport(text, source, character) {
         'medium',
         'Проверьте, что изображение подходит как крупный арт профиля.',
       ),
-      makeImportSuggestion('__imageMap', 'Индекс изображений', imageMap, source, 'low'),
+      makeImportSuggestion(
+        '__imageMap',
+        'Индекс изображений',
+        imageMap,
+        source,
+        'low',
+      ),
     ].filter(Boolean);
   } catch {
     return [];
@@ -5655,7 +5798,9 @@ const FANDOM_VOICE_SUBJECT_TRANSLATIONS = new Map([
 ]);
 
 function localizeFandomVoiceTitle(value, index) {
-  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+  const clean = String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
   const normalized = clean.toLocaleLowerCase('en-US');
   const direct = FANDOM_VOICE_TITLE_TRANSLATIONS.get(normalized);
   if (direct) return direct;
@@ -5677,23 +5822,40 @@ function localizeFandomVoiceTitle(value, index) {
 function parseFandomVoiceMediaImport(text, source) {
   try {
     const payload = JSON.parse(text);
-    const pages = Array.isArray(payload?.query?.pages) ? payload.query.pages : [];
-    const voiceRoot = String(source.voiceRoot || '').replace(/[_\s]+/g, ' ').trim();
+    const pages = Array.isArray(payload?.query?.pages)
+      ? payload.query.pages
+      : [];
+    const voiceRoot = String(source.voiceRoot || '')
+      .replace(/[_\s]+/g, ' ')
+      .trim();
     const rootPattern = voiceRoot
-      ? new RegExp(`^${escapeRegExp(voiceRoot).replace(/\\ /g, '\\s+')}\\s+`, 'i')
+      ? new RegExp(
+          `^${escapeRegExp(voiceRoot).replace(/\\ /g, '\\s+')}\\s+`,
+          'i',
+        )
       : null;
     const rows = pages
       .map((page) => {
         const info = page?.imageinfo?.[0];
-        const fileTitle = String(page?.title || '').replace(/_/g, ' ').trim();
-        const match = fileTitle.match(/^File:VO\s+(?:(ZH|JA|KO)\s+)?(.+?)\.ogg$/i);
-        if (!match || !info?.url || !/(?:audio|ogg)/i.test(String(info.mime || ''))) {
+        const fileTitle = String(page?.title || '')
+          .replace(/_/g, ' ')
+          .trim();
+        const match = fileTitle.match(
+          /^File:VO\s+(?:(ZH|JA|KO)\s+)?(.+?)\.ogg$/i,
+        );
+        if (
+          !match ||
+          !info?.url ||
+          !/(?:audio|ogg)/i.test(String(info.mime || ''))
+        ) {
           return null;
         }
         const languageCode = String(match[1] || '').toUpperCase();
         const language = FANDOM_VOICE_LANGUAGES.get(languageCode);
         if (!language) return null;
-        const rawTitle = rootPattern ? match[2].replace(rootPattern, '').trim() : match[2];
+        const rawTitle = rootPattern
+          ? match[2].replace(rootPattern, '').trim()
+          : match[2];
         if (!rawTitle || (rawTitle === match[2] && voiceRoot)) return null;
         return {
           sortKey: `${languageCode}:${rawTitle}`,
@@ -5744,7 +5906,11 @@ function parseFandomRuVoiceLibraryImport(text, source, character) {
       ? payload.query.allimages
       : [];
     const aliases = [character.name, character.originalName, character.slug]
-      .map((value) => String(value || '').trim().replace(/\s+/g, '_'))
+      .map((value) =>
+        String(value || '')
+          .trim()
+          .replace(/\s+/g, '_'),
+      )
       .filter(Boolean)
       .sort((left, right) => right.length - left.length);
     const rows = images
@@ -5753,14 +5919,18 @@ function parseFandomRuVoiceLibraryImport(text, source, character) {
         const match = fileName.match(
           /^VO_(?:(JA|KR|ZH)_)?(.+?)\.(mp3|m4a|ogg|oga|wav|flac|webm)$/i,
         );
-        if (!match || !image?.url || !/(?:audio|mpeg|ogg|webm)/i.test(String(image.mime || ''))) {
+        if (
+          !match ||
+          !image?.url ||
+          !/(?:audio|mpeg|ogg|webm)/i.test(String(image.mime || ''))
+        ) {
           return null;
         }
         const stem = match[2];
         const alias = aliases.find((candidate) =>
-          stem.toLocaleLowerCase('ru-RU').startsWith(
-            `${candidate.toLocaleLowerCase('ru-RU')}_`,
-          ),
+          stem
+            .toLocaleLowerCase('ru-RU')
+            .startsWith(`${candidate.toLocaleLowerCase('ru-RU')}_`),
         );
         if (!alias) return null;
         const title = normalizeImportedRuText(
@@ -5983,7 +6153,8 @@ function parseNevernessAppProfileImport(html, source) {
     .filter(Boolean);
 
   const skins = [];
-  const outfitPattern = /<article\b[^>]*data-outfit-id=["']([^"']+)["'][\s\S]*?<\/article>/gi;
+  const outfitPattern =
+    /<article\b[^>]*data-outfit-id=["']([^"']+)["'][\s\S]*?<\/article>/gi;
   for (const match of String(html || '').matchAll(outfitPattern)) {
     const outfitId = decodeHtmlEntities(match[1]);
     const localization = knownOutfitLocalizations.get(outfitId);
@@ -6034,7 +6205,10 @@ function extractImportPanel(html, panelId) {
   const source = String(html || '');
   const start = source.indexOf(`id="${panelId}"`);
   if (start < 0) return '';
-  const end = source.indexOf('<div role="tabpanel"', start + panelId.length + 5);
+  const end = source.indexOf(
+    '<div role="tabpanel"',
+    start + panelId.length + 5,
+  );
   return source.slice(start, end < 0 ? source.length : end);
 }
 
@@ -6070,8 +6244,12 @@ function parseInteractiveMapRuImport(html, source, character) {
   const dossierHtml =
     profilePanel.match(/>Досье<\/h2>([\s\S]*?)(?=<\/section>)/i)?.[1] || '';
   const dossierParts = [];
-  for (const match of dossierHtml.matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/gi)) {
-    const title = htmlToPlainText(match[1].match(/<h3\b[^>]*>([\s\S]*?)<\/h3>/i)?.[1] || '');
+  for (const match of dossierHtml.matchAll(
+    /<article\b[^>]*>([\s\S]*?)<\/article>/gi,
+  )) {
+    const title = htmlToPlainText(
+      match[1].match(/<h3\b[^>]*>([\s\S]*?)<\/h3>/i)?.[1] || '',
+    );
     const description = htmlToPlainText(
       match[1].match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1] || '',
     );
@@ -6128,17 +6306,17 @@ function parseInteractiveMapRuImport(html, source, character) {
   )) {
     const block = match[1];
     const level = Number(
-      htmlToPlainText(block.match(/<p\b[^>]*>(Effect[1-6])<\/p>/i)?.[1] || '').replace(
-        /\D/g,
-        '',
-      ),
+      htmlToPlainText(
+        block.match(/<p\b[^>]*>(Effect[1-6])<\/p>/i)?.[1] || '',
+      ).replace(/\D/g, ''),
     );
     if (!Number.isInteger(level) || level < 1 || level > 6) continue;
     const name = htmlToPlainText(
       block.match(/<h4\b[^>]*>([\s\S]*?)<\/h4>/i)?.[1] || '',
     );
     const description = htmlToPlainText(
-      block.match(/<p\b[^>]*whitespace-pre-line[^>]*>([\s\S]*?)<\/p>/i)?.[1] || '',
+      block.match(/<p\b[^>]*whitespace-pre-line[^>]*>([\s\S]*?)<\/p>/i)?.[1] ||
+        '',
     );
     const iconUrl = normalizeImportImageSrc(
       block.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] || '',
@@ -6150,15 +6328,21 @@ function parseInteractiveMapRuImport(html, source, character) {
   }
 
   const friendshipHeading = affinityPanel.indexOf('Уровни дружбы</h3>');
-  const giftsHtml = friendshipHeading >= 0 ? affinityPanel.slice(0, friendshipHeading) : '';
+  const giftsHtml =
+    friendshipHeading >= 0 ? affinityPanel.slice(0, friendshipHeading) : '';
   const gifts = [];
   for (const match of giftsHtml.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
     const attributes = match[1];
     const block = match[2];
-    const points = block.match(/♥\s*\+([\d\s,.]+)/)?.[1]?.replace(/\D/g, '') || '';
+    const points =
+      block.match(/♥\s*\+([\d\s,.]+)/)?.[1]?.replace(/\D/g, '') || '';
     if (!points) continue;
-    const name = decodeHtmlEntities(attributes.match(/\btitle="([^"]+)"/i)?.[1] || '').trim();
-    const href = decodeHtmlEntities(attributes.match(/\bhref="([^"]+)"/i)?.[1] || '');
+    const name = decodeHtmlEntities(
+      attributes.match(/\btitle="([^"]+)"/i)?.[1] || '',
+    ).trim();
+    const href = decodeHtmlEntities(
+      attributes.match(/\bhref="([^"]+)"/i)?.[1] || '',
+    );
     const iconUrl = normalizeImportImageSrc(
       block.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] || '',
       source.url,
@@ -6173,7 +6357,8 @@ function parseInteractiveMapRuImport(html, source, character) {
   }
 
   const friendship = [];
-  const friendshipHtml = friendshipHeading >= 0 ? affinityPanel.slice(friendshipHeading) : '';
+  const friendshipHtml =
+    friendshipHeading >= 0 ? affinityPanel.slice(friendshipHeading) : '';
   const levelMarker =
     '<div class="flex items-start gap-4 rounded-lg border border-[rgb(var(--border))] p-3 sm:p-4">';
   const levelChunks = friendshipHtml.split(levelMarker).slice(1, 11);
@@ -6183,7 +6368,8 @@ function parseInteractiveMapRuImport(html, source, character) {
     );
     const level = Number(levelMatch?.[1]);
     const points = Number(String(levelMatch?.[2] || '').replace(/\D/g, ''));
-    if (!Number.isInteger(level) || level < 1 || level > 10 || !points) continue;
+    if (!Number.isInteger(level) || level < 1 || level > 10 || !points)
+      continue;
     const rewards = [];
     for (const rewardMatch of chunk.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
       const attributes = rewardMatch[1];
@@ -6195,7 +6381,9 @@ function parseInteractiveMapRuImport(html, source, character) {
         ? `Именная награда уровня ${level}`
         : sourceName;
       const quantity = block.match(/>×\s*([^<]+)<\/span>/i)?.[1]?.trim() || '';
-      const href = decodeHtmlEntities(attributes.match(/\bhref="([^"]+)"/i)?.[1] || '');
+      const href = decodeHtmlEntities(
+        attributes.match(/\bhref="([^"]+)"/i)?.[1] || '',
+      );
       const iconUrl = normalizeImportImageSrc(
         block.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] || '',
         source.url,
@@ -6221,7 +6409,9 @@ function parseInteractiveMapRuImport(html, source, character) {
   }
 
   const skins = [];
-  for (const match of cosmeticsPanel.matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/gi)) {
+  for (const match of cosmeticsPanel.matchAll(
+    /<article\b[^>]*>([\s\S]*?)<\/article>/gi,
+  )) {
     const block = match[1];
     const name = htmlToPlainText(
       block.match(/<h4\b[^>]*>([\s\S]*?)<\/h4>/i)?.[1] || '',
@@ -6245,7 +6435,13 @@ function parseInteractiveMapRuImport(html, source, character) {
 
   return [
     makeImportSuggestion('profile.faction', 'Фракция', faction, source, 'high'),
-    makeImportSuggestion('profile.birthday', 'День рождения', birthday, source, 'high'),
+    makeImportSuggestion(
+      'profile.birthday',
+      'День рождения',
+      birthday,
+      source,
+      'high',
+    ),
     makeImportSuggestion(
       'profile.biographyShort',
       'Биография',
@@ -6253,11 +6449,41 @@ function parseInteractiveMapRuImport(html, source, character) {
       source,
       'high',
     ),
-    makeImportSuggestion('profile.biography', 'Биография', biography, source, 'high'),
-    makeImportSuggestion('profile.abilities', 'Способности', abilities, source, 'high'),
-    makeImportSuggestion('profile.awakenings', 'Пробуждения', awakenings, source, 'high'),
-    makeImportSuggestion('profile.gifts', 'Любимые подарки', gifts, source, 'high'),
-    makeImportSuggestion('profile.friendship', 'Симпатия 1–10', friendship, source, 'high'),
+    makeImportSuggestion(
+      'profile.biography',
+      'Биография',
+      biography,
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.abilities',
+      'Способности',
+      abilities,
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.awakenings',
+      'Пробуждения',
+      awakenings,
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.gifts',
+      'Любимые подарки',
+      gifts,
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.friendship',
+      'Симпатия 1–10',
+      friendship,
+      source,
+      'high',
+    ),
     makeImportSuggestion('profile.skins', 'Гардероб', skins, source, 'high'),
   ].filter(Boolean);
 }
@@ -6294,15 +6520,20 @@ function parseGame8SkinsImport(text, source, character) {
     );
     const characterCellIndex = cells.findIndex((cell) => {
       const normalized = normalizeImportSearch(cell);
-      return characterNames.some((name) => normalized === name || normalized.includes(name));
+      return characterNames.some(
+        (name) => normalized === name || normalized.includes(name),
+      );
     });
     const normalizedAlt = normalizeImportSearch(characterFromAlt);
     const matchesCharacter =
-      characterNames.some((name) => normalizedAlt === name) || characterCellIndex >= 0;
+      characterNames.some((name) => normalizedAlt === name) ||
+      characterCellIndex >= 0;
     if (!matchesCharacter || !skinName || !imageUrl) continue;
 
     const obtainText =
-      characterCellIndex >= 0 ? cells[characterCellIndex + 1] || '' : cells[2] || '';
+      characterCellIndex >= 0
+        ? cells[characterCellIndex + 1] || ''
+        : cells[2] || '';
     const description = [
       translateGame8Obtain(obtainText, displayCharacterName),
       'Название является рабочим переводом; перед публикацией проверьте его в русской версии игры.',
@@ -6354,10 +6585,36 @@ function parseGame8SkinsImport(text, source, character) {
 function parseNteWikiImport(text, source) {
   const lines = compactImportLines(text);
   const suggestions = [
-    makeImportSuggestion('rarity', 'Редкость', (lines.find((line) => /^Ранг\s+[SA]/i.test(line)) || '').match(/Ранг\s+([SA])/i)?.[1] || '', source, 'high'),
-    makeImportSuggestion('attribute', 'Атрибут', nextImportLine(lines, 'Элемент'), source, 'high'),
-    makeImportSuggestion('profile.birthday', 'День рождения', nextImportLine(lines, 'День рождения'), source, 'high'),
-    makeImportSuggestion('profile.faction', 'Фракция', nextImportLine(lines, 'Фракция'), source, 'high'),
+    makeImportSuggestion(
+      'rarity',
+      'Редкость',
+      (lines.find((line) => /^Ранг\s+[SA]/i.test(line)) || '').match(
+        /Ранг\s+([SA])/i,
+      )?.[1] || '',
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'attribute',
+      'Атрибут',
+      nextImportLine(lines, 'Элемент'),
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.birthday',
+      'День рождения',
+      nextImportLine(lines, 'День рождения'),
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.faction',
+      'Фракция',
+      nextImportLine(lines, 'Фракция'),
+      source,
+      'high',
+    ),
   ];
   const quote = lines.find((line) => line.startsWith('> '));
   suggestions.push(
@@ -6369,7 +6626,9 @@ function parseNteWikiImport(text, source) {
       'medium',
     ),
   );
-  const overviewIndex = lines.findIndex((line) => line === 'Обзор Хотори' || /^Обзор\s+/i.test(line));
+  const overviewIndex = lines.findIndex(
+    (line) => line === 'Обзор Хотори' || /^Обзор\s+/i.test(line),
+  );
   const overviewText =
     overviewIndex >= 0
       ? lines.slice(overviewIndex + 1, overviewIndex + 4).join('\n\n')
@@ -6386,12 +6645,24 @@ function parseNteWikiImport(text, source) {
     );
   }
   const stats = ['HP', 'ATK', 'DEF', 'Crit', 'CDMG']
-    .map((label) => ({ id: crypto.randomUUID(), label, value: nextImportLine(lines, label) }))
+    .map((label) => ({
+      id: crypto.randomUUID(),
+      label,
+      value: nextImportLine(lines, label),
+    }))
     .filter((item) => item.value);
   suggestions.push(
-    makeImportSuggestion('profile.baseStats', 'Начальные показатели', stats, source, 'medium'),
+    makeImportSuggestion(
+      'profile.baseStats',
+      'Начальные показатели',
+      stats,
+      source,
+      'medium',
+    ),
   );
-  const abilityStart = lines.findIndex((line) => normalizeImportSearch(line) === 'навыки');
+  const abilityStart = lines.findIndex(
+    (line) => normalizeImportSearch(line) === 'навыки',
+  );
   const abilityEnd =
     abilityStart >= 0
       ? lines.findIndex(
@@ -6406,7 +6677,10 @@ function parseNteWikiImport(text, source) {
   const pageAbilityNames =
     abilityStart >= 0
       ? lines
-          .slice(abilityStart + 1, abilityEnd > abilityStart ? abilityEnd : abilityStart + 14)
+          .slice(
+            abilityStart + 1,
+            abilityEnd > abilityStart ? abilityEnd : abilityStart + 14,
+          )
           .map((line) =>
             cleanImportImageTitle(line)
               .replace(/^#+\s*/, '')
@@ -6426,7 +6700,9 @@ function parseNteWikiImport(text, source) {
           )
       : [];
   const faqAbilityNames = parseGenshinBuildsFaqAbilityNames(text);
-  const abilityNames = pageAbilityNames.length ? pageAbilityNames : faqAbilityNames;
+  const abilityNames = pageAbilityNames.length
+    ? pageAbilityNames
+    : faqAbilityNames;
   const abilityTypes = [
     'Базовая атака',
     'Навык',
@@ -6444,7 +6720,8 @@ function parseNteWikiImport(text, source) {
       name,
       type: abilityTypes[index] || 'Навык',
       iconUrl: '',
-      description: 'Название найдено в NTE Wiki; описание подтягивается из других источников или заполняется вручную.',
+      description:
+        'Название найдено в NTE Wiki; описание подтягивается из других источников или заполняется вручную.',
     }));
   if (abilities.length) {
     suggestions.push(
@@ -6458,14 +6735,21 @@ function parseNteWikiImport(text, source) {
       ),
     );
   }
-  const materialStart = lines.findIndex((line) => line.includes('Сводка материалов'));
+  const materialStart = lines.findIndex((line) =>
+    line.includes('Сводка материалов'),
+  );
   if (materialStart >= 0) {
     const materials = [];
-    for (let index = materialStart + 1; index < Math.min(lines.length, materialStart + 30); index += 3) {
+    for (
+      let index = materialStart + 1;
+      index < Math.min(lines.length, materialStart + 30);
+      index += 3
+    ) {
       const name = lines[index];
       const amount = lines[index + 1];
       const sourceText = lines[index + 2];
-      if (!name || !hasRussianText(name) || !/^×?\d+/.test(amount || '')) continue;
+      if (!name || !hasRussianText(name) || !/^×?\d+/.test(amount || ''))
+        continue;
       materials.push({
         id: crypto.randomUUID(),
         name,
@@ -6477,7 +6761,13 @@ function parseNteWikiImport(text, source) {
       });
     }
     suggestions.push(
-      makeImportSuggestion('profile.materials', 'Материалы прокачки', materials, source, 'medium'),
+      makeImportSuggestion(
+        'profile.materials',
+        'Материалы прокачки',
+        materials,
+        source,
+        'medium',
+      ),
     );
   }
   return suggestions;
@@ -6497,7 +6787,15 @@ function parseNteWikiCharactersIndexImport(text, source, character) {
   });
   if (!line) return [];
 
-  const esperTypes = ['Хаос', 'Чары', 'Психея', 'Психика', 'Космос', 'Лакшана', 'Анима'];
+  const esperTypes = [
+    'Хаос',
+    'Чары',
+    'Психея',
+    'Психика',
+    'Космос',
+    'Лакшана',
+    'Анима',
+  ];
   const knownRoles = [
     'Перенаправление урона',
     'Усиление разрушения',
@@ -6522,7 +6820,9 @@ function parseNteWikiCharactersIndexImport(text, source, character) {
     .filter(Boolean)
     .sort((a, b) => String(b).length - String(a).length)
     .find((name) =>
-      normalizeImportSearch(compactLine).startsWith(normalizeImportSearch(String(name))),
+      normalizeImportSearch(compactLine).startsWith(
+        normalizeImportSearch(String(name)),
+      ),
     );
   if (matchedName) roleText = roleText.slice(String(matchedName).length).trim();
   if (attribute) roleText = roleText.split(attribute)[0].trim();
@@ -6544,7 +6844,9 @@ function parseNteWikiCharactersIndexImport(text, source, character) {
 }
 
 function parseGenshinBuildsFaqAbilityNames(text) {
-  const match = String(text || '').match(/skills include:\s*([^"<.]+)(?:\.|"|<)/i);
+  const match = String(text || '').match(
+    /skills include:\s*([^"<.]+)(?:\.|"|<)/i,
+  );
   if (!match) return [];
   return match[1]
     .split(',')
@@ -6570,7 +6872,11 @@ function parseGenshinBuildsImport(text, source, character) {
   const awakenings = [];
   const awakeningStart = lines.findIndex((line) => line === 'Awakening');
   const voiceStart = lines.findIndex((line) => line === 'Voice Actors');
-  for (let index = awakeningStart + 1; awakeningStart >= 0 && index < voiceStart; index += 2) {
+  for (
+    let index = awakeningStart + 1;
+    awakeningStart >= 0 && index < voiceStart;
+    index += 2
+  ) {
     const match = (lines[index] || '').match(/^(\d+)\s+(.+)/);
     if (!match) continue;
     const level = Number(match[1]);
@@ -6583,7 +6889,13 @@ function parseGenshinBuildsImport(text, source, character) {
     });
   }
   suggestions.push(
-    makeImportSuggestion('profile.awakenings', 'Пробуждения', awakenings, source, 'medium'),
+    makeImportSuggestion(
+      'profile.awakenings',
+      'Пробуждения',
+      awakenings,
+      source,
+      'medium',
+    ),
   );
   const voiceActors = [];
   const languageMap = {
@@ -6597,13 +6909,24 @@ function parseGenshinBuildsImport(text, source, character) {
     if (actor) voiceActors.push({ language, name: actor });
   }
   suggestions.push(
-    makeImportSuggestion('profile.voiceActors', 'Озвучка: актёры', voiceActors, source, 'high'),
+    makeImportSuggestion(
+      'profile.voiceActors',
+      'Озвучка: актёры',
+      voiceActors,
+      source,
+      'high',
+    ),
   );
   const abilities = [];
   const skillsStart = lines.findIndex((line) => line === 'Skills');
   const passivesStart = lines.findIndex((line) => line === 'Passives');
   if (skillsStart >= 0 && passivesStart > skillsStart) {
-    const skillTypes = ['Базовая атака', 'Навык', 'Сверхспособность', 'Навык поддержки'];
+    const skillTypes = [
+      'Базовая атака',
+      'Навык',
+      'Сверхспособность',
+      'Навык поддержки',
+    ];
     for (let index = skillsStart + 1; index < passivesStart; index += 1) {
       const match = (lines[index] || '').match(/^Proactive\s+(.+)/i);
       if (!match || abilities.length >= skillTypes.length) continue;
@@ -6619,16 +6942,28 @@ function parseGenshinBuildsImport(text, source, character) {
         name: normalizeImportedRuText(match[1]),
         type: skillTypes[abilities.length],
         iconUrl: '',
-        description: normalizeImportedRuText(lines.slice(index + 1, end).join(' ')),
+        description: normalizeImportedRuText(
+          lines.slice(index + 1, end).join(' '),
+        ),
       });
     }
   }
   if (passivesStart >= 0 && awakeningStart > passivesStart) {
     const passiveLines = lines.slice(passivesStart + 1, awakeningStart);
-    for (let index = 0; index + 1 < passiveLines.length && abilities.length < 6; index += 2) {
+    for (
+      let index = 0;
+      index + 1 < passiveLines.length && abilities.length < 6;
+      index += 2
+    ) {
       const name = normalizeImportedRuText(passiveLines[index]);
       const description = normalizeImportedRuText(passiveLines[index + 1]);
-      if (!name || !description || !hasRussianText(name) || !hasRussianText(description)) continue;
+      if (
+        !name ||
+        !description ||
+        !hasRussianText(name) ||
+        !hasRussianText(description)
+      )
+        continue;
       abilities.push({
         id: crypto.randomUUID(),
         name,
@@ -6731,12 +7066,19 @@ function parseIcyVeinsCharacterImport(html, source, character) {
 
   const voiceHeading = names
     .map((name) => `${name} Voice Actors`)
-    .find((heading) => plainText.toLocaleLowerCase('en-US').includes(heading.toLocaleLowerCase('en-US')));
-  if (voiceHeading) {
-    const start = plainText.toLocaleLowerCase('en-US').indexOf(
-      voiceHeading.toLocaleLowerCase('en-US'),
+    .find((heading) =>
+      plainText
+        .toLocaleLowerCase('en-US')
+        .includes(heading.toLocaleLowerCase('en-US')),
     );
-    const voiceWindow = plainText.slice(start + voiceHeading.length, start + 900);
+  if (voiceHeading) {
+    const start = plainText
+      .toLocaleLowerCase('en-US')
+      .indexOf(voiceHeading.toLocaleLowerCase('en-US'));
+    const voiceWindow = plainText.slice(
+      start + voiceHeading.length,
+      start + 900,
+    );
     const stopNames = names.map(escapeRegExp).join('|');
     const stopPattern = stopNames
       ? `|\\s+(?:${stopNames})\\s+(?:Guide|Best Builds)`
@@ -6793,7 +7135,8 @@ function parseIcyVeinsCharacterImport(html, source, character) {
 
 function extractGuideHeadingBlocks(html) {
   const blocks = [];
-  const expression = /<h([2-4])\b[^>]*>([\s\S]*?)<\/h\1>([\s\S]*?)(?=<h[2-4]\b|$)/gi;
+  const expression =
+    /<h([2-4])\b[^>]*>([\s\S]*?)<\/h\1>([\s\S]*?)(?=<h[2-4]\b|$)/gi;
   for (const match of String(html || '').matchAll(expression)) {
     blocks.push({
       level: Number(match[1]),
@@ -6857,11 +7200,19 @@ function extractGuideTeamRows(html) {
     });
   };
 
-  for (const rowMatch of String(html || '').matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
-    const cells = [...rowMatch[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+  for (const rowMatch of String(html || '').matchAll(
+    /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi,
+  )) {
+    const cells = [
+      ...rowMatch[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi),
+    ]
       .map((cellMatch) => {
-        const paragraphNames = [...cellMatch[1].matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
-          .map((paragraph) => normalizeGuideTeamMember(htmlToPlainText(paragraph[1])))
+        const paragraphNames = [
+          ...cellMatch[1].matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi),
+        ]
+          .map((paragraph) =>
+            normalizeGuideTeamMember(htmlToPlainText(paragraph[1])),
+          )
           .filter(
             (name) =>
               name &&
@@ -6869,8 +7220,11 @@ function extractGuideTeamRows(html) {
               !/[.!?:;]{1,}/.test(name) &&
               hasRussianText(name),
           );
-        if (paragraphNames.length) return [...new Set(paragraphNames)].slice(0, 4);
-        const fallback = normalizeGuideTeamMember(htmlToPlainText(cellMatch[1]));
+        if (paragraphNames.length)
+          return [...new Set(paragraphNames)].slice(0, 4);
+        const fallback = normalizeGuideTeamMember(
+          htmlToPlainText(cellMatch[1]),
+        );
         return fallback && fallback.length <= 60 ? [fallback] : [];
       })
       .filter((options) => options.length);
@@ -6878,7 +7232,11 @@ function extractGuideTeamRows(html) {
 
     const primary = cells.map((options) => options[0]);
     addComposition(primary);
-    for (let cellIndex = 0; cellIndex < cells.length && rows.length < 12; cellIndex += 1) {
+    for (
+      let cellIndex = 0;
+      cellIndex < cells.length && rows.length < 12;
+      cellIndex += 1
+    ) {
       for (const alternative of cells[cellIndex].slice(1)) {
         const variant = [...primary];
         variant[cellIndex] = alternative;
@@ -6904,22 +7262,32 @@ function extractExplicitGuideTeamRows(html, fallbackTitle) {
 function extractGuideContentRows(html, fallbackTitle) {
   const rows = [];
   const addRow = (title, description) => {
-    const cleanTitle = localizeImportedGuideText(title).replace(/^Image\s*/i, '').trim();
+    const cleanTitle = localizeImportedGuideText(title)
+      .replace(/^Image\s*/i, '')
+      .trim();
     const cleanDescription = localizeImportedGuideText(description).trim();
     const combined = [cleanTitle, cleanDescription].filter(Boolean).join(' — ');
     const row = guideImportRow(combined, fallbackTitle);
     if (!row) return;
-    const derivedTitle = (cleanTitle || row.title || fallbackTitle).slice(0, 120);
+    const derivedTitle = (cleanTitle || row.title || fallbackTitle).slice(
+      0,
+      120,
+    );
     row.title = derivedTitle;
     row.description = cleanTitle
       ? cleanDescription
-      : cleanDescription.slice(derivedTitle.length).replace(/^[\s—:.-]+/, '').trim();
+      : cleanDescription
+          .slice(derivedTitle.length)
+          .replace(/^[\s—:.-]+/, '')
+          .trim();
     const key = normalizeImportSearch(`${row.title} ${row.description}`);
     if (!key || rows.some((item) => item.key === key)) return;
     rows.push({ ...row, key });
   };
 
-  for (const match of String(html || '').matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+  for (const match of String(html || '').matchAll(
+    /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi,
+  )) {
     const cells = [...match[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
       .map((cell) => htmlToPlainText(cell[1]).trim())
       .filter(Boolean);
@@ -6934,14 +7302,18 @@ function extractGuideContentRows(html, fallbackTitle) {
     addRow(cells[0], cells.slice(1).join(' '));
   }
 
-  for (const match of String(html || '').matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)) {
+  for (const match of String(html || '').matchAll(
+    /<li\b[^>]*>([\s\S]*?)<\/li>/gi,
+  )) {
     const text = htmlToPlainText(match[1]).trim();
     if (text.length < 3 || text.length > 1800) continue;
     addRow('', text);
   }
 
   if (!rows.length) {
-    for (const match of String(html || '').matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+    for (const match of String(html || '').matchAll(
+      /<p\b[^>]*>([\s\S]*?)<\/p>/gi,
+    )) {
       const text = htmlToPlainText(match[1]).trim();
       if (text.length < 20 || text.length > 2400) continue;
       addRow('', text);
@@ -6957,7 +7329,9 @@ function extractGuideContentRows(html, fallbackTitle) {
 function extractGuideComparisonRows(html) {
   const strengths = [];
   const weaknesses = [];
-  for (const row of String(html || '').matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+  for (const row of String(html || '').matchAll(
+    /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi,
+  )) {
     const cells = [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
       .map((match) => htmlToPlainText(match[1]).trim())
       .filter(Boolean);
@@ -6974,12 +7348,16 @@ function extractGuideComparisonRows(html) {
 function wotpackAbilityType(value) {
   const normalized = normalizeImportSearch(value);
   if (normalized.startsWith('базовая атака')) return 'Базовая атака';
-  if (normalized.startsWith('навык перенаправления')) return 'Навык перенаправления';
+  if (normalized.startsWith('навык перенаправления'))
+    return 'Навык перенаправления';
   if (normalized.startsWith('сверхспособность')) return 'Сверхспособность';
   if (normalized.startsWith('навык поддержки')) return 'Навык поддержки';
   if (normalized.startsWith('пассив')) return 'Пассивный навык';
   if (normalized.startsWith('черта персонажа')) return 'Черта персонажа';
-  if (normalized.startsWith('повседневный') || normalized.startsWith('вторая способность')) {
+  if (
+    normalized.startsWith('повседневный') ||
+    normalized.startsWith('вторая способность')
+  ) {
     return 'Повседневный навык';
   }
   return 'Навык';
@@ -6987,7 +7365,11 @@ function wotpackAbilityType(value) {
 
 function parseWotpackCharacterImport(html, source, character) {
   const plainText = htmlToPlainText(html);
-  if (!compactImportLines(plainText).some((line) => lineMatchesCharacter(line, character))) {
+  if (
+    !compactImportLines(plainText).some((line) =>
+      lineMatchesCharacter(line, character),
+    )
+  ) {
     return [];
   }
 
@@ -7001,7 +7383,10 @@ function parseWotpackCharacterImport(html, source, character) {
   const seenAbilities = new Set();
   const addAbility = (typeLabel, nameValue, descriptionValue) => {
     const name = normalizeImportedRuText(nameValue).slice(0, 160);
-    const description = normalizeImportedRuText(descriptionValue).slice(0, 8000);
+    const description = normalizeImportedRuText(descriptionValue).slice(
+      0,
+      8000,
+    );
     let type = wotpackAbilityType(typeLabel);
     if (
       type === 'Навык' &&
@@ -7012,7 +7397,13 @@ function parseWotpackCharacterImport(html, source, character) {
       type = 'Повседневный навык';
     }
     const key = normalizeImportSearch(`${type} ${name}`);
-    if (!name || !description || !hasRussianText(name) || seenAbilities.has(key)) return;
+    if (
+      !name ||
+      !description ||
+      !hasRussianText(name) ||
+      seenAbilities.has(key)
+    )
+      return;
     seenAbilities.add(key);
     abilities.push({
       id: `wotpack-${hashText(`${type}:${name}`).slice(0, 20)}`,
@@ -7034,11 +7425,14 @@ function parseWotpackCharacterImport(html, source, character) {
     const secondDaily = text.match(
       /^(?:Вторая способность|Другая особенность\s*[—–-]\s*талант)\s+[«"]([^»"]+)[»"]\s*(?:[—–-]\s*)?(.+)$/i,
     );
-    if (secondDaily) addAbility('Вторая способность', secondDaily[1], secondDaily[2]);
+    if (secondDaily)
+      addAbility('Вторая способность', secondDaily[1], secondDaily[2]);
   };
 
   if (skillBlock) {
-    for (const match of skillBlock.html.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)) {
+    for (const match of skillBlock.html.matchAll(
+      /<li\b[^>]*>([\s\S]*?)<\/li>/gi,
+    )) {
       parseAbilityText(htmlToPlainText(match[1]));
     }
     for (const line of compactImportLines(htmlToPlainText(skillBlock.html))) {
@@ -7056,7 +7450,10 @@ function parseWotpackCharacterImport(html, source, character) {
     ['Черта персонажа', 6],
     ['Повседневный навык', 7],
   ]);
-  abilities.sort((left, right) => (order.get(left.type) ?? 99) - (order.get(right.type) ?? 99));
+  abilities.sort(
+    (left, right) =>
+      (order.get(left.type) ?? 99) - (order.get(right.type) ?? 99),
+  );
 
   const awakeningBlock = blocks.find((block) =>
     /эффект.*пробужден|пробужден.*выб|лучш.*пробужден/.test(
@@ -7067,14 +7464,18 @@ function parseWotpackCharacterImport(html, source, character) {
   if (awakeningBlock) {
     const lines = compactImportLines(htmlToPlainText(awakeningBlock.html));
     const ranking = lines.find(
-      (line) => /Э[1-6]\s+[^>]{2,}/i.test(line) && (line.match(/Э[1-6]/gi) || []).length >= 3,
+      (line) =>
+        /Э[1-6]\s+[^>]{2,}/i.test(line) &&
+        (line.match(/Э[1-6]/gi) || []).length >= 3,
     );
     if (ranking) {
       for (const match of ranking.matchAll(
         /Э([1-6])\s+(.+?)(?=\s*(?:>|=)\s*Э[1-6]|$)/gi,
       )) {
         const level = Number(match[1]);
-        const name = normalizeImportedRuText(match[2]).replace(/[.;:,]+$/, '').trim();
+        const name = normalizeImportedRuText(match[2])
+          .replace(/[.;:,]+$/, '')
+          .trim();
         if (!name || awakenings.some((item) => item.level === level)) continue;
         const detail = lines.find(
           (line) =>
@@ -7117,21 +7518,60 @@ function parseWotpackCharacterImport(html, source, character) {
 function classifyGuideHeading(value) {
   const heading = normalizeImportSearch(value);
   const rules = [
-    ['guide.summary', /кратк.*(?:справ|вывод|итог|обзор)|лучш.*билд.*neverness|tl.?dr|quick summary/],
-    ['guide.pullAdvice', /стоит ли|нужно ли|(?:выбив|крут).*(?:персонаж|геро)|pulling advice|pull advice/],
+    [
+      'guide.summary',
+      /кратк.*(?:справ|вывод|итог|обзор)|лучш.*билд.*neverness|tl.?dr|quick summary/,
+    ],
+    [
+      'guide.pullAdvice',
+      /стоит ли|нужно ли|(?:выбив|крут).*(?:персонаж|геро)|pulling advice|pull advice/,
+    ],
     ['guide.strengths', /плюс|сильн.*сторон|strength/],
     ['guide.weaknesses', /минус|слаб.*сторон|weakness/],
-    ['guide.skillPriority', /навык.*приоритет|приоритет.*(?:навык|прокач)|прокач.*навык|skill priority/],
-    ['guide.alternativeArcs', /альтернатив|f2p.*(?:arc|дуг)|(?:arc|дуг).*f2p|alternative arcs?/],
-    ['guide.bestArcs', /лучш.*(?:дуг|arc|арк)|(?:какую|выбор).*дуг|дуг.*использ|best arcs?/],
-    ['guide.mainStats', /рекомендуем.*атрибут.*модул|основн.*(?:стат|характерист)|^характеристик|main stats?|приоритет характеристик/],
-    ['guide.modules', /патрон|картридж|консол|модул|cartridge|console|module layout/],
-    ['guide.subStats', /саб.*стат|дополнительн.*(?:стат|характерист)|sub.?stats?/],
-    ['guide.f2pTeams', /f2p.*(?:команд|отряд|состав)|бюджетн.*(?:команд|отряд|состав)|команд.*без.*вложен/],
-    ['guide.premiumTeams', /premium.*(?:team|команд)|премиальн.*(?:команд|отряд|состав)|донатн.*(?:команд|отряд|состав)/],
-    ['guide.starterTeams', /стартов.*(?:команд|отряд|состав)|команд.*для.*старт|starter teams?/],
-    ['guide.endgameTeams', /эндг(?:ейм|еим).*(?:команд|отряд|состав)|команд.*эндг(?:ейм|еим)|endgame teams?/],
-    ['guide.teams', /лучш.*команд|лучш.*состав|^команд|состав.*(?:команд|для)|отряд|best teams?/],
+    [
+      'guide.skillPriority',
+      /навык.*приоритет|приоритет.*(?:навык|прокач)|прокач.*навык|skill priority/,
+    ],
+    [
+      'guide.alternativeArcs',
+      /альтернатив|f2p.*(?:arc|дуг)|(?:arc|дуг).*f2p|alternative arcs?/,
+    ],
+    [
+      'guide.bestArcs',
+      /лучш.*(?:дуг|arc|арк)|(?:какую|выбор).*дуг|дуг.*использ|best arcs?/,
+    ],
+    [
+      'guide.mainStats',
+      /рекомендуем.*атрибут.*модул|основн.*(?:стат|характерист)|^характеристик|main stats?|приоритет характеристик/,
+    ],
+    [
+      'guide.modules',
+      /патрон|картридж|консол|модул|cartridge|console|module layout/,
+    ],
+    [
+      'guide.subStats',
+      /саб.*стат|дополнительн.*(?:стат|характерист)|sub.?stats?/,
+    ],
+    [
+      'guide.f2pTeams',
+      /f2p.*(?:команд|отряд|состав)|бюджетн.*(?:команд|отряд|состав)|команд.*без.*вложен/,
+    ],
+    [
+      'guide.premiumTeams',
+      /premium.*(?:team|команд)|премиальн.*(?:команд|отряд|состав)|донатн.*(?:команд|отряд|состав)/,
+    ],
+    [
+      'guide.starterTeams',
+      /стартов.*(?:команд|отряд|состав)|команд.*для.*старт|starter teams?/,
+    ],
+    [
+      'guide.endgameTeams',
+      /эндг(?:ейм|еим).*(?:команд|отряд|состав)|команд.*эндг(?:ейм|еим)|endgame teams?/,
+    ],
+    [
+      'guide.teams',
+      /лучш.*команд|лучш.*состав|^команд|состав.*(?:команд|для)|отряд|best teams?/,
+    ],
     ['guide.rotations', /ротац|rotation/],
     ['guide.mistakes', /част.*ошиб|ошибк.*игр|common mistakes?/],
     ['guide.tips', /как играть|совет|механик|управлен|how to play|tips?/],
@@ -7179,14 +7619,21 @@ function localizeImportedGuideText(value) {
   ]);
   let result = String(value || '');
   for (const [source, target] of replacements) {
-    result = result.replace(new RegExp(`\\b${escapeRegExp(source)}\\b`, 'gi'), target);
+    result = result.replace(
+      new RegExp(`\\b${escapeRegExp(source)}\\b`, 'gi'),
+      target,
+    );
   }
   return result.trim();
 }
 
 function parseIcyVeinsGuideImport(html, source, character) {
   const plainText = htmlToPlainText(html);
-  if (!compactImportLines(plainText).some((line) => lineMatchesCharacter(line, character))) {
+  if (
+    !compactImportLines(plainText).some((line) =>
+      lineMatchesCharacter(line, character),
+    )
+  ) {
     return [];
   }
 
@@ -7265,7 +7712,9 @@ function parseIcyVeinsGuideImport(html, source, character) {
 
   const skillBlock = findBlock(/skill priority|приоритет.*навык/);
   if (skillBlock) {
-    const priorityLine = compactImportLines(htmlToPlainText(skillBlock.html)).find(
+    const priorityLine = compactImportLines(
+      htmlToPlainText(skillBlock.html),
+    ).find(
       (line) =>
         (line.match(/(?:>|=)/g) || []).length >= 2 &&
         /skill|ultimate|attack/i.test(line),
@@ -7298,9 +7747,13 @@ function parseIcyVeinsGuideImport(html, source, character) {
       /<div[^>]+class=["'][^"']*\bhoyo-block\b[^"']*\bteam-block\b[^"']*["'][^>]*>/i,
     );
     for (const chunk of teamChunks.slice(1)) {
-      const members = [...chunk.slice(0, 9000).matchAll(
-        /<span[^>]+class=["'][^"']*nte_portrait_text[^"']*["'][^>]*>([^<]+)<\/span>/gi,
-      )]
+      const members = [
+        ...chunk
+          .slice(0, 9000)
+          .matchAll(
+            /<span[^>]+class=["'][^"']*nte_portrait_text[^"']*["'][^>]*>([^<]+)<\/span>/gi,
+          ),
+      ]
         .map((match) => localizeImportedGuideText(htmlToPlainText(match[1])))
         .filter(Boolean)
         .filter((name, index, values) => values.indexOf(name) === index)
@@ -7334,7 +7787,11 @@ function parseIcyVeinsGuideImport(html, source, character) {
 
 function parseKaidenGuideImport(html, source, character) {
   const plainText = htmlToPlainText(html);
-  if (!compactImportLines(plainText).some((line) => lineMatchesCharacter(line, character))) {
+  if (
+    !compactImportLines(plainText).some((line) =>
+      lineMatchesCharacter(line, character),
+    )
+  ) {
     return [];
   }
 
@@ -7344,7 +7801,9 @@ function parseKaidenGuideImport(html, source, character) {
     const teamWindow = html.slice(teamStart, teamStart + 60000);
     const members = [];
     for (const match of teamWindow.matchAll(/data-name=["']([^"']+)["']/gi)) {
-      const name = localizeImportedGuideText(decodeHtmlEntities(match[1])).trim();
+      const name = localizeImportedGuideText(
+        decodeHtmlEntities(match[1]),
+      ).trim();
       if (name && !members.includes(name)) members.push(name);
       if (members.length >= 4) break;
     }
@@ -7397,7 +7856,11 @@ function parseKaidenGuideImport(html, source, character) {
 
 function parseEditorialGuideImport(html, source, character) {
   const plainText = htmlToPlainText(html);
-  if (!compactImportLines(plainText).some((line) => lineMatchesCharacter(line, character))) {
+  if (
+    !compactImportLines(plainText).some((line) =>
+      lineMatchesCharacter(line, character),
+    )
+  ) {
     return [];
   }
 
@@ -7430,9 +7893,7 @@ function parseEditorialGuideImport(html, source, character) {
       inheritedField = '';
       continue;
     }
-    if (
-      /(?:преимуществ.*недостат|плюс.*минус)/.test(normalizedHeading)
-    ) {
+    if (/(?:преимуществ.*недостат|плюс.*минус)/.test(normalizedHeading)) {
       const comparison = extractGuideComparisonRows(block.html);
       if (comparison.strengths.length) {
         rowsByField.set('guide.strengths', [
@@ -7463,7 +7924,8 @@ function parseEditorialGuideImport(html, source, character) {
       : extractGuideContentRows(block.html, labels[field]);
     const description = localizeImportedGuideText(block.lines.join(' '));
     if (isTeamField && !teamRows.length) continue;
-    if (!extractedRows.length && !isPredominantlyRussianText(description)) continue;
+    if (!extractedRows.length && !isPredominantlyRussianText(description))
+      continue;
     const rows = rowsByField.get(field) || [];
     rows.push(
       ...(extractedRows.length
@@ -7509,14 +7971,26 @@ function parseEditorialGuideImport(html, source, character) {
 }
 
 function parseGameWithGuideImport(text, source, character) {
-  const structured = parseGameWithStructuredGuideImport(text, source, character);
-  const plainText = /<\/?[a-z][\s\S]*>/i.test(text) ? htmlToPlainText(text) : text;
+  const structured = parseGameWithStructuredGuideImport(
+    text,
+    source,
+    character,
+  );
+  const plainText = /<\/?[a-z][\s\S]*>/i.test(text)
+    ? htmlToPlainText(text)
+    : text;
   const lines = compactImportLines(plainText);
   if (!lines.some((line) => lineMatchesCharacter(line, character))) return [];
   const videoUrl = extractYoutubeUrls(text)[0] || '';
   return [
     ...structured,
-    makeImportSuggestion('guide.videoUrl', 'Видео-гайд', videoUrl, source, 'medium'),
+    makeImportSuggestion(
+      'guide.videoUrl',
+      'Видео-гайд',
+      videoUrl,
+      source,
+      'medium',
+    ),
   ].filter(Boolean);
 }
 
@@ -7537,17 +8011,20 @@ function parseGameWithStructuredGuideImport(text, source, character) {
   }
 
   const signatureArcName = gameWithLocaleText(item.signatureArc?.name);
-  const signatureArcIcon = normalizeExternalImageUrl(item.signatureArc?.iconUrl || '');
-  const bestArcs = signatureArcName && hasRussianText(signatureArcName)
-    ? [
-        {
-          name: signatureArcName,
-          imageUrl: signatureArcIcon,
-          description:
-            'GameWith указывает эту дугу как связанную/сигнатурную. Финальную оценку BiS подтверждает редактор гайда.',
-        },
-      ]
-    : [];
+  const signatureArcIcon = normalizeExternalImageUrl(
+    item.signatureArc?.iconUrl || '',
+  );
+  const bestArcs =
+    signatureArcName && hasRussianText(signatureArcName)
+      ? [
+          {
+            name: signatureArcName,
+            imageUrl: signatureArcIcon,
+            description:
+              'GameWith указывает эту дугу как связанную/сигнатурную. Финальную оценку BiS подтверждает редактор гайда.',
+          },
+        ]
+      : [];
   return [
     makeImportSuggestion(
       'guide.bestArcs',
@@ -7562,7 +8039,10 @@ function parseGameWithStructuredGuideImport(text, source, character) {
 
 function parseIcyVeinsTierImport(text, source, character) {
   const name = character.originalName || character.name;
-  const pattern = new RegExp(`\\b([SABCD])\\b[^\\n]{0,220}\\b${escapeRegExp(name)}\\b`, 'i');
+  const pattern = new RegExp(
+    `\\b([SABCD])\\b[^\\n]{0,220}\\b${escapeRegExp(name)}\\b`,
+    'i',
+  );
   const match = text.match(pattern);
   return [
     makeImportSuggestion(
@@ -7588,7 +8068,9 @@ function gameWithLocaleText(value) {
   if (!value) return '';
   if (typeof value === 'string') return normalizeImportedRuText(value);
   if (typeof value !== 'object') return normalizeImportedRuText(value);
-  return normalizeImportedRuText(value.ru || value.en || value.ja || value.cn || value.ko || '');
+  return normalizeImportedRuText(
+    value.ru || value.en || value.ja || value.cn || value.ko || '',
+  );
 }
 
 function formatGameWithRuDate(value, options = {}) {
@@ -7618,8 +8100,8 @@ function translateGameWithElement(value) {
     ['相', 'Лакшана'],
   ].find(([key]) => raw.includes(key));
   if (direct) return direct[1];
-  const ru = ['Чары', 'Хаос', 'Психика', 'Анима', 'Космос', 'Лакшана'].find((item) =>
-    normalized.includes(normalizeImportSearch(item)),
+  const ru = ['Чары', 'Хаос', 'Психика', 'Анима', 'Космос', 'Лакшана'].find(
+    (item) => normalized.includes(normalizeImportSearch(item)),
   );
   return ru || translateEsperType(raw) || raw;
 }
@@ -7672,7 +8154,8 @@ function translateGameWithRoleTags(value) {
   const raw = gameWithLocaleText(value) || String(value || '');
   const normalized = normalizeImportSearch(raw);
   const roles = [];
-  if (/ダメージ|damage|урон/i.test(raw) || normalized.includes('урон')) roles.push('Урон');
+  if (/ダメージ|damage|урон/i.test(raw) || normalized.includes('урон'))
+    roles.push('Урон');
   if (/main dps|основн/i.test(normalized)) roles.push('Основной ДД');
   if (/dot|periodic|период/i.test(normalized)) roles.push('Периодический урон');
   if (/support|поддерж/i.test(normalized)) roles.push('Поддержка');
@@ -7724,7 +8207,9 @@ function gameWithSkillAttributes(entry) {
     .slice(0, 80)
     .map((line, index) => {
       const parts = line.match(/^(.{1,160}?)(?:[：:]|\s+[—–-]\s+)\s*(.+)$/);
-      const label = normalizeImportedRuText(parts?.[1] || `Показатель ${index + 1}`);
+      const label = normalizeImportedRuText(
+        parts?.[1] || `Показатель ${index + 1}`,
+      );
       const value = normalizeImportedRuText(parts?.[2] || line);
       return {
         id: `ability-attribute-${hashText(`${label}:${value}`).slice(0, 20)}`,
@@ -7752,7 +8237,9 @@ function hasRussianText(value) {
 function isPredominantlyRussianText(value, minimumRatio = 0.55) {
   const letters = String(value || '').match(/[a-zа-яё]/gi) || [];
   if (!letters.length) return false;
-  const russianLetters = letters.filter((letter) => /[а-яё]/i.test(letter)).length;
+  const russianLetters = letters.filter((letter) =>
+    /[а-яё]/i.test(letter),
+  ).length;
   return russianLetters / letters.length >= minimumRatio;
 }
 
@@ -7810,13 +8297,17 @@ function parseGameWithStructuredAbilities(item) {
     gameWithAbility(citySkills[0], 'Повседневный навык'),
   ].filter(Boolean);
 
-  if (abilities.filter((ability) => ability.type === 'Повседневный навык').length < 2) {
+  if (
+    abilities.filter((ability) => ability.type === 'Повседневный навык')
+      .length < 2
+  ) {
     abilities.push({
       id: crypto.randomUUID(),
       name: 'Не введено',
       type: 'Повседневный навык',
       iconUrl: '',
-      description: 'В проверенных источниках не найден второй повседневный навык.',
+      description:
+        'В проверенных источниках не найден второй повседневный навык.',
       attributes: [],
     });
   }
@@ -7825,7 +8316,9 @@ function parseGameWithStructuredAbilities(item) {
 }
 
 function parseGameWithStructuredAwakenings(item) {
-  const effects = Array.isArray(item?.awakeningEffects) ? item.awakeningEffects : [];
+  const effects = Array.isArray(item?.awakeningEffects)
+    ? item.awakeningEffects
+    : [];
   return effects
     .map((awakening) => ({
       level: Number(awakening.level || 0),
@@ -7833,9 +8326,11 @@ function parseGameWithStructuredAwakenings(item) {
       iconUrl: normalizeExternalImageUrl(awakening.iconUrl || ''),
       description: gameWithLocaleText(awakening.effect),
     }))
-    .filter((awakening) => awakening.level >= 1 && awakening.level <= 6 && awakening.name);
+    .filter(
+      (awakening) =>
+        awakening.level >= 1 && awakening.level <= 6 && awakening.name,
+    );
 }
-
 
 function formatGameWithMaterialCount(value) {
   if (value === undefined || value === null || value === '') return '';
@@ -7875,9 +8370,18 @@ function collectGameWithMaterialRows(groups, sourceLabel) {
 
 function collectGameWithStructuredMaterials(item) {
   return [
-    ...collectGameWithMaterialRows(item?.breakthroughMaterials, 'Материалы прорыва'),
-    ...collectGameWithMaterialRows(item?.skillUpgradeMaterials, 'Материалы навыков'),
-    ...collectGameWithMaterialRows(item?.supportSkillMaterials, 'Материалы навыков поддержки'),
+    ...collectGameWithMaterialRows(
+      item?.breakthroughMaterials,
+      'Материалы прорыва',
+    ),
+    ...collectGameWithMaterialRows(
+      item?.skillUpgradeMaterials,
+      'Материалы навыков',
+    ),
+    ...collectGameWithMaterialRows(
+      item?.supportSkillMaterials,
+      'Материалы навыков поддержки',
+    ),
   ].slice(0, 80);
 }
 
@@ -7890,7 +8394,9 @@ function parseGameWithStructuredCharacterImport(text, source, character) {
     .filter(Boolean);
   if (
     characterNames.length &&
-    !characterNames.some((candidate) => importedNames.some((name) => name.includes(candidate)))
+    !characterNames.some((candidate) =>
+      importedNames.some((name) => name.includes(candidate)),
+    )
   ) {
     return [];
   }
@@ -7901,10 +8407,19 @@ function parseGameWithStructuredCharacterImport(text, source, character) {
     ['ОЗ', item.stats?.hp],
     ['Шанс крит.', item.stats?.critRate ? item.stats.critRate + '%' : ''],
     ['Урон крит.', item.stats?.critDamage ? item.stats.critDamage + '%' : ''],
-    ['Усиление урона', item.stats?.damageBonus ? item.stats.damageBonus + '%' : '0%'],
+    [
+      'Усиление урона',
+      item.stats?.damageBonus ? item.stats.damageBonus + '%' : '0%',
+    ],
   ]
-    .filter(([, value]) => value !== undefined && value !== null && value !== '')
-    .map(([label, value]) => ({ id: crypto.randomUUID(), label, value: String(value) }));
+    .filter(
+      ([, value]) => value !== undefined && value !== null && value !== '',
+    )
+    .map(([label, value]) => ({
+      id: crypto.randomUUID(),
+      label,
+      value: String(value),
+    }));
 
   const abilities = parseGameWithStructuredAbilities(item);
   const awakenings = parseGameWithStructuredAwakenings(item);
@@ -7916,20 +8431,68 @@ function parseGameWithStructuredCharacterImport(text, source, character) {
       id: crypto.randomUUID(),
       name,
       iconUrl: '',
-      effect: 'Любимый подарок для повышения симпатии; значение подтверждено источником GameWith.',
+      effect:
+        'Любимый подарок для повышения симпатии; значение подтверждено источником GameWith.',
     }));
   const materials = collectGameWithStructuredMaterials(item);
 
-
   return [
-    makeImportSuggestion('rarity', 'Редкость', String(item.rarity || '').match(/[SA]/)?.[0] || '', source, 'high'),
-    makeImportSuggestion('attribute', 'Атрибут', translateGameWithElement(item.element), source, 'high'),
-    makeImportSuggestion('profile.arcType', 'Тип дуги', translateGameWithArcType(item.arcType), source, 'high'),
-    makeImportSuggestion('profile.faction', 'Фракция', gameWithLocaleText(item.profile?.faction), source, 'high'),
-    makeImportSuggestion('profile.birthday', 'День рождения', formatGameWithRuDate(item.profile?.birthday, { withoutYear: true }), source, 'medium'),
-    makeImportSuggestion('profile.biographyShort', 'Биография', gameWithLocaleText(item.profileText), source, 'high'),
-    makeImportSuggestion('profile.roleTags', 'Роли персонажа', translateGameWithRoleTags(item.role), source, 'medium'),
-    makeImportSuggestion('profile.baseStats', 'Начальные показатели', stats, source, 'high'),
+    makeImportSuggestion(
+      'rarity',
+      'Редкость',
+      String(item.rarity || '').match(/[SA]/)?.[0] || '',
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'attribute',
+      'Атрибут',
+      translateGameWithElement(item.element),
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.arcType',
+      'Тип дуги',
+      translateGameWithArcType(item.arcType),
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.faction',
+      'Фракция',
+      gameWithLocaleText(item.profile?.faction),
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.birthday',
+      'День рождения',
+      formatGameWithRuDate(item.profile?.birthday, { withoutYear: true }),
+      source,
+      'medium',
+    ),
+    makeImportSuggestion(
+      'profile.biographyShort',
+      'Биография',
+      gameWithLocaleText(item.profileText),
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.roleTags',
+      'Роли персонажа',
+      translateGameWithRoleTags(item.role),
+      source,
+      'medium',
+    ),
+    makeImportSuggestion(
+      'profile.baseStats',
+      'Начальные показатели',
+      stats,
+      source,
+      'high',
+    ),
     makeImportSuggestion(
       'profile.materials',
       'Материалы прокачки',
@@ -7962,15 +8525,27 @@ function parseGameWithStructuredCharacterImport(text, source, character) {
       'high',
       'GameWith отдаёт названия подарков без иконок; иконки можно добавить вручную.',
     ),
-    makeImportSuggestion('imageUrl', 'Иконка персонажа', normalizeExternalImageUrl(item.iconUrl || ''), source, 'medium'),
+    makeImportSuggestion(
+      'imageUrl',
+      'Иконка персонажа',
+      normalizeExternalImageUrl(item.iconUrl || ''),
+      source,
+      'medium',
+    ),
   ].filter(Boolean);
 }
 
 function parseGameWithCharacterDetailImport(text, source, character) {
-  const plainText = /<\/?[a-z][\s\S]*>/i.test(text) ? htmlToPlainText(text) : text;
+  const plainText = /<\/?[a-z][\s\S]*>/i.test(text)
+    ? htmlToPlainText(text)
+    : text;
   const lines = compactImportLines(plainText);
   if (!lines.some((line) => lineMatchesCharacter(line, character))) return [];
-  const structuredSuggestions = parseGameWithStructuredCharacterImport(text, source, character);
+  const structuredSuggestions = parseGameWithStructuredCharacterImport(
+    text,
+    source,
+    character,
+  );
 
   const nextAfter = (label) => {
     const index = lines.findIndex(
@@ -8012,17 +8587,22 @@ function parseGameWithCharacterDetailImport(text, source, character) {
   const abilities = [];
   const majorHeadings = abilityHeadings.map(([heading]) => heading);
   for (const [heading, type] of abilityHeadings) {
-    const index = lines.findIndex((line) => normalizeImportSearch(line).startsWith(normalizeImportSearch(heading)));
+    const index = lines.findIndex((line) =>
+      normalizeImportSearch(line).startsWith(normalizeImportSearch(heading)),
+    );
     if (index < 0) continue;
     const name = lines[index + 1] || heading;
     const nextMajor = lines.findIndex(
       (line, lineIndex) =>
         lineIndex > index &&
         majorHeadings.some((candidate) =>
-          normalizeImportSearch(line).startsWith(normalizeImportSearch(candidate)),
+          normalizeImportSearch(line).startsWith(
+            normalizeImportSearch(candidate),
+          ),
         ),
     );
-    const end = nextMajor > index ? nextMajor : Math.min(lines.length, index + 18);
+    const end =
+      nextMajor > index ? nextMajor : Math.min(lines.length, index + 18);
     const description = lines
       .slice(index + 2, end)
       .filter((line) => !stopWords.some((word) => line.startsWith(word)))
@@ -8056,18 +8636,55 @@ function parseGameWithCharacterDetailImport(text, source, character) {
             id: crypto.randomUUID(),
             name,
             iconUrl: '',
-            effect: 'Любимый подарок для повышения симпатии; проверьте значение в игре.',
+            effect:
+              'Любимый подарок для повышения симпатии; проверьте значение в игре.',
           }))
       : [];
 
   return [
     ...structuredSuggestions,
-    makeImportSuggestion('rarity', 'Редкость', nextAfter('Редкость').match(/[SA]/)?.[0] || '', source, 'high'),
-    makeImportSuggestion('attribute', 'Атрибут', nextAfter('Стихия'), source, 'high'),
-    makeImportSuggestion('profile.arcType', 'Тип дуги', nextAfter('Тип арки'), source, 'high'),
-    makeImportSuggestion('profile.baseStats', 'Начальные показатели', stats, source, 'high'),
-    makeImportSuggestion('profile.abilities', 'Способности', abilities.slice(0, 8), source, 'medium'),
-    makeImportSuggestion('profile.gifts', 'Любимые подарки', gifts, source, 'medium'),
+    makeImportSuggestion(
+      'rarity',
+      'Редкость',
+      nextAfter('Редкость').match(/[SA]/)?.[0] || '',
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'attribute',
+      'Атрибут',
+      nextAfter('Стихия'),
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.arcType',
+      'Тип дуги',
+      nextAfter('Тип арки'),
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.baseStats',
+      'Начальные показатели',
+      stats,
+      source,
+      'high',
+    ),
+    makeImportSuggestion(
+      'profile.abilities',
+      'Способности',
+      abilities.slice(0, 8),
+      source,
+      'medium',
+    ),
+    makeImportSuggestion(
+      'profile.gifts',
+      'Любимые подарки',
+      gifts,
+      source,
+      'medium',
+    ),
   ].filter(Boolean);
 }
 
@@ -8077,7 +8694,15 @@ function parseGameWithCharacterImport(text, source, character) {
   );
   if (!line) return [];
 
-  const arcTypes = ['Твёрдый', 'Твёрдое', 'Жидкий', 'Жидкость', 'Гибридный', 'Газ', 'Плазма'];
+  const arcTypes = [
+    'Твёрдый',
+    'Твёрдое',
+    'Жидкий',
+    'Жидкость',
+    'Гибридный',
+    'Газ',
+    'Плазма',
+  ];
   const arcType = arcTypes.find((item) =>
     normalizeImportSearch(line).includes(normalizeImportSearch(item)),
   );
@@ -8097,7 +8722,9 @@ function parseKaidenTierImport(text, source, character) {
   const candidates = characterNameCandidates(character);
   const tierRows = text.match(/\b[SABCD]\b[\s\S]{0,600}/g) || [];
   const row = tierRows.find((item) =>
-    candidates.some((candidate) => normalizeImportSearch(item).includes(candidate)),
+    candidates.some((candidate) =>
+      normalizeImportSearch(item).includes(candidate),
+    ),
   );
   const tier = row?.match(/\b([SABCD])\b/)?.[1] || '';
   return [
@@ -8122,16 +8749,21 @@ function parseDubbingWikiVoiceImport(text, source, character) {
     .replace(/\[[^\]]+\]/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
-  const names = cleaned.split(/\s{2,}| {1,}(?=[A-ZА-ЯЁ][a-zа-яё]+ [A-ZА-ЯЁ])/).filter(Boolean);
+  const names = cleaned
+    .split(/\s{2,}| {1,}(?=[A-ZА-ЯЁ][a-zа-яё]+ [A-ZА-ЯЁ])/)
+    .filter(Boolean);
   const actorCandidates = names.filter(
     (item) =>
       !lineMatchesCharacter(item, character) &&
       !/\b(TBA|Character|Actor|Original|Japanese|Dub)\b/i.test(item),
   );
   const voiceActors = [];
-  if (actorCandidates[0]) voiceActors.push({ language: 'Китайский', name: actorCandidates[0] });
-  if (actorCandidates[1]) voiceActors.push({ language: 'Японский', name: actorCandidates[1] });
-  if (actorCandidates[2]) voiceActors.push({ language: 'Английский', name: actorCandidates[2] });
+  if (actorCandidates[0])
+    voiceActors.push({ language: 'Китайский', name: actorCandidates[0] });
+  if (actorCandidates[1])
+    voiceActors.push({ language: 'Японский', name: actorCandidates[1] });
+  if (actorCandidates[2])
+    voiceActors.push({ language: 'Английский', name: actorCandidates[2] });
 
   return [
     makeImportSuggestion(
@@ -8153,10 +8785,22 @@ function parseVoiceTableImport(text, source, character, label) {
 
   const voiceActors = [];
   const patterns = [
-    ['Английский', /(?:English VA:|English Actor:|Dub Actor\s+)([^.;|]+?)(?=(?:Japanese|Chinese|Korean|$))/i],
-    ['Японский', /(?:Japanese VA:|Japanese Actor\s+)([^.;|]+?)(?=(?:English|Chinese|Korean|$))/i],
-    ['Китайский', /(?:Chinese VA:|Original Actor\s+)([^.;|]+?)(?=(?:English|Japanese|Korean|$))/i],
-    ['Корейский', /(?:Korean VA:|Korean Actor\s+)([^.;|]+?)(?=(?:English|Japanese|Chinese|$))/i],
+    [
+      'Английский',
+      /(?:English VA:|English Actor:|Dub Actor\s+)([^.;|]+?)(?=(?:Japanese|Chinese|Korean|$))/i,
+    ],
+    [
+      'Японский',
+      /(?:Japanese VA:|Japanese Actor\s+)([^.;|]+?)(?=(?:English|Chinese|Korean|$))/i,
+    ],
+    [
+      'Китайский',
+      /(?:Chinese VA:|Original Actor\s+)([^.;|]+?)(?=(?:English|Japanese|Korean|$))/i,
+    ],
+    [
+      'Корейский',
+      /(?:Korean VA:|Korean Actor\s+)([^.;|]+?)(?=(?:English|Japanese|Chinese|$))/i,
+    ],
   ];
   for (const [language, pattern] of patterns) {
     const match = nearby.match(pattern);
@@ -8167,7 +8811,9 @@ function parseVoiceTableImport(text, source, character, label) {
   }
 
   if (!voiceActors.length) {
-    const fallback = nearby.match(/(?:voiced by|voice[:\s]+)([^.;|]+)/i)?.[1]?.trim();
+    const fallback = nearby
+      .match(/(?:voiced by|voice[:\s]+)([^.;|]+)/i)?.[1]
+      ?.trim();
     if (fallback) voiceActors.push({ language: 'Английский', name: fallback });
   }
 
@@ -8284,15 +8930,17 @@ function parseFandomCharacterImport(text, source, character) {
   const suggestions = [];
   const candidates = characterNameCandidates(character);
   const joined = lines.join(' ');
-  if (!candidates.some((candidate) => normalizeImportSearch(joined).includes(candidate))) {
+  if (
+    !candidates.some((candidate) =>
+      normalizeImportSearch(joined).includes(candidate),
+    )
+  ) {
     return [];
   }
 
   const birthday = firstLineAfter(lines, 'Birthday');
   const releaseDate = firstLineAfter(lines, 'Release Date');
-  const profileWindow = lines
-    .slice(0, Math.min(lines.length, 120))
-    .join(' ');
+  const profileWindow = lines.slice(0, Math.min(lines.length, 120)).join(' ');
   const esperType = translateEsperType(profileWindow);
   const arcType = translateArcType(profileWindow);
   const roleTags = translateCombatRole(profileWindow);
@@ -8300,8 +8948,20 @@ function parseFandomCharacterImport(text, source, character) {
 
   suggestions.push(
     makeImportSuggestion('attribute', 'Атрибут', esperType, source, 'medium'),
-    makeImportSuggestion('profile.arcType', 'Тип дуги', arcType, source, 'medium'),
-    makeImportSuggestion('profile.birthday', 'День рождения', birthday, source, 'medium'),
+    makeImportSuggestion(
+      'profile.arcType',
+      'Тип дуги',
+      arcType,
+      source,
+      'medium',
+    ),
+    makeImportSuggestion(
+      'profile.birthday',
+      'День рождения',
+      birthday,
+      source,
+      'medium',
+    ),
     makeImportSuggestion(
       'profile.releaseDate',
       'Дата релиза',
@@ -8330,7 +8990,10 @@ function parseFandomCharacterImport(text, source, character) {
 }
 
 function normalizeImportImageSrc(value, sourceUrl) {
-  const raw = decodeHtmlEntities(String(value || '').trim()).replace(/\\u0026/g, '&');
+  const raw = decodeHtmlEntities(String(value || '').trim()).replace(
+    /\\u0026/g,
+    '&',
+  );
   if (!raw) return '';
   if (raw.startsWith('//')) return normalizeExternalImageUrl(`https:${raw}`);
   if (/^https?:\/\//i.test(raw)) return normalizeExternalImageUrl(raw);
@@ -8342,7 +9005,8 @@ function normalizeImportImageSrc(value, sourceUrl) {
 }
 
 function importMainImageScore(image, source, character) {
-  if (!image?.url || isPlaceholderImportImage(image.url, image.title)) return -1;
+  if (!image?.url || isPlaceholderImportImage(image.url, image.title))
+    return -1;
   const title = normalizeImportSearch(image.title || '');
   const url = normalizeImportSearch(decodedMediaUrl(image.url));
   const names = characterNameCandidates(character);
@@ -8356,7 +9020,11 @@ function importMainImageScore(image, source, character) {
   let score = 0;
   if (names.some((name) => title.includes(name))) score += 80;
   if (names.some((name) => url.includes(name))) score += 55;
-  if (/иконка|портрет|представление|спл[эе]ш|splash|portrait|character/i.test(title)) {
+  if (
+    /иконка|портрет|представление|спл[эе]ш|splash|portrait|character/i.test(
+      title,
+    )
+  ) {
     score += 20;
   }
   if (recognizedCharacterPath) {
@@ -8424,13 +9092,14 @@ function extractImportImages(html, source, character = {}) {
     }
   }
 
-  const bestImage = candidates
-    .map((image) => ({
-      ...image,
-      score: importMainImageScore(image, source, character),
-    }))
-    .filter((image) => image.score >= 20)
-    .sort((left, right) => right.score - left.score)[0]?.url || '';
+  const bestImage =
+    candidates
+      .map((image) => ({
+        ...image,
+        score: importMainImageScore(image, source, character),
+      }))
+      .filter((image) => image.score >= 20)
+      .sort((left, right) => right.score - left.score)[0]?.url || '';
   const imageMap = buildImportImageMap(titledImages, character);
   return [
     makeImportSuggestion(
@@ -8449,7 +9118,13 @@ function extractImportImages(html, source, character = {}) {
       'medium',
       'Можно использовать как временный splash, если изображение подходит.',
     ),
-    makeImportSuggestion('__imageMap', 'Индекс изображений', imageMap, source, 'low'),
+    makeImportSuggestion(
+      '__imageMap',
+      'Индекс изображений',
+      imageMap,
+      source,
+      'low',
+    ),
   ].filter(Boolean);
 }
 
@@ -8512,8 +9187,7 @@ function buildKnownVoiceMediaSource(character) {
   return {
     ...source,
     status: 'reference',
-    message:
-      `Найден видео-справочник «${sourceInfo.title}». Язык отдельных реплик и права на аудиофайлы источник не подтверждает, поэтому строки не создаются автоматически.`,
+    message: `Найден видео-справочник «${sourceInfo.title}». Язык отдельных реплик и права на аудиофайлы источник не подтверждает, поэтому строки не создаются автоматически.`,
     suggestions: [],
   };
 }
@@ -8521,7 +9195,6 @@ function buildKnownVoiceMediaSource(character) {
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
-
 
 function parseImportSuggestionJson(item) {
   try {
@@ -8536,7 +9209,8 @@ function importImageMapFromSuggestions(items) {
   for (const item of items) {
     if (!item || item.field !== '__imageMap') continue;
     const parsed = parseImportSuggestionJson(item);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      continue;
     for (const [name, url] of Object.entries(parsed)) {
       const normalizedName = normalizeImportSearch(name);
       if (normalizedName && typeof url === 'string') {
@@ -8558,8 +9232,8 @@ function findImportImageByName(imageMap, name, options = {}) {
   if (options.fuzzy === false) return '';
   for (const candidate of candidates) {
     if (candidate.length < 4) continue;
-    const fuzzy = [...imageMap.entries()].find(([key]) =>
-      key.includes(candidate) || candidate.includes(key),
+    const fuzzy = [...imageMap.entries()].find(
+      ([key]) => key.includes(candidate) || candidate.includes(key),
     );
     if (fuzzy?.[1]) return fuzzy[1];
   }
@@ -8573,7 +9247,12 @@ function importMediaLookupLabels(entry, field = '') {
   const add = (value) => {
     const clean = normalizeImportedRuText(value);
     if (!clean || clean === 'Не введено') return;
-    if (!labels.some((label) => normalizeImportSearch(label) === normalizeImportSearch(clean))) {
+    if (
+      !labels.some(
+        (label) =>
+          normalizeImportSearch(label) === normalizeImportSearch(clean),
+      )
+    ) {
       labels.push(clean);
     }
   };
@@ -8623,12 +9302,16 @@ function enrichArraySuggestionMedia(item, imageMap) {
   let changed = false;
   const allowFuzzyMediaMatch = item.field === 'profile.skins';
   const nextValue = parsed.map((entry) => {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+      return entry;
     const record = entry;
     const imageUrl = importMediaLookupLabels(record, item.field)
-      .map((label) => findImportImageByName(imageMap, label, { fuzzy: allowFuzzyMediaMatch }))
+      .map((label) =>
+        findImportImageByName(imageMap, label, { fuzzy: allowFuzzyMediaMatch }),
+      )
       .find(Boolean);
-    if (!imageUrl || isClearlyWrongCollectionMedia(item.field, imageUrl)) return entry;
+    if (!imageUrl || isClearlyWrongCollectionMedia(item.field, imageUrl))
+      return entry;
     if ('imageUrl' in record && !record.imageUrl) {
       changed = true;
       return { ...record, imageUrl };
@@ -8645,7 +9328,8 @@ function enrichArraySuggestionMedia(item, imageMap) {
   });
   if (!changed) return item;
   const cleanValue = JSON.stringify(nextValue);
-  const mediaNote = 'Иконки сопоставлены по названию или алиасам файла из Fandom RU; проверьте превью перед сохранением.';
+  const mediaNote =
+    'Иконки сопоставлены по названию или алиасам файла из Fandom RU; проверьте превью перед сохранением.';
   return {
     ...item,
     id: item.id + ':media:' + hashText(cleanValue).slice(0, 8),
@@ -8668,7 +9352,9 @@ function isCleanImportedAbilityName(value) {
     !hasRussianText(name) ||
     isImportPlaceholderText(name) ||
     /(?:^|\b)GA_[A-Za-z0-9_]+|(?:_name|_des)\b/i.test(name) ||
-    /(?:^|\s)(?:если|когда|после|при)\s.+(?:%|урон|эффект|цель|диссонанс)/i.test(name) ||
+    /(?:^|\s)(?:если|когда|после|при)\s.+(?:%|урон|эффект|цель|диссонанс)/i.test(
+      name,
+    ) ||
     /[:;]\s*(?:если|когда|после|при|увелич|нанос|получ)/i.test(name)
   ) {
     return false;
@@ -8680,7 +9366,8 @@ function normalizedAbilityType(value) {
   const type = normalizeImportSearch(value);
   if (type.includes('базов') && type.includes('атак')) return 'Базовая атака';
   if (type.includes('перенаправ')) return 'Навык перенаправления';
-  if (type.includes('сверхспособ') || type.includes('ультим')) return 'Сверхспособность';
+  if (type.includes('сверхспособ') || type.includes('ультим'))
+    return 'Сверхспособность';
   if (type.includes('поддерж')) return 'Навык поддержки';
   if (type.includes('пассив')) return 'Пассивный навык';
   if (type.includes('черт')) return 'Черта персонажа';
@@ -8726,13 +9413,18 @@ function cleanImportedAbility(entry) {
 
 function abilityCollectionQuality(item, abilities) {
   const clean = abilities.map(cleanImportedAbility).filter(Boolean);
-  const described = clean.filter((ability) => abilityDescriptionScore(ability) > 0);
+  const described = clean.filter(
+    (ability) => abilityDescriptionScore(ability) > 0,
+  );
   const distinctTypes = new Set(clean.map((ability) => ability.type)).size;
   return (
     clean.length * 1200 +
     described.length * 300 +
     distinctTypes * 120 +
-    clean.reduce((sum, ability) => sum + Math.min(abilityDescriptionScore(ability), 500), 0) +
+    clean.reduce(
+      (sum, ability) => sum + Math.min(abilityDescriptionScore(ability), 500),
+      0,
+    ) +
     importSuggestionScore(item) * 5
   );
 }
@@ -8740,7 +9432,9 @@ function abilityCollectionQuality(item, abilities) {
 const IMPORT_CONFIDENCE_WEIGHT = { high: 30, medium: 20, low: 10 };
 
 function importSuggestionSourceWeight(item) {
-  const source = `${item.sourceName} ${item.sourceUrl}`.toLocaleLowerCase('ru-RU');
+  const source = `${item.sourceName} ${item.sourceUrl}`.toLocaleLowerCase(
+    'ru-RU',
+  );
   if (source.includes('сводка проверенных источников')) return 130;
   if (
     ['profile.abilities', 'profile.awakenings'].includes(item.field) &&
@@ -8748,7 +9442,10 @@ function importSuggestionSourceWeight(item) {
   ) {
     return 125;
   }
-  if (item.field === 'profile.biography' || item.field === 'profile.biographyShort') {
+  if (
+    item.field === 'profile.biography' ||
+    item.field === 'profile.biographyShort'
+  ) {
     if (source.includes('официаль')) return 120;
     if (source.includes('interactivemap')) return 118;
     if (source.includes('fandom ru')) return 115;
@@ -8816,7 +9513,11 @@ function importSuggestionAgreementKey(item) {
   return normalizeImportedRuText(item?.value || '').toLocaleLowerCase('ru-RU');
 }
 
-function importSuggestionQualityFlags(item, agreementCount = 1, variantCount = 1) {
+function importSuggestionQualityFlags(
+  item,
+  agreementCount = 1,
+  variantCount = 1,
+) {
   const flags = new Set(
     Array.isArray(item?.qualityFlags) ? item.qualityFlags : [],
   );
@@ -8896,7 +9597,9 @@ const PROFILE_COLLECTION_MERGE_CONFIGS = [
 
 function isUsefulImportCollectionValue(value) {
   const text = String(value || '').trim();
-  return Boolean(text && !/требует проверки|не найден|undefined|null/i.test(text));
+  return Boolean(
+    text && !/требует проверки|не найден|undefined|null/i.test(text),
+  );
 }
 
 function mergeImportCollectionEntry(primary, fallback) {
@@ -8910,7 +9613,10 @@ function mergeImportCollectionEntry(primary, fallback) {
   ])) {
     const current = primary?.[key];
     const candidate = fallback?.[key];
-    if (!isUsefulImportCollectionValue(current) && isUsefulImportCollectionValue(candidate)) {
+    if (
+      !isUsefulImportCollectionValue(current) &&
+      isUsefulImportCollectionValue(candidate)
+    ) {
       merged[key] = candidate;
       continue;
     }
@@ -8946,7 +9652,10 @@ function mergeProfileCollectionImportSuggestions(items, config) {
     .filter((item) => item?.field === config.field)
     .map((item) => ({ item, value: parseImportSuggestionJson(item) }))
     .filter(({ value }) => Array.isArray(value) && value.length)
-    .sort((left, right) => importSuggestionScore(right.item) - importSuggestionScore(left.item));
+    .sort(
+      (left, right) =>
+        importSuggestionScore(right.item) - importSuggestionScore(left.item),
+    );
   if (candidates.length < 2) return null;
 
   if (config.preferTopCandidate) {
@@ -8984,7 +9693,10 @@ function mergeProfileCollectionImportSuggestions(items, config) {
       const key = config.key(entry);
       if (!key || /level:nan$/.test(key)) continue;
       const current = rows.get(key);
-      rows.set(key, current ? mergeImportCollectionEntry(current, entry) : entry);
+      rows.set(
+        key,
+        current ? mergeImportCollectionEntry(current, entry) : entry,
+      );
     }
   }
   const merged = [...rows.values()];
@@ -8993,9 +9705,9 @@ function mergeProfileCollectionImportSuggestions(items, config) {
   if (!limited.length) return null;
 
   const cleanValue = JSON.stringify(limited);
-  const sourceNames = [...new Set(
-    candidates.map(({ item }) => item.sourceName).filter(Boolean),
-  )];
+  const sourceNames = [
+    ...new Set(candidates.map(({ item }) => item.sourceName).filter(Boolean)),
+  ];
   const sources = importSuggestionSourceRefs(candidates);
   return {
     id: `merged:${config.field}:${hashText(cleanValue).slice(0, 10)}`,
@@ -9062,17 +9774,23 @@ function mergeAbilityImportSuggestions(items) {
         }))
         .filter(
           ({ candidate, slot }) =>
-            normalizeImportSearch(candidate.name) === normalizedName || slot === baseSlots[index],
+            normalizeImportSearch(candidate.name) === normalizedName ||
+            slot === baseSlots[index],
         ),
     );
     const bestDescription = [...matches]
       .sort(
         (left, right) =>
-          abilityDescriptionScore(right.candidate) - abilityDescriptionScore(left.candidate) ||
+          abilityDescriptionScore(right.candidate) -
+            abilityDescriptionScore(left.candidate) ||
           importSuggestionScore(right.item) - importSuggestionScore(left.item),
       )
-      .find(({ candidate }) => abilityDescriptionScore(candidate) > 0)?.candidate;
-    const bestIcon = matches.find(({ candidate }) => candidate.iconUrl)?.candidate.iconUrl || '';
+      .find(
+        ({ candidate }) => abilityDescriptionScore(candidate) > 0,
+      )?.candidate;
+    const bestIcon =
+      matches.find(({ candidate }) => candidate.iconUrl)?.candidate.iconUrl ||
+      '';
     return {
       ...ability,
       iconUrl: ability.iconUrl || bestIcon,
@@ -9084,10 +9802,16 @@ function mergeAbilityImportSuggestions(items) {
   });
 
   if (merged.length < 7) {
-    const names = new Set(merged.map((ability) => normalizeImportSearch(ability.name)));
+    const names = new Set(
+      merged.map((ability) => normalizeImportSearch(ability.name)),
+    );
     const slots = new Set(baseSlots);
     for (const collection of collectionsWithSlots.slice(1)) {
-      for (let index = 0; index < collection.value.length && merged.length < 12; index += 1) {
+      for (
+        let index = 0;
+        index < collection.value.length && merged.length < 12;
+        index += 1
+      ) {
         const ability = collection.value[index];
         const name = normalizeImportSearch(ability.name);
         const slot = collection.slots[index];
@@ -9120,7 +9844,8 @@ function mergeAbilityImportSuggestions(items) {
 }
 
 function completeKnownAbilitySlots(suggestion, character) {
-  if (!suggestion || nevernessAppCharacterCode(character) !== 'cang') return suggestion;
+  if (!suggestion || nevernessAppCharacterCode(character) !== 'cang')
+    return suggestion;
   const current = parseImportSuggestionJson(suggestion);
   if (!Array.isArray(current) || !current.length) return suggestion;
 
@@ -9129,8 +9854,16 @@ function completeKnownAbilitySlots(suggestion, character) {
     ['Навык', 'Щедрое руководство', 'Описание требует проверки в игре.'],
     ['Сверхспособность', 'Суд осени', 'Описание требует проверки в игре.'],
     ['Навык поддержки', 'Перерыв окончен', 'Описание требует проверки в игре.'],
-    ['Пассивный навык', 'Умеренное озорство', 'Описание требует проверки в игре.'],
-    ['Пассивный навык', 'Умеренная работа', 'Описание требует проверки в игре.'],
+    [
+      'Пассивный навык',
+      'Умеренное озорство',
+      'Описание требует проверки в игре.',
+    ],
+    [
+      'Пассивный навык',
+      'Умеренная работа',
+      'Описание требует проверки в игре.',
+    ],
     [
       'Повседневный навык',
       'Цветение в зените',
@@ -9165,10 +9898,15 @@ function completeKnownAbilitySlots(suggestion, character) {
 
 function enrichCharacterImportSuggestions(items, character = {}) {
   const imageMap = importImageMapFromSuggestions(items);
-  const enriched = items.map((item) => enrichArraySuggestionMedia(item, imageMap));
+  const enriched = items.map((item) =>
+    enrichArraySuggestionMedia(item, imageMap),
+  );
   const bestAbilitySuggestion = enriched
     .filter((item) => item?.field === 'profile.abilities')
-    .sort((left, right) => importSuggestionScore(right) - importSuggestionScore(left))[0];
+    .sort(
+      (left, right) =>
+        importSuggestionScore(right) - importSuggestionScore(left),
+    )[0];
   const mergedAbilities = completeKnownAbilitySlots(
     mergeAbilityImportSuggestions(enriched) || bestAbilitySuggestion,
     character,
@@ -9198,17 +9936,19 @@ function enrichCharacterImportSuggestions(items, character = {}) {
         value: JSON.stringify(roleIcons),
         sourceName: 'Fandom RU: изображения ролей',
         sourceUrl:
-          enriched.find((item) => item?.field === '__imageMap')?.sourceUrl || '',
+          enriched.find((item) => item?.field === '__imageMap')?.sourceUrl ||
+          '',
         confidence: 'high',
-        note:
-          'Иконки сопоставлены с подтверждёнными русскими названиями ролей. Можно принять блок целиком или проверить строки по одной.',
+        note: 'Иконки сопоставлены с подтверждёнными русскими названиями ролей. Можно принять блок целиком или проверить строки по одной.',
       }
     : null;
   return [
     ...(mergedAbilities
       ? [enrichArraySuggestionMedia(mergedAbilities, imageMap)]
       : []),
-    ...mergedCollections.map((item) => enrichArraySuggestionMedia(item, imageMap)),
+    ...mergedCollections.map((item) =>
+      enrichArraySuggestionMedia(item, imageMap),
+    ),
     ...(roleIconSuggestion ? [roleIconSuggestion] : []),
     ...enriched,
   ];
@@ -9317,7 +10057,8 @@ function dedupeImportSuggestions(items) {
                 .join(' '),
             },
             score:
-              importSuggestionScore(best) + Math.min(30, Math.max(0, agreement - 1) * 12),
+              importSuggestionScore(best) +
+              Math.min(30, Math.max(0, agreement - 1) * 12),
           };
         })
         .sort((left, right) => right.score - left.score)
@@ -9390,7 +10131,10 @@ function normalizeGuideImportSuggestion(item) {
     item.field === 'guide.videoUrl'
       ? String(item.value || '').trim()
       : normalizeImportedRuText(item.value);
-  if (item.field === 'guide.summary' && !isUsefulGuideSummary(normalizedValue)) {
+  if (
+    item.field === 'guide.summary' &&
+    !isUsefulGuideSummary(normalizedValue)
+  ) {
     return null;
   }
   return {
@@ -9431,13 +10175,17 @@ function dedupeGuideImportSuggestions(items) {
   const result = [];
   for (const [field, candidates] of grouped) {
     const sorted = [...candidates].sort(
-      (left, right) => importSuggestionScore(right) - importSuggestionScore(left),
+      (left, right) =>
+        importSuggestionScore(right) - importSuggestionScore(left),
     );
     if (field === 'guide.videoUrl') {
       const seenUrls = new Set();
       const uniqueVideos = sorted
         .filter((item) => {
-          if (!isUsefulImportCollectionValue(item.value) || seenUrls.has(item.value)) {
+          if (
+            !isUsefulImportCollectionValue(item.value) ||
+            seenUrls.has(item.value)
+          ) {
             return false;
           }
           seenUrls.add(item.value);
@@ -9468,14 +10216,19 @@ function dedupeGuideImportSuggestions(items) {
         const primaryText =
           typeof entry === 'string'
             ? entry
-            : entry?.name || entry?.title || entry?.label || entry?.description || '';
+            : entry?.name ||
+              entry?.title ||
+              entry?.label ||
+              entry?.description ||
+              '';
         if (!hasRussianText(primaryText)) continue;
-        const key = normalizeImportSearch(
-          primaryText,
-        );
+        const key = normalizeImportSearch(primaryText);
         if (!key) continue;
         const current = rows.get(key);
-        rows.set(key, current ? mergeImportCollectionEntry(current, entry) : entry);
+        rows.set(
+          key,
+          current ? mergeImportCollectionEntry(current, entry) : entry,
+        );
       }
     }
     if (!rows.size) {
@@ -9483,7 +10236,8 @@ function dedupeGuideImportSuggestions(items) {
       result.push(
         ...sorted
           .filter((item) => {
-            if (!hasRussianText(item.value) || seenValues.has(item.value)) return false;
+            if (!hasRussianText(item.value) || seenValues.has(item.value))
+              return false;
             seenValues.add(item.value);
             return true;
           })
@@ -9494,7 +10248,9 @@ function dedupeGuideImportSuggestions(items) {
 
     const merged = [...rows.values()].slice(0, limits[field] || 24);
     const cleanValue = JSON.stringify(merged);
-    const sourceNames = [...new Set(sorted.map((item) => item.sourceName).filter(Boolean))];
+    const sourceNames = [
+      ...new Set(sorted.map((item) => item.sourceName).filter(Boolean)),
+    ];
     const sources = importSuggestionSourceRefs(sorted);
     const variantCount = new Set(sorted.map(importSuggestionAgreementKey)).size;
     const mergedSuggestion = {
@@ -9539,8 +10295,18 @@ function collectImportMediaLookupNames(items) {
   const names = [];
   const add = (value) => {
     const clean = normalizeImportedRuText(value);
-    if (!clean || clean === 'Не введено' || clean.length < 3 || clean.length > 80) return;
-    if (!names.some((name) => normalizeImportSearch(name) === normalizeImportSearch(clean))) {
+    if (
+      !clean ||
+      clean === 'Не введено' ||
+      clean.length < 3 ||
+      clean.length > 80
+    )
+      return;
+    if (
+      !names.some(
+        (name) => normalizeImportSearch(name) === normalizeImportSearch(clean),
+      )
+    ) {
       names.push(clean);
     }
   };
@@ -9572,7 +10338,7 @@ function collectImportMediaLookupNames(items) {
   return names.slice(0, IMPORT_MEDIA_LOOKUP_LIMIT);
 }
 
-async function fetchFandomMediaLookupSource(items) {
+async function fetchFandomMediaLookupSource(items, deadline) {
   const names = collectImportMediaLookupNames(items);
   const source = {
     id: 'fandom-ru-media-lookup',
@@ -9588,26 +10354,41 @@ async function fetchFandomMediaLookupSource(items) {
       suggestions: [],
     };
   }
+  if (deadline.signal.aborted || deadline.remainingMs() <= 0) {
+    return importTimeoutSource(
+      source,
+      'Поиск иконок остановлен по общему лимиту времени автоимпорта.',
+    );
+  }
 
   const imageMap = {};
+  const lookupOutcomes = { success: 0, failed: 0, timeout: 0 };
   await mapWithConcurrency(
     names,
     IMPORT_MEDIA_FETCH_CONCURRENCY,
     async (name) => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), IMPORT_SOURCE_TIMEOUT_MS);
+      const linkedTimeout = createLinkedImportTimeout(
+        deadline.signal,
+        Math.min(IMPORT_SOURCE_TIMEOUT_MS, deadline.remainingMs()),
+      );
       try {
+        if (linkedTimeout.signal.aborted) {
+          lookupOutcomes.timeout += 1;
+          return;
+        }
         const response = await fetch(
           `${source.url}&aifrom=${encodeURIComponent(name)}&ailimit=6&aiprop=url|mime|size|dimensions&format=json&formatversion=2&origin=*`,
           {
             headers: {
               accept: 'application/json',
-              'user-agent': 'NTE-Meta-Editorial/1.0 (+https://bonaqu.github.io/nte-meta/)',
+              'user-agent':
+                'NTE-Meta-Editorial/1.0 (+https://bonaqu.github.io/nte-meta/)',
             },
-            signal: controller.signal,
+            signal: linkedTimeout.signal,
           },
         );
         if (!response.ok) {
+          lookupOutcomes.failed += 1;
           await discardResponseBody(response);
           return;
         }
@@ -9619,28 +10400,56 @@ async function fetchFandomMediaLookupSource(items) {
             url: normalizeExternalImageUrl(image.url || ''),
           }))
           .filter((image) => {
-            const title = normalizeImportSearch(cleanImportImageTitle(image.title));
+            const title = normalizeImportSearch(
+              cleanImportImageTitle(image.title),
+            );
             return (
               image.url &&
-              (title.startsWith(normalizedName) || title.includes(normalizedName))
+              (title.startsWith(normalizedName) ||
+                title.includes(normalizedName))
             );
           });
         Object.assign(imageMap, buildImportImageMap(exactImages, {}));
-      } catch {
-        // Media lookup is best-effort; missing icons should not block text import.
+        lookupOutcomes.success += 1;
+      } catch (error) {
+        if (linkedTimeout.signal.aborted || error?.name === 'AbortError') {
+          lookupOutcomes.timeout += 1;
+        } else {
+          lookupOutcomes.failed += 1;
+        }
       } finally {
-        clearTimeout(timeout);
+        linkedTimeout.dispose();
       }
     },
   );
 
-  const suggestion = makeImportSuggestion('__imageMap', 'Индекс иконок', imageMap, source, 'low');
+  if (deadline.signal.aborted) {
+    return importTimeoutSource(
+      source,
+      'Поиск иконок остановлен по общему лимиту времени автоимпорта.',
+    );
+  }
+
+  const suggestion = makeImportSuggestion(
+    '__imageMap',
+    'Индекс иконок',
+    imageMap,
+    source,
+    'low',
+  );
   return {
     ...source,
-    status: suggestion ? 'ok' : 'partial',
+    status:
+      suggestion || lookupOutcomes.success > 0
+        ? suggestion
+          ? 'ok'
+          : 'partial'
+        : lookupOutcomes.timeout > 0
+          ? 'timeout'
+          : 'partial',
     message: suggestion
-      ? 'Найдены точные совпадения файлов для части строк.'
-      : 'Иконки навыков, пробуждений, подарков или материалов по точным названиям не найдены.',
+      ? `Найдены точные совпадения файлов для части строк. Успешно: ${lookupOutcomes.success}, ошибки: ${lookupOutcomes.failed}, таймауты: ${lookupOutcomes.timeout}.`
+      : `Иконки по точным названиям не найдены. Успешно: ${lookupOutcomes.success}, ошибки: ${lookupOutcomes.failed}, таймауты: ${lookupOutcomes.timeout}.`,
     suggestions: suggestion ? [suggestion] : [],
   };
 }
@@ -9697,7 +10506,8 @@ function buildImportCoverage(suggestions, mode) {
     const hasCorroboratedVariant = variants.some(
       (item) =>
         Number(item.agreementCount || 0) >= 2 ||
-        (item.confidence === 'high' && !item.qualityFlags?.includes('conflict')),
+        (item.confidence === 'high' &&
+          !item.qualityFlags?.includes('conflict')),
     );
     (hasCorroboratedVariant
       ? coverage.readyFields
@@ -9735,68 +10545,79 @@ async function handleCharacterImportLookup(request, env) {
     });
   }
   const importCharacter = {
+    name: character.name || query,
+    originalName: character.original_name || query,
+    slug,
+  };
+  return withImportDeadline(request.signal, async (deadline) => {
+    const sourceResults = await mapWithConcurrency(
+      selectImportSources(characterImportSources(slug, importCharacter)),
+      IMPORT_FETCH_CONCURRENCY,
+      (source) => fetchImportSource(source, importCharacter, deadline),
+    );
+    const voiceActorSource = buildKnownVoiceActorSource({
       name: character.name || query,
       originalName: character.original_name || query,
       slug,
-    };
-  const sourceResults = await mapWithConcurrency(
-    selectImportSources(characterImportSources(slug, importCharacter)),
-    IMPORT_FETCH_CONCURRENCY,
-    (source) => fetchImportSource(source, importCharacter),
-  );
-  const voiceActorSource = buildKnownVoiceActorSource({
-    name: character.name || query,
-    originalName: character.original_name || query,
-    slug,
-  });
-  if (voiceActorSource) sourceResults.push(voiceActorSource);
-  const voiceMediaSource = buildKnownVoiceMediaSource({
-    name: character.name || query,
-    originalName: character.original_name || query,
-    slug,
-  });
-  if (voiceMediaSource) sourceResults.push(voiceMediaSource);
-  const affinitySource = buildKnownAffinitySource({
-    name: character.name || query,
-    originalName: character.original_name || query,
-    slug,
-  });
-  if (affinitySource) sourceResults.push(affinitySource);
-  const rawSuggestions = sourceResults.flatMap((source) => source.suggestions);
-  sourceResults.push(await fetchFandomMediaLookupSource(rawSuggestions));
-  const suggestions = dedupeImportSuggestions(
-    enrichCharacterImportSuggestions(
-      sourceResults.flatMap((source) => source.suggestions),
-      importCharacter,
-    ),
-  );
-  const fields = {};
-  for (const suggestion of suggestions) {
-    if (
-      !suggestion.field.startsWith('guide.') &&
-      fields[suggestion.field] === undefined
-    ) {
-      fields[suggestion.field] = suggestion.value;
+    });
+    if (voiceActorSource) sourceResults.push(voiceActorSource);
+    const voiceMediaSource = buildKnownVoiceMediaSource({
+      name: character.name || query,
+      originalName: character.original_name || query,
+      slug,
+    });
+    if (voiceMediaSource) sourceResults.push(voiceMediaSource);
+    const affinitySource = buildKnownAffinitySource({
+      name: character.name || query,
+      originalName: character.original_name || query,
+      slug,
+    });
+    if (affinitySource) sourceResults.push(affinitySource);
+    const rawSuggestions = sourceResults.flatMap(
+      (source) => source.suggestions,
+    );
+    sourceResults.push(
+      await fetchFandomMediaLookupSource(rawSuggestions, deadline),
+    );
+    const suggestions = dedupeImportSuggestions(
+      enrichCharacterImportSuggestions(
+        sourceResults.flatMap((source) => source.suggestions),
+        importCharacter,
+      ),
+    );
+    const fields = {};
+    for (const suggestion of suggestions) {
+      if (
+        !suggestion.field.startsWith('guide.') &&
+        fields[suggestion.field] === undefined
+      ) {
+        fields[suggestion.field] = suggestion.value;
+      }
     }
-  }
-  return json({
-    data: {
-      found: suggestions.length > 0,
-      message: suggestions.length
-        ? `Найдено ${suggestions.length} предложений. Выберите подходящие варианты: блок можно принять целиком или проверить построчно.`
-        : `Для "${query}" не найдено структурированных данных. Проверьте источники вручную.`,
-      sources: sourceResults.map((source) => ({
-        id: source.id,
-        name: source.name,
-        url: source.publicUrl || source.url,
-        trust: source.trust,
-        status: source.status,
-        message: source.message,
-      })),
-      suggestions,
-      fields,
-      coverage: buildImportCoverage(suggestions, 'character'),
-    },
+    return json({
+      data: {
+        found: suggestions.length > 0,
+        message: suggestions.length
+          ? `Найдено ${suggestions.length} предложений. Выберите подходящие варианты: блок можно принять целиком или проверить построчно.`
+          : `Для "${query}" не найдено структурированных данных. Проверьте источники вручную.`,
+        sources: sourceResults.map((source) => ({
+          id: source.id,
+          name: source.name,
+          url: source.publicUrl || source.url,
+          trust: source.trust,
+          status: source.status,
+          message: source.message,
+        })),
+        suggestions,
+        fields,
+        coverage: buildImportCoverage(suggestions, 'character'),
+        timing: {
+          budgetMs: deadline.budgetMs,
+          elapsedMs: deadline.elapsedMs(),
+          deadlineReached: deadline.deadlineReached(),
+        },
+      },
+    });
   });
 }
 
@@ -9828,7 +10649,10 @@ async function handleGuideImportLookup(request, env) {
   }
 
   if (!query || query.length < 2) {
-    return json({ error: 'Укажите персонажа для поиска источников гайда' }, 400);
+    return json(
+      { error: 'Укажите персонажа для поиска источников гайда' },
+      400,
+    );
   }
 
   if (!character.slug) {
@@ -9858,35 +10682,42 @@ async function handleGuideImportLookup(request, env) {
     originalName: character.original_name || query,
     slug,
   };
-  const sourceResults = await mapWithConcurrency(
-    selectImportSources(guideImportSources(slug, importCharacter)),
-    IMPORT_FETCH_CONCURRENCY,
-    (source) => fetchImportSource(source, importCharacter),
-  );
-  const suggestions = dedupeGuideImportSuggestions(
-    sourceResults.flatMap((source) => source.suggestions),
-  );
+  return withImportDeadline(request.signal, async (deadline) => {
+    const sourceResults = await mapWithConcurrency(
+      selectImportSources(guideImportSources(slug, importCharacter)),
+      IMPORT_FETCH_CONCURRENCY,
+      (source) => fetchImportSource(source, importCharacter, deadline),
+    );
+    const suggestions = dedupeGuideImportSuggestions(
+      sourceResults.flatMap((source) => source.suggestions),
+    );
 
-  return json({
-    data: {
-      found: suggestions.length > 0,
-      message: suggestions.length
-        ? `Найдено ${suggestions.length} предложений для гайда. Выберите подходящие варианты: блок можно принять целиком или проверить построчно.`
-        : `Для "${query}" не найдено структурированных guide-данных. Проверьте источники вручную.`,
-      sources: sourceResults.map((source) => ({
-        id: source.id,
-        name: source.name,
-        url: source.url,
-        trust: source.trust,
-        status: source.status,
-        message: source.message,
-      })),
-      suggestions,
-      fields: Object.fromEntries(
-        suggestions.map((suggestion) => [suggestion.field, suggestion.value]),
-      ),
-      coverage: buildImportCoverage(suggestions, 'guide'),
-    },
+    return json({
+      data: {
+        found: suggestions.length > 0,
+        message: suggestions.length
+          ? `Найдено ${suggestions.length} предложений для гайда. Выберите подходящие варианты: блок можно принять целиком или проверить построчно.`
+          : `Для "${query}" не найдено структурированных guide-данных. Проверьте источники вручную.`,
+        sources: sourceResults.map((source) => ({
+          id: source.id,
+          name: source.name,
+          url: source.url,
+          trust: source.trust,
+          status: source.status,
+          message: source.message,
+        })),
+        suggestions,
+        fields: Object.fromEntries(
+          suggestions.map((suggestion) => [suggestion.field, suggestion.value]),
+        ),
+        coverage: buildImportCoverage(suggestions, 'guide'),
+        timing: {
+          budgetMs: deadline.budgetMs,
+          elapsedMs: deadline.elapsedMs(),
+          deadlineReached: deadline.deadlineReached(),
+        },
+      },
+    });
   });
 }
 
@@ -9999,7 +10830,9 @@ async function handleSystemStatus(request, env) {
   ];
   const counts = {};
   for (const [key, table] of tables) {
-    const row = await env.DB.prepare(`SELECT COUNT(*) count FROM ${table}`).first();
+    const row = await env.DB.prepare(
+      `SELECT COUNT(*) count FROM ${table}`,
+    ).first();
     counts[key] = Number(row?.count || 0);
   }
   return json({
@@ -10008,7 +10841,9 @@ async function handleSystemStatus(request, env) {
       d1: 'ok',
       generatedAt: new Date().toISOString(),
       counts,
-      migrations: { latestKnown: '0023_fix_hotori_guide_markdown_newlines.sql' },
+      migrations: {
+        latestKnown: '0023_fix_hotori_guide_markdown_newlines.sql',
+      },
     },
   });
 }
@@ -10306,7 +11141,9 @@ async function listThreads(env, includeHidden = false) {
 }
 
 async function getThread(env, idOrSlug, includeHidden = false) {
-  const where = includeHidden ? '1 = 1' : "community_threads.status <> 'hidden'";
+  const where = includeHidden
+    ? '1 = 1'
+    : "community_threads.status <> 'hidden'";
   const row = await env.DB.prepare(
     `SELECT community_threads.*,
             COUNT(comments.id) AS comments_count
@@ -10559,11 +11396,16 @@ function validateEntityRecord(entity, record, isCreate) {
       const maxLength =
         field === 'body_markdown' || field === 'transcript_markdown'
           ? 60000
-          : ['image_url', 'splash_url', 'source_url', 'video_url'].includes(field)
+          : ['image_url', 'splash_url', 'source_url', 'video_url'].includes(
+                field,
+              )
             ? MAX_PROFILE_RESOURCE_URL_CHARS
             : 8000;
       if (value.length > maxLength) {
-        throwHttp(`Поле «${fieldLabel(field)}» содержит слишком много текста`, 400);
+        throwHttp(
+          `Поле «${fieldLabel(field)}» содержит слишком много текста`,
+          400,
+        );
       }
       record[field] = value.trim();
     }
@@ -10588,10 +11430,7 @@ function validateEntityRecord(entity, record, isCreate) {
   ) {
     throwHttp('Неизвестный тир', 400);
   }
-  if (
-    record.tierlist_type !== undefined &&
-    record.tierlist_type !== 'base'
-  ) {
+  if (record.tierlist_type !== undefined && record.tierlist_type !== 'base') {
     throwHttp('На сайте используется один единый тир-лист', 400);
   }
   if (
@@ -10685,11 +11524,16 @@ function normalizeCharacterProfile(value) {
   const url = (input, label = 'URL медиа') => {
     const result = String(input || '').trim();
     if (result.startsWith('data:')) {
-      if (!/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/i.test(result)) {
+      if (
+        !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/i.test(result)
+      ) {
         throwHttp(`${label} должен быть изображением PNG, JPEG или WebP`, 400);
       }
       if (result.length > MAX_PROFILE_DATA_URL_CHARS) {
-        throwHttp(`${label} слишком большой. Уменьшите изображение перед загрузкой.`, 400);
+        throwHttp(
+          `${label} слишком большой. Уменьшите изображение перед загрузкой.`,
+          400,
+        );
       }
       return result;
     }
@@ -10715,7 +11559,10 @@ function normalizeCharacterProfile(value) {
     }
     const rawRewards = Array.isArray(item.rewards) ? item.rewards : [];
     if (rawRewards.length > 12) {
-      throwHttp('На одном уровне симпатии можно указать не больше 12 наград', 400);
+      throwHttp(
+        'На одном уровне симпатии можно указать не больше 12 наград',
+        400,
+      );
     }
     const rewards = rawRewards.map((reward) => ({
       id: id(reward?.id),
@@ -10817,7 +11664,10 @@ function normalizeCharacterProfile(value) {
     })),
     awakenings,
   };
-  if (new TextEncoder().encode(JSON.stringify(profile)).byteLength > MAX_PROFILE_JSON_BYTES) {
+  if (
+    new TextEncoder().encode(JSON.stringify(profile)).byteLength >
+    MAX_PROFILE_JSON_BYTES
+  ) {
     throwHttp(
       'Общий размер изображений профиля слишком большой. Уменьшите файлы или используйте прямые ссылки.',
       400,
@@ -11444,7 +12294,8 @@ function withCors(request, env, response) {
   const hasSession = Boolean(
     request.headers.get('Authorization') || readCookie(request, SESSION_COOKIE),
   );
-  const isPublicMedia = request.method === 'GET' && url.pathname === '/api/media';
+  const isPublicMedia =
+    request.method === 'GET' && url.pathname === '/api/media';
   if (isAllowedOrigin(origin, env)) {
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.set('Access-Control-Allow-Credentials', 'true');
@@ -11456,7 +12307,7 @@ function withCors(request, env, response) {
     response.status === 200 &&
     !hasSession &&
     !response.headers.has('Set-Cookie') &&
-      /^\/api\/(characters|guides|rotations|teams|tierlists|news|leaks|threads)(\/|$)/.test(
+    /^\/api\/(characters|guides|rotations|teams|tierlists|news|leaks|threads)(\/|$)/.test(
       url.pathname,
     )
   ) {

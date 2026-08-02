@@ -39,7 +39,11 @@ function renderInline(text: string, allowMedia: boolean) {
       }
       const src = getSafeLink(image[2]);
       if (!src) {
-        return <React.Fragment key={index}>{image[1] || 'Изображение'}</React.Fragment>;
+        return (
+          <React.Fragment key={index}>
+            {image[1] || 'Изображение'}
+          </React.Fragment>
+        );
       }
       return (
         <img
@@ -171,13 +175,21 @@ export function MarkdownPreview({
     }
 
     if (trimmed.startsWith('### ')) {
-      nodes.push(<h3 key={`h3-${index}`}>{renderInline(trimmed.slice(4), allowMedia)}</h3>);
+      nodes.push(
+        <h3 key={`h3-${index}`}>
+          {renderInline(trimmed.slice(4), allowMedia)}
+        </h3>,
+      );
       index += 1;
       continue;
     }
 
     if (trimmed.startsWith('## ')) {
-      nodes.push(<h2 key={`h2-${index}`}>{renderInline(trimmed.slice(3), allowMedia)}</h2>);
+      nodes.push(
+        <h2 key={`h2-${index}`}>
+          {renderInline(trimmed.slice(3), allowMedia)}
+        </h2>,
+      );
       index += 1;
       continue;
     }
@@ -248,7 +260,9 @@ export function MarkdownPreview({
       paragraph.push(lines[index].trim());
       index += 1;
     }
-    nodes.push(<p key={`p-${index}`}>{renderInline(paragraph.join(' '), allowMedia)}</p>);
+    nodes.push(
+      <p key={`p-${index}`}>{renderInline(paragraph.join(' '), allowMedia)}</p>,
+    );
   }
 
   return <div className="markdown-preview">{nodes}</div>;

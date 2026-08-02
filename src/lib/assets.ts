@@ -43,7 +43,9 @@ export function resolveAssetUrl(value?: string | null) {
 }
 
 export function normalizeExternalAssetUrl(value?: string | null) {
-  const url = String(value || '').trim().replace(/&amp;/g, '&');
+  const url = String(value || '')
+    .trim()
+    .replace(/&amp;/g, '&');
   if (!url) return '';
 
   if (/^https:\/\/static\.wikia\.nocookie\.net\//i.test(url)) {
@@ -54,9 +56,9 @@ export function normalizeExternalAssetUrl(value?: string | null) {
       )?.[1];
       parsed.pathname = parsed.pathname
         .replace(
-        /\/revision\/latest(?:\/(?:scale-to-width-down|smart|thumbnail|width)\/[^/?#]+|\/[^/?#]+)?$/i,
-        '/revision/latest',
-      )
+          /\/revision\/latest(?:\/(?:scale-to-width-down|smart|thumbnail|width)\/[^/?#]+|\/[^/?#]+)?$/i,
+          '/revision/latest',
+        )
         .replace(/\/revision\/latest\/width\/[^/?#]+$/i, '/revision/latest')
         .replace(/\/revision\/latest\/[^/?#]+$/i, '/revision/latest');
       parsed.search = '';

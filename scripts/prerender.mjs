@@ -17,7 +17,11 @@ const publicSections = [
     'Гайды',
     'Практические гайды NTE Meta: ротации, билды, команды и ошибки.',
   ],
-  ['tierlists', 'Тир-листы', 'Единый редакционный тир-лист NTE Meta: S, A, B, C, D.'],
+  [
+    'tierlists',
+    'Тир-листы',
+    'Единый редакционный тир-лист NTE Meta: S, A, B, C, D.',
+  ],
 ];
 
 const utilityPages = [
@@ -120,10 +124,7 @@ function renderDocument(page) {
     /<script type="application\/ld\+json">.*?<\/script>/s,
     `<script type="application/ld+json">${JSON.stringify(schema)}</script>`,
   );
-  html = html.replace(
-    '<div id="root"></div>',
-    renderStaticRoot(page),
-  );
+  html = html.replace('<div id="root"></div>', renderStaticRoot(page));
   return html;
 }
 
@@ -194,7 +195,10 @@ const pages = [
         title: 'Материалы',
         body: (item.profile?.materials || [])
           .slice(0, 8)
-          .map((material) => `${material.name}: ${material.amount} (${material.source})`)
+          .map(
+            (material) =>
+              `${material.name}: ${material.amount} (${material.source})`,
+          )
           .join(' '),
       },
     ],
@@ -226,7 +230,9 @@ const pages = [
     date: item.updatedAt || item.date,
     article: true,
     schemaType: 'NewsArticle',
-    staticSections: [{ title: 'Материал', body: item.body || item.bodyMarkdown }],
+    staticSections: [
+      { title: 'Материал', body: item.body || item.bodyMarkdown },
+    ],
   })),
   ...leaks.map((item) => ({
     route: `leaks/${item.slug}`,
@@ -262,10 +268,12 @@ for (const page of pages) {
 const sitemap = [
   '<?xml version="1.0" encoding="UTF-8"?>',
   '<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">',
-  ...pages.filter((page) => !page.noindex).map(
-    (page) =>
-      `  <url><loc>${siteUrl}/${page.route ? `${page.route}/` : ''}</loc>${page.date ? `<lastmod>${String(page.date).slice(0, 10)}</lastmod>` : ''}</url>`,
-  ),
+  ...pages
+    .filter((page) => !page.noindex)
+    .map(
+      (page) =>
+        `  <url><loc>${siteUrl}/${page.route ? `${page.route}/` : ''}</loc>${page.date ? `<lastmod>${String(page.date).slice(0, 10)}</lastmod>` : ''}</url>`,
+    ),
   '</urlset>',
 ].join('\n');
 

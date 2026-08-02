@@ -50,13 +50,18 @@ export function getGuideCharacter(data: SiteData, guide: Guide) {
 }
 
 export function getGuideForCharacter(data: SiteData, character: Character) {
-  const idCandidates = [character.id, character.slug].map(normalizeSearchText).filter(Boolean);
+  const idCandidates = [character.id, character.slug]
+    .map(normalizeSearchText)
+    .filter(Boolean);
   const nameCandidates = [character.name, character.originalName]
     .map(normalizeSearchText)
     .filter(isHumanNameCandidate);
 
   return data.guides.find((guide) => {
-    if (guide.characterId === character.id || guide.characterId === character.slug) {
+    if (
+      guide.characterId === character.id ||
+      guide.characterId === character.slug
+    ) {
       return true;
     }
     const guideSlug = normalizeSearchText(guide.slug);
@@ -115,7 +120,8 @@ export function getCharacterTierPlacement(data: SiteData, characterId: string) {
   const position =
     tierlist.items
       .slice(0, itemIndex + 1)
-      .filter((candidate) => normalizeTier(candidate.tier) === tier).length || 1;
+      .filter((candidate) => normalizeTier(candidate.tier) === tier).length ||
+    1;
 
   return {
     tier,

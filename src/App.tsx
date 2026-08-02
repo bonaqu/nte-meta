@@ -137,6 +137,7 @@ import type {
   CharacterAbilityAttribute,
   CharacterImportLookupResult,
   CharacterImportSuggestion,
+  CharacterProfile,
   CharacterRoleIcon,
   CharacterVoiceLine,
   Comment,
@@ -173,6 +174,14 @@ function formatProfileDate(value: string) {
   return formatDate(value);
 }
 
+function formatPortalLoadError(error: unknown) {
+  const rawMessage =
+    error instanceof Error ? error.message : 'Сервис временно недоступен';
+  const reason = rawMessage.replace(/^\/api\/[^:]+:\s*/u, '').trim();
+  const normalizedReason = reason.replace(/[.!?]+$/u, '');
+  return `Не удалось загрузить данные портала. ${normalizedReason}. Повторите загрузку.`;
+}
+
 const AdminCharacterEditor = lazy(() =>
   import('./features/admin/character-editor').then((module) => ({
     default: module.AdminCharacterEditor,
@@ -199,7 +208,10 @@ function RichTextEditorField(props: RichTextEditorProps) {
   return (
     <Suspense
       fallback={
-        <div className="rich-text-editor rich-text-editor__loading" aria-busy="true">
+        <div
+          className="rich-text-editor rich-text-editor__loading"
+          aria-busy="true"
+        >
           Загружаем визуальный редактор...
         </div>
       }
@@ -236,7 +248,11 @@ function getAttributeOptions(characters: Character[]) {
   return [
     anyAttributeOption,
     ...Array.from(
-      new Set(characters.map((character) => character.attribute.trim()).filter(Boolean)),
+      new Set(
+        characters
+          .map((character) => character.attribute.trim())
+          .filter(Boolean),
+      ),
     ).sort((left, right) => left.localeCompare(right, 'ru-RU')),
   ];
 }
@@ -448,6 +464,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [error, setError] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const loadedPrivateSourcesForRef = useRef('');
 
   useEffect(() => {
@@ -455,6 +472,7 @@ function App() {
 
     async function init() {
       setLoading(true);
+      setError('');
       const [currentUser, siteData] = await Promise.all([me(), loadSiteData()]);
       const viewer = currentUser.ok ? currentUser.data : null;
 
@@ -468,18 +486,14 @@ function App() {
     }
 
     init().catch((loadError: unknown) => {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : 'Не удалось загрузить данные',
-      );
+      setError(formatPortalLoadError(loadError));
       setLoading(false);
     });
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadAttempt]);
 
   useEffect(() => {
     const staffId =
@@ -635,7 +649,7 @@ function App() {
       ],
       tierlists: [
         'Тир-листы',
-      'Единый тир-лист NTE Meta с ручной редакционной оценкой.',
+        'Единый тир-лист NTE Meta с ручной редакционной оценкой.',
         '/tierlists/',
       ],
       admin: ['Админка', 'Защищённая редакционная CMS NTE Meta.', '/admin/'],
@@ -669,7 +683,12 @@ function App() {
     page = <RouteLoadingState route={route} />;
   } else if (section === 'characters') {
     page = slug ? (
-      <CharacterDetailPage data={data} slug={slug} user={user} setData={setData} />
+      <CharacterDetailPage
+        data={data}
+        slug={slug}
+        user={user}
+        setData={setData}
+      />
     ) : (
       <CharactersPage data={data} user={user} setData={setData} />
     );
@@ -739,7 +758,18 @@ function App() {
         />
       ) : null}
       <main id="main-content" className="site-main">
-        {error ? <StatusBanner tone="danger" text={error} /> : null}
+        {error ? (
+          <div className="portal-load-error">
+            <StatusBanner tone="danger" text={error} />
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => setLoadAttempt((current) => current + 1)}
+            >
+              <RotateCw aria-hidden="true" /> Повторить загрузку
+            </button>
+          </div>
+        ) : null}
         {loading ? (
           <StatusBanner
             tone="info"
@@ -771,7 +801,9 @@ function BackToTopButton() {
     let frame = 0;
     const update = () => {
       window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(() => setVisible(window.scrollY > 720));
+      frame = window.requestAnimationFrame(() =>
+        setVisible(window.scrollY > 720),
+      );
     };
     update();
     window.addEventListener('scroll', update, { passive: true });
@@ -790,7 +822,8 @@ function BackToTopButton() {
       onClick={() =>
         window.scrollTo({
           top: 0,
-          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)')
+            .matches
             ? 'auto'
             : 'smooth',
         })
@@ -895,7 +928,15 @@ function Header({
           );
         })}
       </nav>
-      <a className="profile-chip" href="#/profile">
+      <a
+        className="profile-chip"
+        href="#/profile"
+        aria-label={
+          user
+            ? `Профиль: ${user.displayName || user.username}`
+            : 'Войти в профиль'
+        }
+      >
         <UserCircle aria-hidden="true" />
         <span>
           {user
@@ -943,7 +984,9 @@ function HomePage({
   async function refreshContent() {
     setData(
       await loadSiteData({
-        includePrivate: Boolean(user && roleWeight[user.role] >= roleWeight.editor),
+        includePrivate: Boolean(
+          user && roleWeight[user.role] >= roleWeight.editor,
+        ),
       }),
     );
   }
@@ -986,7 +1029,7 @@ function HomePage({
             >
               <img
                 src={resolveAssetUrl(character.splashUrl || character.imageUrl)}
-                alt={character.name}
+                alt=""
                 width="280"
                 height="360"
                 loading={index === 0 ? 'eager' : 'lazy'}
@@ -1235,7 +1278,9 @@ function HomePage({
 
       <EditorShell
         open={homeEditor === 'guide'}
-        title={homeEditorItemId === 'new' ? 'Добавить гайд' : 'Редактировать гайд'}
+        title={
+          homeEditorItemId === 'new' ? 'Добавить гайд' : 'Редактировать гайд'
+        }
         eyebrow="Редактор"
         description="Персонажный гайд создаётся прямо из главной и сразу попадёт в раздел гайдов после публикации."
         dirty={homeEditorDirty}
@@ -1244,8 +1289,10 @@ function HomePage({
           setHomeEditor(null);
         }}
       >
-        {user ? (
-          <Suspense fallback={<SkeletonGrid label="Загрузка редактора гайда" />}>
+        {homeEditor === 'guide' && user ? (
+          <Suspense
+            fallback={<SkeletonGrid label="Загрузка редактора гайда" />}
+          >
             <AdminGuides
               data={data}
               setData={setData}
@@ -1265,7 +1312,11 @@ function HomePage({
 
       <EditorShell
         open={homeEditor === 'news'}
-        title={homeEditorItemId === 'new' ? 'Добавить новость' : 'Редактировать новость'}
+        title={
+          homeEditorItemId === 'new'
+            ? 'Добавить новость'
+            : 'Редактировать новость'
+        }
         eyebrow="Редакция"
         dirty={homeEditorDirty}
         onClose={() => {
@@ -1273,23 +1324,27 @@ function HomePage({
           setHomeEditor(null);
         }}
       >
-        <Suspense fallback={<SkeletonGrid label="Загрузка редактора новости" />}>
-          <AdminNewsManager
-            items={data.news}
-            initialSelectedId={homeEditorItemId}
-            access={user ? contentAccess(user, 'news') : undefined}
-            onRefresh={refreshContent}
-            onDirtyChange={setHomeEditorDirty}
-            onSaved={({ saved, values, publishStatus }) => {
-              if (publishStatus === 'draft') return;
-              const slug = String(saved?.slug || values.slug || '').trim();
-              if (!slug) return;
-              setHomeEditorDirty(false);
-              setHomeEditor(null);
-              window.location.hash = `#/news/${slug}`;
-            }}
-          />
-        </Suspense>
+        {homeEditor === 'news' && canCreateNews ? (
+          <Suspense
+            fallback={<SkeletonGrid label="Загрузка редактора новости" />}
+          >
+            <AdminNewsManager
+              items={data.news}
+              initialSelectedId={homeEditorItemId}
+              access={user ? contentAccess(user, 'news') : undefined}
+              onRefresh={refreshContent}
+              onDirtyChange={setHomeEditorDirty}
+              onSaved={({ saved, values, publishStatus }) => {
+                if (publishStatus === 'draft') return;
+                const slug = String(saved?.slug || values.slug || '').trim();
+                if (!slug) return;
+                setHomeEditorDirty(false);
+                setHomeEditor(null);
+                window.location.hash = `#/news/${slug}`;
+              }}
+            />
+          </Suspense>
+        ) : null}
       </EditorShell>
 
       <EditorShell
@@ -1304,28 +1359,32 @@ function HomePage({
           setHomeEditor(null);
         }}
       >
-        <Suspense fallback={<SkeletonGrid label="Загрузка редактора слива" />}>
-          <LeakDiscoveryPanel
-            onPromoted={async (leakId) => {
-              await refreshContent();
-              setHomeEditorItemId(leakId);
-            }}
-          />
-          <AdminLeaksManager
-            items={data.leaks}
-            initialSelectedId={homeEditorItemId}
-            access={user ? contentAccess(user, 'leaks') : undefined}
-            onRefresh={refreshContent}
-            onDirtyChange={setHomeEditorDirty}
-            onSaved={({ saved, values }) => {
-              const slug = String(saved?.slug || values.slug || '').trim();
-              if (!slug) return;
-              setHomeEditorDirty(false);
-              setHomeEditor(null);
-              window.location.hash = `#/leaks/${slug}`;
-            }}
-          />
-        </Suspense>
+        {homeEditor === 'leak' && canCreateLeak ? (
+          <Suspense
+            fallback={<SkeletonGrid label="Загрузка редактора слива" />}
+          >
+            <LeakDiscoveryPanel
+              onPromoted={async (leakId) => {
+                await refreshContent();
+                setHomeEditorItemId(leakId);
+              }}
+            />
+            <AdminLeaksManager
+              items={data.leaks}
+              initialSelectedId={homeEditorItemId}
+              access={user ? contentAccess(user, 'leaks') : undefined}
+              onRefresh={refreshContent}
+              onDirtyChange={setHomeEditorDirty}
+              onSaved={({ saved, values }) => {
+                const slug = String(saved?.slug || values.slug || '').trim();
+                if (!slug) return;
+                setHomeEditorDirty(false);
+                setHomeEditor(null);
+                window.location.hash = `#/leaks/${slug}`;
+              }}
+            />
+          </Suspense>
+        ) : null}
       </EditorShell>
 
       <EditorShell
@@ -1338,7 +1397,7 @@ function HomePage({
           setHomeEditor(null);
         }}
       >
-        {user ? (
+        {homeEditor === 'thread' && user ? (
           <ThreadEditor
             user={user}
             onDirtyChange={setHomeEditorDirty}
@@ -1369,17 +1428,25 @@ function ThreadEditor({
   const draftKey = `nte-thread-draft-${thread?.id || 'new'}`;
   const storedDraft = useMemo(() => {
     try {
-      return JSON.parse(localStorage.getItem(draftKey) || '{}') as Partial<CommunityThread>;
+      return JSON.parse(
+        localStorage.getItem(draftKey) || '{}',
+      ) as Partial<CommunityThread>;
     } catch {
       return {};
     }
   }, [draftKey]);
   const [title, setTitle] = useState(storedDraft.title || thread?.title || '');
   const [slug, setSlug] = useState(storedDraft.slug || thread?.slug || '');
-  const [summary, setSummary] = useState(storedDraft.summary || thread?.summary || '');
+  const [summary, setSummary] = useState(
+    storedDraft.summary || thread?.summary || '',
+  );
   const [body, setBody] = useState(storedDraft.body || thread?.body || '');
-  const [tags, setTags] = useState((storedDraft.tags || thread?.tags || []).join(', '));
-  const [status, setStatus] = useState<CommunityThread['status']>(thread?.status || 'open');
+  const [tags, setTags] = useState(
+    (storedDraft.tags || thread?.tags || []).join(', '),
+  );
+  const [status, setStatus] = useState<CommunityThread['status']>(
+    thread?.status || 'open',
+  );
   const [slugTouched, setSlugTouched] = useState(
     Boolean(thread?.slug || storedDraft.slug),
   );
@@ -1461,78 +1528,83 @@ function ThreadEditor({
         Текст в редакторе сразу выглядит так же, как после публикации.
       </p>
       <section className="admin-panel entity-form thread-editor__form">
-          <label htmlFor="thread-title">Заголовок</label>
+        <label htmlFor="thread-title">Заголовок</label>
+        <input
+          id="thread-title"
+          value={title}
+          minLength={4}
+          maxLength={120}
+          onChange={(event) => updateTitle(event.target.value)}
+          required
+        />
+        <label htmlFor="thread-slug">
+          Адрес страницы
           <input
-            id="thread-title"
-            value={title}
-            minLength={4}
-            maxLength={120}
-            onChange={(event) => updateTitle(event.target.value)}
+            id="thread-slug"
+            value={slug}
+            maxLength={140}
+            onChange={(event) => updateSlug(event.target.value)}
             required
+            aria-describedby="thread-slug-help"
           />
-          <label htmlFor="thread-slug">
-            Адрес страницы
-            <input
-              id="thread-slug"
-              value={slug}
-              maxLength={140}
-              onChange={(event) => updateSlug(event.target.value)}
-              required
-              aria-describedby="thread-slug-help"
-            />
-            <small id="thread-slug-help">
-              Создаётся из заголовка автоматически. Его можно изменить для короткой ссылки.
-            </small>
-          </label>
-          <label htmlFor="thread-summary">Краткое описание</label>
-          <textarea
-            id="thread-summary"
-            value={summary}
-            rows={3}
-            maxLength={240}
-            onChange={(event) => setSummary(event.target.value)}
-            required
-          />
-          <label htmlFor="thread-body">Текст треда</label>
-          <RichTextEditorField
-            id="thread-body"
-            value={body}
-            onChange={setBody}
-            maxLength={12000}
-            minHeight={340}
-            placeholder="Сформулируйте тему, добавьте детали и вопросы для обсуждения..."
-            ariaLabel="Текст треда"
-          />
-          <label htmlFor="thread-tags">Теги</label>
-          <input
-            id="thread-tags"
-            value={tags}
-            placeholder="вопрос, ротация, патч"
-            onChange={(event) => setTags(event.target.value)}
-          />
-          {roleWeight[user.role] >= roleWeight.editor ? (
-            <>
-              <label htmlFor="thread-status">Статус обсуждения</label>
-              <select
-                id="thread-status"
-                value={status}
-                onChange={(event) =>
-                  setStatus(event.target.value as CommunityThread['status'])
-                }
-              >
-                <option value="open">Открыт для обсуждения</option>
-                <option value="closed">В архиве · только чтение</option>
-                {roleWeight[user.role] >= roleWeight.moderator ? (
-                  <option value="hidden">Скрыт модерацией</option>
-                ) : null}
-              </select>
-            </>
-          ) : null}
+          <small id="thread-slug-help">
+            Создаётся из заголовка автоматически. Его можно изменить для
+            короткой ссылки.
+          </small>
+        </label>
+        <label htmlFor="thread-summary">Краткое описание</label>
+        <textarea
+          id="thread-summary"
+          value={summary}
+          rows={3}
+          maxLength={240}
+          onChange={(event) => setSummary(event.target.value)}
+          required
+        />
+        <label htmlFor="thread-body">Текст треда</label>
+        <RichTextEditorField
+          id="thread-body"
+          value={body}
+          onChange={setBody}
+          maxLength={12000}
+          minHeight={340}
+          placeholder="Сформулируйте тему, добавьте детали и вопросы для обсуждения..."
+          ariaLabel="Текст треда"
+        />
+        <label htmlFor="thread-tags">Теги</label>
+        <input
+          id="thread-tags"
+          value={tags}
+          placeholder="вопрос, ротация, патч"
+          onChange={(event) => setTags(event.target.value)}
+        />
+        {roleWeight[user.role] >= roleWeight.editor ? (
+          <>
+            <label htmlFor="thread-status">Статус обсуждения</label>
+            <select
+              id="thread-status"
+              value={status}
+              onChange={(event) =>
+                setStatus(event.target.value as CommunityThread['status'])
+              }
+            >
+              <option value="open">Открыт для обсуждения</option>
+              <option value="closed">В архиве · только чтение</option>
+              {roleWeight[user.role] >= roleWeight.moderator ? (
+                <option value="hidden">Скрыт модерацией</option>
+              ) : null}
+            </select>
+          </>
+        ) : null}
       </section>
       <div className="editor-shell__footer">
         <button className="primary-button" type="submit" disabled={pending}>
           <CheckCircle2 aria-hidden="true" />
-          {pending ? 'Сохраняем...' : thread ? 'Сохранить тред' : 'Опубликовать тред'}
+          {pending
+            ? 'Сохраняем...'
+            : thread
+              ? 'Сохранить тред'
+              : 'Опубликовать тред'}
         </button>
         <span className="form-message" aria-live="polite">
           {message || 'Черновик автоматически хранится в этом браузере.'}
@@ -1654,7 +1726,8 @@ function ThreadsPage({
                 <div className="thread-list-card__heading">
                   <div>
                     <p className="eyebrow">
-                      {thread.author} · {formatDate(thread.updatedAt || thread.createdAt)}
+                      {thread.author} ·{' '}
+                      {formatDate(thread.updatedAt || thread.createdAt)}
                     </p>
                     <h2>{thread.title}</h2>
                   </div>
@@ -1675,10 +1748,7 @@ function ThreadsPage({
                 <div className="thread-list-card__footer">
                   <Tags tags={thread.tags} />
                   <span>{thread.commentsCount || 0} комментариев</span>
-                  <a
-                    className="text-button"
-                    href={`#/threads/${thread.slug}`}
-                  >
+                  <a className="text-button" href={`#/threads/${thread.slug}`}>
                     Открыть <ChevronRight aria-hidden="true" />
                   </a>
                 </div>
@@ -1737,14 +1807,18 @@ function ThreadPage({
   user: User | null;
   setData: SiteDataSetter;
 }) {
-  const thread = data.threads.find((item) => item.slug === slug || item.id === slug);
+  const thread = data.threads.find(
+    (item) => item.slug === slug || item.id === slug,
+  );
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorDirty, setEditorDirty] = useState(false);
 
   async function refreshContent() {
     setData(
       await loadSiteData({
-        includePrivate: Boolean(user && roleWeight[user.role] >= roleWeight.editor),
+        includePrivate: Boolean(
+          user && roleWeight[user.role] >= roleWeight.editor,
+        ),
       }),
     );
   }
@@ -1778,7 +1852,11 @@ function ThreadPage({
           ) : null}
           <Tags tags={thread.tags} />
           {canEditThread ? (
-            <button className="ghost-button" type="button" onClick={() => setEditorOpen(true)}>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => setEditorOpen(true)}
+            >
               <Pencil aria-hidden="true" /> Редактировать тред
             </button>
           ) : null}
@@ -1868,7 +1946,9 @@ function MetricsStrip({ data }: { data: SiteData }) {
 
 function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
   const updatedGuide = data.guides[0];
-  const focusCharacter = updatedGuide ? getGuideCharacter(data, updatedGuide) : undefined;
+  const focusCharacter = updatedGuide
+    ? getGuideCharacter(data, updatedGuide)
+    : undefined;
   const pendingLeaks = data.leaks.filter((leak) => !leak.approved).length;
   const sourceCount = data.sources.length;
   const sourceMetric = sourceCount
@@ -1878,7 +1958,9 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
       : 'Ручная проверка';
   const recentThread = data.threads[0];
   const leadHref = updatedGuide ? `#/guides/${updatedGuide.slug}` : '#/guides';
-  const leadTitle = updatedGuide ? updatedGuide.title : 'Нужен первый глубокий гайд';
+  const leadTitle = updatedGuide
+    ? updatedGuide.title
+    : 'Нужен первый глубокий гайд';
   const leadText = updatedGuide
     ? `${updatedGuide.patch} · обновлено ${formatDate(updatedGuide.updatedAt)}`
     : 'Создайте персонажный гайд и добавьте команды, ротации, видео и проверенные источники.';
@@ -1906,17 +1988,29 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
 
   function updateSpotlight(event: React.PointerEvent<HTMLElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
-    event.currentTarget.style.setProperty('--spot-x', `${event.clientX - rect.left}px`);
-    event.currentTarget.style.setProperty('--spot-y', `${event.clientY - rect.top}px`);
+    event.currentTarget.style.setProperty(
+      '--spot-x',
+      `${event.clientX - rect.left}px`,
+    );
+    event.currentTarget.style.setProperty(
+      '--spot-y',
+      `${event.clientY - rect.top}px`,
+    );
   }
 
   return (
     <section className="home-focus-panel" aria-label="Редакционный пульс">
-      <a className="home-focus-lead spotlight-surface" href={leadHref} onPointerMove={updateSpotlight}>
+      <a
+        className="home-focus-lead spotlight-surface"
+        href={leadHref}
+        onPointerMove={updateSpotlight}
+      >
         {focusCharacter ? (
           <img
             className="home-focus-lead__art"
-            src={resolveAssetUrl(focusCharacter.splashUrl || focusCharacter.imageUrl)}
+            src={resolveAssetUrl(
+              focusCharacter.splashUrl || focusCharacter.imageUrl,
+            )}
             alt=""
             width="720"
             height="560"
@@ -2004,7 +2098,9 @@ function CharacterCard({
             {character.role} · {character.attribute} · {character.rarity}
           </p>
           {character.shortDescription ? (
-            <p className="character-card__summary">{character.shortDescription}</p>
+            <p className="character-card__summary">
+              {character.shortDescription}
+            </p>
           ) : null}
           <Tags tags={cardTags} />
         </div>
@@ -2027,7 +2123,9 @@ function GuideCard({
   return (
     <article className="guide-card">
       <img
-        src={resolveAssetUrl(character?.splashUrl || character?.imageUrl || 'assets/logo.svg')}
+        src={resolveAssetUrl(
+          character?.splashUrl || character?.imageUrl || 'assets/logo.svg',
+        )}
         alt={character?.name || guide.title}
         width="460"
         height="280"
@@ -2066,7 +2164,13 @@ function GuideCard({
   );
 }
 
-function NewsCompactCard({ item, onEdit }: { item: NewsItem; onEdit?: () => void }) {
+function NewsCompactCard({
+  item,
+  onEdit,
+}: {
+  item: NewsItem;
+  onEdit?: () => void;
+}) {
   return (
     <article className="compact-card">
       <img
@@ -2074,9 +2178,9 @@ function NewsCompactCard({ item, onEdit }: { item: NewsItem; onEdit?: () => void
         alt=""
         width="96"
         height="96"
-            loading="lazy"
-            referrerPolicy="no-referrer"
-          />
+        loading="lazy"
+        referrerPolicy="no-referrer"
+      />
       <div>
         <span>
           {item.category} · {formatDate(item.date)}
@@ -2098,7 +2202,13 @@ function NewsCompactCard({ item, onEdit }: { item: NewsItem; onEdit?: () => void
   );
 }
 
-function LeakCompactCard({ item, onEdit }: { item: LeakItem; onEdit?: () => void }) {
+function LeakCompactCard({
+  item,
+  onEdit,
+}: {
+  item: LeakItem;
+  onEdit?: () => void;
+}) {
   return (
     <article className="compact-card leak">
       <CircleAlert aria-hidden="true" />
@@ -2236,7 +2346,8 @@ function CharactersPage({
           queryMatch &&
           (rarity === 'Любая редкость' || character.rarity === rarity) &&
           (tier === 'Любой тир' || tierPlacement?.tier === tier) &&
-          (attribute === anyAttributeOption || character.attribute === attribute)
+          (attribute === anyAttributeOption ||
+            character.attribute === attribute)
         );
       })
       .map(({ character }) => character);
@@ -2245,7 +2356,9 @@ function CharactersPage({
   async function refreshContent() {
     setData(
       await loadSiteData({
-        includePrivate: Boolean(user && roleWeight[user.role] >= roleWeight.editor),
+        includePrivate: Boolean(
+          user && roleWeight[user.role] >= roleWeight.editor,
+        ),
       }),
     );
   }
@@ -2267,7 +2380,11 @@ function CharactersPage({
           пробуждения. Практическая мета находится в разделе гайдов.
         </p>
         {canManageContent(user, 'characters', 'create') ? (
-          <button className="primary-button" type="button" onClick={() => setEditorOpen(true)}>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => setEditorOpen(true)}
+          >
             <Plus aria-hidden="true" /> Добавить персонажа
           </button>
         ) : null}
@@ -2311,15 +2428,29 @@ function CharactersPage({
           Найдено: {filtered.length} из {data.characters.length}
         </p>
         {hasActiveFilters ? (
-          <button className="ghost-button filter-reset-button" type="button" onClick={resetFilters}>
+          <button
+            className="ghost-button filter-reset-button"
+            type="button"
+            onClick={resetFilters}
+          >
             <RotateCw aria-hidden="true" /> Сбросить фильтры
           </button>
         ) : null}
       </div>
       {filtered.length ? (
-        <section className="character-grid">
+        <section
+          className="character-grid"
+          aria-labelledby="character-results-heading"
+        >
+          <h2 id="character-results-heading" className="sr-only">
+            Список персонажей
+          </h2>
           {filtered.map((character) => (
-            <CharacterCard key={character.id} character={character} data={data} />
+            <CharacterCard
+              key={character.id}
+              character={character}
+              data={data}
+            />
           ))}
         </section>
       ) : (
@@ -2340,7 +2471,9 @@ function CharactersPage({
         }}
       >
         {user ? (
-          <Suspense fallback={<SkeletonGrid label="Загрузка редактора персонажа" />}>
+          <Suspense
+            fallback={<SkeletonGrid label="Загрузка редактора персонажа" />}
+          >
             <AdminCharacterEditor
               items={data.characters}
               initialSelectedId="new"
@@ -2461,14 +2594,22 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
 
   useEffect(() => setVisibleCount(8), [activeLanguage]);
 
-  const languageLines = lines.filter((line) => line.language === activeLanguage);
+  const languageLines = lines.filter(
+    (line) => line.language === activeLanguage,
+  );
   const visibleLines = languageLines.slice(0, visibleCount);
 
   return (
     <div className="voice-library">
-      <div className="voice-language-tabs" role="tablist" aria-label="Язык озвучки">
+      <div
+        className="voice-language-tabs"
+        role="tablist"
+        aria-label="Язык озвучки"
+      >
         {languages.map((language) => {
-          const count = lines.filter((line) => line.language === language).length;
+          const count = lines.filter(
+            (line) => line.language === language,
+          ).length;
           const selected = language === activeLanguage;
           return (
             <button
@@ -2609,6 +2750,69 @@ function CharacterAbilityCard({
   );
 }
 
+function CharacterSkinMedia({
+  skin,
+  onOpen,
+}: {
+  skin: CharacterProfile['skins'][number];
+  onOpen: () => void;
+}) {
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'failed'>(
+    'loading',
+  );
+
+  useEffect(() => {
+    setLoadState('loading');
+    const timeout = globalThis.setTimeout(() => {
+      setLoadState((current) => (current === 'loading' ? 'failed' : current));
+    }, 3_500);
+    return () => globalThis.clearTimeout(timeout);
+  }, [skin.id, skin.imageUrl]);
+
+  if (loadState === 'failed') {
+    return (
+      <div className="skin-media-fallback" role="status">
+        <ImageIcon aria-hidden="true" />
+        <span>
+          Изображение пока недоступно. Обновите страницу, чтобы повторить
+          загрузку.
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      className="skin-media"
+      type="button"
+      aria-label={`Открыть изображение «${skin.name}» целиком`}
+      aria-busy={loadState === 'loading'}
+      disabled={loadState === 'loading'}
+      onClick={onOpen}
+    >
+      <img
+        src={resolveAssetUrl(skin.imageUrl)}
+        alt={skin.name}
+        width="640"
+        height="720"
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onLoad={() => setLoadState('ready')}
+        onError={() => setLoadState('failed')}
+      />
+      <span className="skin-media-action">
+        {loadState === 'loading' ? (
+          'Загружаем изображение…'
+        ) : (
+          <>
+            <Maximize2 aria-hidden="true" /> Посмотреть целиком
+          </>
+        )}
+      </span>
+    </button>
+  );
+}
+
 function CharacterDetailPage({
   data,
   slug,
@@ -2634,6 +2838,7 @@ function CharacterDetailPage({
     description: string;
   } | null>(null);
   const skinDialogRef = useRef<HTMLDialogElement>(null);
+
   const scrollToCharacterSection = useCallback(
     (id: string, behavior: ScrollBehavior = 'smooth') => {
       const target = document.getElementById(id);
@@ -2660,8 +2865,12 @@ function CharacterDetailPage({
       (entries) => {
         const visible = entries
           .filter((entry) => entry.isIntersecting)
-          .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top);
-        if (visible[0]?.target.id) setActiveCharacterSection(visible[0].target.id);
+          .sort(
+            (left, right) =>
+              left.boundingClientRect.top - right.boundingClientRect.top,
+          );
+        if (visible[0]?.target.id)
+          setActiveCharacterSection(visible[0].target.id);
       },
       { rootMargin: '-150px 0px -58% 0px', threshold: [0, 0.12, 0.4] },
     );
@@ -2709,7 +2918,9 @@ function CharacterDetailPage({
   async function refreshContent() {
     setData(
       await loadSiteData({
-        includePrivate: Boolean(user && roleWeight[user.role] >= roleWeight.editor),
+        includePrivate: Boolean(
+          user && roleWeight[user.role] >= roleWeight.editor,
+        ),
       }),
     );
   }
@@ -2730,46 +2941,44 @@ function CharacterDetailPage({
             {character.originalName} · {profile.faction || 'Фракция уточняется'}
           </p>
           <h1>{character.name}</h1>
-          {character.shortDescription ? <p>{character.shortDescription}</p> : null}
+          {character.shortDescription ? (
+            <p>{character.shortDescription}</p>
+          ) : null}
           <dl className="guide-facts character-profile-facts">
-          <div>
-            <dt>День рождения</dt>
-            <dd>{profile.birthday || 'Не указан'}</dd>
-          </div>
-          <div>
-            <dt>Дата релиза</dt>
-            <dd>
-              {profile.releaseDate
-                ? formatProfileDate(profile.releaseDate)
-                : 'Не указана'}
-            </dd>
-          </div>
-          <div>
-            <dt>Версия появления</dt>
-            <dd>{profile.releaseVersion || 'Не указана'}</dd>
-          </div>
-          <div>
+            <div>
+              <dt>День рождения</dt>
+              <dd>{profile.birthday || 'Не указан'}</dd>
+            </div>
+            <div>
+              <dt>Дата релиза</dt>
+              <dd>
+                {profile.releaseDate
+                  ? formatProfileDate(profile.releaseDate)
+                  : 'Не указана'}
+              </dd>
+            </div>
+            <div>
+              <dt>Версия появления</dt>
+              <dd>{profile.releaseVersion || 'Не указана'}</dd>
+            </div>
+            <div>
               <dt>Атрибут</dt>
-            <dd>{character.attribute}</dd>
-          </div>
-        <div>
-          <dt>Тип дуги</dt>
-          <dd>{profile.arcType || 'Не указан'}</dd>
-        </div>
-        <div>
-          <dt>Редкость</dt>
-          <dd>{character.rarity}</dd>
-        </div>
-        <div>
-          <dt>Тир-лист</dt>
-          <dd>
-            {tierPlacement
-              ? tierPlacement.tier
-              : 'Не задан'}
-          </dd>
-        </div>
-        <div>
-          <dt>Фракция</dt>
+              <dd>{character.attribute}</dd>
+            </div>
+            <div>
+              <dt>Тип дуги</dt>
+              <dd>{profile.arcType || 'Не указан'}</dd>
+            </div>
+            <div>
+              <dt>Редкость</dt>
+              <dd>{character.rarity}</dd>
+            </div>
+            <div>
+              <dt>Тир-лист</dt>
+              <dd>{tierPlacement ? tierPlacement.tier : 'Не задан'}</dd>
+            </div>
+            <div>
+              <dt>Фракция</dt>
               <dd>{profile.faction || 'Не указана'}</dd>
             </div>
           </dl>
@@ -2783,7 +2992,11 @@ function CharacterDetailPage({
                 <BookOpen aria-hidden="true" /> Гайд на персонажа
               </a>
             ) : canManageContent(user, 'guides', 'create') ? (
-              <button className="primary-button" type="button" onClick={() => setGuideEditorOpen(true)}>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => setGuideEditorOpen(true)}
+              >
                 <Plus aria-hidden="true" /> Создать гайд
               </button>
             ) : (
@@ -2808,16 +3021,16 @@ function CharacterDetailPage({
           ['character-abilities', 'Способности'],
           ['character-awakenings', 'Пробуждения'],
           ['character-progression', 'Прокачка'],
-          ...(profile.skins.length
-            ? [['character-wardrobe', 'Гардероб']]
-            : []),
+          ...(profile.skins.length ? [['character-wardrobe', 'Гардероб']] : []),
           ['character-voice', 'Озвучка'],
         ].map(([id, label]) => (
           <button
             type="button"
             key={id}
             className={activeCharacterSection === id ? 'active' : ''}
-            aria-current={activeCharacterSection === id ? 'location' : undefined}
+            aria-current={
+              activeCharacterSection === id ? 'location' : undefined
+            }
             onClick={() => {
               setActiveCharacterSection(id);
               scrollToCharacterSection(id);
@@ -2944,7 +3157,10 @@ function CharacterDetailPage({
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <span className="character-detail-fallback-icon" aria-hidden="true">
+                  <span
+                    className="character-detail-fallback-icon"
+                    aria-hidden="true"
+                  >
                     <ImageIcon />
                   </span>
                 )}
@@ -2976,32 +3192,37 @@ function CharacterDetailPage({
                     : [];
                 return (
                   <article key={level.level}>
-                  <strong>{level.level}</strong>
-                  <div className="friendship-level-content">
-                    <h3>{`Уровень симпатии ${level.level}`}</h3>
-                    <p>{level.description}</p>
-                    {rewards.length ? (
-                      <ul className="friendship-reward-list" aria-label={`Награды уровня ${level.level}`}>
-                        {rewards.map((reward) => (
-                          <li key={reward.id}>
-                            {reward.iconUrl ? (
-                              <img
-                                src={resolveAssetUrl(reward.iconUrl)}
-                                alt=""
-                                width="44"
-                                height="44"
-                                loading="lazy"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : null}
-                            <span>{reward.name || 'Награда'}</span>
-                            {reward.quantity ? <strong>×{reward.quantity}</strong> : null}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </div>
-                </article>
+                    <strong>{level.level}</strong>
+                    <div className="friendship-level-content">
+                      <h3>{`Уровень симпатии ${level.level}`}</h3>
+                      <p>{level.description}</p>
+                      {rewards.length ? (
+                        <ul
+                          className="friendship-reward-list"
+                          aria-label={`Награды уровня ${level.level}`}
+                        >
+                          {rewards.map((reward) => (
+                            <li key={reward.id}>
+                              {reward.iconUrl ? (
+                                <img
+                                  src={resolveAssetUrl(reward.iconUrl)}
+                                  alt=""
+                                  width="44"
+                                  height="44"
+                                  loading="lazy"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : null}
+                              <span>{reward.name || 'Награда'}</span>
+                              {reward.quantity ? (
+                                <strong>×{reward.quantity}</strong>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  </article>
                 );
               })}
           </div>
@@ -3020,7 +3241,10 @@ function CharacterDetailPage({
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <span className="character-detail-fallback-icon" aria-hidden="true">
+                  <span
+                    className="character-detail-fallback-icon"
+                    aria-hidden="true"
+                  >
                     <Star />
                   </span>
                 )}
@@ -3041,30 +3265,16 @@ function CharacterDetailPage({
             {profile.skins.map((skin) => (
               <article key={skin.id}>
                 {skin.imageUrl ? (
-                  <button
-                    className="skin-media"
-                    type="button"
-                    aria-label={`Открыть изображение «${skin.name}» целиком`}
-                    onClick={() =>
+                  <CharacterSkinMedia
+                    skin={skin}
+                    onOpen={() =>
                       setActiveSkin({
                         name: skin.name,
                         imageUrl: skin.imageUrl,
                         description: skin.description,
                       })
                     }
-                  >
-                    <img
-                      src={resolveAssetUrl(skin.imageUrl)}
-                      alt={skin.name}
-                      width="640"
-                      height="720"
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
-                    <span className="skin-media-action">
-                      <Maximize2 aria-hidden="true" /> Посмотреть целиком
-                    </span>
-                  </button>
+                  />
                 ) : null}
                 <h3>{skin.name}</h3>
                 <p>{skin.description}</p>
@@ -3116,8 +3326,8 @@ function CharacterDetailPage({
               <CharacterVoiceLibrary lines={profile.voiceLines} />
             ) : (
               <p className="empty-inline-copy">
-                Аудио пока не добавлено. Редакторы смогут разместить реплики
-                для каждого языка отдельно.
+                Аудио пока не добавлено. Редакторы смогут разместить реплики для
+                каждого языка отдельно.
               </p>
             )}
           </section>
@@ -3178,7 +3388,9 @@ function CharacterDetailPage({
         }}
       >
         {user ? (
-          <Suspense fallback={<SkeletonGrid label="Загрузка редактора персонажа" />}>
+          <Suspense
+            fallback={<SkeletonGrid label="Загрузка редактора персонажа" />}
+          >
             <AdminCharacterEditor
               items={data.characters}
               initialSelectedId={character.id}
@@ -3209,7 +3421,9 @@ function CharacterDetailPage({
         }}
       >
         {user ? (
-          <Suspense fallback={<SkeletonGrid label="Загрузка редактора гайда" />}>
+          <Suspense
+            fallback={<SkeletonGrid label="Загрузка редактора гайда" />}
+          >
             <AdminGuides
               data={data}
               setData={setData}
@@ -3383,7 +3597,10 @@ function GuideDetail({
       (entries) => {
         const visible = entries
           .filter((entry) => entry.isIntersecting)
-          .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top);
+          .sort(
+            (left, right) =>
+              left.boundingClientRect.top - right.boundingClientRect.top,
+          );
         if (visible[0]?.target.id) setActiveGuideSection(visible[0].target.id);
       },
       { rootMargin: '-120px 0px -62% 0px', threshold: [0, 0.15, 0.5] },
@@ -3394,11 +3611,17 @@ function GuideDetail({
 
   return (
     <div className="page-stack">
-      <GuideHero guide={guide} character={character} tierPlacement={tierPlacement} />
+      <GuideHero
+        guide={guide}
+        character={character}
+        tierPlacement={tierPlacement}
+      />
       <section className="guide-toolbar">
         <div>
           <p>Проверенный материал редакции</p>
-          <strong>{character.name} · {character.attribute} · {character.role}</strong>
+          <strong>
+            {character.name} · {character.attribute} · {character.role}
+          </strong>
         </div>
         <div className="guide-toolbar-actions">
           <a className="ghost-button" href={`#/characters/${character.slug}`}>
@@ -3406,7 +3629,11 @@ function GuideDetail({
           </a>
           <RatingBar targetType="guide" targetId={guide.id} user={user} />
           {canManageContent(user, 'guides', 'edit') ? (
-            <button className="ghost-button" type="button" onClick={() => setEditorOpen(true)}>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => setEditorOpen(true)}
+            >
               <Pencil aria-hidden="true" /> Редактировать гайд
             </button>
           ) : null}
@@ -3420,7 +3647,9 @@ function GuideDetail({
               type="button"
               key={section.id}
               className={activeGuideSection === section.id ? 'active' : ''}
-              aria-current={activeGuideSection === section.id ? 'location' : undefined}
+              aria-current={
+                activeGuideSection === section.id ? 'location' : undefined
+              }
               onClick={() => {
                 setActiveGuideSection(section.id);
                 document
@@ -3492,7 +3721,9 @@ function GuideDetail({
         }}
       >
         {user ? (
-          <Suspense fallback={<SkeletonGrid label="Загрузка редактора гайда" />}>
+          <Suspense
+            fallback={<SkeletonGrid label="Загрузка редактора гайда" />}
+          >
             <AdminGuides
               data={data}
               setData={setData}
@@ -3620,9 +3851,13 @@ function TeamCard({
   const hasRotation = rotationSteps.length > 0;
 
   return (
-    <article className={`team-card ${hasRotation ? 'has-rotation' : 'without-rotation'}`}>
+    <article
+      className={`team-card ${hasRotation ? 'has-rotation' : 'without-rotation'}`}
+    >
       <div className="team-card-heading">
-        <span className="team-card-kicker"><Users aria-hidden="true" /> Состав</span>
+        <span className="team-card-kicker">
+          <Users aria-hidden="true" /> Состав
+        </span>
         <h3>{team.title}</h3>
         {team.synergy ? <p>{team.synergy}</p> : null}
       </div>
@@ -3661,7 +3896,9 @@ function TeamCard({
       {hasRotation ? (
         <div className="team-rotation-sequence">
           <div className="rotation-sequence-heading">
-            <span><Play aria-hidden="true" /> Старт</span>
+            <span>
+              <Play aria-hidden="true" /> Старт
+            </span>
             <strong>Командная ротация</strong>
           </div>
           <ol>
@@ -3771,9 +4008,10 @@ function CommentsBlock({
   );
   const canChooseAnswer = Boolean(
     targetType === 'thread' &&
-      user &&
-      (canModerateComments ||
-        data.threads.find((thread) => thread.id === targetId)?.authorId === user.id),
+    user &&
+    (canModerateComments ||
+      data.threads.find((thread) => thread.id === targetId)?.authorId ===
+        user.id),
   );
   const threadedComments = useMemo(() => {
     const byParent = new Map<string, Comment[]>();
@@ -3808,9 +4046,7 @@ function CommentsBlock({
             new Date(left.createdAt).getTime() -
             new Date(right.createdAt).getTime(),
         )
-        .forEach((child) =>
-          append(child, depth + 1, comment.author, rootId),
-        );
+        .forEach((child) => append(child, depth + 1, comment.author, rootId));
     };
     roots.forEach((comment) => append(comment));
     comments
@@ -4034,9 +4270,7 @@ function CommentsBlock({
     const nextValue = !comment[marker];
     const result = await updateComment(
       comment.id,
-      marker === 'isPinned'
-        ? { isPinned: nextValue }
-        : { isAnswer: nextValue },
+      marker === 'isPinned' ? { isPinned: nextValue } : { isAnswer: nextValue },
     );
     if (result.ok) {
       setComments((current) =>
@@ -4078,7 +4312,9 @@ function CommentsBlock({
       reportDetails,
     );
     if (result.ok) {
-      setMessage('Жалоба отправлена модераторам. Спасибо за помощь сообществу.');
+      setMessage(
+        'Жалоба отправлена модераторам. Спасибо за помощь сообществу.',
+      );
       reportDialogRef.current?.close('submitted');
     } else {
       setMessage(result.error);
@@ -4099,7 +4335,11 @@ function CommentsBlock({
             {context ? `Ответ для ${context.author}` : 'Комментарий'}
           </label>
           {context ? (
-            <button className="text-button" type="button" onClick={() => setReplyTo(null)}>
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => setReplyTo(null)}
+            >
               <X aria-hidden="true" /> Отменить ответ
             </button>
           ) : null}
@@ -4135,7 +4375,11 @@ function CommentsBlock({
           <p id="comment-status" className="inline-status" aria-live="polite">
             {message}
           </p>
-          <button className="primary-button" type="submit" disabled={!user || pending}>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={!user || pending}
+          >
             <MessageCircle aria-hidden="true" />
             {pending ? 'Отправляем...' : context ? 'Ответить' : 'Отправить'}
           </button>
@@ -4166,226 +4410,240 @@ function CommentsBlock({
         {threadedComments.length ? (
           threadedComments.map(({ comment, depth, parentAuthor, rootId }) =>
             depth > 0 && collapsedBranches.has(rootId) ? null : (
-            <article
-              className={`comment-card ${
-                comment.parentId
-                  ? `is-reply reply-depth-${Math.min(depth, 3)}`
-                  : ''
-              }`}
-              id={`comment-${comment.id}`}
-              key={comment.id}
-            >
-              <div className="comment-heading">
-                <div className="comment-author-line">
-                  <strong>{comment.author}</strong>
-                  {comment.isPinned ? (
-                    <span className="comment-marker is-pinned">
-                      <Pin aria-hidden="true" /> Закреплено
-                    </span>
-                  ) : null}
-                  {comment.isAnswer ? (
-                    <span className="comment-marker is-answer">
-                      <BadgeCheck aria-hidden="true" /> Принятый ответ
-                    </span>
-                  ) : null}
-                </div>
-                <span>
-                  {formatDate(comment.createdAt)}
-                  {comment.updatedAt && comment.updatedAt !== comment.createdAt
-                    ? ' · изменено'
-                    : ''}
-                </span>
-              </div>
-              {parentAuthor ? (
-                <p className="comment-parent-context">
-                  <Reply aria-hidden="true" /> Ответ для {parentAuthor}
-                </p>
-              ) : null}
-              {editingId === comment.id ? (
-                <div className="comment-edit">
-                  <label htmlFor={`edit-${comment.id}`}>
-                    Изменить комментарий
-                  </label>
-                  <RichTextEditorField
-                    id={`edit-${comment.id}`}
-                    value={editBody}
-                    onChange={setEditBody}
-                    actions={[
-                      'bold',
-                      'italic',
-                      'underline',
-                      'strike',
-                      'list',
-                      'ordered-list',
-                      'quote',
-                      'link',
-                    ]}
-                    ariaLabel="Изменить комментарий"
-                    maxLength={4000}
-                    minHeight={108}
-                    compact
-                  />
-                  <div className="button-row">
-                    <button
-                      className="primary-button"
-                      type="button"
-                      disabled={actionId === comment.id}
-                      onClick={() => saveEdit(comment)}
-                    >
-                      Сохранить
-                    </button>
-                    <button
-                      className="ghost-button"
-                      type="button"
-                      onClick={() => setEditingId('')}
-                    >
-                      Отменить
-                    </button>
+              <article
+                className={`comment-card ${
+                  comment.parentId
+                    ? `is-reply reply-depth-${Math.min(depth, 3)}`
+                    : ''
+                }`}
+                id={`comment-${comment.id}`}
+                key={comment.id}
+              >
+                <div className="comment-heading">
+                  <div className="comment-author-line">
+                    <strong>{comment.author}</strong>
+                    {comment.isPinned ? (
+                      <span className="comment-marker is-pinned">
+                        <Pin aria-hidden="true" /> Закреплено
+                      </span>
+                    ) : null}
+                    {comment.isAnswer ? (
+                      <span className="comment-marker is-answer">
+                        <BadgeCheck aria-hidden="true" /> Принятый ответ
+                      </span>
+                    ) : null}
                   </div>
+                  <span>
+                    {formatDate(comment.createdAt)}
+                    {comment.updatedAt &&
+                    comment.updatedAt !== comment.createdAt
+                      ? ' · изменено'
+                      : ''}
+                  </span>
                 </div>
-              ) : (
-                <MarkdownPreview value={comment.body} allowMedia={false} />
-              )}
-              {!readOnly && replyTo?.id === comment.id
-                ? renderCommentComposer(comment)
-                : null}
-              {depth === 0 && (branchReplyCounts.get(comment.id) || 0) > 0 ? (
-                <button
-                  className="comment-branch-toggle"
-                  type="button"
-                  aria-expanded={!collapsedBranches.has(comment.id)}
-                  onClick={() =>
-                    setCollapsedBranches((current) => {
-                      const next = new Set(current);
-                      if (next.has(comment.id)) next.delete(comment.id);
-                      else next.add(comment.id);
-                      return next;
-                    })
-                  }
-                >
-                  <ChevronDown aria-hidden="true" />
-                  {collapsedBranches.has(comment.id) ? 'Показать' : 'Скрыть'} ответы (
-                  {branchReplyCounts.get(comment.id)})
-                </button>
-              ) : null}
-              <div className="comment-actions">
-                {!readOnly ? (
-                  <>
-                    <button
-                      className={`text-button ${comment.activeReactions?.includes('like') ? 'is-active' : ''}`}
-                      type="button"
-                      aria-pressed={comment.activeReactions?.includes('like') || false}
-                      disabled={actionId === comment.id}
-                      onClick={() => void reactToComment(comment, 'like')}
-                    >
-                      <ThumbsUp aria-hidden="true" />
-                      Поддержать {comment.reactions?.likes || 0}
-                    </button>
-                    <button
-                      className={`text-button ${comment.activeReactions?.includes('dislike') ? 'is-active' : ''}`}
-                      type="button"
-                      aria-pressed={comment.activeReactions?.includes('dislike') || false}
-                      disabled={actionId === comment.id}
-                      onClick={() => void reactToComment(comment, 'dislike')}
-                    >
-                      <ThumbsDown aria-hidden="true" />
-                      Не согласен {comment.reactions?.dislikes || 0}
-                    </button>
-                    <button
-                      className={`text-button ${comment.activeReactions?.includes('useful') ? 'is-active' : ''}`}
-                      type="button"
-                      aria-pressed={comment.activeReactions?.includes('useful') || false}
-                      disabled={actionId === comment.id}
-                      onClick={() => void reactToComment(comment, 'useful')}
-                    >
-                      <CheckCircle2 aria-hidden="true" />
-                      Полезно {comment.reactions?.useful ?? comment.score}
-                    </button>
-                  </>
+                {parentAuthor ? (
+                  <p className="comment-parent-context">
+                    <Reply aria-hidden="true" /> Ответ для {parentAuthor}
+                  </p>
                 ) : null}
-                {user && !readOnly ? (
+                {editingId === comment.id ? (
+                  <div className="comment-edit">
+                    <label htmlFor={`edit-${comment.id}`}>
+                      Изменить комментарий
+                    </label>
+                    <RichTextEditorField
+                      id={`edit-${comment.id}`}
+                      value={editBody}
+                      onChange={setEditBody}
+                      actions={[
+                        'bold',
+                        'italic',
+                        'underline',
+                        'strike',
+                        'list',
+                        'ordered-list',
+                        'quote',
+                        'link',
+                      ]}
+                      ariaLabel="Изменить комментарий"
+                      maxLength={4000}
+                      minHeight={108}
+                      compact
+                    />
+                    <div className="button-row">
+                      <button
+                        className="primary-button"
+                        type="button"
+                        disabled={actionId === comment.id}
+                        onClick={() => saveEdit(comment)}
+                      >
+                        Сохранить
+                      </button>
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() => setEditingId('')}
+                      >
+                        Отменить
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <MarkdownPreview value={comment.body} allowMedia={false} />
+                )}
+                {!readOnly && replyTo?.id === comment.id
+                  ? renderCommentComposer(comment)
+                  : null}
+                {depth === 0 && (branchReplyCounts.get(comment.id) || 0) > 0 ? (
                   <button
-                    className="text-button"
+                    className="comment-branch-toggle"
                     type="button"
-                    onClick={() => {
-                      setReplyTo(comment);
-                    }}
+                    aria-expanded={!collapsedBranches.has(comment.id)}
+                    onClick={() =>
+                      setCollapsedBranches((current) => {
+                        const next = new Set(current);
+                        if (next.has(comment.id)) next.delete(comment.id);
+                        else next.add(comment.id);
+                        return next;
+                      })
+                    }
                   >
-                    <Reply aria-hidden="true" />
-                    Ответить
+                    <ChevronDown aria-hidden="true" />
+                    {collapsedBranches.has(comment.id)
+                      ? 'Показать'
+                      : 'Скрыть'}{' '}
+                    ответы ({branchReplyCounts.get(comment.id)})
                   </button>
                 ) : null}
-                {user && user.id !== comment.userId ? (
-                  <button
-                    className="text-button comment-report-button"
-                    type="button"
-                    disabled={actionId === comment.id}
-                    onClick={() => requestReport(comment)}
-                  >
-                    <Flag aria-hidden="true" />
-                    Пожаловаться
-                  </button>
-                ) : null}
-                <button
-                  className="icon-button comment-link-button"
-                  type="button"
-                  title="Скопировать ссылку на комментарий"
-                  aria-label="Скопировать ссылку на комментарий"
-                  onClick={() => void copyCommentLink(comment)}
-                >
-                  <Link2 aria-hidden="true" />
-                </button>
-                {user?.id === comment.userId && !readOnly ? (
-                  <>
+                <div className="comment-actions">
+                  {!readOnly ? (
+                    <>
+                      <button
+                        className={`text-button ${comment.activeReactions?.includes('like') ? 'is-active' : ''}`}
+                        type="button"
+                        aria-pressed={
+                          comment.activeReactions?.includes('like') || false
+                        }
+                        disabled={actionId === comment.id}
+                        onClick={() => void reactToComment(comment, 'like')}
+                      >
+                        <ThumbsUp aria-hidden="true" />
+                        Поддержать {comment.reactions?.likes || 0}
+                      </button>
+                      <button
+                        className={`text-button ${comment.activeReactions?.includes('dislike') ? 'is-active' : ''}`}
+                        type="button"
+                        aria-pressed={
+                          comment.activeReactions?.includes('dislike') || false
+                        }
+                        disabled={actionId === comment.id}
+                        onClick={() => void reactToComment(comment, 'dislike')}
+                      >
+                        <ThumbsDown aria-hidden="true" />
+                        Не согласен {comment.reactions?.dislikes || 0}
+                      </button>
+                      <button
+                        className={`text-button ${comment.activeReactions?.includes('useful') ? 'is-active' : ''}`}
+                        type="button"
+                        aria-pressed={
+                          comment.activeReactions?.includes('useful') || false
+                        }
+                        disabled={actionId === comment.id}
+                        onClick={() => void reactToComment(comment, 'useful')}
+                      >
+                        <CheckCircle2 aria-hidden="true" />
+                        Полезно {comment.reactions?.useful ?? comment.score}
+                      </button>
+                    </>
+                  ) : null}
+                  {user && !readOnly ? (
                     <button
                       className="text-button"
                       type="button"
                       onClick={() => {
-                        setEditingId(comment.id);
-                        setEditBody(comment.body);
+                        setReplyTo(comment);
                       }}
                     >
-                      <Pencil aria-hidden="true" />
-                      Изменить
+                      <Reply aria-hidden="true" />
+                      Ответить
                     </button>
+                  ) : null}
+                  {user && user.id !== comment.userId ? (
                     <button
-                      className="text-button danger"
+                      className="text-button comment-report-button"
                       type="button"
                       disabled={actionId === comment.id}
-                      onClick={() => requestDelete(comment)}
+                      onClick={() => requestReport(comment)}
                     >
-                      <Trash2 aria-hidden="true" />
-                      Удалить
+                      <Flag aria-hidden="true" />
+                      Пожаловаться
                     </button>
-                  </>
-                ) : null}
-                {canModerateComments ? (
+                  ) : null}
                   <button
-                    className={`text-button ${comment.isPinned ? 'is-active' : ''}`}
+                    className="icon-button comment-link-button"
                     type="button"
-                    aria-pressed={comment.isPinned || false}
-                    disabled={actionId === comment.id}
-                    onClick={() => void toggleCommentMarker(comment, 'isPinned')}
+                    title="Скопировать ссылку на комментарий"
+                    aria-label="Скопировать ссылку на комментарий"
+                    onClick={() => void copyCommentLink(comment)}
                   >
-                    <Pin aria-hidden="true" />
-                    {comment.isPinned ? 'Открепить' : 'Закрепить'}
+                    <Link2 aria-hidden="true" />
                   </button>
-                ) : null}
-                {canChooseAnswer ? (
-                  <button
-                    className={`text-button ${comment.isAnswer ? 'is-active' : ''}`}
-                    type="button"
-                    aria-pressed={comment.isAnswer || false}
-                    disabled={actionId === comment.id}
-                    onClick={() => void toggleCommentMarker(comment, 'isAnswer')}
-                  >
-                    <BadgeCheck aria-hidden="true" />
-                    {comment.isAnswer ? 'Снять ответ' : 'Принять ответ'}
-                  </button>
-                ) : null}
-              </div>
-            </article>
-          ))
+                  {user?.id === comment.userId && !readOnly ? (
+                    <>
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={() => {
+                          setEditingId(comment.id);
+                          setEditBody(comment.body);
+                        }}
+                      >
+                        <Pencil aria-hidden="true" />
+                        Изменить
+                      </button>
+                      <button
+                        className="text-button danger"
+                        type="button"
+                        disabled={actionId === comment.id}
+                        onClick={() => requestDelete(comment)}
+                      >
+                        <Trash2 aria-hidden="true" />
+                        Удалить
+                      </button>
+                    </>
+                  ) : null}
+                  {canModerateComments ? (
+                    <button
+                      className={`text-button ${comment.isPinned ? 'is-active' : ''}`}
+                      type="button"
+                      aria-pressed={comment.isPinned || false}
+                      disabled={actionId === comment.id}
+                      onClick={() =>
+                        void toggleCommentMarker(comment, 'isPinned')
+                      }
+                    >
+                      <Pin aria-hidden="true" />
+                      {comment.isPinned ? 'Открепить' : 'Закрепить'}
+                    </button>
+                  ) : null}
+                  {canChooseAnswer ? (
+                    <button
+                      className={`text-button ${comment.isAnswer ? 'is-active' : ''}`}
+                      type="button"
+                      aria-pressed={comment.isAnswer || false}
+                      disabled={actionId === comment.id}
+                      onClick={() =>
+                        void toggleCommentMarker(comment, 'isAnswer')
+                      }
+                    >
+                      <BadgeCheck aria-hidden="true" />
+                      {comment.isAnswer ? 'Снять ответ' : 'Принять ответ'}
+                    </button>
+                  ) : null}
+                </div>
+              </article>
+            ),
+          )
         ) : (
           <EmptyState
             title="Комментариев пока нет"
@@ -4409,9 +4667,11 @@ function CommentsBlock({
           </p>
           <fieldset className="report-reason-list">
             <legend>Причина</legend>
-            {(Object.entries(commentReportReasonLabels) as Array<
-              [CommentReportReason, string]
-            >).map(([value, label]) => (
+            {(
+              Object.entries(commentReportReasonLabels) as Array<
+                [CommentReportReason, string]
+              >
+            ).map(([value, label]) => (
               <label key={value}>
                 <input
                   type="radio"
@@ -4540,7 +4800,11 @@ function GuidesPage({
           ротации собраны внутри каждого материала.
         </p>
         {canManageContent(user, 'guides', 'create') ? (
-          <button className="primary-button" type="button" onClick={() => setEditorGuideId('new')}>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => setEditorGuideId('new')}
+          >
             <Plus aria-hidden="true" /> Создать гайд
           </button>
         ) : null}
@@ -4577,17 +4841,28 @@ function GuidesPage({
         />
       </search>
       <div className="filter-results-row">
-        <p id="guide-results-count" className="filter-summary" aria-live="polite">
+        <p
+          id="guide-results-count"
+          className="filter-summary"
+          aria-live="polite"
+        >
           Найдено: {filtered.length} из {data.guides.length}
         </p>
         {hasActiveFilters ? (
-          <button className="ghost-button filter-reset-button" type="button" onClick={resetFilters}>
+          <button
+            className="ghost-button filter-reset-button"
+            type="button"
+            onClick={resetFilters}
+          >
             <RotateCw aria-hidden="true" /> Сбросить фильтры
           </button>
         ) : null}
       </div>
       {filtered.length ? (
-        <section className="guide-grid">
+        <section className="guide-grid" aria-labelledby="guide-results-heading">
+          <h2 id="guide-results-heading" className="sr-only">
+            Список гайдов
+          </h2>
           {filtered.map((guide) => (
             <GuideCard
               key={guide.id}
@@ -4619,7 +4894,9 @@ function GuidesPage({
         }}
       >
         {user ? (
-          <Suspense fallback={<SkeletonGrid label="Загрузка редактора гайда" />}>
+          <Suspense
+            fallback={<SkeletonGrid label="Загрузка редактора гайда" />}
+          >
             <AdminGuides
               data={data}
               setData={setData}
@@ -4659,9 +4936,9 @@ function TierListsPage({
         <p className="eyebrow">S · A · B · C · D</p>
         <h1>Тир-листы</h1>
         <p>
-          Единый редакционный список S, A, B, C и D. Тиры отражают
-          практическую ценность персонажей для большинства игроков, а внутри
-          одного тира все персонажи считаются равноценными.
+          Единый редакционный список S, A, B, C и D. Тиры отражают практическую
+          ценность персонажей для большинства игроков, а внутри одного тира все
+          персонажи считаются равноценными.
         </p>
         {canManageContent(user, 'tierlists', 'edit') ? (
           <button
@@ -4672,11 +4949,11 @@ function TierListsPage({
               setEditorOpen(true);
             }}
           >
-          <Pencil aria-hidden="true" /> Редактировать тир-лист
-        </button>
-      ) : null}
-    </section>
-    <section className="content-band">
+            <Pencil aria-hidden="true" /> Редактировать тир-лист
+          </button>
+        ) : null}
+      </section>
+      <section className="content-band">
         <SectionHeader
           eyebrow={`Патч ${tierlist?.patch || '1.0'} · обновлено ${tierlist ? formatDate(tierlist.updatedAt) : ''}`}
           title={tierlist?.title || 'Тир-лист'}
@@ -4703,7 +4980,9 @@ function TierListsPage({
         }}
       >
         {user ? (
-          <Suspense fallback={<SkeletonGrid label="Загрузка редактора тир-листа" />}>
+          <Suspense
+            fallback={<SkeletonGrid label="Загрузка редактора тир-листа" />}
+          >
             <AdminTierlists
               data={data}
               setData={setData}
@@ -4778,7 +5057,9 @@ function NewsDetailPage({
   async function refreshContent() {
     setData(
       await loadSiteData({
-        includePrivate: Boolean(user && roleWeight[user.role] >= roleWeight.editor),
+        includePrivate: Boolean(
+          user && roleWeight[user.role] >= roleWeight.editor,
+        ),
       }),
     );
   }
@@ -4816,7 +5097,11 @@ function NewsDetailPage({
             />
             <Tags tags={item.tags} />
             {canManageContent(user, 'news', 'edit') ? (
-              <button className="ghost-button" type="button" onClick={() => setEditorOpen(true)}>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => setEditorOpen(true)}
+              >
                 <Pencil aria-hidden="true" /> Редактировать новость
               </button>
             ) : null}
@@ -4849,7 +5134,9 @@ function NewsDetailPage({
           setEditorOpen(false);
         }}
       >
-        <Suspense fallback={<SkeletonGrid label="Загрузка редактора новости" />}>
+        <Suspense
+          fallback={<SkeletonGrid label="Загрузка редактора новости" />}
+        >
           <AdminNewsManager
             items={data.news}
             initialSelectedId={item.id}
@@ -4892,7 +5179,9 @@ function LeakDetailPage({
   async function refreshContent() {
     setData(
       await loadSiteData({
-        includePrivate: Boolean(user && roleWeight[user.role] >= roleWeight.editor),
+        includePrivate: Boolean(
+          user && roleWeight[user.role] >= roleWeight.editor,
+        ),
       }),
     );
   }
@@ -4925,7 +5214,11 @@ function LeakDetailPage({
             sourceUrl={item.sourceUrl}
           />
           {canManageContent(user, 'leaks', 'edit') ? (
-            <button className="ghost-button" type="button" onClick={() => setEditorOpen(true)}>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => setEditorOpen(true)}
+            >
               <Pencil aria-hidden="true" /> Редактировать слив
             </button>
           ) : null}
@@ -5137,9 +5430,7 @@ function AdminPage({
       <div className="page-stack profile-page">
         <section className="page-hero compact">
           <h1>Админка недоступна</h1>
-          <p>
-            Системная админка доступна только moderator, admin и owner.
-          </p>
+          <p>Системная админка доступна только moderator, admin и owner.</p>
           <a className="primary-button" href="#/profile">
             <UserCircle aria-hidden="true" /> Вернуться в профиль
           </a>
@@ -5517,14 +5808,32 @@ function AuthPanel({ setUser }: { setUser: (user: User | null) => void }) {
 }
 
 function AdminDashboard({ data }: { data: SiteData }) {
-  const publishedNews = data.news.filter((item) => item.publishStatus !== 'draft');
+  const publishedNews = data.news.filter(
+    (item) => item.publishStatus !== 'draft',
+  );
   const approvedLeaks = data.leaks.filter((item) => item.approved);
   const pendingLeaks = data.leaks.filter((item) => !item.approved);
   const dashboardMetrics = [
-    { label: 'Гайды', value: data.guides.length, detail: 'редактируются прямо в разделах' },
-    { label: 'Персонажи', value: data.characters.length, detail: 'база лора и профилей' },
-    { label: 'Публикации', value: publishedNews.length + approvedLeaks.length, detail: 'новости и сливы' },
-    { label: 'Очередь сливов', value: pendingLeaks.length, detail: 'требуют проверки' },
+    {
+      label: 'Гайды',
+      value: data.guides.length,
+      detail: 'редактируются прямо в разделах',
+    },
+    {
+      label: 'Персонажи',
+      value: data.characters.length,
+      detail: 'база лора и профилей',
+    },
+    {
+      label: 'Публикации',
+      value: publishedNews.length + approvedLeaks.length,
+      detail: 'новости и сливы',
+    },
+    {
+      label: 'Очередь сливов',
+      value: pendingLeaks.length,
+      detail: 'требуют проверки',
+    },
   ];
   const quickActions = [
     {
@@ -5555,19 +5864,33 @@ function AdminDashboard({ data }: { data: SiteData }) {
 
   return (
     <div className="admin-dashboard">
-      <section className="admin-command-hero" aria-labelledby="admin-dashboard-title">
+      <section
+        className="admin-command-hero"
+        aria-labelledby="admin-dashboard-title"
+      >
         <div>
           <p className="eyebrow">Системная панель</p>
-          <h2 id="admin-dashboard-title">Админка для контроля, не для контентной рутины</h2>
+          <h2 id="admin-dashboard-title">
+            Админка для контроля, не для контентной рутины
+          </h2>
           <p>
             Контент создаётся прямо в публичных разделах, а здесь остаются
             пользователи, роли, модерация, источники, аудит и состояние API/D1.
           </p>
         </div>
-        <div className="admin-command-status" aria-label="Ключевые зоны ответственности">
-          <span><ShieldCheck aria-hidden="true" /> Модерация</span>
-          <span><Users aria-hidden="true" /> Роли</span>
-          <span><Settings aria-hidden="true" /> Система</span>
+        <div
+          className="admin-command-status"
+          aria-label="Ключевые зоны ответственности"
+        >
+          <span>
+            <ShieldCheck aria-hidden="true" /> Модерация
+          </span>
+          <span>
+            <Users aria-hidden="true" /> Роли
+          </span>
+          <span>
+            <Settings aria-hidden="true" /> Система
+          </span>
         </div>
       </section>
       <MetricsStrip data={data} />
@@ -5589,7 +5912,11 @@ function AdminDashboard({ data }: { data: SiteData }) {
         </div>
         <div className="admin-action-grid">
           {quickActions.map((action) => (
-            <a className="admin-action-card" href={action.href} key={action.href}>
+            <a
+              className="admin-action-card"
+              href={action.href}
+              key={action.href}
+            >
               {action.icon}
               <strong>{action.title}</strong>
               <span>{action.text}</span>
@@ -5605,11 +5932,26 @@ function AdminDashboard({ data }: { data: SiteData }) {
           </div>
         </div>
         <ul className="admin-role-list">
-          <li><strong>Пользователь</strong><span>профиль, комментарии и оценки.</span></li>
-          <li><strong>Редактор</strong><span>кнопки управления разрешённым контентом.</span></li>
-          <li><strong>Модератор</strong><span>модерация комментариев и предупреждения.</span></li>
-          <li><strong>Администратор</strong><span>пользователи, роли, источники и настройки.</span></li>
-          <li><strong>Владелец</strong><span>полный доступ и удаление пользователей.</span></li>
+          <li>
+            <strong>Пользователь</strong>
+            <span>профиль, комментарии и оценки.</span>
+          </li>
+          <li>
+            <strong>Редактор</strong>
+            <span>кнопки управления разрешённым контентом.</span>
+          </li>
+          <li>
+            <strong>Модератор</strong>
+            <span>модерация комментариев и предупреждения.</span>
+          </li>
+          <li>
+            <strong>Администратор</strong>
+            <span>пользователи, роли, источники и настройки.</span>
+          </li>
+          <li>
+            <strong>Владелец</strong>
+            <span>полный доступ и удаление пользователей.</span>
+          </li>
         </ul>
       </section>
     </div>
@@ -5830,7 +6172,9 @@ function getYoutubeThumbnailUrl(url: string) {
   return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : '';
 }
 
-function getImportConfidenceLabel(confidence: CharacterImportSuggestion['confidence']) {
+function getImportConfidenceLabel(
+  confidence: CharacterImportSuggestion['confidence'],
+) {
   if (confidence === 'high') return 'Высокая уверенность';
   if (confidence === 'medium') return 'Средняя уверенность';
   return 'Требует ручной проверки';
@@ -5851,7 +6195,10 @@ function getGuideImportPreviewUrls(suggestion: CharacterImportSuggestion) {
   try {
     const parsed = JSON.parse(suggestion.value) as unknown;
     if (typeof parsed === 'string') {
-      if (/(?:image|splash|icon)url/i.test(suggestion.field) || getYoutubeThumbnailUrl(parsed)) {
+      if (
+        /(?:image|splash|icon)url/i.test(suggestion.field) ||
+        getYoutubeThumbnailUrl(parsed)
+      ) {
         addUrl(parsed);
       }
       return urls;
@@ -5867,7 +6214,10 @@ function getGuideImportPreviewUrls(suggestion: CharacterImportSuggestion) {
       }
     }
   } catch {
-    if (/(?:image|splash|icon)url/i.test(suggestion.field) || getYoutubeThumbnailUrl(suggestion.value)) {
+    if (
+      /(?:image|splash|icon)url/i.test(suggestion.field) ||
+      getYoutubeThumbnailUrl(suggestion.value)
+    ) {
       addUrl(suggestion.value);
     }
   }
@@ -5951,7 +6301,8 @@ function GuideCreateFields({
           aria-describedby={`${fieldId}-slug-help`}
         />
         <small id={`${fieldId}-slug-help`}>
-          Создаётся из заголовка автоматически. При необходимости задайте короткую ссылку вручную.
+          Создаётся из заголовка автоматически. При необходимости задайте
+          короткую ссылку вручную.
         </small>
       </label>
       <label htmlFor={`${fieldId}-summary`}>
@@ -5963,11 +6314,19 @@ function GuideCreateFields({
           maxLength={GUIDE_SUMMARY_MAX_LENGTH}
           required
         />
-        <small>Короткий вывод до {GUIDE_SUMMARY_MAX_LENGTH} знаков. Подробности добавляются секциями.</small>
+        <small>
+          Короткий вывод до {GUIDE_SUMMARY_MAX_LENGTH} знаков. Подробности
+          добавляются секциями.
+        </small>
       </label>
       <label htmlFor={`${fieldId}-patch`}>
         Патч
-        <input id={`${fieldId}-patch`} name="patch" defaultValue="1.0" required />
+        <input
+          id={`${fieldId}-patch`}
+          name="patch"
+          defaultValue="1.0"
+          required
+        />
       </label>
     </>
   );
@@ -6007,13 +6366,15 @@ function AdminGuides({
     sections[0]?.id || '',
   );
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [dragOverSectionIndex, setDragOverSectionIndex] = useState<number | null>(
-    null,
-  );
+  const [dragOverSectionIndex, setDragOverSectionIndex] = useState<
+    number | null
+  >(null);
   const [dragOverSectionPlacement, setDragOverSectionPlacement] = useState<
     'before' | 'after'
   >('before');
   const [pending, setPending] = useState(false);
+  const [guideImportPending, setGuideImportPending] = useState(false);
+  const [guideImportStatus, setGuideImportStatus] = useState('');
   const [message, setMessage] = useState('');
   const [sectionImageUrl, setSectionImageUrl] = useState('');
   const [sectionImageAlt, setSectionImageAlt] = useState('');
@@ -6023,9 +6384,8 @@ function AdminGuides({
   const [guideImportDecisions, setGuideImportDecisions] = useState<
     Record<string, 'accepted' | 'rejected'>
   >({});
-  const [guideImportCoverage, setGuideImportCoverage] = useState<
-    CharacterImportLookupResult['coverage']
-  >();
+  const [guideImportCoverage, setGuideImportCoverage] =
+    useState<CharacterImportLookupResult['coverage']>();
   const [guideMeta, setGuideMeta] = useState({
     title: guide?.title || '',
     summary: guide?.summary || '',
@@ -6039,6 +6399,10 @@ function AdminGuides({
   const deleteSectionDialogRef = useRef<HTMLDialogElement>(null);
   const sectionDragPreviewRef = useRef<HTMLElement | null>(null);
   const skipNextGuideDraftSaveRef = useRef(false);
+  const guideImportControllerRef = useRef<AbortController | null>(null);
+  const guideImportRequestIdRef = useRef(0);
+  const guideImportButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreGuideImportFocusRef = useRef(false);
   const canCreate = canManageContent(user, 'guides', 'create');
   const canPublish = canManageContent(user, 'guides', 'publish');
   const canDelete = canManageContent(user, 'guides', 'delete');
@@ -6067,6 +6431,13 @@ function AdminGuides({
   }, [selectedSectionId]);
 
   useEffect(() => {
+    if (guideImportControllerRef.current) {
+      guideImportRequestIdRef.current += 1;
+      guideImportControllerRef.current.abort();
+      guideImportControllerRef.current = null;
+    }
+    setGuideImportPending(false);
+    setGuideImportStatus('');
     if (!guide) {
       return;
     }
@@ -6110,6 +6481,14 @@ function AdminGuides({
     });
   }, [guide]);
 
+  useEffect(
+    () => () => {
+      guideImportRequestIdRef.current += 1;
+      guideImportControllerRef.current?.abort();
+    },
+    [],
+  );
+
   const activeGuide = guide;
   const activeGuideCharacter = activeGuide
     ? getGuideCharacter(data, activeGuide)
@@ -6128,7 +6507,9 @@ function AdminGuides({
         videoUrl: activeGuide.videoUrl || '',
         status: activeGuide.status,
       },
-      sections: [...activeGuide.sections].sort((a, b) => a.position - b.position),
+      sections: [...activeGuide.sections].sort(
+        (a, b) => a.position - b.position,
+      ),
     };
   }, [activeGuide]);
   const baselineGuideSignature = useMemo(
@@ -6154,7 +6535,12 @@ function AdminGuides({
         if (isGuideDirty) {
           localStorage.setItem(
             guideDraftKey,
-            JSON.stringify({ guideMeta, sections, selectedSectionId, markdown }),
+            JSON.stringify({
+              guideMeta,
+              sections,
+              selectedSectionId,
+              markdown,
+            }),
           );
         } else {
           localStorage.removeItem(guideDraftKey);
@@ -6192,6 +6578,12 @@ function AdminGuides({
   useEffect(() => {
     onDirtyChange?.(isGuideDirty);
   }, [isGuideDirty, onDirtyChange]);
+
+  useEffect(() => {
+    if (guideImportPending || !restoreGuideImportFocusRef.current) return;
+    restoreGuideImportFocusRef.current = false;
+    guideImportButtonRef.current?.focus();
+  }, [guideImportPending]);
 
   useEffect(
     () => () => {
@@ -6347,7 +6739,9 @@ function AdminGuides({
       .replaceAll('[', '')
       .replaceAll(']', '');
     const snippet = `![${altText}](${rawUrl})`;
-    updateSelectedMarkdown(`${markdown.trimEnd()}${markdown.trim() ? '\n\n' : ''}${snippet}`);
+    updateSelectedMarkdown(
+      `${markdown.trimEnd()}${markdown.trim() ? '\n\n' : ''}${snippet}`,
+    );
     setSectionImageUrl('');
     setSectionImageAlt('');
     setMessage('Изображение добавлено в текущую секцию. Сохраните раздел.');
@@ -6355,22 +6749,62 @@ function AdminGuides({
 
   async function lookupGuideSources() {
     if (!activeGuide) return;
-    setPending(true);
-    setMessage('');
+    const controller = new AbortController();
+    const requestId = guideImportRequestIdRef.current + 1;
+    guideImportRequestIdRef.current = requestId;
+    guideImportControllerRef.current?.abort();
+    guideImportControllerRef.current = controller;
+    setGuideImportPending(true);
+    setMessage('Ищем данные для гайда в подключённых источниках…');
+    setGuideImportStatus('Ищем данные для гайда. Поиск можно отменить.');
     const character = getGuideCharacter(data, activeGuide);
-    const result = await lookupGuideInfo({
-      guideId: activeGuide.id,
-      query: character?.name || activeGuide.title,
-    });
-    if (result.ok) {
-      setGuideImportSuggestions(result.data.suggestions || []);
-      setGuideImportDecisions({});
-      setGuideImportCoverage(result.data.coverage);
-      setMessage(result.data.message);
-    } else {
-      setMessage(result.error);
+    try {
+      const result = await lookupGuideInfo(
+        {
+          guideId: activeGuide.id,
+          query: character?.name || activeGuide.title,
+        },
+        { signal: controller.signal },
+      );
+      if (
+        requestId !== guideImportRequestIdRef.current ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
+      if (result.ok) {
+        const resultMessage =
+          result.data.message ||
+          'Источники не вернули данных. Измените запрос и повторите поиск.';
+        setGuideImportSuggestions(result.data.suggestions || []);
+        setGuideImportDecisions({});
+        setGuideImportCoverage(result.data.coverage);
+        setMessage(resultMessage);
+        setGuideImportStatus(resultMessage);
+      } else if (!result.aborted) {
+        setMessage(result.error);
+        setGuideImportStatus(`${result.error} Можно повторить поиск.`);
+      }
+    } finally {
+      if (requestId === guideImportRequestIdRef.current) {
+        guideImportControllerRef.current = null;
+        restoreGuideImportFocusRef.current = true;
+        setGuideImportPending(false);
+      }
     }
-    setPending(false);
+  }
+
+  function cancelGuideSourceLookup() {
+    if (!guideImportControllerRef.current) return;
+    guideImportRequestIdRef.current += 1;
+    guideImportControllerRef.current.abort();
+    guideImportControllerRef.current = null;
+    restoreGuideImportFocusRef.current = true;
+    setGuideImportPending(false);
+    const cancelMessage =
+      'Поиск отменён. Черновик и найденные предложения сохранены.';
+    setMessage(cancelMessage);
+    setGuideImportStatus(cancelMessage);
   }
 
   function rejectGuideImportSuggestion(suggestion: CharacterImportSuggestion) {
@@ -6404,13 +6838,17 @@ function AdminGuides({
         summary: prepareGuideImportSummary(suggestion.value),
       }));
       acceptGuideImportDecision(suggestion);
-      setMessage('Выбранный краткий вывод добавлен в гайд. Проверьте текст и сохраните.');
+      setMessage(
+        'Выбранный краткий вывод добавлен в гайд. Проверьте текст и сохраните.',
+      );
       return;
     }
     if (suggestion.field === 'guide.videoUrl') {
       setGuideMeta((current) => ({ ...current, videoUrl: suggestion.value }));
       acceptGuideImportDecision(suggestion);
-      setMessage('YouTube-ссылка добавлена в параметры гайда. Проверьте превью и сохраните.');
+      setMessage(
+        'YouTube-ссылка добавлена в параметры гайда. Проверьте превью и сохраните.',
+      );
       return;
     }
 
@@ -6419,7 +6857,10 @@ function AdminGuides({
         'guide.pullAdvice': { title: 'Стоит ли качать', type: 'pull-advice' },
         'guide.strengths': { title: 'Плюсы', type: 'strengths' },
         'guide.weaknesses': { title: 'Минусы', type: 'weaknesses' },
-        'guide.skillPriority': { title: 'Приоритет навыков', type: 'skill-priority' },
+        'guide.skillPriority': {
+          title: 'Приоритет навыков',
+          type: 'skill-priority',
+        },
         'guide.bestArcs': { title: 'Лучшие дуги', type: 'best-arcs' },
         'guide.alternativeArcs': {
           title: 'Альтернативные дуги',
@@ -6433,9 +6874,18 @@ function AdminGuides({
         'guide.mistakes': { title: 'Частые ошибки', type: 'mistakes' },
         'guide.teams': { title: 'Лучшие команды', type: 'teams' },
         'guide.f2pTeams': { title: 'F2P-команды', type: 'f2p-teams' },
-        'guide.premiumTeams': { title: 'Premium-команды', type: 'premium-teams' },
-        'guide.starterTeams': { title: 'Команды для старта', type: 'starter-teams' },
-        'guide.endgameTeams': { title: 'Команды для эндгейма', type: 'endgame-teams' },
+        'guide.premiumTeams': {
+          title: 'Premium-команды',
+          type: 'premium-teams',
+        },
+        'guide.starterTeams': {
+          title: 'Команды для старта',
+          type: 'starter-teams',
+        },
+        'guide.endgameTeams': {
+          title: 'Команды для эндгейма',
+          type: 'endgame-teams',
+        },
         'guide.videoUrl': { title: 'Видео-гайд', type: 'video' },
       };
     const sectionConfig = guideImportSections[suggestion.field] || {
@@ -6460,7 +6910,8 @@ function AdminGuides({
 
     setSections((current) => {
       const existingIndex = current.findIndex(
-        (section) => section.type === sectionType || section.title === sectionTitle,
+        (section) =>
+          section.type === sectionType || section.title === sectionTitle,
       );
       if (existingIndex >= 0) {
         const next = [...current];
@@ -6564,8 +7015,8 @@ function AdminGuides({
         slug: createdGuide?.slug || result.data.slug || slug,
         status: createdGuide?.status || result.data.status || nextStatus,
         action: 'created',
-  });
-  } else {
+      });
+    } else {
       setMessage(result.error);
     }
     setPending(false);
@@ -6595,19 +7046,21 @@ function AdminGuides({
       },
       'PATCH',
     );
-  if (result.ok) {
-  const nextData = await loadSiteData({ includePrivate: true });
-  setData(nextData);
-  const savedGuide = nextData.guides.find((item) => item.id === activeGuide.id);
-  localStorage.removeItem(guideDraftKey);
-  setMessage('Метаданные гайда сохранены.');
-  await onSaved?.({
-  id: activeGuide.id,
-  slug: savedGuide?.slug || activeGuide.slug,
-  status: savedGuide?.status || guideMeta.status,
-  action: 'saved',
-  });
-  } else {
+    if (result.ok) {
+      const nextData = await loadSiteData({ includePrivate: true });
+      setData(nextData);
+      const savedGuide = nextData.guides.find(
+        (item) => item.id === activeGuide.id,
+      );
+      localStorage.removeItem(guideDraftKey);
+      setMessage('Метаданные гайда сохранены.');
+      await onSaved?.({
+        id: activeGuide.id,
+        slug: savedGuide?.slug || activeGuide.slug,
+        status: savedGuide?.status || guideMeta.status,
+        action: 'saved',
+      });
+    } else {
       setMessage(result.error);
     }
     setPending(false);
@@ -6853,14 +7306,26 @@ function AdminGuides({
               </span>
             </div>
             <dl>
-              <div><dt>Роль</dt><dd>{activeGuideCharacter.role}</dd></div>
-              <div><dt>Тип</dt><dd>{activeGuideCharacter.type}</dd></div>
-              <div><dt>Редкость</dt><dd>{activeGuideCharacter.rarity}</dd></div>
-              <div><dt>Тир-лист</dt><dd>{activeGuideTier?.tier || 'Не задан'}</dd></div>
+              <div>
+                <dt>Роль</dt>
+                <dd>{activeGuideCharacter.role}</dd>
+              </div>
+              <div>
+                <dt>Тип</dt>
+                <dd>{activeGuideCharacter.type}</dd>
+              </div>
+              <div>
+                <dt>Редкость</dt>
+                <dd>{activeGuideCharacter.rarity}</dd>
+              </div>
+              <div>
+                <dt>Тир-лист</dt>
+                <dd>{activeGuideTier?.tier || 'Не задан'}</dd>
+              </div>
             </dl>
             <p>
-              Эти данные берутся из страницы персонажа и единого тир-листа. Здесь они
-              показаны для проверки и не дублируются в форме гайда.
+              Эти данные берутся из страницы персонажа и единого тир-листа.
+              Здесь они показаны для проверки и не дублируются в форме гайда.
             </p>
           </div>
         ) : null}
@@ -6909,51 +7374,52 @@ function AdminGuides({
               <option value="archived">Архив</option>
             </select>
           </label>
-            <label>
-              Ссылка на YouTube
-              <input
-                type="url"
-                value={guideMeta.videoUrl}
+          <label>
+            Ссылка на YouTube
+            <input
+              type="url"
+              value={guideMeta.videoUrl}
               onChange={(event) =>
                 setGuideMeta((current) => ({
                   ...current,
                   videoUrl: event.target.value,
                 }))
-                }
+              }
+            />
+          </label>
+          {getYoutubeThumbnailUrl(guideMeta.videoUrl) ? (
+            <div className="youtube-url-preview">
+              <img
+                src={getYoutubeThumbnailUrl(guideMeta.videoUrl)}
+                alt=""
+                width="168"
+                height="94"
+                loading="lazy"
+                referrerPolicy="no-referrer"
               />
-            </label>
-            {getYoutubeThumbnailUrl(guideMeta.videoUrl) ? (
-              <div className="youtube-url-preview">
-                <img
-                  src={getYoutubeThumbnailUrl(guideMeta.videoUrl)}
-                  alt=""
-                  width="168"
-                  height="94"
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                />
-                <a href={guideMeta.videoUrl} target="_blank" rel="noreferrer">
-                  Открыть видео
-                </a>
-              </div>
-            ) : null}
-            <label className="wide-field">
-              Краткое описание
-              <textarea
-                rows={4}
-                maxLength={GUIDE_SUMMARY_MAX_LENGTH}
-                value={guideMeta.summary}
-                onChange={(event) =>
-                  setGuideMeta((current) => ({
-                    ...current,
-                    summary: event.target.value,
-                  }))
-                }
-              />
-              <small>
-                {guideMeta.summary.length}/{GUIDE_SUMMARY_MAX_LENGTH}. Подробный текст хранится в секциях ниже.
-              </small>
-            </label>
+              <a href={guideMeta.videoUrl} target="_blank" rel="noreferrer">
+                Открыть видео
+              </a>
+            </div>
+          ) : null}
+          <label className="wide-field">
+            Краткое описание
+            <textarea
+              rows={4}
+              maxLength={GUIDE_SUMMARY_MAX_LENGTH}
+              value={guideMeta.summary}
+              onChange={(event) =>
+                setGuideMeta((current) => ({
+                  ...current,
+                  summary: event.target.value,
+                }))
+              }
+            />
+            <small>
+              {guideMeta.summary.length}/{GUIDE_SUMMARY_MAX_LENGTH}. Подробный
+              текст хранится в секциях ниже.
+            </small>
+          </label>
         </div>
         <button
           className="primary-button"
@@ -6965,7 +7431,10 @@ function AdminGuides({
         </button>
       </section>
 
-      <section className="import-review-panel guide-import-panel" aria-label="Автоимпорт гайда">
+      <section
+        className="import-review-panel guide-import-panel"
+        aria-label="Автоимпорт гайда"
+      >
         <div>
           <p className="eyebrow">Источники гайда</p>
           <h3>Подсказки именно для гайда</h3>
@@ -6976,13 +7445,37 @@ function AdminGuides({
           </p>
         </div>
         <button
+          ref={guideImportButtonRef}
           className="ghost-button"
           type="button"
-          disabled={pending}
+          disabled={guideImportPending}
+          aria-describedby="guide-import-status"
           onClick={lookupGuideSources}
         >
-          <Search aria-hidden="true" /> Найти источники гайда
+          <Search aria-hidden="true" />
+          {guideImportPending
+            ? 'Ищем источники гайда…'
+            : 'Найти источники гайда'}
         </button>
+        {guideImportPending ? (
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={cancelGuideSourceLookup}
+          >
+            Отменить поиск
+          </button>
+        ) : null}
+        <p
+          id="guide-import-status"
+          className="form-message import-status-region"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          aria-busy={guideImportPending}
+        >
+          {guideImportStatus}
+        </p>
         {guideImportCoverage ? (
           <div className="import-coverage">
             <div>
@@ -6991,69 +7484,79 @@ function AdminGuides({
             </div>
             <div>
               <strong>Нужна ручная проверка</strong>
-              <span>{guideImportCoverage.reviewFields.join(', ') || 'Нет'}</span>
+              <span>
+                {guideImportCoverage.reviewFields.join(', ') || 'Нет'}
+              </span>
             </div>
             <div>
               <strong>Не найдено</strong>
-              <span>{guideImportCoverage.missingFields.join(', ') || 'Нет'}</span>
+              <span>
+                {guideImportCoverage.missingFields.join(', ') || 'Нет'}
+              </span>
             </div>
           </div>
         ) : null}
         {guideImportSuggestions.length ? (
-            <div className="import-suggestion-list">
-                {guideImportSuggestions.map((suggestion) => {
-                  const decision = guideImportDecisions[suggestion.id];
-                  const fieldLabel = getGuideImportFieldLabel(suggestion.field);
-                  const contextLabel = getGuideImportContextLabel(
-                    suggestion,
-                    fieldLabel,
-                  );
-                  const previewUrls = getGuideImportPreviewUrls(suggestion);
-                  const rowSuggestions = getGuideImportRows(suggestion);
-                  const fieldVariants = guideImportSuggestions.filter(
-                    (candidate) => candidate.field === suggestion.field,
-                  );
-                  const variantIndex = fieldVariants.findIndex(
-                    (candidate) => candidate.id === suggestion.id,
-                  );
-                  const variantCount = suggestion.variantCount || fieldVariants.length || 1;
-                  const agreementCount = suggestion.agreementCount || 1;
-                  return (
-                  <article
-                    className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
-                      key={suggestion.id}
+          <div className="import-suggestion-list">
+            {guideImportSuggestions.map((suggestion) => {
+              const decision = guideImportDecisions[suggestion.id];
+              const fieldLabel = getGuideImportFieldLabel(suggestion.field);
+              const contextLabel = getGuideImportContextLabel(
+                suggestion,
+                fieldLabel,
+              );
+              const previewUrls = getGuideImportPreviewUrls(suggestion);
+              const rowSuggestions = getGuideImportRows(suggestion);
+              const fieldVariants = guideImportSuggestions.filter(
+                (candidate) => candidate.field === suggestion.field,
+              );
+              const variantIndex = fieldVariants.findIndex(
+                (candidate) => candidate.id === suggestion.id,
+              );
+              const variantCount =
+                suggestion.variantCount || fieldVariants.length || 1;
+              const agreementCount = suggestion.agreementCount || 1;
+              return (
+                <article
+                  className={`import-suggestion ${decision ? `is-${decision}` : ''}`}
+                  key={suggestion.id}
+                >
+                  <div>
+                    <strong>{fieldLabel}</strong>
+                    {fieldVariants.length > 1 ? (
+                      <span className="import-variant-label">
+                        Вариант {variantIndex + 1} из {fieldVariants.length}
+                      </span>
+                    ) : null}
+                    <div
+                      className="import-quality-badges"
+                      aria-label="Качество предложения"
                     >
-                      <div>
-                        <strong>{fieldLabel}</strong>
-                        {fieldVariants.length > 1 ? (
-                          <span className="import-variant-label">
-                            Вариант {variantIndex + 1} из {fieldVariants.length}
-                          </span>
-                        ) : null}
-                        <div className="import-quality-badges" aria-label="Качество предложения">
-                          {agreementCount >= 2 ? (
-                            <span className="quality-consensus">
-                              Совпало в {agreementCount} источниках
-                            </span>
-                          ) : null}
-                          {variantCount >= 2 ? (
-                            <span className="quality-conflict">
-                              На выбор: {variantCount} варианта
-                            </span>
-                          ) : null}
-                          {suggestion.qualityFlags?.includes('incomplete') ? (
-                            <span className="quality-review">
-                              Нужна внимательная проверка
-                            </span>
-                          ) : null}
-                        </div>
-                        {contextLabel ? <span>{contextLabel}</span> : null}
-                      </div>
-                      <div className="import-suggestion-value">
-                      {previewUrls.length ? (
+                      {agreementCount >= 2 ? (
+                        <span className="quality-consensus">
+                          Совпало в {agreementCount} источниках
+                        </span>
+                      ) : null}
+                      {variantCount >= 2 ? (
+                        <span className="quality-conflict">
+                          На выбор: {variantCount} варианта
+                        </span>
+                      ) : null}
+                      {suggestion.qualityFlags?.includes('incomplete') ? (
+                        <span className="quality-review">
+                          Нужна внимательная проверка
+                        </span>
+                      ) : null}
+                    </div>
+                    {contextLabel ? <span>{contextLabel}</span> : null}
+                  </div>
+                  <div className="import-suggestion-value">
+                    {previewUrls.length ? (
                       <div
                         className={`import-image-preview ${
-                          previewUrls.length > 1 ? 'import-image-preview--grid' : ''
+                          previewUrls.length > 1
+                            ? 'import-image-preview--grid'
+                            : ''
                         }`}
                       >
                         <div>
@@ -7083,103 +7586,114 @@ function AdminGuides({
                           ))}
                         </div>
                         <span>Нажмите на превью, чтобы открыть оригинал</span>
-                        </div>
-                      ) : null}
-                      <div className="import-suggestion-markdown">
-                        <MarkdownPreview value={formatGuideImportValue(suggestion.value)} />
                       </div>
-                      {rowSuggestions.length ? (
-                        <div
-                          className="import-row-review"
-                          aria-label={`Строки гайда: ${fieldLabel}`}
-                        >
-                          <div className="import-row-bulk-actions">
-                            <button
-                              className="compact-action"
-                              type="button"
-                              disabled={decision === 'accepted'}
-                              onClick={() => applyGuideImportSuggestion(suggestion)}
-                            >
-                              <CheckCircle2 aria-hidden="true" />
-                              Принять весь блок
-                            </button>
-                            <button
-                              className="compact-action danger"
-                              type="button"
-                              disabled={decision === 'rejected'}
-                              onClick={() => rejectGuideImportSuggestion(suggestion)}
-                            >
-                              <XCircle aria-hidden="true" />
-                              Отклонить весь блок
-                            </button>
-                          </div>
-                          {rowSuggestions.map((row) => {
-                            const rowDecision = guideImportDecisions[row.id];
-                            const rowPreviewUrls = getGuideImportPreviewUrls(row);
-                            return (
-                              <div
-                                className={`import-row ${
-                                  rowDecision ? `is-${rowDecision}` : ''
-                                }`}
-                                key={row.id}
-                              >
-                                {rowPreviewUrls[0] ? (
-                                  <img
-                                    src={resolveAssetUrl(rowPreviewUrls[0])}
-                                    alt=""
-                                    width="44"
-                                    height="44"
-                                    loading="lazy"
-                                    referrerPolicy="no-referrer"
-                                  />
-                                ) : null}
-                                <span>{row.label}</span>
-                                <div className="import-row-actions">
-                                  <button
-                                    className="icon-button success"
-                                    type="button"
-                                    aria-label={`Принять строку гайда: ${row.label}`}
-                                    disabled={rowDecision === 'accepted'}
-                                    onClick={() => applyGuideImportSuggestion(row)}
-                                  >
-                                    <CheckCircle2 aria-hidden="true" />
-                                  </button>
-                                  <button
-                                    className="icon-button danger"
-                                    type="button"
-                                    aria-label={`Отклонить строку гайда: ${row.label}`}
-                                    disabled={rowDecision === 'rejected'}
-                                    onClick={() => rejectGuideImportSuggestion(row)}
-                                  >
-                                    <XCircle aria-hidden="true" />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : null}
+                    ) : null}
+                    <div className="import-suggestion-markdown">
+                      <MarkdownPreview
+                        value={formatGuideImportValue(suggestion.value)}
+                      />
                     </div>
+                    {rowSuggestions.length ? (
+                      <div
+                        className="import-row-review"
+                        aria-label={`Строки гайда: ${fieldLabel}`}
+                      >
+                        <div className="import-row-bulk-actions">
+                          <button
+                            className="compact-action"
+                            type="button"
+                            disabled={decision === 'accepted'}
+                            onClick={() =>
+                              applyGuideImportSuggestion(suggestion)
+                            }
+                          >
+                            <CheckCircle2 aria-hidden="true" />
+                            Принять весь блок
+                          </button>
+                          <button
+                            className="compact-action danger"
+                            type="button"
+                            disabled={decision === 'rejected'}
+                            onClick={() =>
+                              rejectGuideImportSuggestion(suggestion)
+                            }
+                          >
+                            <XCircle aria-hidden="true" />
+                            Отклонить весь блок
+                          </button>
+                        </div>
+                        {rowSuggestions.map((row) => {
+                          const rowDecision = guideImportDecisions[row.id];
+                          const rowPreviewUrls = getGuideImportPreviewUrls(row);
+                          return (
+                            <div
+                              className={`import-row ${
+                                rowDecision ? `is-${rowDecision}` : ''
+                              }`}
+                              key={row.id}
+                            >
+                              {rowPreviewUrls[0] ? (
+                                <img
+                                  src={resolveAssetUrl(rowPreviewUrls[0])}
+                                  alt=""
+                                  width="44"
+                                  height="44"
+                                  loading="lazy"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : null}
+                              <span>{row.label}</span>
+                              <div className="import-row-actions">
+                                <button
+                                  className="icon-button success"
+                                  type="button"
+                                  aria-label={`Принять строку гайда: ${row.label}`}
+                                  disabled={rowDecision === 'accepted'}
+                                  onClick={() =>
+                                    applyGuideImportSuggestion(row)
+                                  }
+                                >
+                                  <CheckCircle2 aria-hidden="true" />
+                                </button>
+                                <button
+                                  className="icon-button danger"
+                                  type="button"
+                                  aria-label={`Отклонить строку гайда: ${row.label}`}
+                                  disabled={rowDecision === 'rejected'}
+                                  onClick={() =>
+                                    rejectGuideImportSuggestion(row)
+                                  }
+                                >
+                                  <XCircle aria-hidden="true" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
                   <small>
-                    {suggestion.sourceName} · {getImportConfidenceLabel(suggestion.confidence)}
+                    {suggestion.sourceName} ·{' '}
+                    {getImportConfidenceLabel(suggestion.confidence)}
                     {suggestion.note ? ` · ${suggestion.note}` : ''}
                   </small>
                   <div className="import-suggestion-actions">
                     <ImportSourceLinks suggestion={suggestion} />
                     <button
-                        className="icon-button success"
-                        type="button"
-                        aria-label={`Принять ${fieldLabel}`}
-                        onClick={() => applyGuideImportSuggestion(suggestion)}
-                      >
+                      className="icon-button success"
+                      type="button"
+                      aria-label={`Принять ${fieldLabel}`}
+                      onClick={() => applyGuideImportSuggestion(suggestion)}
+                    >
                       <CheckCircle2 aria-hidden="true" />
                     </button>
                     <button
-                        className="icon-button"
-                        type="button"
-                        aria-label={`Отклонить ${fieldLabel}`}
-                        onClick={() => rejectGuideImportSuggestion(suggestion)}
-                      >
+                      className="icon-button"
+                      type="button"
+                      aria-label={`Отклонить ${fieldLabel}`}
+                      onClick={() => rejectGuideImportSuggestion(suggestion)}
+                    >
                       <X aria-hidden="true" />
                     </button>
                   </div>
@@ -7226,51 +7740,51 @@ function AdminGuides({
           >
             {sections.map((section, index) => (
               <button
-              key={section.id}
-              type="button"
-              draggable
-              onDragStart={(event) => {
-                setSectionDragImage(event, section);
-                setDragIndex(index);
-              }}
-              onDragEnter={(event) => {
-                if (dragIndex !== null && dragIndex !== index) {
-                  setDragOverSectionIndex(index);
-                  setDragOverSectionPlacement(getSectionDropPlacement(event));
-                }
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-                if (dragIndex !== null && dragIndex !== index) {
-                  setDragOverSectionIndex(index);
-                  setDragOverSectionPlacement(getSectionDropPlacement(event));
-                }
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                reorder(index, getSectionDropPlacement(event));
-              }}
-              onDragEnd={clearSectionDragState}
-              onClick={() => selectSection(section)}
-              aria-pressed={section.id === selectedSectionId}
+                key={section.id}
+                type="button"
+                draggable
+                onDragStart={(event) => {
+                  setSectionDragImage(event, section);
+                  setDragIndex(index);
+                }}
+                onDragEnter={(event) => {
+                  if (dragIndex !== null && dragIndex !== index) {
+                    setDragOverSectionIndex(index);
+                    setDragOverSectionPlacement(getSectionDropPlacement(event));
+                  }
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  if (dragIndex !== null && dragIndex !== index) {
+                    setDragOverSectionIndex(index);
+                    setDragOverSectionPlacement(getSectionDropPlacement(event));
+                  }
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  reorder(index, getSectionDropPlacement(event));
+                }}
+                onDragEnd={clearSectionDragState}
+                onClick={() => selectSection(section)}
+                aria-pressed={section.id === selectedSectionId}
                 className={[
                   section.id === selectedSectionId ? 'active' : '',
                   dragIndex === index ? 'is-dragging' : '',
-                dragOverSectionIndex === index && dragIndex !== index
-                  ? 'is-drop-target'
-                  : '',
-                dragOverSectionIndex === index && dragIndex !== index
-                  ? `is-drop-${dragOverSectionPlacement}`
-                  : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              data-drop-placement={
-                dragOverSectionIndex === index && dragIndex !== index
-                  ? dragOverSectionPlacement
-                  : undefined
-              }
-            >
+                  dragOverSectionIndex === index && dragIndex !== index
+                    ? 'is-drop-target'
+                    : '',
+                  dragOverSectionIndex === index && dragIndex !== index
+                    ? `is-drop-${dragOverSectionPlacement}`
+                    : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                data-drop-placement={
+                  dragOverSectionIndex === index && dragIndex !== index
+                    ? dragOverSectionPlacement
+                    : undefined
+                }
+              >
                 <GripVertical aria-hidden="true" />
                 <span>{section.title}</span>
                 <small>{guideSectionTypeLabel(section.type)}</small>
@@ -7369,7 +7883,10 @@ function AdminGuides({
               </select>
             </label>
           </div>
-          <div className="guide-image-insert" aria-label="Вставка изображения в секцию">
+          <div
+            className="guide-image-insert"
+            aria-label="Вставка изображения в секцию"
+          >
             <label htmlFor="guide-section-image-url">
               Ссылка на изображение для секции
               <input
@@ -7390,11 +7907,17 @@ function AdminGuides({
                 placeholder="Например: схема ротации Хотори"
               />
             </label>
-            <button className="ghost-button" type="button" onClick={insertSectionImage}>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={insertSectionImage}
+            >
               <ImageIcon aria-hidden="true" /> Вставить изображение
             </button>
           </div>
-          <label id="markdown-editor-label" htmlFor="markdown-editor">Текст раздела</label>
+          <label id="markdown-editor-label" htmlFor="markdown-editor">
+            Текст раздела
+          </label>
           <RichTextEditorField
             id="markdown-editor"
             value={markdown}
@@ -7748,10 +8271,7 @@ function GuideTeamsEditor({
               onClick={() =>
                 setDraft((current) => ({
                   ...current,
-                  members: [
-                    ...current.members,
-                    { characterId: '', role: '' },
-                  ],
+                  members: [...current.members, { characterId: '', role: '' }],
                 }))
               }
             >
@@ -7762,7 +8282,8 @@ function GuideTeamsEditor({
           <fieldset className="rotation-step-editor">
             <legend>Пошаговая ротация всей команды</legend>
             <p>
-              Одна строка — одно действие. После последнего шага цикл возвращается к первому.
+              Одна строка — одно действие. После последнего шага цикл
+              возвращается к первому.
             </p>
             {(draft.rotationSteps || []).map((step, index) => (
               <div key={`${selectedId}-rotation-${index}`}>
@@ -8001,18 +8522,20 @@ function AdminTierlists({
           .map((item) => ({ ...item, tier: normalizeTier(item.tier) }));
 
         if (tier === nextTier) {
-        const insertIndex = targetCharacterId
-          ? rowItems.findIndex((item) => item.characterId === targetCharacterId)
-          : -1;
-        if (insertIndex >= 0) {
-          rowItems.splice(
-            placement === 'after' ? insertIndex + 1 : insertIndex,
-            0,
-            moving,
-          );
-        } else {
-          rowItems.push(moving);
-        }
+          const insertIndex = targetCharacterId
+            ? rowItems.findIndex(
+                (item) => item.characterId === targetCharacterId,
+              )
+            : -1;
+          if (insertIndex >= 0) {
+            rowItems.splice(
+              placement === 'after' ? insertIndex + 1 : insertIndex,
+              0,
+              moving,
+            );
+          } else {
+            rowItems.push(moving);
+          }
         }
 
         nextItems.push(...rowItems);
@@ -8055,7 +8578,10 @@ function AdminTierlists({
     document.body.append(clone);
     dragPreviewRef.current = clone;
     event.dataTransfer.setDragImage(clone, rect.width / 2, rect.height / 2);
-    event.dataTransfer.setData('application/x-nte-character-name', character.name);
+    event.dataTransfer.setData(
+      'application/x-nte-character-name',
+      character.name,
+    );
   }
 
   const availableCharacters = data.characters.filter(
@@ -8127,10 +8653,10 @@ function AdminTierlists({
       <section className="admin-panel tierlist-editor-header">
         <div className="panel-title-row">
           <div>
-        <p className="eyebrow">Единый редакционный список</p>
-        <h2>Редактор тир-листа</h2>
-      </div>
-    </div>
+            <p className="eyebrow">Единый редакционный список</p>
+            <h2>Редактор тир-листа</h2>
+          </div>
+        </div>
         <div className="tierlist-meta-fields">
           <label>
             Название
@@ -8185,7 +8711,9 @@ function AdminTierlists({
           {tierOrder.map((tier) => (
             <section
               className={`tier-drop-row tier-${tier.toLowerCase()} ${
-                dragOver?.tier === tier && !dragOver.characterId ? 'is-over' : ''
+                dragOver?.tier === tier && !dragOver.characterId
+                  ? 'is-over'
+                  : ''
               }`}
               key={tier}
               onDragEnter={() => setDragOver({ tier })}
@@ -8196,7 +8724,9 @@ function AdminTierlists({
                 }
               }}
               onDragLeave={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                if (
+                  !event.currentTarget.contains(event.relatedTarget as Node)
+                ) {
                   setDragOver(null);
                 }
               }}
@@ -8211,68 +8741,81 @@ function AdminTierlists({
                   const character = getCharacter(data, item.characterId);
                   if (!character) return null;
                   const isDragging = draggedCharacterId === item.characterId;
-                const isDropTarget =
-                  dragOver?.tier === tier &&
-                  dragOver.characterId === item.characterId;
-                const dropPlacement = isDropTarget
-                  ? dragOver?.placement || 'before'
-                  : null;
+                  const isDropTarget =
+                    dragOver?.tier === tier &&
+                    dragOver.characterId === item.characterId;
+                  const dropPlacement = isDropTarget
+                    ? dragOver?.placement || 'before'
+                    : null;
                   return (
                     <button
                       type="button"
                       draggable
                       key={item.characterId}
-                    className={`tier-drag-card ${
-                      isDragging ? 'is-dragging' : ''
-                    } ${isDropTarget ? 'is-drop-target' : ''} ${
-                      dropPlacement ? `is-drop-${dropPlacement}` : ''
-                    }`}
-                    title={`${character.name}: перетащить или переставить в строке ${tier}`}
-                    aria-label={`${character.name}, тир ${tier}`}
-                    data-drop-placement={dropPlacement || undefined}
-                    onDragStart={(event) => {
-                      event.dataTransfer.effectAllowed = 'move';
-                      event.dataTransfer.setData('text/plain', item.characterId);
-                      setTierDragImage(event, character);
-                      setDraggedCharacterId(item.characterId);
-                    }}
-                    onDragEnter={(event) => {
-                      if (draggedCharacterId && draggedCharacterId !== item.characterId) {
-                        setDragOver({
-                          tier,
-                          characterId: item.characterId,
-                          placement: getTierDropPlacement(event),
-                        });
-                      }
-                    }}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      if (!draggedCharacterId || draggedCharacterId === item.characterId) {
-                        return;
-                      }
-                      const placement = getTierDropPlacement(event);
-                      if (
-                        dragOver?.tier !== tier ||
-                        dragOver.characterId !== item.characterId ||
-                        dragOver.placement !== placement
-                      ) {
-                        setDragOver({ tier, characterId: item.characterId, placement });
-                      }
-                    }}
+                      className={`tier-drag-card ${
+                        isDragging ? 'is-dragging' : ''
+                      } ${isDropTarget ? 'is-drop-target' : ''} ${
+                        dropPlacement ? `is-drop-${dropPlacement}` : ''
+                      }`}
+                      title={`${character.name}: перетащить или переставить в строке ${tier}`}
+                      aria-label={`${character.name}, тир ${tier}`}
+                      data-drop-placement={dropPlacement || undefined}
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData(
+                          'text/plain',
+                          item.characterId,
+                        );
+                        setTierDragImage(event, character);
+                        setDraggedCharacterId(item.characterId);
+                      }}
+                      onDragEnter={(event) => {
+                        if (
+                          draggedCharacterId &&
+                          draggedCharacterId !== item.characterId
+                        ) {
+                          setDragOver({
+                            tier,
+                            characterId: item.characterId,
+                            placement: getTierDropPlacement(event),
+                          });
+                        }
+                      }}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (
+                          !draggedCharacterId ||
+                          draggedCharacterId === item.characterId
+                        ) {
+                          return;
+                        }
+                        const placement = getTierDropPlacement(event);
+                        if (
+                          dragOver?.tier !== tier ||
+                          dragOver.characterId !== item.characterId ||
+                          dragOver.placement !== placement
+                        ) {
+                          setDragOver({
+                            tier,
+                            characterId: item.characterId,
+                            placement,
+                          });
+                        }
+                      }}
                       onDrop={(event) => {
                         event.preventDefault();
-                      event.stopPropagation();
-                      if (draggedCharacterId) {
-                        moveCharacter(
-                          draggedCharacterId,
-                          tier,
-                          item.characterId,
-                          dragOver?.placement || getTierDropPlacement(event),
-                        );
-                      }
-                    }}
-                    onDragEnd={clearTierDragState}
+                        event.stopPropagation();
+                        if (draggedCharacterId) {
+                          moveCharacter(
+                            draggedCharacterId,
+                            tier,
+                            item.characterId,
+                            dragOver?.placement || getTierDropPlacement(event),
+                          );
+                        }
+                      }}
+                      onDragEnd={clearTierDragState}
                     >
                       <span className="tier-card-rank">{index + 1}</span>
                       <img
@@ -8342,9 +8885,9 @@ function AdminTierlists({
                   <select
                     value={item.tier}
                     onChange={(event) =>
-                    updateItem(item.characterId, {
-                      tier: normalizeTier(event.target.value),
-                    })
+                      updateItem(item.characterId, {
+                        tier: normalizeTier(event.target.value),
+                      })
                     }
                   >
                     {tierOrder.map((tier) => (
@@ -8438,15 +8981,15 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
     let mounted = true;
     Promise.all([loadModerationComments(), loadCommentReports()]).then(
       ([commentsResult, reportsResult]) => {
-      if (!mounted) return;
-      if (commentsResult.ok) {
-        setComments(commentsResult.data);
-      } else {
-        setMessage(commentsResult.error);
-      }
-      if (reportsResult.ok) setReports(reportsResult.data);
-      else if (commentsResult.ok) setMessage(reportsResult.error);
-      setLoading(false);
+        if (!mounted) return;
+        if (commentsResult.ok) {
+          setComments(commentsResult.data);
+        } else {
+          setMessage(commentsResult.error);
+        }
+        if (reportsResult.ok) setReports(reportsResult.data);
+        else if (commentsResult.ok) setMessage(reportsResult.error);
+        setLoading(false);
       },
     );
     return () => {
@@ -8546,13 +9089,19 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
         {loading ? 'Загружаем очередь...' : message}
       </p>
       {reports.length ? (
-        <section className="moderation-report-queue" aria-labelledby="comment-reports-title">
+        <section
+          className="moderation-report-queue"
+          aria-labelledby="comment-reports-title"
+        >
           <div className="panel-title-row">
             <div>
               <p className="eyebrow">Сигналы сообщества</p>
               <h3 id="comment-reports-title">Жалобы на комментарии</h3>
             </div>
-            <span>{reports.filter((report) => report.status === 'open').length} открыто</span>
+            <span>
+              {reports.filter((report) => report.status === 'open').length}{' '}
+              открыто
+            </span>
           </div>
           <div className="moderation-report-list">
             {reports.map((report) => (
@@ -8566,7 +9115,8 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
                 </div>
                 <blockquote>{report.commentBody}</blockquote>
                 <p>
-                  Автор: {report.commentAuthor} · пожаловался: {report.reporterName}
+                  Автор: {report.commentAuthor} · пожаловался:{' '}
+                  {report.reporterName}
                 </p>
                 {report.details ? <p>{report.details}</p> : null}
                 {report.status === 'open' ? (
@@ -8607,7 +9157,8 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
             <div className="comment-heading">
               <strong>{comment.author}</strong>
               <span>
-                {moderationTargetLabels[comment.targetType] || comment.targetType}
+                {moderationTargetLabels[comment.targetType] ||
+                  comment.targetType}
                 {' · '}
                 {moderationStatusLabels[comment.status || 'visible'] ||
                   comment.status ||
@@ -8689,19 +9240,19 @@ function AdminComments({ data, user }: { data: SiteData; user: User }) {
           </div>
         </form>
       </dialog>
-        <dialog
-          className="confirm-dialog"
-          ref={warningDialogRef}
-          onCancel={(event) => {
-            event.preventDefault();
-            closeWarningDialog();
-          }}
-          onClose={(event) => {
-            event.currentTarget.querySelector('form')?.reset();
-            setActionId('');
-            setWarningTarget(null);
-          }}
-        >
+      <dialog
+        className="confirm-dialog"
+        ref={warningDialogRef}
+        onCancel={(event) => {
+          event.preventDefault();
+          closeWarningDialog();
+        }}
+        onClose={(event) => {
+          event.currentTarget.querySelector('form')?.reset();
+          setActionId('');
+          setWarningTarget(null);
+        }}
+      >
         <form onSubmit={submitWarning}>
           <h2>Предупреждение пользователю</h2>
           <p>
@@ -8780,14 +9331,23 @@ function AdminWarnings() {
     };
   }, []);
 
-  async function updateStatus(warning: UserWarning, status: 'active' | 'dismissed') {
+  async function updateStatus(
+    warning: UserWarning,
+    status: 'active' | 'dismissed',
+  ) {
     setActionId(warning.id);
     const result = await updateWarningStatus(warning.id, status);
     if (result.ok) {
       setWarnings((current) =>
-        current.map((item) => (item.id === warning.id ? { ...item, status } : item)),
+        current.map((item) =>
+          item.id === warning.id ? { ...item, status } : item,
+        ),
       );
-      setMessage(status === 'dismissed' ? 'Предупреждение закрыто.' : 'Предупреждение снова активно.');
+      setMessage(
+        status === 'dismissed'
+          ? 'Предупреждение закрыто.'
+          : 'Предупреждение снова активно.',
+      );
     } else {
       setMessage(result.error);
     }
@@ -8809,11 +9369,15 @@ function AdminWarnings() {
       <div className="comment-list">
         {warnings.length ? (
           warnings.map((warning) => (
-            <article className={`comment-card status-${warning.status || 'active'}`} key={warning.id}>
+            <article
+              className={`comment-card status-${warning.status || 'active'}`}
+              key={warning.id}
+            >
               <div className="comment-heading">
                 <strong>{warning.reason}</strong>
                 <span>
-                  {warning.userName || warning.userId || 'Пользователь'} · {formatDate(warning.createdAt)}
+                  {warning.userName || warning.userId || 'Пользователь'} ·{' '}
+                  {formatDate(warning.createdAt)}
                 </span>
               </div>
               {warning.note ? <p>{warning.note}</p> : null}
@@ -8825,11 +9389,15 @@ function AdminWarnings() {
                   onClick={() =>
                     updateStatus(
                       warning,
-                        (warning.status || 'active') === 'active' ? 'dismissed' : 'active',
+                      (warning.status || 'active') === 'active'
+                        ? 'dismissed'
+                        : 'active',
                     )
                   }
                 >
-                  {(warning.status || 'active') === 'active' ? 'Закрыть' : 'Вернуть'}
+                  {(warning.status || 'active') === 'active'
+                    ? 'Закрыть'
+                    : 'Вернуть'}
                 </button>
               </div>
             </article>

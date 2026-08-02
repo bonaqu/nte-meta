@@ -5,8 +5,14 @@ test.describe('Публичный портал NTE Meta', () => {
     page,
   }) => {
     const consoleErrors: string[] = [];
+    const failedResponses: string[] = [];
     page.on('console', (message) => {
       if (message.type() === 'error') consoleErrors.push(message.text());
+    });
+    page.on('response', (response) => {
+      if (response.status() >= 400) {
+        failedResponses.push(`${response.status()} ${response.url()}`);
+      }
     });
 
     await page.goto('/');
@@ -24,7 +30,10 @@ test.describe('Публичный портал NTE Meta', () => {
       page.getByRole('heading', { name: 'Треды и обсуждения игроков' }),
     ).toBeVisible();
     await expect(page.locator('main')).toHaveAttribute('id', 'main-content');
-    expect(consoleErrors).toEqual([]);
+    expect(
+      consoleErrors,
+      `HTTP failures: ${failedResponses.join(', ')}`,
+    ).toEqual([]);
   });
 
   test('персонажи не показывают устаревшие seed-карточки до ответа API', async ({
@@ -77,6 +86,50 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(page.getByText('Актуальная карточка А')).toBeVisible();
   });
 
+  test('сбой API завершает синхронизацию и показывает видимую ошибку', async ({
+    page,
+  }) => {
+    let characterRequests = 0;
+    await page.route('**/api/characters', async (route) => {
+      characterRequests += 1;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      if (characterRequests > 1) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          json: { data: [] },
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        json: { error: 'Тестовая недоступность каталога' },
+      });
+    });
+
+    await page.goto('/#/characters', { waitUntil: 'domcontentloaded' });
+    const loadingHeading = page.getByRole('heading', {
+      name: /Синхронизируем данные персонажей/,
+    });
+    await expect(loadingHeading).toBeVisible();
+    await expect(page.getByText('Хотори')).toHaveCount(0);
+    await expect(page.getByText('Лакримоза')).toHaveCount(0);
+
+    await expect(loadingHeading).toHaveCount(0);
+    await expect(
+      page.getByText(
+        'Не удалось загрузить данные портала. Тестовая недоступность каталога. Повторите загрузку.',
+      ),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Повторить загрузку' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Персонажи Neverness to Everness' }),
+    ).toBeVisible();
+    await expect(page.getByText('Персонажи не найдены')).toBeVisible();
+    expect(characterRequests).toBe(2);
+  });
+
   test('поиск персонажей ведёт в lore-профиль, а мета остаётся в гайдах', async ({
     page,
   }) => {
@@ -85,8 +138,15 @@ test.describe('Публичный портал NTE Meta', () => {
       page.getByRole('heading', { name: 'Персонажи Neverness to Everness' }),
     ).toBeVisible();
 
+    const resultsSummary = page.locator('#character-results-count');
+    const initialSummary = await resultsSummary.textContent();
+    const totalCharacters = Number(initialSummary?.match(/из\s+(\d+)/)?.[1]);
+    expect(totalCharacters).toBeGreaterThan(0);
+
     await page.getByPlaceholder('Имя, атрибут, тег...').fill('Хотори');
-    await expect(page.getByText(/Найдено: 1 из/)).toBeVisible();
+    await expect(resultsSummary).toHaveText(
+      new RegExp(`Найдено: [1-9]\\d* из ${totalCharacters}`),
+    );
     await expect(
       page.getByRole('link', { name: 'Открыть страницу персонажа Хотори' }),
     ).toBeVisible();
@@ -110,20 +170,14 @@ test.describe('Публичный портал NTE Meta', () => {
       page.getByRole('heading', { name: 'Актёры озвучки', exact: true }),
     ).toBeVisible();
     await expect(
-      page
-        .locator('.voice-actor-grid')
-        .or(page.getByText('Актёры озвучки не указаны'))
-        .first(),
+      page.getByRole('region', { name: 'Актёры озвучки' }),
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Прокачка и симпатия' }),
     ).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Озвучка' })).toBeVisible();
     await expect(
-      page
-        .locator('.voice-line-list article')
-        .or(page.getByText('Аудио пока не загружено'))
-        .first(),
+      page.getByRole('region', { name: 'Реплики персонажа' }),
     ).toBeVisible();
     await expect(page.locator('.guide-section-card')).toHaveCount(0);
     await expect(page.getByText('Комментарии и обсуждения')).toBeVisible();
@@ -174,7 +228,7 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(page.getByText(/доверие: средний/i)).toBeVisible();
   });
 
-test('отряды и ротации находятся внутри гайда, тир-лист единый', async ({
+  test('отряды и ротации находятся внутри гайда, тир-лист единый', async ({
     page,
   }) => {
     await page.goto('/#/teams');
@@ -195,21 +249,26 @@ test('отряды и ротации находятся внутри гайда,
     ).toBeVisible();
     await expect(
       page.getByText(
-        'У каждого состава своя последовательность переключений персонажей и навыков.',
+        'Состав, роли и последовательность действий собраны в одном месте.',
       ),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Командная ротация', { exact: true }),
     ).toBeVisible();
     await expect(page.locator('a[href="#/teams"]')).toHaveCount(0);
     await expect(page.locator('a[href="#/rotations"]')).toHaveCount(0);
 
-  await page.goto('/#/tierlists');
-  await expect(
-    page.getByRole('heading', { name: 'Тир-листы', exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText('Единый редакционный список')).toBeVisible();
-  await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Premium C6' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Base C0' })).toHaveCount(0);
-});
+    await page.goto('/#/tierlists');
+    await expect(
+      page.getByRole('heading', { name: 'Тир-листы', exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText('Единый редакционный список')).toBeVisible();
+    await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Premium C6' })).toHaveCount(
+      0,
+    );
+    await expect(page.getByRole('button', { name: 'Base C0' })).toHaveCount(0);
+  });
 
   test('авторизация отделена от CMS, отдельного пустого комьюнити-раздела нет', async ({
     page,

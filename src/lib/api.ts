@@ -29,7 +29,7 @@ let sessionToken = '';
 
 type ApiResult<T> =
   | { ok: true; data: T }
-  | { ok: false; error: string; status: number };
+  | { ok: false; error: string; status: number; aborted?: boolean };
 export type ReactionSummary = {
   likes: number;
   dislikes: number;
@@ -106,14 +106,18 @@ async function request<T>(
       data: (Object.hasOwn(payload, 'data') ? payload.data : payload) as T,
     };
   } catch (error) {
+    const abortedByCaller = Boolean(init.signal?.aborted) && !timedOut;
     return {
       ok: false,
-      error: timedOut
-        ? 'Сервер слишком долго отвечает. Проверьте соединение и повторите попытку.'
-        : error instanceof Error
-          ? error.message
-          : 'Не удалось выполнить запрос',
+      error: abortedByCaller
+        ? 'Запрос отменён.'
+        : timedOut
+          ? 'Сервер слишком долго отвечает. Проверьте соединение и повторите попытку.'
+          : error instanceof Error
+            ? error.message
+            : 'Не удалось выполнить запрос',
       status: 0,
+      aborted: abortedByCaller,
     };
   } finally {
     clearTimeout(timeout);
@@ -412,26 +416,34 @@ export async function loadSystemStatus() {
   return request<SystemStatus>('/api/system/status');
 }
 
-export async function lookupCharacterInfo(query: string) {
+export async function lookupCharacterInfo(
+  query: string,
+  options: { signal?: AbortSignal } = {},
+) {
   return request<CharacterImportLookupResult>(
     '/api/character-import/lookup',
     {
       method: 'POST',
       body: JSON.stringify({ query }),
+      signal: options.signal,
     },
     { timeoutMs: IMPORT_REQUEST_TIMEOUT_MS },
   );
 }
 
-export async function lookupGuideInfo(payload: {
-  guideId?: string;
-  query?: string;
-}) {
+export async function lookupGuideInfo(
+  payload: {
+    guideId?: string;
+    query?: string;
+  },
+  options: { signal?: AbortSignal } = {},
+) {
   return request<CharacterImportLookupResult>(
     '/api/guide-import/lookup',
     {
       method: 'POST',
       body: JSON.stringify(payload),
+      signal: options.signal,
     },
     { timeoutMs: IMPORT_REQUEST_TIMEOUT_MS },
   );

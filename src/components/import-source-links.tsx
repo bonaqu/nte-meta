@@ -16,7 +16,12 @@ export function ImportSourceLinks({
 
   if (sources.length === 1) {
     return (
-      <a className="import-source-link" href={sources[0].url} target="_blank" rel="noreferrer">
+      <a
+        className="import-source-link"
+        href={sources[0].url}
+        target="_blank"
+        rel="noreferrer"
+      >
         <ExternalLink aria-hidden="true" />
         Источник
       </a>

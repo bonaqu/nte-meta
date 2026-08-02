@@ -236,7 +236,8 @@ function toDraft(character: Character): CharacterDraft {
       ...emptyProfile(),
       ...profile,
       biography,
-      biographyShort: character.shortDescription || profile.biographyShort || '',
+      biographyShort:
+        character.shortDescription || profile.biographyShort || '',
       roleTags: profile.roleTags?.length ? profile.roleTags : [character.role],
     },
   };
@@ -307,14 +308,17 @@ function ImportSuggestionList({
   if (!suggestions.length) return null;
 
   return (
-    <section className="import-review-panel" aria-label="Предложения автоимпорта">
+    <section
+      className="import-review-panel"
+      aria-label="Предложения автоимпорта"
+    >
       <div>
         <p className="eyebrow">Автоимпорт</p>
         <h3>Выберите и подтвердите найденные данные</h3>
         <p>
           Для одного поля может быть несколько вариантов из разных источников.
-          Галочка применяет выбранное в черновик; на сайте данные появятся только
-          после сохранения или публикации.
+          Галочка применяет выбранное в черновик; на сайте данные появятся
+          только после сохранения или публикации.
         </p>
       </div>
       <div className="import-suggestion-list">
@@ -345,7 +349,10 @@ function ImportSuggestionList({
                     Вариант {variant.index} из {variant.total}
                   </span>
                 ) : null}
-                <div className="import-quality-badges" aria-label="Качество предложения">
+                <div
+                  className="import-quality-badges"
+                  aria-label="Качество предложения"
+                >
                   {agreementCount >= 2 ? (
                     <span className="quality-consensus">
                       Совпало в {agreementCount} источниках
@@ -357,7 +364,9 @@ function ImportSuggestionList({
                     </span>
                   ) : null}
                   {suggestion.qualityFlags?.includes('incomplete') ? (
-                    <span className="quality-review">Нужна внимательная проверка</span>
+                    <span className="quality-review">
+                      Нужна внимательная проверка
+                    </span>
                   ) : null}
                 </div>
                 {suggestionContext ? <span>{suggestionContext}</span> : null}
@@ -425,7 +434,10 @@ function ImportSuggestionList({
                         Отклонить весь блок
                       </button>
                     </div>
-                    <div className="import-row-review-list" aria-label={`Строки: ${fieldLabel}`}>
+                    <div
+                      className="import-row-review-list"
+                      aria-label={`Строки: ${fieldLabel}`}
+                    >
                       {rowSuggestions.map((row) => {
                         const rowDecision = decisions[row.id];
                         const rowPreviewUrls = getSuggestionPreviewUrls(row);
@@ -448,7 +460,11 @@ function ImportSuggestionList({
                             <div className="import-row-content">
                               <span>{row.label}</span>
                               {rowAudioUrl ? (
-                                <audio controls preload="none" src={rowAudioUrl}>
+                                <audio
+                                  controls
+                                  preload="none"
+                                  src={rowAudioUrl}
+                                >
                                   Ваш браузер не поддерживает аудио.
                                 </audio>
                               ) : null}
@@ -481,7 +497,8 @@ function ImportSuggestionList({
                 ) : null}
               </div>
               <small>
-                {suggestion.sourceName} · {formatImportConfidence(suggestion.confidence)}
+                {suggestion.sourceName} ·{' '}
+                {formatImportConfidence(suggestion.confidence)}
                 {suggestion.note ? ` · ${suggestion.note}` : ''}
               </small>
               <div className="import-suggestion-actions">
@@ -548,7 +565,9 @@ function summarizeSuggestionValue(value: string) {
   return value.length > 260 ? `${value.slice(0, 260)}...` : value;
 }
 
-function formatImportConfidence(confidence: CharacterImportSuggestion['confidence']) {
+function formatImportConfidence(
+  confidence: CharacterImportSuggestion['confidence'],
+) {
   if (confidence === 'high') return 'Высокая уверенность';
   if (confidence === 'medium') return 'Средняя уверенность';
   return 'Требует ручной проверки';
@@ -568,7 +587,8 @@ function getSuggestionPreviewUrls(suggestion: CharacterImportSuggestion) {
     if (typeof value !== 'string') return;
     if (!/^(?:https?:|data:|blob:|\/?assets\/)/i.test(value)) return;
     if (directAudioPattern.test(value)) return;
-    const normalized = getYoutubeThumbnailUrl(value) || normalizeExternalAssetUrl(value);
+    const normalized =
+      getYoutubeThumbnailUrl(value) || normalizeExternalAssetUrl(value);
     if (normalized && !urls.includes(normalized)) urls.push(normalized);
   };
   const visit = (value: unknown, depth = 0) => {
@@ -587,7 +607,10 @@ function getSuggestionPreviewUrls(suggestion: CharacterImportSuggestion) {
   };
 
   const parsed = parseImportValue(suggestion.value);
-  if (typeof parsed === 'string' && /(?:image|splash|icon)url/i.test(suggestion.field)) {
+  if (
+    typeof parsed === 'string' &&
+    /(?:image|splash|icon)url/i.test(suggestion.field)
+  ) {
     addUrl(parsed);
     return urls;
   }
@@ -760,7 +783,9 @@ function readEditorImageFile(
     throw new Error('Поддерживаются только PNG, WebP или JPEG.');
   }
   if (file.size > maxBytes) {
-    throw new Error(`${label} должен весить не больше ${Math.round(maxBytes / 1024)} KB.`);
+    throw new Error(
+      `${label} должен весить не больше ${Math.round(maxBytes / 1024)} KB.`,
+    );
   }
 
   return new Promise<string>((resolve, reject) => {
@@ -769,10 +794,15 @@ function readEditorImageFile(
     reader.onload = () => {
       const dataUrl = String(reader.result || '');
       const image = new Image();
-      image.onerror = () => reject(new Error('Не удалось проверить изображение.'));
+      image.onerror = () =>
+        reject(new Error('Не удалось проверить изображение.'));
       image.onload = () => {
         if (image.naturalWidth > maxSide || image.naturalHeight > maxSide) {
-          reject(new Error(`Размер файла должен быть не больше ${maxSide}×${maxSide} px.`));
+          reject(
+            new Error(
+              `Размер файла должен быть не больше ${maxSide}×${maxSide} px.`,
+            ),
+          );
           return;
         }
         resolve(dataUrl);
@@ -1007,18 +1037,23 @@ export function AdminCharacterEditor({
   const [query, setQuery] = useState('');
   const [message, setMessage] = useState('');
   const [tone, setTone] = useState<'info' | 'danger' | 'success'>('info');
-  const [pending, setPending] = useState(false);
+  const [mutationPending, setMutationPending] = useState(false);
+  const [importPending, setImportPending] = useState(false);
+  const [importStatus, setImportStatus] = useState('');
   const [importSuggestions, setImportSuggestions] = useState<
     CharacterImportSuggestion[]
   >([]);
   const [importDecisions, setImportDecisions] = useState<
     Record<string, 'accepted' | 'rejected'>
   >({});
-  const [importCoverage, setImportCoverage] = useState<
-    CharacterImportLookupResult['coverage']
-  >();
+  const [importCoverage, setImportCoverage] =
+    useState<CharacterImportLookupResult['coverage']>();
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const skipNextDraftSaveRef = useRef(false);
+  const importControllerRef = useRef<AbortController | null>(null);
+  const importRequestIdRef = useRef(0);
+  const importButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreImportFocusRef = useRef(false);
   const selected = items.find((item) => item.id === selectedId);
   const draftKey = `nte-character-draft:${selectedId}`;
   const baselineDraft = useMemo(
@@ -1090,11 +1125,32 @@ export function AdminCharacterEditor({
   }, [isDirty, onDirtyChange]);
 
   useEffect(() => {
+    if (importPending || !restoreImportFocusRef.current) return;
+    restoreImportFocusRef.current = false;
+    importButtonRef.current?.focus();
+  }, [importPending]);
+
+  useEffect(() => {
+    if (importControllerRef.current) {
+      importRequestIdRef.current += 1;
+      importControllerRef.current.abort();
+      importControllerRef.current = null;
+    }
+    setImportPending(false);
+    setImportStatus('');
     setMessage('');
     setImportSuggestions([]);
     setImportDecisions({});
     setImportCoverage(undefined);
   }, [selectedId]);
+
+  useEffect(
+    () => () => {
+      importRequestIdRef.current += 1;
+      importControllerRef.current?.abort();
+    },
+    [],
+  );
 
   function patch(patchValue: Partial<CharacterDraft>) {
     setDraft((current) => ({ ...current, ...patchValue }));
@@ -1110,25 +1166,71 @@ export function AdminCharacterEditor({
   async function lookupBaseInfo() {
     const lookupQuery = draft.name || draft.originalName;
     if (!lookupQuery.trim()) {
+      const validationMessage =
+        'Укажите имя персонажа перед поиском базовой информации.';
       setTone('danger');
-      setMessage('Укажите имя персонажа перед поиском базовой информации.');
+      setMessage(validationMessage);
+      setImportStatus(validationMessage);
       return;
     }
 
-    setPending(true);
-    setMessage('');
-    const result = await lookupCharacterInfo(lookupQuery);
-    if (result.ok) {
-      setTone(result.data.found ? 'success' : 'info');
-      setMessage(result.data.message || 'Источники не настроены. Заполните поля вручную.');
-      setImportSuggestions(result.data.suggestions || []);
-      setImportDecisions({});
-      setImportCoverage(result.data.coverage);
-    } else {
-      setTone('danger');
-      setMessage(formatEditorError(result.error));
+    const controller = new AbortController();
+    const requestId = importRequestIdRef.current + 1;
+    importRequestIdRef.current = requestId;
+    importControllerRef.current?.abort();
+    importControllerRef.current = controller;
+    setImportPending(true);
+    setTone('info');
+    setMessage('Ищем базовую информацию в подключённых источниках…');
+    setImportStatus('Ищем базовую информацию. Поиск можно отменить.');
+
+    try {
+      const result = await lookupCharacterInfo(lookupQuery, {
+        signal: controller.signal,
+      });
+      if (
+        requestId !== importRequestIdRef.current ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
+      if (result.ok) {
+        const resultMessage =
+          result.data.message ||
+          'Источники не вернули данных. Измените запрос и повторите поиск.';
+        setTone(result.data.found ? 'success' : 'info');
+        setMessage(resultMessage);
+        setImportStatus(resultMessage);
+        setImportSuggestions(result.data.suggestions || []);
+        setImportDecisions({});
+        setImportCoverage(result.data.coverage);
+      } else if (!result.aborted) {
+        const errorMessage = formatEditorError(result.error);
+        setTone('danger');
+        setMessage(errorMessage);
+        setImportStatus(`${errorMessage} Можно повторить поиск.`);
+      }
+    } finally {
+      if (requestId === importRequestIdRef.current) {
+        importControllerRef.current = null;
+        restoreImportFocusRef.current = true;
+        setImportPending(false);
+      }
     }
-    setPending(false);
+  }
+
+  function cancelBaseInfoLookup() {
+    if (!importControllerRef.current) return;
+    importRequestIdRef.current += 1;
+    importControllerRef.current.abort();
+    importControllerRef.current = null;
+    restoreImportFocusRef.current = true;
+    setImportPending(false);
+    setTone('info');
+    const cancelMessage =
+      'Поиск отменён. Черновик и найденные предложения сохранены.';
+    setMessage(cancelMessage);
+    setImportStatus(cancelMessage);
   }
 
   function applyImportSuggestion(suggestion: CharacterImportSuggestion) {
@@ -1151,10 +1253,15 @@ export function AdminCharacterEditor({
         profile: { ...current.profile },
       };
       if (suggestion.field === 'name') next.name = String(parsed);
-      else if (suggestion.field === 'originalName') next.originalName = String(parsed);
-      else if (suggestion.field === 'rarity' && ['S', 'A'].includes(String(parsed))) {
+      else if (suggestion.field === 'originalName')
+        next.originalName = String(parsed);
+      else if (
+        suggestion.field === 'rarity' &&
+        ['S', 'A'].includes(String(parsed))
+      ) {
         next.rarity = String(parsed) as Character['rarity'];
-      } else if (suggestion.field === 'attribute') next.attribute = String(parsed);
+      } else if (suggestion.field === 'attribute')
+        next.attribute = String(parsed);
       else if (suggestion.field === 'profile.faction') {
         next.profile.faction = String(parsed);
       } else if (suggestion.field === 'profile.arcType') {
@@ -1172,62 +1279,98 @@ export function AdminCharacterEditor({
         next.profile.biography = String(parsed);
       } else if (suggestion.field === 'profile.trivia') {
         next.profile.trivia = mergeText(next.profile.trivia, String(parsed));
-      } else if (suggestion.field === 'profile.roleTags' && Array.isArray(parsed)) {
+      } else if (
+        suggestion.field === 'profile.roleTags' &&
+        Array.isArray(parsed)
+      ) {
         next.profile.roleTags = Array.from(
-          new Set([...next.profile.roleTags, ...parsed.map(String).filter(Boolean)]),
+          new Set([
+            ...next.profile.roleTags,
+            ...parsed.map(String).filter(Boolean),
+          ]),
         );
-      } else if (suggestion.field === 'profile.roleIcons' && Array.isArray(parsed)) {
+      } else if (
+        suggestion.field === 'profile.roleIcons' &&
+        Array.isArray(parsed)
+      ) {
         next.profile.roleIcons = mergeRowsByKey(
           next.profile.roleIcons || [],
           parsed as CharacterRoleIcon[],
           (item) => item.name,
         );
-      } else if (suggestion.field === 'profile.voiceActors' && Array.isArray(parsed)) {
+      } else if (
+        suggestion.field === 'profile.voiceActors' &&
+        Array.isArray(parsed)
+      ) {
         next.profile.voiceActors = mergeRowsByKey(
           next.profile.voiceActors,
           parsed as CharacterVoiceActor[],
           (item) => item.language,
         );
-      } else if (suggestion.field === 'profile.voiceLines' && Array.isArray(parsed)) {
+      } else if (
+        suggestion.field === 'profile.voiceLines' &&
+        Array.isArray(parsed)
+      ) {
         next.profile.voiceLines = mergeRowsByKey(
           next.profile.voiceLines,
           parsed as CharacterVoiceLine[],
           (item) => `${item.language}:${item.title}`,
         );
-      } else if (suggestion.field === 'profile.materials' && Array.isArray(parsed)) {
+      } else if (
+        suggestion.field === 'profile.materials' &&
+        Array.isArray(parsed)
+      ) {
         next.profile.materials = mergeRowsByKey(
           next.profile.materials,
           parsed as CharacterMaterial[],
           (item) => item.name,
         );
-      } else if (suggestion.field === 'profile.friendship' && Array.isArray(parsed)) {
+      } else if (
+        suggestion.field === 'profile.friendship' &&
+        Array.isArray(parsed)
+      ) {
         next.profile.friendship = mergeFriendshipLevels(
           next.profile.friendship,
           parsed as CharacterFriendshipLevel[],
         );
-      } else if (suggestion.field === 'profile.gifts' && Array.isArray(parsed)) {
+      } else if (
+        suggestion.field === 'profile.gifts' &&
+        Array.isArray(parsed)
+      ) {
         next.profile.gifts = mergeNamedRows(
           next.profile.gifts,
           parsed as CharacterGift[],
         );
-      } else if (suggestion.field === 'profile.skins' && Array.isArray(parsed)) {
+      } else if (
+        suggestion.field === 'profile.skins' &&
+        Array.isArray(parsed)
+      ) {
         next.profile.skins = mergeNamedRows(
           next.profile.skins,
           parsed as CharacterSkin[],
         );
-      } else if (suggestion.field === 'profile.baseStats' && Array.isArray(parsed)) {
+      } else if (
+        suggestion.field === 'profile.baseStats' &&
+        Array.isArray(parsed)
+      ) {
         next.profile.baseStats = mergeRowsByKey(
           next.profile.baseStats,
           parsed as CharacterStat[],
           (item) => item.label,
         );
-      } else if (suggestion.field === 'profile.abilities' && Array.isArray(parsed)) {
+      } else if (
+        suggestion.field === 'profile.abilities' &&
+        Array.isArray(parsed)
+      ) {
         next.profile.abilities = mergeRowsByKey(
           next.profile.abilities,
           parsed as CharacterAbility[],
           (item) => `${item.type}:${item.name}`,
         );
-      } else if (suggestion.field === 'profile.awakenings' && Array.isArray(parsed)) {
+      } else if (
+        suggestion.field === 'profile.awakenings' &&
+        Array.isArray(parsed)
+      ) {
         next.profile.awakenings = mergeRowsByKey(
           next.profile.awakenings,
           parsed as CharacterAwakening[],
@@ -1269,10 +1412,14 @@ export function AdminCharacterEditor({
       const dataUrl = await readSmallIconFile(file);
       onReady(dataUrl);
       setTone('success');
-      setMessage('Иконка загружена в черновик. Проверьте предпросмотр и сохраните персонажа.');
+      setMessage(
+        'Иконка загружена в черновик. Проверьте предпросмотр и сохраните персонажа.',
+      );
     } catch (error) {
       setTone('danger');
-      setMessage(error instanceof Error ? error.message : 'Не удалось загрузить иконку.');
+      setMessage(
+        error instanceof Error ? error.message : 'Не удалось загрузить иконку.',
+      );
     }
   }
 
@@ -1285,10 +1432,16 @@ export function AdminCharacterEditor({
       const dataUrl = await readSkinImageFile(file);
       onReady(dataUrl);
       setTone('success');
-      setMessage('Изображение загружено в черновик. Проверьте предпросмотр и сохраните персонажа.');
+      setMessage(
+        'Изображение загружено в черновик. Проверьте предпросмотр и сохраните персонажа.',
+      );
     } catch (error) {
       setTone('danger');
-      setMessage(error instanceof Error ? error.message : 'Не удалось загрузить изображение.');
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Не удалось загрузить изображение.',
+      );
     }
   }
 
@@ -1311,7 +1464,7 @@ export function AdminCharacterEditor({
       biography,
       biographyShort: shortDescription || summary,
     };
-    setPending(true);
+    setMutationPending(true);
     setMessage('');
     const payload = {
       ...draft,
@@ -1352,13 +1505,13 @@ export function AdminCharacterEditor({
       setTone('danger');
       setMessage(formatEditorError(result.error));
     }
-    setPending(false);
+    setMutationPending(false);
   }
 
   async function confirmDelete() {
     if (!selected) return;
     deleteDialogRef.current?.close();
-    setPending(true);
+    setMutationPending(true);
     const result = await deleteEntity(`/api/characters/${selected.id}`);
     if (result.ok) {
       setSelectedId('new');
@@ -1370,7 +1523,7 @@ export function AdminCharacterEditor({
       setTone('danger');
       setMessage(formatEditorError(result.error));
     }
-    setPending(false);
+    setMutationPending(false);
   }
 
   const profile = draft.profile;
@@ -1412,14 +1565,14 @@ export function AdminCharacterEditor({
               aria-pressed={selectedId === item.id}
               onClick={() => setSelectedId(item.id)}
             >
-                    <img
-                      src={resolveAssetUrl(item.imageUrl)}
-                      alt=""
-                      width="44"
-                      height="44"
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
+              <img
+                src={resolveAssetUrl(item.imageUrl)}
+                alt=""
+                width="44"
+                height="44"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
               <span>
                 <strong>{item.name}</strong>
                 <small>{item.profile?.faction || item.attribute}</small>
@@ -1449,17 +1602,30 @@ export function AdminCharacterEditor({
           </div>
           <div className="button-row">
             <button
+              ref={importButtonRef}
               className="ghost-button"
               type="button"
-              disabled={pending}
+              disabled={importPending}
+              aria-describedby="character-import-status"
               onClick={() => void lookupBaseInfo()}
             >
-              Найти базовую информацию
+              {importPending
+                ? 'Ищем базовую информацию…'
+                : 'Найти базовую информацию'}
             </button>
+            {importPending ? (
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={cancelBaseInfoLookup}
+              >
+                Отменить поиск
+              </button>
+            ) : null}
             <button
               className="ghost-button"
               type="button"
-              disabled={pending}
+              disabled={mutationPending}
               onClick={() => void persist('draft')}
             >
               Сохранить черновик
@@ -1468,7 +1634,7 @@ export function AdminCharacterEditor({
               <button
                 className="primary-button"
                 type="submit"
-                disabled={pending}
+                disabled={mutationPending}
               >
                 <CheckCircle2 aria-hidden="true" /> Опубликовать
               </button>
@@ -1487,36 +1653,50 @@ export function AdminCharacterEditor({
           </div>
         </header>
 
-      {message ? <StatusBanner tone={tone} text={message} /> : null}
-      {importCoverage ? (
-        <div className="import-coverage" aria-label="Покрытие найденных данных">
-          <div>
-            <strong>Можно сверять</strong>
-            <span>{importCoverage.readyFields.join(', ') || 'Нет'}</span>
-          </div>
-          <div>
-            <strong>Нужна ручная проверка</strong>
-            <span>{importCoverage.reviewFields.join(', ') || 'Нет'}</span>
-          </div>
-          <div>
-            <strong>Не найдено</strong>
-            <span>{importCoverage.missingFields.join(', ') || 'Нет'}</span>
-          </div>
-        </div>
-      ) : null}
-      <ImportSuggestionList
-        suggestions={importSuggestions}
-        decisions={importDecisions}
-        onAccept={applyImportSuggestion}
-        onReject={(suggestion) =>
-          setImportDecisions((current) => ({
-            ...current,
-            [suggestion.id]: 'rejected',
-          }))
-        }
-      />
+        <p
+          id="character-import-status"
+          className="form-message import-status-region"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          aria-busy={importPending}
+        >
+          {importStatus}
+        </p>
 
-      <details className="editor-section" open>
+        {message ? <StatusBanner tone={tone} text={message} /> : null}
+        {importCoverage ? (
+          <div
+            className="import-coverage"
+            aria-label="Покрытие найденных данных"
+          >
+            <div>
+              <strong>Можно сверять</strong>
+              <span>{importCoverage.readyFields.join(', ') || 'Нет'}</span>
+            </div>
+            <div>
+              <strong>Нужна ручная проверка</strong>
+              <span>{importCoverage.reviewFields.join(', ') || 'Нет'}</span>
+            </div>
+            <div>
+              <strong>Не найдено</strong>
+              <span>{importCoverage.missingFields.join(', ') || 'Нет'}</span>
+            </div>
+          </div>
+        ) : null}
+        <ImportSuggestionList
+          suggestions={importSuggestions}
+          decisions={importDecisions}
+          onAccept={applyImportSuggestion}
+          onReject={(suggestion) =>
+            setImportDecisions((current) => ({
+              ...current,
+              [suggestion.id]: 'rejected',
+            }))
+          }
+        />
+
+        <details className="editor-section" open>
           <summary>Основная информация</summary>
           <div className="editor-field-grid">
             <label>
@@ -1538,7 +1718,8 @@ export function AdminCharacterEditor({
               />
             </label>
             <label className="wide-field">
-              Подпись под именем <span className="field-optional">необязательно</span>
+              Подпись под именем{' '}
+              <span className="field-optional">необязательно</span>
               <textarea
                 value={draft.shortDescription}
                 rows={3}
@@ -1549,7 +1730,8 @@ export function AdminCharacterEditor({
                 }
               />
               <small>
-                Это отдельная подпись в первом экране профиля, а не сокращённая биография.
+                Это отдельная подпись в первом экране профиля, а не сокращённая
+                биография.
               </small>
             </label>
             <label>
@@ -1561,64 +1743,68 @@ export function AdminCharacterEditor({
                 aria-describedby="character-slug-help"
               />
               <small id="character-slug-help">
-                Создаётся из имени автоматически. Измените только если нужна другая короткая ссылка.
+                Создаётся из имени автоматически. Измените только если нужна
+                другая короткая ссылка.
               </small>
             </label>
-        <label>
-          Фракция
-          <input
-            value={profile.faction}
-            onChange={(event) =>
-              patchProfile({ faction: event.target.value })
-            }
-          />
-        </label>
-        <label>
-          Тип дуги
-          <input
-            value={profile.arcType}
-            placeholder="Твёрдое, Газ, Жидкость..."
-            onChange={(event) =>
-              patchProfile({ arcType: event.target.value })
-            }
-          />
-        </label>
-        <label>
-          День рождения
-          <input
-            value={profile.birthday}
-            placeholder="Например, 21 июня"
+            <label>
+              Фракция
+              <input
+                value={profile.faction}
+                onChange={(event) =>
+                  patchProfile({ faction: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              Тип дуги
+              <input
+                value={profile.arcType}
+                placeholder="Твёрдое, Газ, Жидкость..."
+                onChange={(event) =>
+                  patchProfile({ arcType: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              День рождения
+              <input
+                value={profile.birthday}
+                placeholder="Например, 21 июня"
                 onChange={(event) =>
                   patchProfile({ birthday: event.target.value })
-            }
-          />
-        </label>
-        <label>
-          Дата релиза
-          <input
-            value={profile.releaseDate}
-            placeholder="Например, 03 июня 2026"
-            onChange={(event) =>
-              patchProfile({ releaseDate: event.target.value })
-            }
-          />
-        </label>
-        <label>
-          Версия появления <span className="field-optional">необязательно</span>
-          <input
-            value={profile.releaseVersion || ''}
-            placeholder="Например, 1.2"
-            onChange={(event) =>
-              patchProfile({ releaseVersion: event.target.value })
-            }
-          />
-          <small>Версия игры, в которой персонаж стал доступен или заявлен.</small>
-        </label>
-        <label>
+                }
+              />
+            </label>
+            <label>
+              Дата релиза
+              <input
+                value={profile.releaseDate}
+                placeholder="Например, 03 июня 2026"
+                onChange={(event) =>
+                  patchProfile({ releaseDate: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              Версия появления{' '}
+              <span className="field-optional">необязательно</span>
+              <input
+                value={profile.releaseVersion || ''}
+                placeholder="Например, 1.2"
+                onChange={(event) =>
+                  patchProfile({ releaseVersion: event.target.value })
+                }
+              />
+              <small>
+                Версия игры, в которой персонаж стал доступен или заявлен.
+              </small>
+            </label>
+            <label>
               Атрибут
-          <input
-            required
-            value={draft.attribute}
+              <input
+                required
+                value={draft.attribute}
                 onChange={(event) => patch({ attribute: event.target.value })}
               />
             </label>
@@ -1632,8 +1818,8 @@ export function AdminCharacterEditor({
               >
                 <option value="S">S</option>
                 <option value="A">A</option>
-                </select>
-              </label>
+              </select>
+            </label>
             <label>
               Основная роль
               <input
@@ -1697,8 +1883,9 @@ export function AdminCharacterEditor({
                         type="file"
                         accept="image/png,image/webp,image/jpeg"
                         onChange={(event) =>
-                          void uploadInlineIcon(event.target.files?.[0], (iconUrl) =>
-                            update({ ...item, iconUrl }),
+                          void uploadInlineIcon(
+                            event.target.files?.[0],
+                            (iconUrl) => update({ ...item, iconUrl }),
                           )
                         }
                       />
@@ -1719,7 +1906,9 @@ export function AdminCharacterEditor({
               />
             </div>
             <div className="inline-note wide-field">
-              <strong>Тир персонажа редактируется в разделе «Тир-листы».</strong>
+              <strong>
+                Тир персонажа редактируется в разделе «Тир-листы».
+              </strong>
               <span>
                 Профиль персонажа хранит лор, биографию и игровые данные.
                 Актуальный тир S/A/B/C/D берётся из единого тир-листа и не
@@ -1769,81 +1958,83 @@ export function AdminCharacterEditor({
                 }
               />
             </label>
-          <label>
-            URL иконки
-            <input
-              type="text"
-              inputMode="url"
-              required
-              value={draft.imageUrl}
-              onChange={(event) => patch({ imageUrl: event.target.value })}
-            />
-          </label>
-          <div className="media-field-preview">
             <label>
-              Загрузить иконку/карточку
+              URL иконки
               <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(event) => {
-                  void uploadInlineImage(event.target.files?.[0], (imageUrl) =>
-                    patch({ imageUrl }),
-                  );
-                  event.currentTarget.value = '';
-                }}
+                type="text"
+                inputMode="url"
+                required
+                value={draft.imageUrl}
+                onChange={(event) => patch({ imageUrl: event.target.value })}
               />
             </label>
-            {draft.imageUrl ? (
-              <img
-                className="editor-image-preview"
-                src={resolveAssetUrl(draft.imageUrl)}
-                alt=""
-                width="120"
-                height="120"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <span>Превью появится после URL или загрузки файла.</span>
-            )}
-          </div>
-          <label>
-            URL splash art
-            <input
-              type="text"
-              inputMode="url"
-              value={draft.splashUrl}
-              onChange={(event) => patch({ splashUrl: event.target.value })}
-            />
-          </label>
-          <div className="media-field-preview">
+            <div className="media-field-preview">
+              <label>
+                Загрузить иконку/карточку
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(event) => {
+                    void uploadInlineImage(
+                      event.target.files?.[0],
+                      (imageUrl) => patch({ imageUrl }),
+                    );
+                    event.currentTarget.value = '';
+                  }}
+                />
+              </label>
+              {draft.imageUrl ? (
+                <img
+                  className="editor-image-preview"
+                  src={resolveAssetUrl(draft.imageUrl)}
+                  alt=""
+                  width="120"
+                  height="120"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span>Превью появится после URL или загрузки файла.</span>
+              )}
+            </div>
             <label>
-              Загрузить splash art
+              URL splash art
               <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(event) => {
-                  void uploadInlineImage(event.target.files?.[0], (splashUrl) =>
-                    patch({ splashUrl }),
-                  );
-                  event.currentTarget.value = '';
-                }}
+                type="text"
+                inputMode="url"
+                value={draft.splashUrl}
+                onChange={(event) => patch({ splashUrl: event.target.value })}
               />
             </label>
-            {draft.splashUrl ? (
-              <img
-                className="editor-image-preview editor-image-preview--wide"
-                src={resolveAssetUrl(draft.splashUrl)}
-                alt=""
-                width="180"
-                height="112"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <span>Превью появится после URL или загрузки файла.</span>
-            )}
-          </div>
+            <div className="media-field-preview">
+              <label>
+                Загрузить splash art
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(event) => {
+                    void uploadInlineImage(
+                      event.target.files?.[0],
+                      (splashUrl) => patch({ splashUrl }),
+                    );
+                    event.currentTarget.value = '';
+                  }}
+                />
+              </label>
+              {draft.splashUrl ? (
+                <img
+                  className="editor-image-preview editor-image-preview--wide"
+                  src={resolveAssetUrl(draft.splashUrl)}
+                  alt=""
+                  width="180"
+                  height="112"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span>Превью появится после URL или загрузки файла.</span>
+              )}
+            </div>
           </div>
         </details>
 
@@ -1961,8 +2152,9 @@ export function AdminCharacterEditor({
                     type="file"
                     accept="image/png,image/webp,image/jpeg"
                     onChange={(event) =>
-                      void uploadInlineIcon(event.target.files?.[0], (iconUrl) =>
-                        update({ ...item, iconUrl }),
+                      void uploadInlineIcon(
+                        event.target.files?.[0],
+                        (iconUrl) => update({ ...item, iconUrl }),
                       )
                     }
                   />
@@ -1992,7 +2184,9 @@ export function AdminCharacterEditor({
                   Атрибуты
                   <textarea
                     rows={6}
-                    placeholder={'Коэфф. урона 1-го удара — 16,7 %\nЭнергия циклов — 33'}
+                    placeholder={
+                      'Коэфф. урона 1-го удара — 16,7 %\nЭнергия циклов — 33'
+                    }
                     value={formatAbilityAttributes(item.attributes)}
                     onChange={(event) =>
                       update({
@@ -2030,11 +2224,13 @@ export function AdminCharacterEditor({
                       update({ ...item, level: Number(event.target.value) })
                     }
                   >
-                {[0, 1, 2, 3, 4, 5, 6].map((level) => (
-                  <option key={level} value={level}>
-                    {level === 0 ? 'Без пробуждений' : `Пробуждение ${level}`}
-                  </option>
-                ))}
+                    {[0, 1, 2, 3, 4, 5, 6].map((level) => (
+                      <option key={level} value={level}>
+                        {level === 0
+                          ? 'Без пробуждений'
+                          : `Пробуждение ${level}`}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label>
@@ -2063,8 +2259,9 @@ export function AdminCharacterEditor({
                     type="file"
                     accept="image/png,image/webp,image/jpeg"
                     onChange={(event) =>
-                      void uploadInlineIcon(event.target.files?.[0], (iconUrl) =>
-                        update({ ...item, iconUrl }),
+                      void uploadInlineIcon(
+                        event.target.files?.[0],
+                        (iconUrl) => update({ ...item, iconUrl }),
                       )
                     }
                   />
@@ -2173,145 +2370,171 @@ export function AdminCharacterEditor({
                 update(withFriendshipRewards(item, nextRewards));
               return (
                 <>
-                <label>
-                  Уровень
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={item.level}
-                    onChange={(event) =>
-                      update({ ...item, level: Number(event.target.value) })
-                    }
-                  />
-                </label>
-                <label className="wide-field">
-                  Описание
-                  <textarea
-                    rows={3}
-                    value={item.description}
-                    onChange={(event) =>
-                      update({ ...item, description: event.target.value })
-                    }
-                  />
-                </label>
-                <div className="friendship-reward-editor wide-field">
-                  <div className="friendship-reward-editor__header">
-                    <div>
-                      <strong>Награды уровня</strong>
-                      <small>Каждая награда хранится с количеством и своей иконкой.</small>
-                    </div>
-                    <button
-                      className="ghost-button compact-button"
-                      type="button"
-                      onClick={() =>
-                        setRewards([
-                          ...rewards,
-                          { id: rowId(), name: '', quantity: '', iconUrl: '' },
-                        ])
+                  <label>
+                    Уровень
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={item.level}
+                      onChange={(event) =>
+                        update({ ...item, level: Number(event.target.value) })
                       }
-                    >
-                      <Plus aria-hidden="true" /> Добавить награду
-                    </button>
-                  </div>
-                  {rewards.length ? (
-                    <div className="friendship-reward-editor__list">
-                      {rewards.map((reward, rewardIndex) => (
-                        <article key={reward.id}>
-                          {reward.iconUrl ? (
-                            <img
-                              src={resolveAssetUrl(reward.iconUrl)}
-                              alt=""
-                              width="48"
-                              height="48"
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <span className="friendship-reward-placeholder" aria-hidden="true">
-                              {rewardIndex + 1}
-                            </span>
-                          )}
-                          <label>
-                            Награда
-                            <input
-                              value={reward.name}
-                              onChange={(event) =>
-                                setRewards(
-                                  rewards.map((entry, index) =>
-                                    index === rewardIndex
-                                      ? { ...entry, name: event.target.value }
-                                      : entry,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                          <label>
-                            Количество
-                            <input
-                              value={reward.quantity}
-                              onChange={(event) =>
-                                setRewards(
-                                  rewards.map((entry, index) =>
-                                    index === rewardIndex
-                                      ? { ...entry, quantity: event.target.value }
-                                      : entry,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                          <label className="friendship-reward-url">
-                            URL иконки
-                            <input
-                              type="text"
-                              inputMode="url"
-                              value={reward.iconUrl}
-                              onChange={(event) =>
-                                setRewards(
-                                  rewards.map((entry, index) =>
-                                    index === rewardIndex
-                                      ? { ...entry, iconUrl: event.target.value }
-                                      : entry,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                          <label className="friendship-reward-upload">
-                            Загрузить иконку
-                            <input
-                              type="file"
-                              accept="image/png,image/webp,image/jpeg"
-                              onChange={(event) =>
-                                void uploadInlineIcon(event.target.files?.[0], (iconUrl) =>
+                    />
+                  </label>
+                  <label className="wide-field">
+                    Описание
+                    <textarea
+                      rows={3}
+                      value={item.description}
+                      onChange={(event) =>
+                        update({ ...item, description: event.target.value })
+                      }
+                    />
+                  </label>
+                  <div className="friendship-reward-editor wide-field">
+                    <div className="friendship-reward-editor__header">
+                      <div>
+                        <strong>Награды уровня</strong>
+                        <small>
+                          Каждая награда хранится с количеством и своей иконкой.
+                        </small>
+                      </div>
+                      <button
+                        className="ghost-button compact-button"
+                        type="button"
+                        onClick={() =>
+                          setRewards([
+                            ...rewards,
+                            {
+                              id: rowId(),
+                              name: '',
+                              quantity: '',
+                              iconUrl: '',
+                            },
+                          ])
+                        }
+                      >
+                        <Plus aria-hidden="true" /> Добавить награду
+                      </button>
+                    </div>
+                    {rewards.length ? (
+                      <div className="friendship-reward-editor__list">
+                        {rewards.map((reward, rewardIndex) => (
+                          <article key={reward.id}>
+                            {reward.iconUrl ? (
+                              <img
+                                src={resolveAssetUrl(reward.iconUrl)}
+                                alt=""
+                                width="48"
+                                height="48"
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <span
+                                className="friendship-reward-placeholder"
+                                aria-hidden="true"
+                              >
+                                {rewardIndex + 1}
+                              </span>
+                            )}
+                            <label>
+                              Награда
+                              <input
+                                value={reward.name}
+                                onChange={(event) =>
                                   setRewards(
                                     rewards.map((entry, index) =>
-                                      index === rewardIndex ? { ...entry, iconUrl } : entry,
+                                      index === rewardIndex
+                                        ? { ...entry, name: event.target.value }
+                                        : entry,
                                     ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <label>
+                              Количество
+                              <input
+                                value={reward.quantity}
+                                onChange={(event) =>
+                                  setRewards(
+                                    rewards.map((entry, index) =>
+                                      index === rewardIndex
+                                        ? {
+                                            ...entry,
+                                            quantity: event.target.value,
+                                          }
+                                        : entry,
+                                    ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <label className="friendship-reward-url">
+                              URL иконки
+                              <input
+                                type="text"
+                                inputMode="url"
+                                value={reward.iconUrl}
+                                onChange={(event) =>
+                                  setRewards(
+                                    rewards.map((entry, index) =>
+                                      index === rewardIndex
+                                        ? {
+                                            ...entry,
+                                            iconUrl: event.target.value,
+                                          }
+                                        : entry,
+                                    ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <label className="friendship-reward-upload">
+                              Загрузить иконку
+                              <input
+                                type="file"
+                                accept="image/png,image/webp,image/jpeg"
+                                onChange={(event) =>
+                                  void uploadInlineIcon(
+                                    event.target.files?.[0],
+                                    (iconUrl) =>
+                                      setRewards(
+                                        rewards.map((entry, index) =>
+                                          index === rewardIndex
+                                            ? { ...entry, iconUrl }
+                                            : entry,
+                                        ),
+                                      ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <button
+                              className="icon-button danger"
+                              type="button"
+                              aria-label={`Удалить награду ${reward.name || rewardIndex + 1}`}
+                              onClick={() =>
+                                setRewards(
+                                  rewards.filter(
+                                    (_, index) => index !== rewardIndex,
                                   ),
                                 )
                               }
-                            />
-                          </label>
-                          <button
-                            className="icon-button danger"
-                            type="button"
-                            aria-label={`Удалить награду ${reward.name || rewardIndex + 1}`}
-                            onClick={() =>
-                              setRewards(rewards.filter((_, index) => index !== rewardIndex))
-                            }
-                          >
-                            <Trash2 aria-hidden="true" />
-                          </button>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="friendship-reward-empty">Награды пока не добавлены.</p>
-                  )}
-                </div>
+                            >
+                              <Trash2 aria-hidden="true" />
+                            </button>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="friendship-reward-empty">
+                        Награды пока не добавлены.
+                      </p>
+                    )}
+                  </div>
                 </>
               );
             }}
@@ -2385,42 +2608,43 @@ export function AdminCharacterEditor({
                     }
                   />
                 </label>
-                    <label>
-                      URL изображения
-                      <input
-                        type="text"
-                        inputMode="url"
+                <label>
+                  URL изображения
+                  <input
+                    type="text"
+                    inputMode="url"
                     value={item.imageUrl}
                     onChange={(event) =>
                       update({ ...item, imageUrl: event.target.value })
-                        }
-                      />
-                    </label>
-                    <label>
-                      Загрузить изображение
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(event) =>
-                          void uploadInlineImage(event.target.files?.[0], (imageUrl) =>
-                            update({ ...item, imageUrl }),
-                          )
-                        }
-                      />
-                    </label>
-                    {item.imageUrl ? (
-                      <img
-                        className="editor-image-preview"
-                        src={resolveAssetUrl(item.imageUrl)}
-                        alt=""
-                        width="120"
-                        height="72"
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : null}
-                    <label className="wide-field">
-                      Описание
+                    }
+                  />
+                </label>
+                <label>
+                  Загрузить изображение
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) =>
+                      void uploadInlineImage(
+                        event.target.files?.[0],
+                        (imageUrl) => update({ ...item, imageUrl }),
+                      )
+                    }
+                  />
+                </label>
+                {item.imageUrl ? (
+                  <img
+                    className="editor-image-preview"
+                    src={resolveAssetUrl(item.imageUrl)}
+                    alt=""
+                    width="120"
+                    height="72"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : null}
+                <label className="wide-field">
+                  Описание
                   <textarea
                     rows={3}
                     value={item.description}
@@ -2534,7 +2758,8 @@ export function AdminCharacterEditor({
                   />
                   <small>
                     Для нативного плеера нужен прямой файл: mp3, m4a, ogg, wav,
-                    flac или webm. Видео и страницы добавляйте ниже как источник.
+                    flac или webm. Видео и страницы добавляйте ниже как
+                    источник.
                   </small>
                 </label>
                 <label className="wide-field">
@@ -2557,29 +2782,29 @@ export function AdminCharacterEditor({
                     onChange={(event) =>
                       update({ ...item, description: event.target.value })
                     }
-                />
-              </label>
-              {item.sourceUrl && getYoutubeThumbnailUrl(item.sourceUrl) ? (
-                <a
-                  className="audio-source-preview"
-                  href={item.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <img
-                    src={getYoutubeThumbnailUrl(item.sourceUrl)}
-                    alt=""
-                    width="168"
-                    height="94"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
                   />
-                  <span>Открыть видео-источник реплик</span>
-                </a>
-              ) : null}
-              {item.audioUrl && isDirectAudioUrl(item.audioUrl) ? (
-                <audio controls preload="none" src={item.audioUrl}>
-                  Ваш браузер не поддерживает аудио.
+                </label>
+                {item.sourceUrl && getYoutubeThumbnailUrl(item.sourceUrl) ? (
+                  <a
+                    className="audio-source-preview"
+                    href={item.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <img
+                      src={getYoutubeThumbnailUrl(item.sourceUrl)}
+                      alt=""
+                      width="168"
+                      height="94"
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                    <span>Открыть видео-источник реплик</span>
+                  </a>
+                ) : null}
+                {item.audioUrl && isDirectAudioUrl(item.audioUrl) ? (
+                  <audio controls preload="none" src={item.audioUrl}>
+                    Ваш браузер не поддерживает аудио.
                   </audio>
                 ) : item.audioUrl && isVideoSourceUrl(item.audioUrl) ? (
                   <span className="audio-placeholder audio-placeholder--warning">
@@ -2588,8 +2813,8 @@ export function AdminCharacterEditor({
                   </span>
                 ) : item.audioUrl ? (
                   <span className="audio-placeholder">
-                    <Headphones aria-hidden="true" /> Плеер появится после ссылки
-                    на прямой аудиофайл.
+                    <Headphones aria-hidden="true" /> Плеер появится после
+                    ссылки на прямой аудиофайл.
                   </span>
                 ) : item.sourceUrl ? (
                   <a
@@ -2602,7 +2827,8 @@ export function AdminCharacterEditor({
                   </a>
                 ) : (
                   <span className="audio-placeholder">
-                    <Headphones aria-hidden="true" /> Добавьте URL аудио или источник
+                    <Headphones aria-hidden="true" /> Добавьте URL аудио или
+                    источник
                   </span>
                 )}
               </>

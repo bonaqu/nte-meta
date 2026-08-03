@@ -491,6 +491,18 @@
 }
 
 @layer base {
+  .sr-only {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   body {
     min-block-size: 100svh;
     background:
@@ -1790,12 +1802,12 @@
   }
 
   .guide-grid {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
     align-items: stretch;
   }
 
   .character-grid {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
     align-items: stretch;
     justify-content: stretch;
   }
@@ -1881,8 +1893,8 @@
     display: block;
     inline-size: 100%;
     block-size: 100%;
-    object-fit: cover;
-    object-position: top center;
+    object-fit: contain;
+    object-position: center bottom;
   }
 
   .character-card > a > div {
@@ -2044,7 +2056,9 @@
   }
 
   .tier-row a {
-    display: block;
+    display: grid;
+    justify-items: center;
+    gap: 6px;
     flex: 0 0 auto;
     margin: 0;
     padding: 0;
@@ -2052,13 +2066,32 @@
     border-radius: var(--radius-sm);
     background: var(--surface);
     cursor: pointer;
+    overflow: visible;
+  }
+
+  .tier-person__portrait {
+    display: grid;
+    place-items: center;
     overflow: hidden;
+    border-radius: 50%;
   }
 
   .tier-row img {
     inline-size: 48px;
     block-size: 48px;
     object-fit: cover;
+  }
+
+  .tier-person__name {
+    max-inline-size: 78px;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 0.7rem;
+    font-weight: 800;
+    line-height: 1.15;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .community-band {
@@ -3502,6 +3535,23 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
+  }
+
+  .auth-panel form {
+    display: grid;
+    gap: 8px;
+  }
+
+  .auth-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 18px;
+    align-items: center;
+    margin-block-start: 8px;
+  }
+
+  .auth-actions > * {
+    min-block-size: 44px;
   }
 
   .profile-page {

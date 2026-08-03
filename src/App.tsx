@@ -2246,18 +2246,22 @@ function TierPreview({ grouped }: { grouped: Record<Tier, Character[]> }) {
           <div>
             {grouped[tier].slice(0, 8).map((character) => (
               <a
+                className="tier-person"
                 key={character.id}
                 href={`#/characters/${character.slug}`}
                 title={character.name}
               >
-                <img
-                  src={resolveAssetUrl(character.imageUrl)}
-                  alt={character.name}
-                  width="58"
-                  height="58"
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                />
+                <span className="tier-person__portrait" aria-hidden="true">
+                  <img
+                    src={resolveAssetUrl(character.imageUrl)}
+                    alt=""
+                    width="58"
+                    height="58"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                </span>
+                <span className="tier-person__name">{character.name}</span>
               </a>
             ))}
           </div>
@@ -5778,29 +5782,31 @@ function AuthPanel({ setUser }: { setUser: (user: User | null) => void }) {
             ) : null}
           </>
         ) : null}
-        <button className="primary-button" type="submit" disabled={pending}>
-          <LockKeyhole aria-hidden="true" />
-          {pending
-            ? 'Проверяем...'
-            : mode === 'login'
-              ? 'Войти'
-              : 'Создать аккаунт'}
-        </button>
-        <button
-          className="text-button"
-          type="button"
-          disabled={mode === 'login' && !authConfig.registrationEnabled}
-          onClick={() => {
-            setMessage('');
-            setMode(mode === 'login' ? 'register' : 'login');
-          }}
-        >
-          {mode === 'login'
-            ? authConfig.registrationEnabled
-              ? 'Нужна регистрация'
-              : 'Регистрация временно закрыта'
-            : 'Уже есть аккаунт'}
-        </button>
+        <div className="auth-actions">
+          <button className="primary-button" type="submit" disabled={pending}>
+            <LockKeyhole aria-hidden="true" />
+            {pending
+              ? 'Проверяем...'
+              : mode === 'login'
+                ? 'Войти'
+                : 'Создать аккаунт'}
+          </button>
+          <button
+            className="text-button"
+            type="button"
+            disabled={mode === 'login' && !authConfig.registrationEnabled}
+            onClick={() => {
+              setMessage('');
+              setMode(mode === 'login' ? 'register' : 'login');
+            }}
+          >
+            {mode === 'login'
+              ? authConfig.registrationEnabled
+                ? 'Нужна регистрация'
+                : 'Регистрация временно закрыта'
+              : 'Уже есть аккаунт'}
+          </button>
+        </div>
       </form>
       {message ? <StatusBanner tone={messageTone} text={message} /> : null}
     </section>

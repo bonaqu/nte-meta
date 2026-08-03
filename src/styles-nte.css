@@ -626,7 +626,7 @@
   .tier-row {
     grid-template-columns: 76px minmax(0, 1fr);
     gap: 0;
-    min-block-size: 86px;
+    min-block-size: 108px;
     overflow: hidden;
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -658,7 +658,7 @@
   .tier-row > div {
     align-items: center;
     gap: 10px;
-    min-block-size: 84px;
+    min-block-size: 106px;
     padding: 10px 14px;
     border: 0;
     border-radius: 0;
@@ -666,12 +666,12 @@
   }
 
   .tier-row a {
-    border-radius: 50%;
-    border-color: rgb(255 255 255 / 0.36);
-    background: #20242b;
-    box-shadow:
-      0 0 0 3px #0a0c10,
-      0 0 0 5px #d89b32;
+    min-inline-size: 76px;
+    padding: 4px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    box-shadow: none;
     transition:
       transform 160ms ease,
       box-shadow 160ms ease;
@@ -679,10 +679,22 @@
 
   .tier-row a:is(:hover, :focus-visible) {
     transform: translateY(-3px) scale(1.04);
+    background: rgb(255 255 255 / 0.05);
+    box-shadow: 0 12px 24px rgb(0 0 0 / 0.32);
+  }
+
+  .tier-person__portrait {
+    border: 1px solid rgb(255 255 255 / 0.36);
+    background: #20242b;
     box-shadow:
       0 0 0 3px #0a0c10,
-      0 0 0 5px var(--pink),
-      0 12px 24px rgb(0 0 0 / 0.32);
+      0 0 0 5px #d89b32;
+  }
+
+  .tier-row a:is(:hover, :focus-visible) .tier-person__portrait {
+    box-shadow:
+      0 0 0 3px #0a0c10,
+      0 0 0 5px var(--pink);
   }
 
   .tier-row img {

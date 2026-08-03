@@ -3778,10 +3778,14 @@ function normalizeProfileImportValue(field, value) {
     return hasRussianText(localized) ? localized : '';
   }
   if (field === 'attribute') return normalizeImportElement(value);
-  if (field === 'profile.arcType') return normalizeImportArcType(value);
-  if (field === 'profile.faction') return normalizeImportFaction(value);
+  if (field === 'profile.arcType') {
+    return normalizeImportArcType(value).slice(0, 120);
+  }
+  if (field === 'profile.faction') {
+    return normalizeImportFaction(value).slice(0, 160);
+  }
   if (field === 'profile.birthday' || field === 'profile.releaseDate') {
-    return formatRuImportDate(value);
+    return formatRuImportDate(value).slice(0, 80);
   }
   if (
     (field === 'profile.biography' || field === 'profile.biographyShort') &&
@@ -3789,7 +3793,17 @@ function normalizeProfileImportValue(field, value) {
   ) {
     return '';
   }
-  return normalizeImportedRuText(value);
+  const normalized = normalizeImportedRuText(value);
+  const maxLength =
+    {
+      name: 160,
+      originalName: 160,
+      attribute: 120,
+      'profile.releaseVersion': 40,
+      'profile.biography': 60000,
+      'profile.trivia': 60000,
+    }[field] || 8000;
+  return normalized.slice(0, maxLength);
 }
 
 function makeImportSuggestion(
@@ -5079,9 +5093,11 @@ function readWikiParam(content, key) {
 function normalizeImportedStringList(value) {
   const items = [
     ...new Set(
-      value.map((item) => normalizeImportedRuText(item)).filter(Boolean),
+      value
+        .map((item) => normalizeImportedRuText(item).slice(0, 80))
+        .filter(Boolean),
     ),
-  ];
+  ].slice(0, 12);
   return items.some((item) => hasRussianText(item))
     ? items.filter((item) => hasRussianText(item))
     : items;
@@ -5096,7 +5112,7 @@ function normalizeVoiceActorRows(value) {
     if (!language || !name) continue;
     rows.set(normalizeImportSearch(language), { ...item, language, name });
   }
-  return [...rows.values()];
+  return [...rows.values()].slice(0, 12);
 }
 
 function normalizeBaseStatLabel(value) {
@@ -5130,8 +5146,8 @@ function normalizeBaseStatRows(value) {
   for (const item of value) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
     const originalLabel = normalizeImportedRuText(item.label);
-    const label = normalizeBaseStatLabel(originalLabel);
-    const statValue = normalizeImportedRuText(item.value);
+    const label = normalizeBaseStatLabel(originalLabel).slice(0, 120);
+    const statValue = normalizeImportedRuText(item.value).slice(0, 120);
     if (!label || !statValue) continue;
     const key = normalizeImportSearch(label);
     const rank = originalLabel === label ? 2 : 1;
@@ -5143,7 +5159,7 @@ function normalizeBaseStatRows(value) {
       });
     }
   }
-  return [...rows.values()].map((item) => item.value);
+  return [...rows.values()].map((item) => item.value).slice(0, 40);
 }
 
 function decodedMediaUrl(value) {
@@ -5176,11 +5192,33 @@ function isClearlyWrongCollectionMedia(field, value) {
 }
 
 function normalizeProfileCollectionRows(field, value) {
+  const collectionLimit =
+    {
+      'profile.roleIcons': 12,
+      'profile.abilities': 30,
+      'profile.awakenings': 7,
+      'profile.materials': 80,
+      'profile.friendship': 10,
+      'profile.friendshipRewards': 12,
+      'profile.gifts': 40,
+      'profile.voiceLines': 500,
+    }[field] || 80;
   const normalized = value
+    .slice(0, collectionLimit)
     .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
     .map((item) => {
       const next = { ...item };
-      const fieldLimits = { name: 160, title: 160, label: 120, language: 40 };
+      const fieldLimits = {
+        name: field === 'profile.roleIcons' ? 80 : 160,
+        title: 160,
+        label: field === 'profile.baseStats' ? 120 : 160,
+        language: 40,
+        type: 80,
+        amount: 80,
+        quantity: 40,
+        rewardName: 160,
+        value: field === 'profile.baseStats' ? 120 : 500,
+      };
       for (const [key, limit] of Object.entries(fieldLimits)) {
         if (typeof next[key] === 'string') {
           next[key] = normalizeImportedRuText(next[key]).slice(0, limit);
@@ -5316,7 +5354,7 @@ function normalizeSkinRows(value) {
       },
     ];
   });
-  return dedupeProfileCollectionRows('profile.skins', rows);
+  return dedupeProfileCollectionRows('profile.skins', rows).slice(0, 30);
 }
 
 function extractFandomCharacterIntro(content) {
@@ -9384,8 +9422,14 @@ function cleanImportedAbility(entry) {
     ? entry.attributes
         .slice(0, 80)
         .map((attribute, index) => {
-          const label = normalizeImportedRuText(attribute?.label || '');
-          const value = normalizeImportedRuText(attribute?.value || '');
+          const label = normalizeImportedRuText(attribute?.label || '').slice(
+            0,
+            160,
+          );
+          const value = normalizeImportedRuText(attribute?.value || '').slice(
+            0,
+            500,
+          );
           if (!label || !value) return null;
           return {
             id:
@@ -11511,11 +11555,11 @@ function normalizeCharacterProfile(value) {
     }
     return items.map(mapper);
   };
-  const text = (input, max = 8000) => {
+  const text = (input, max = 8000, label = 'Поле профиля') => {
     const result = String(input || '').trim();
     if (result.length > max) {
       throwHttp(
-        `В одном из полей профиля больше ${max} символов. Сократите текст и повторите сохранение.`,
+        `Поле «${label}» содержит ${result.length} символов при лимите ${max}. Сократите текст и повторите сохранение.`,
         400,
       );
     }
@@ -11566,15 +11610,19 @@ function normalizeCharacterProfile(value) {
     }
     const rewards = rawRewards.map((reward) => ({
       id: id(reward?.id),
-      name: text(reward?.name, 160),
-      quantity: text(reward?.quantity, 40),
+      name: text(reward?.name, 160, `Симпатия ${level}: награда`),
+      quantity: text(
+        reward?.quantity,
+        40,
+        `Симпатия ${level}: количество награды`,
+      ),
       iconUrl: url(reward?.iconUrl, 'URL иконки награды симпатии'),
     }));
     return {
       level,
-      rewardName: text(item.rewardName, 160),
+      rewardName: text(item.rewardName, 160, `Симпатия ${level}: награды`),
       rewardIconUrl: url(item.rewardIconUrl, 'URL иконки награды симпатии'),
-      description: text(item.description, 2000),
+      description: text(item.description, 2000, `Симпатия ${level}: описание`),
       rewards,
     };
   });
@@ -11586,81 +11634,81 @@ function normalizeCharacterProfile(value) {
     }
     return {
       level,
-      name: text(item.name, 160),
+      name: text(item.name, 160, `Пробуждение ${level}: название`),
       iconUrl: url(item.iconUrl),
-      description: text(item.description, 8000),
+      description: text(item.description, 8000, `Пробуждение ${level}`),
     };
   });
 
   const profile = {
-    faction: text(value.faction, 160),
-    arcType: text(value.arcType, 120),
-    birthday: text(value.birthday, 80),
-    releaseDate: text(value.releaseDate, 80),
-    releaseVersion: text(value.releaseVersion, 40),
-    biographyShort: text(value.biographyShort, 1000),
-    biography: text(value.biography, 60000),
-    trivia: text(value.trivia, 60000),
-    roleTags: collection('roleTags', 12, (item) => text(item, 80)).filter(
-      Boolean,
-    ),
+    faction: text(value.faction, 160, 'Фракция'),
+    arcType: text(value.arcType, 120, 'Тип дуги'),
+    birthday: text(value.birthday, 80, 'День рождения'),
+    releaseDate: text(value.releaseDate, 80, 'Дата выхода'),
+    releaseVersion: text(value.releaseVersion, 40, 'Версия появления'),
+    biographyShort: text(value.biographyShort, 1000, 'Краткая биография'),
+    biography: text(value.biography, 60000, 'Биография'),
+    trivia: text(value.trivia, 60000, 'Факты'),
+    roleTags: collection('roleTags', 12, (item, index) =>
+      text(item, 80, `Роль персонажа ${index + 1}`),
+    ).filter(Boolean),
     roleIcons: collection('roleIcons', 12, (item) => ({
-      name: text(item.name, 80),
+      name: text(item.name, 80, 'Название иконки роли'),
       iconUrl: url(item.iconUrl, 'URL иконки роли'),
     })).filter((item) => item.name && item.iconUrl),
     voiceActors: collection('voiceActors', 12, (item) => ({
-      language: text(item.language, 40),
-      name: text(item.name, 160),
+      language: text(item.language, 40, 'Язык озвучки'),
+      name: text(item.name, 160, 'Актёр озвучки'),
     })),
     materials: collection('materials', 80, (item) => ({
       id: id(item.id),
-      name: text(item.name, 160),
+      name: text(item.name, 160, 'Материал: название'),
       iconUrl: url(item.iconUrl),
-      amount: text(item.amount, 80),
-      source: text(item.source, 1000),
+      amount: text(item.amount, 80, 'Материал: количество'),
+      source: text(item.source, 1000, 'Материал: источник'),
     })),
     baseStats: collection('baseStats', 40, (item) => ({
       id: id(item.id),
-      label: text(item.label, 120),
-      value: text(item.value, 120),
+      label: text(item.label, 120, 'Начальный показатель: название'),
+      value: text(item.value, 120, 'Начальный показатель: значение'),
     })),
     abilities: collection('abilities', 30, (item) => {
       const attributes = Array.isArray(item.attributes)
         ? item.attributes.slice(0, 80).map((attribute) => ({
             id: id(attribute?.id),
-            label: text(attribute?.label, 160),
-            value: text(attribute?.value, 500),
+            label: text(attribute?.label, 160, 'Параметр способности'),
+            value: text(attribute?.value, 500, 'Значение способности'),
           }))
         : [];
       return {
         id: id(item.id),
-        name: text(item.name, 160),
-        type: text(item.type, 80),
+        name: text(item.name, 160, 'Способность: название'),
+        type: text(item.type, 80, 'Способность: тип'),
         iconUrl: url(item.iconUrl),
-        description: text(item.description, 8000),
+        description: text(item.description, 8000, 'Способность: описание'),
         attributes,
       };
     }),
     skins: collection('skins', 30, (item) => ({
       id: id(item.id),
-      name: text(item.name, 160),
+      name: text(item.name, 160, 'Облик: название'),
       imageUrl: url(item.imageUrl),
-      description: text(item.description, 4000),
+      description: text(item.description, 4000, 'Облик: описание'),
     })),
     friendship,
     gifts: collection('gifts', 40, (item) => ({
       id: id(item.id),
-      name: text(item.name, 160),
+      name: text(item.name, 160, 'Подарок: название'),
       iconUrl: url(item.iconUrl),
-      effect: text(item.effect, 1000),
+      effect: text(item.effect, 1000, 'Подарок: эффект'),
     })),
     voiceLines: collection('voiceLines', 500, (item) => ({
       id: id(item.id),
-      title: text(item.title, 160),
-      language: text(item.language, 40),
+      title: text(item.title, 160, 'Реплика: название'),
+      language: text(item.language, 40, 'Реплика: язык'),
       audioUrl: url(item.audioUrl),
       sourceUrl: url(item.sourceUrl),
-      description: text(item.description, 1000),
+      description: text(item.description, 1000, 'Реплика: описание'),
     })),
     awakenings,
   };

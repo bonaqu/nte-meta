@@ -81,7 +81,7 @@ export function EditorShell({
               {description ? <p>{description}</p> : null}
             </div>
             <button
-              className="icon-button editor-shell__close-button"
+              className="icon-button game-close-button editor-shell__close-button"
               type="button"
               aria-label="Закрыть редактор"
               onClick={requestClose}

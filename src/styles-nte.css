@@ -166,6 +166,43 @@
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07);
   }
 
+  .icon-button.game-close-button {
+    border-color: #343841;
+    background:
+      radial-gradient(circle at 44% 38%, rgb(255 255 255 / 0.09), transparent 34%),
+      linear-gradient(180deg, #20242b 0%, #101217 100%);
+    box-shadow:
+      0 0 0 3px #080a0e,
+      0 0 0 5px #292d34,
+      inset 0 1px 0 rgb(255 255 255 / 0.13),
+      inset 0 -4px 8px rgb(0 0 0 / 0.5),
+      0 10px 22px rgb(0 0 0 / 0.4);
+  }
+
+  .icon-button.game-close-button::before {
+    z-index: 0;
+  }
+
+  .icon-button.game-close-button svg {
+    position: relative;
+    z-index: 1;
+  }
+
+  .icon-button.game-close-button:is(:hover, :focus-visible) {
+    border-color: color-mix(in srgb, var(--pink) 78%, #fff);
+    background:
+      radial-gradient(circle at 44% 38%, rgb(255 255 255 / 0.12), transparent 34%),
+      linear-gradient(180deg, #242831 0%, #111318 100%);
+    color: #fff;
+    outline: 0;
+    box-shadow:
+      0 0 0 3px #090b0f,
+      0 0 0 6px var(--pink),
+      0 0 0 8px rgb(255 75 154 / 0.18),
+      inset 0 1px 0 rgb(255 255 255 / 0.16),
+      0 12px 26px rgb(0 0 0 / 0.42);
+  }
+
   .site-main {
     padding-block-start: 30px;
   }

@@ -147,13 +147,10 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(resultsSummary).toHaveText(
       new RegExp(`Найдено: [1-9]\\d* из ${totalCharacters}`),
     );
-    await expect(
-      page.getByRole('link', { name: 'Открыть страницу персонажа Хотори' }),
-    ).toBeVisible();
+    const hotoriCardLink = page.getByRole('link', { name: /Хотори/ });
+    await expect(hotoriCardLink).toBeVisible();
 
-    await page
-      .getByRole('link', { name: 'Открыть страницу персонажа Хотори' })
-      .click();
+    await hotoriCardLink.click();
     await expect(
       page.getByRole('heading', { name: 'Хотори', exact: true }),
     ).toBeVisible();

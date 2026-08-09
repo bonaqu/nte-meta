@@ -176,103 +176,6 @@ function makeCharacterSummary(shortDescription: string, biography: string) {
   );
 }
 
-type ProfileTextViolation = {
-  label: string;
-  length: number;
-  limit: number;
-};
-
-function findProfileTextViolations(
-  profile: CharacterProfile,
-): ProfileTextViolation[] {
-  const violations: ProfileTextViolation[] = [];
-  const check = (value: unknown, limit: number, label: string) => {
-    const length = String(value || '').trim().length;
-    if (length > limit) violations.push({ label, length, limit });
-  };
-
-  check(profile.faction, 160, 'Фракция');
-  check(profile.arcType, 120, 'Тип дуги');
-  check(profile.birthday, 80, 'День рождения');
-  check(profile.releaseDate, 80, 'Дата выхода');
-  check(profile.releaseVersion, 40, 'Версия появления');
-  check(profile.biographyShort, 1000, 'Краткая биография');
-  check(profile.biography, 60000, 'Биография');
-  check(profile.trivia, 60000, 'Факты');
-
-  profile.roleTags.forEach((value, index) =>
-    check(value, 80, `Роль персонажа ${index + 1}`),
-  );
-  (profile.roleIcons || []).forEach((item, index) =>
-    check(item.name, 80, `Иконка роли ${index + 1}: название`),
-  );
-  profile.voiceActors.forEach((item, index) => {
-    check(item.language, 40, `Озвучка ${index + 1}: язык`);
-    check(item.name, 160, `Озвучка ${index + 1}: актёр`);
-  });
-  profile.materials.forEach((item, index) => {
-    check(item.name, 160, `Материал ${index + 1}: название`);
-    check(item.amount, 80, `Материал ${index + 1}: количество`);
-    check(item.source, 1000, `Материал ${index + 1}: источник`);
-  });
-  profile.baseStats.forEach((item, index) => {
-    check(item.label, 120, `Показатель ${index + 1}: название`);
-    check(item.value, 120, `Показатель ${index + 1}: значение`);
-  });
-  profile.abilities.forEach((item, index) => {
-    check(item.name, 160, `Способность ${index + 1}: название`);
-    check(item.type, 80, `Способность ${index + 1}: тип`);
-    check(item.description, 8000, `Способность ${index + 1}: описание`);
-    item.attributes?.forEach((attribute, attributeIndex) => {
-      check(
-        attribute.label,
-        160,
-        `Способность ${index + 1}, параметр ${attributeIndex + 1}: название`,
-      );
-      check(
-        attribute.value,
-        500,
-        `Способность ${index + 1}, параметр ${attributeIndex + 1}: значение`,
-      );
-    });
-  });
-  profile.skins.forEach((item, index) => {
-    check(item.name, 160, `Облик ${index + 1}: название`);
-    check(item.description, 4000, `Облик ${index + 1}: описание`);
-  });
-  profile.friendship.forEach((item) => {
-    check(item.rewardName, 160, `Симпатия ${item.level}: награды`);
-    check(item.description, 2000, `Симпатия ${item.level}: описание`);
-    friendshipRewards(item).forEach((reward, index) => {
-      check(
-        reward.name,
-        160,
-        `Симпатия ${item.level}, награда ${index + 1}: название`,
-      );
-      check(
-        reward.quantity,
-        40,
-        `Симпатия ${item.level}, награда ${index + 1}: количество`,
-      );
-    });
-  });
-  profile.gifts.forEach((item, index) => {
-    check(item.name, 160, `Подарок ${index + 1}: название`);
-    check(item.effect, 1000, `Подарок ${index + 1}: эффект`);
-  });
-  profile.voiceLines.forEach((item, index) => {
-    check(item.title, 160, `Реплика ${index + 1}: название`);
-    check(item.language, 40, `Реплика ${index + 1}: язык`);
-    check(item.description, 1000, `Реплика ${index + 1}: описание`);
-  });
-  profile.awakenings.forEach((item) => {
-    check(item.name, 160, `Пробуждение ${item.level}: название`);
-    check(item.description, 8000, `Пробуждение ${item.level}: описание`);
-  });
-
-  return violations;
-}
-
 function emptyProfile(): CharacterProfile {
   return {
     faction: '',
@@ -1561,14 +1464,6 @@ export function AdminCharacterEditor({
       biography,
       biographyShort: shortDescription || summary,
     };
-    const [profileViolation] = findProfileTextViolations(profile);
-    if (profileViolation) {
-      setTone('danger');
-      setMessage(
-        `Поле «${profileViolation.label}» содержит ${profileViolation.length} символов при лимите ${profileViolation.limit}. Исправьте именно это поле и повторите сохранение.`,
-      );
-      return;
-    }
     setMutationPending(true);
     setMessage('');
     const payload = {

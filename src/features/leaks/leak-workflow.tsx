@@ -9,6 +9,7 @@ import {
   Send,
   ShieldCheck,
   SlidersHorizontal,
+  X,
   XCircle,
 } from 'lucide-react';
 import { EmptyState, StatusBanner } from '../../components/ui-state';
@@ -170,13 +171,13 @@ export function LeakSubmissionButton() {
               <h2>Отправить слух или слив</h2>
             </div>
             <button
-              className="icon-button"
+              className="icon-button game-close-button"
               type="button"
               aria-label="Закрыть"
               title="Закрыть"
               onClick={() => dialogRef.current?.close()}
             >
-              <XCircle aria-hidden="true" />
+              <X aria-hidden="true" />
             </button>
           </div>
           <p>

@@ -40,12 +40,21 @@ type FieldDefinition = {
   name: string;
   label: string;
   kind: FieldKind;
+  group?: string;
+  wide?: boolean;
   required?: boolean;
   help?: string;
   options?: FieldOption[];
   min?: number;
   max?: number;
   rows?: number;
+};
+
+type FieldGroupDefinition = {
+  id: string;
+  eyebrow: string;
+  title: string;
+  description: string;
 };
 
 type ManagedItem = { id: string };
@@ -130,6 +139,7 @@ type ManagerConfig<T extends ManagedItem> = {
   singular: string;
   description: string;
   fields: FieldDefinition[];
+  fieldGroups?: FieldGroupDefinition[];
   empty: () => EditorValues;
   fromItem: (item: T) => EditorValues;
   toPayload: (
@@ -212,10 +222,21 @@ function FieldControl({
   const idPrefix = useId().replace(/:/g, '');
   const id = `${idPrefix}-cms-${field.name}`;
   const describedBy = field.help ? `${id}-help` : undefined;
+  const fieldClassName = [
+    'cms-field',
+    `cms-field--${field.name}`,
+    `cms-field--${field.kind}`,
+    field.wide ? 'is-wide' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   if (field.kind === 'checkbox') {
     return (
-      <label className="toggle-row cms-toggle" htmlFor={id}>
+      <label
+        className={`${fieldClassName} toggle-row cms-toggle`}
+        htmlFor={id}
+      >
         <input
           id={id}
           name={field.name}
@@ -239,7 +260,7 @@ function FieldControl({
     const characterOptions = field.options || [];
 
     return (
-      <fieldset className="cms-members">
+      <fieldset className={`${fieldClassName} cms-members`}>
         <legend>{field.label}</legend>
         {members.map((member, index) => (
           <div key={`${member.characterId}-${index}`}>
@@ -311,7 +332,7 @@ function FieldControl({
 
   if (field.kind === 'markdown') {
     return (
-      <div className="cms-rich-field">
+      <div className={`${fieldClassName} cms-rich-field`}>
         <label id={`${id}-label`} htmlFor={id}>
           {field.label}
         </label>
@@ -331,7 +352,7 @@ function FieldControl({
   }
 
   return (
-    <label htmlFor={id}>
+    <label className={fieldClassName} htmlFor={id}>
       {field.label}
       {field.kind === 'select' ? (
         <select
@@ -695,17 +716,51 @@ export function ContentManager<T extends ManagedItem>({
           ) : null}
         </div>
 
-        <div className="cms-fields">
-          {config.fields.map((field) => (
-            <FieldControl
-              field={field}
-              key={field.name}
-              values={values}
-              setValue={setValue}
-              disabled={!access.canPublish && field.name === 'approved'}
-            />
-          ))}
-        </div>
+        {config.fieldGroups?.length ? (
+          <div className="cms-field-groups">
+            {config.fieldGroups.map((group, groupIndex) => {
+              const fields = config.fields.filter(
+                (field) => field.group === group.id,
+              );
+              if (!fields.length) return null;
+              return (
+                <fieldset className="cms-field-group" key={group.id}>
+                  <legend>
+                    <span>{String(groupIndex + 1).padStart(2, '0')}</span>
+                    <strong>{group.title}</strong>
+                    <small>{group.description}</small>
+                  </legend>
+                  <p className="eyebrow">{group.eyebrow}</p>
+                  <div className="cms-fields">
+                    {fields.map((field) => (
+                      <FieldControl
+                        field={field}
+                        key={field.name}
+                        values={values}
+                        setValue={setValue}
+                        disabled={
+                          !access.canPublish && field.name === 'approved'
+                        }
+                      />
+                    ))}
+                  </div>
+                </fieldset>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="cms-fields">
+            {config.fields.map((field) => (
+              <FieldControl
+                field={field}
+                key={field.name}
+                values={values}
+                setValue={setValue}
+                disabled={!access.canPublish && field.name === 'approved'}
+              />
+            ))}
+          </div>
+        )}
 
         <div className="cms-actions">
           {config.supportsPublishing !== false ? (
@@ -822,12 +877,46 @@ export function AdminNewsManager({
       description:
         'Редакционные материалы, официальные источники и статусы публикации.',
       supportsPublishing: true,
+      fieldGroups: [
+        {
+          id: 'identity',
+          eyebrow: 'Карточка публикации',
+          title: 'Основное',
+          description: 'Заголовок, постоянный адрес и рубрика новости.',
+        },
+        {
+          id: 'content',
+          eyebrow: 'Материал',
+          title: 'Текст и обложка',
+          description: 'Краткий анонс, полный текст и основное изображение.',
+        },
+        {
+          id: 'source',
+          eyebrow: 'Проверяемость',
+          title: 'Автор и источник',
+          description: 'Укажите происхождение информации для читателей.',
+        },
+        {
+          id: 'publication',
+          eyebrow: 'Выпуск',
+          title: 'Теги и статус',
+          description: 'Настройте навигацию и режим публикации.',
+        },
+      ],
       fields: [
-        { name: 'title', label: 'Заголовок', kind: 'text', required: true },
+        {
+          name: 'title',
+          label: 'Заголовок',
+          kind: 'text',
+          group: 'identity',
+          wide: true,
+          required: true,
+        },
         {
           name: 'slug',
           label: 'Адрес страницы',
           kind: 'text',
+          group: 'identity',
           required: true,
           help: 'Создаётся из заголовка автоматически. Можно изменить для короткой ссылки.',
         },
@@ -835,34 +924,58 @@ export function AdminNewsManager({
           name: 'category',
           label: 'Категория',
           kind: 'select',
+          group: 'identity',
           options: newsCategories,
         },
         {
           name: 'summary',
           label: 'Краткое описание',
           kind: 'textarea',
+          group: 'content',
+          wide: true,
           required: true,
         },
         {
           name: 'body',
           label: 'Полный текст',
           kind: 'markdown',
+          group: 'content',
+          wide: true,
           required: true,
         },
-        { name: 'author', label: 'Автор', kind: 'text' },
-        { name: 'sourceName', label: 'Название источника', kind: 'text' },
-        { name: 'sourceUrl', label: 'Ссылка на источник', kind: 'url' },
         {
           name: 'imageUrl',
           label: 'URL изображения',
           kind: 'url',
+          group: 'content',
+          wide: true,
           required: true,
         },
-        { name: 'tags', label: 'Теги через запятую', kind: 'tags' },
+        { name: 'author', label: 'Автор', kind: 'text', group: 'source' },
+        {
+          name: 'sourceName',
+          label: 'Название источника',
+          kind: 'text',
+          group: 'source',
+        },
+        {
+          name: 'sourceUrl',
+          label: 'Ссылка на источник',
+          kind: 'url',
+          group: 'source',
+          wide: true,
+        },
+        {
+          name: 'tags',
+          label: 'Теги через запятую',
+          kind: 'tags',
+          group: 'publication',
+        },
         {
           name: 'publishStatus',
           label: 'Статус',
           kind: 'select',
+          group: 'publication',
           options: publishStatuses,
         },
       ],

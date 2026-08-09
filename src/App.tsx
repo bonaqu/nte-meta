@@ -1452,6 +1452,9 @@ function ThreadEditor({
   );
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageTone, setMessageTone] = useState<
+    'info' | 'danger' | 'success'
+  >('info');
   const threadBaseline = useMemo(
     () => ({
       title: thread?.title || '',
@@ -1493,11 +1496,13 @@ function ThreadEditor({
   async function saveThread(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!title.trim() || !summary.trim() || !body.trim()) {
+      setMessageTone('danger');
       setMessage('Заполните заголовок, краткое описание и текст треда.');
       return;
     }
 
     setPending(true);
+    setMessageTone('info');
     setMessage('');
     const payload = {
       title: title.trim(),
@@ -1514,90 +1519,175 @@ function ThreadEditor({
     );
     if (result.ok) {
       localStorage.removeItem(draftKey);
+      setMessageTone('success');
       setMessage(thread ? 'Тред обновлен.' : 'Тред опубликован.');
       await onSaved(result.data);
     } else {
+      setMessageTone('danger');
       setMessage(result.error);
     }
     setPending(false);
   }
 
   return (
-    <form className="editor-form thread-editor" onSubmit={saveThread}>
-      <p className="editor-form__wysiwyg-note">
-        Текст в редакторе сразу выглядит так же, как после публикации.
-      </p>
-      <section className="admin-panel entity-form thread-editor__form">
-        <label htmlFor="thread-title">Заголовок</label>
-        <input
-          id="thread-title"
-          value={title}
-          minLength={4}
-          maxLength={120}
-          onChange={(event) => updateTitle(event.target.value)}
-          required
-        />
-        <label htmlFor="thread-slug">
-          Адрес страницы
-          <input
-            id="thread-slug"
-            value={slug}
-            maxLength={140}
-            onChange={(event) => updateSlug(event.target.value)}
-            required
-            aria-describedby="thread-slug-help"
-          />
-          <small id="thread-slug-help">
-            Создаётся из заголовка автоматически. Его можно изменить для
-            короткой ссылки.
-          </small>
-        </label>
-        <label htmlFor="thread-summary">Краткое описание</label>
-        <textarea
-          id="thread-summary"
-          value={summary}
-          rows={3}
-          maxLength={240}
-          onChange={(event) => setSummary(event.target.value)}
-          required
-        />
-        <label htmlFor="thread-body">Текст треда</label>
-        <RichTextEditorField
-          id="thread-body"
-          value={body}
-          onChange={setBody}
-          maxLength={12000}
-          minHeight={340}
-          placeholder="Сформулируйте тему, добавьте детали и вопросы для обсуждения..."
-          ariaLabel="Текст треда"
-        />
-        <label htmlFor="thread-tags">Теги</label>
-        <input
-          id="thread-tags"
-          value={tags}
-          placeholder="вопрос, ротация, патч"
-          onChange={(event) => setTags(event.target.value)}
-        />
-        {roleWeight[user.role] >= roleWeight.editor ? (
-          <>
-            <label htmlFor="thread-status">Статус обсуждения</label>
-            <select
-              id="thread-status"
-              value={status}
-              onChange={(event) =>
-                setStatus(event.target.value as CommunityThread['status'])
-              }
-            >
-              <option value="open">Открыт для обсуждения</option>
-              <option value="closed">В архиве · только чтение</option>
-              {roleWeight[user.role] >= roleWeight.moderator ? (
-                <option value="hidden">Скрыт модерацией</option>
-              ) : null}
-            </select>
-          </>
-        ) : null}
-      </section>
-      <div className="editor-shell__footer">
+    <form
+      className="editor-form thread-editor"
+      aria-busy={pending}
+      onSubmit={saveThread}
+    >
+      <header className="thread-editor__intro">
+        <div>
+          <p className="eyebrow">Публичное обсуждение</p>
+          <h2>{thread ? 'Обновите тред' : 'Соберите тему для сообщества'}</h2>
+          <p>
+            Один вопрос — один тред. Добавьте контекст, уже проверенные шаги и
+            ожидаемый результат: так участникам проще дать точный ответ.
+          </p>
+        </div>
+        <span className="thread-editor__autosave">
+          <CheckCircle2 aria-hidden="true" /> Черновик хранится в браузере
+        </span>
+      </header>
+
+      <fieldset className="thread-editor__section" disabled={pending}>
+        <legend>
+          <span>01</span>
+          <strong>Тема и адрес</strong>
+          <small>Коротко обозначьте вопрос и проверьте будущую ссылку.</small>
+        </legend>
+        <div className="thread-editor__grid">
+          <label className="thread-editor__field is-wide" htmlFor="thread-title">
+            <span>Заголовок</span>
+            <input
+              id="thread-title"
+              name="title"
+              value={title}
+              minLength={4}
+              maxLength={120}
+              placeholder="Например: кого поставить к Хотори без сигнатурной дуги"
+              autoFocus={!thread}
+              onChange={(event) => updateTitle(event.target.value)}
+              required
+            />
+            <small>{title.length}/120 · сформулируйте вопрос одним предложением</small>
+          </label>
+          <label className="thread-editor__field" htmlFor="thread-slug">
+            <span>Адрес страницы</span>
+            <input
+              id="thread-slug"
+              name="slug"
+              value={slug}
+              maxLength={140}
+              spellCheck={false}
+              onChange={(event) => updateSlug(event.target.value)}
+              required
+              aria-describedby="thread-slug-help"
+            />
+            <small id="thread-slug-help">
+              Создаётся автоматически и остаётся читаемым.
+            </small>
+          </label>
+          <div className="thread-editor__url-preview" aria-live="polite">
+            <Link2 aria-hidden="true" />
+            <span>/threads/{slug || makeSlug(title, 'thread')}</span>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset className="thread-editor__section" disabled={pending}>
+        <legend>
+          <span>02</span>
+          <strong>Контекст обсуждения</strong>
+          <small>Анонс виден в ленте, подробности — внутри треда.</small>
+        </legend>
+        <div className="thread-editor__stack">
+          <label className="thread-editor__field" htmlFor="thread-summary">
+            <span>Краткое описание</span>
+            <textarea
+              id="thread-summary"
+              name="summary"
+              value={summary}
+              rows={3}
+              maxLength={240}
+              placeholder="Опишите исходные условия и чего хотите добиться."
+              onChange={(event) => setSummary(event.target.value)}
+              required
+            />
+            <small>{summary.length}/240 · этот текст увидят в общей ленте</small>
+          </label>
+          <div className="thread-editor__field">
+            <label id="thread-body-label" htmlFor="thread-body">
+              Текст треда
+            </label>
+            <RichTextEditorField
+              id="thread-body"
+              value={body}
+              onChange={setBody}
+              disabled={pending}
+              maxLength={12000}
+              minHeight={340}
+              placeholder="Что уже пробовали, какая команда или сборка используется, где именно возник вопрос..."
+              ariaLabel="Текст треда"
+            />
+            <small>
+              Оформление в редакторе сразу соответствует опубликованной странице.
+            </small>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset className="thread-editor__section" disabled={pending}>
+        <legend>
+          <span>03</span>
+          <strong>Навигация</strong>
+          <small>Теги помогают найти тему; статус доступен редакции.</small>
+        </legend>
+        <div className="thread-editor__grid">
+          <label
+            className={`thread-editor__field${
+              roleWeight[user.role] < roleWeight.editor ? ' is-wide' : ''
+            }`}
+            htmlFor="thread-tags"
+          >
+            <span>Теги</span>
+            <input
+              id="thread-tags"
+              name="tags"
+              value={tags}
+              placeholder="хотори, команда, f2p"
+              onChange={(event) => setTags(event.target.value)}
+            />
+            <small>Разделяйте теги запятыми; достаточно 2–4 точных меток.</small>
+          </label>
+          {roleWeight[user.role] >= roleWeight.editor ? (
+            <label className="thread-editor__field" htmlFor="thread-status">
+              <span>Статус обсуждения</span>
+              <select
+                id="thread-status"
+                name="status"
+                value={status}
+                onChange={(event) =>
+                  setStatus(event.target.value as CommunityThread['status'])
+                }
+              >
+                <option value="open">Открыт для обсуждения</option>
+                <option value="closed">В архиве · только чтение</option>
+                {roleWeight[user.role] >= roleWeight.moderator ? (
+                  <option value="hidden">Скрыт модерацией</option>
+                ) : null}
+              </select>
+              <small>Скрытие доступно только модераторам.</small>
+            </label>
+          ) : null}
+        </div>
+      </fieldset>
+
+      {message ? <StatusBanner tone={messageTone} text={message} /> : null}
+
+      <footer className="editor-shell__footer thread-editor__footer">
+        <span className="form-message">
+          Проверьте заголовок и анонс перед публикацией.
+        </span>
         <button className="primary-button" type="submit" disabled={pending}>
           <CheckCircle2 aria-hidden="true" />
           {pending
@@ -1606,10 +1696,7 @@ function ThreadEditor({
               ? 'Сохранить тред'
               : 'Опубликовать тред'}
         </button>
-        <span className="form-message" aria-live="polite">
-          {message || 'Черновик автоматически хранится в этом браузере.'}
-        </span>
-      </div>
+      </footer>
     </form>
   );
 }
@@ -1628,8 +1715,20 @@ function ThreadsPage({
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorDirty, setEditorDirty] = useState(false);
   const normalizedQuery = normalizeSearchText(query);
-  const visibleThreads = data.threads
-    .filter((thread) => thread.status !== 'hidden')
+  const communityThreads = data.threads.filter(
+    (thread) => thread.status !== 'hidden',
+  );
+  const openThreadCount = communityThreads.filter(
+    (thread) => thread.status === 'open',
+  ).length;
+  const archivedThreadCount = communityThreads.filter(
+    (thread) => thread.status === 'closed',
+  ).length;
+  const communityCommentCount = communityThreads.reduce(
+    (sum, thread) => sum + (thread.commentsCount || 0),
+    0,
+  );
+  const visibleThreads = communityThreads
     .filter((thread) => {
       if (view === 'open') return thread.status === 'open';
       if (view === 'archived') return thread.status === 'closed';
@@ -1660,29 +1759,62 @@ function ThreadsPage({
 
   return (
     <div className="page-stack threads-page">
-      <section className="page-hero">
-        <p className="eyebrow">Комьюнити NTE Meta</p>
-        <h1>Треды и обсуждения</h1>
-        <p>
-          Вопросы по персонажам, ресурсам, отрядам и механикам собраны в
-          отдельных обсуждениях.
-        </p>
-        {user ? (
-          <button
-            className="primary-button"
-            type="button"
-            onClick={() => setEditorOpen(true)}
-          >
-            <MessageCircle aria-hidden="true" /> Создать тред
-          </button>
-        ) : (
-          <a className="ghost-button" href="#/profile">
-            <UserCircle aria-hidden="true" /> Войти для публикации
-          </a>
-        )}
+      <section className="threads-hero" aria-labelledby="threads-page-title">
+        <div className="threads-hero__copy">
+          <p className="eyebrow">Комьюнити NTE Meta</p>
+          <h1 id="threads-page-title">Треды и обсуждения</h1>
+          <p>
+            Практические вопросы по персонажам, ресурсам, отрядам и механикам —
+            отдельно от комментариев к редакционным материалам.
+          </p>
+          <dl className="threads-hero__metrics" aria-label="Сводка обсуждений">
+            <div>
+              <dt>Активные</dt>
+              <dd>{openThreadCount}</dd>
+            </div>
+            <div>
+              <dt>В архиве</dt>
+              <dd>{archivedThreadCount}</dd>
+            </div>
+            <div>
+              <dt>Ответы</dt>
+              <dd>{communityCommentCount}</dd>
+            </div>
+          </dl>
+        </div>
+        <aside className="threads-hero__action" aria-label="Создание треда">
+          <p className="eyebrow">Новая тема</p>
+          <h2>Спросите сообщество</h2>
+          <p>
+            Опишите исходные условия и уже проверенные варианты — черновик не
+            потеряется при закрытии формы.
+          </p>
+          {user ? (
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => setEditorOpen(true)}
+            >
+              <MessageCircle aria-hidden="true" /> Создать тред
+            </button>
+          ) : (
+            <a className="ghost-button" href="#/profile">
+              <UserCircle aria-hidden="true" /> Войти для публикации
+            </a>
+          )}
+        </aside>
       </section>
 
-      <section className="content-band">
+      <section className="content-band threads-board" aria-labelledby="threads-board-title">
+        <header className="threads-board__heading">
+          <div>
+            <p className="eyebrow">Лента сообщества</p>
+            <h2 id="threads-board-title">Обсуждения игроков</h2>
+          </div>
+          <span aria-live="polite">
+            Показано: <strong>{visibleThreads.length}</strong>
+          </span>
+        </header>
         <div className="threads-page__toolbar">
           <label className="search-field">
             <Search aria-hidden="true" />
@@ -1725,11 +1857,13 @@ function ThreadsPage({
               <article className="thread-list-card" key={thread.id}>
                 <div className="thread-list-card__heading">
                   <div>
-                    <p className="eyebrow">
-                      {thread.author} ·{' '}
-                      {formatDate(thread.updatedAt || thread.createdAt)}
-                    </p>
-                    <h2>{thread.title}</h2>
+                    <p className="eyebrow">{thread.author}</p>
+                    <h3>
+                      <a href={`#/threads/${thread.slug}`}>{thread.title}</a>
+                    </h3>
+                    <time dateTime={thread.updatedAt || thread.createdAt}>
+                      Обновлено {formatDate(thread.updatedAt || thread.createdAt)}
+                    </time>
                   </div>
                   <span
                     className={`thread-status${
@@ -1744,10 +1878,13 @@ function ThreadsPage({
                     {thread.status === 'closed' ? 'Архив' : 'Обсуждается'}
                   </span>
                 </div>
-                <p>{thread.summary}</p>
+                <p className="thread-list-card__summary">{thread.summary}</p>
                 <div className="thread-list-card__footer">
                   <Tags tags={thread.tags} />
-                  <span>{thread.commentsCount || 0} комментариев</span>
+                  <span className="thread-list-card__comments">
+                    <MessageSquare aria-hidden="true" />
+                    {thread.commentsCount || 0} комментариев
+                  </span>
                   <a className="text-button" href={`#/threads/${thread.slug}`}>
                     Открыть <ChevronRight aria-hidden="true" />
                   </a>
@@ -1763,6 +1900,37 @@ function ThreadsPage({
                   : view === 'archived'
                     ? 'Архивные обсуждения появятся после закрытия тредов редакцией.'
                     : 'Создайте первое обсуждение по игре.'
+              }
+              action={
+                query ? (
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => setQuery('')}
+                  >
+                    Сбросить поиск
+                  </button>
+                ) : view === 'archived' ? (
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => setView('open')}
+                  >
+                    Показать активные
+                  </button>
+                ) : user ? (
+                  <button
+                    className="primary-button"
+                    type="button"
+                    onClick={() => setEditorOpen(true)}
+                  >
+                    <MessageCircle aria-hidden="true" /> Создать тред
+                  </button>
+                ) : (
+                  <a className="ghost-button" href="#/profile">
+                    Войти для публикации
+                  </a>
+                )
               }
             />
           )}
@@ -2067,14 +2235,11 @@ function CharacterCard({
 
   return (
     <article className="character-card">
-      <a
-        href={`#/characters/${character.slug}`}
-        aria-label={`Открыть страницу персонажа ${character.name}`}
-      >
+      <a href={`#/characters/${character.slug}`}>
         <span className="character-card__media">
           <img
             src={resolveAssetUrl(character.imageUrl)}
-            alt={character.name}
+            alt=""
             width="320"
             height="320"
             loading="lazy"
@@ -3353,7 +3518,7 @@ function CharacterDetailPage({
         {activeSkin ? (
           <div className="skin-lightbox-layout">
             <button
-              className="icon-button skin-lightbox-close"
+              className="icon-button game-close-button skin-lightbox-close"
               type="button"
               aria-label="Закрыть полноразмерное изображение"
               onClick={() => setActiveSkin(null)}
@@ -3767,12 +3932,16 @@ function RatingBar({
   });
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
+  const reactionRevision = useRef(0);
 
   useEffect(() => {
     if (!hasApiBase()) return;
+    const revision = ++reactionRevision.current;
     let mounted = true;
     loadReactionSummary(targetType, targetId).then((result) => {
-      if (mounted && result.ok) setScore(result.data);
+      if (mounted && revision === reactionRevision.current && result.ok) {
+        setScore(result.data);
+      }
     });
     return () => {
       mounted = false;
@@ -3786,10 +3955,15 @@ function RatingBar({
     }
     setPending(true);
     setMessage('');
+    const revision = ++reactionRevision.current;
     const isActive = score.active.includes(reactionType);
     const result = isActive
       ? await removeReaction(targetType, targetId, reactionType)
       : await sendReaction(targetType, targetId, reactionType);
+    if (revision !== reactionRevision.current) {
+      setPending(false);
+      return;
+    }
     if (result.ok) {
       setScore(result.data);
       setMessage('');
@@ -4651,7 +4825,7 @@ function CommentsBlock({
         ) : (
           <EmptyState
             title="Комментариев пока нет"
-            text="Будьте первым после подключения API и авторизации."
+            text="Начните обсуждение: поделитесь опытом, ротацией или уточняющим вопросом."
           />
         )}
       </div>

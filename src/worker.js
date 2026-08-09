@@ -3772,6 +3772,9 @@ function normalizeProfileImportValue(field, value) {
     return value;
   }
   if (typeof value !== 'string') return value;
+  if (/(?:image|splash|icon|audio|source|video)Url$/i.test(field)) {
+    return value.trim();
+  }
   if (field.startsWith('guide.')) {
     if (field === 'guide.videoUrl') return value.trim();
     const localized = localizeImportedGuideText(value);
@@ -3779,13 +3782,13 @@ function normalizeProfileImportValue(field, value) {
   }
   if (field === 'attribute') return normalizeImportElement(value);
   if (field === 'profile.arcType') {
-    return normalizeImportArcType(value).slice(0, 120);
+    return normalizeImportArcType(value);
   }
   if (field === 'profile.faction') {
-    return normalizeImportFaction(value).slice(0, 160);
+    return normalizeImportFaction(value);
   }
   if (field === 'profile.birthday' || field === 'profile.releaseDate') {
-    return formatRuImportDate(value).slice(0, 80);
+    return formatRuImportDate(value);
   }
   if (
     (field === 'profile.biography' || field === 'profile.biographyShort') &&
@@ -3794,14 +3797,13 @@ function normalizeProfileImportValue(field, value) {
     return '';
   }
   const normalized = normalizeImportedRuText(value);
+  if (field.startsWith('profile.')) return normalized;
   const maxLength =
     {
       name: 160,
       originalName: 160,
       attribute: 120,
       'profile.releaseVersion': 40,
-      'profile.biography': 60000,
-      'profile.trivia': 60000,
     }[field] || 8000;
   return normalized.slice(0, maxLength);
 }
@@ -5094,7 +5096,7 @@ function normalizeImportedStringList(value) {
   const items = [
     ...new Set(
       value
-        .map((item) => normalizeImportedRuText(item).slice(0, 80))
+        .map((item) => normalizeImportedRuText(item))
         .filter(Boolean),
     ),
   ].slice(0, 12);
@@ -5107,8 +5109,8 @@ function normalizeVoiceActorRows(value) {
   const rows = new Map();
   for (const item of value) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
-    const language = normalizeImportedRuText(item.language).slice(0, 40);
-    const name = normalizeImportedRuText(item.name).slice(0, 160);
+    const language = normalizeImportedRuText(item.language);
+    const name = normalizeImportedRuText(item.name);
     if (!language || !name) continue;
     rows.set(normalizeImportSearch(language), { ...item, language, name });
   }
@@ -5146,8 +5148,8 @@ function normalizeBaseStatRows(value) {
   for (const item of value) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
     const originalLabel = normalizeImportedRuText(item.label);
-    const label = normalizeBaseStatLabel(originalLabel).slice(0, 120);
-    const statValue = normalizeImportedRuText(item.value).slice(0, 120);
+    const label = normalizeBaseStatLabel(originalLabel);
+    const statValue = normalizeImportedRuText(item.value);
     if (!label || !statValue) continue;
     const key = normalizeImportSearch(label);
     const rank = originalLabel === label ? 2 : 1;
@@ -5208,40 +5210,28 @@ function normalizeProfileCollectionRows(field, value) {
     .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
     .map((item) => {
       const next = { ...item };
-      const fieldLimits = {
-        name: field === 'profile.roleIcons' ? 80 : 160,
-        title: 160,
-        label: field === 'profile.baseStats' ? 120 : 160,
-        language: 40,
-        type: 80,
-        amount: 80,
-        quantity: 40,
-        rewardName: 160,
-        value: field === 'profile.baseStats' ? 120 : 500,
-      };
-      for (const [key, limit] of Object.entries(fieldLimits)) {
+      const textFields = [
+        'name',
+        'title',
+        'label',
+        'language',
+        'type',
+        'amount',
+        'quantity',
+        'rewardName',
+        'value',
+      ];
+      for (const key of textFields) {
         if (typeof next[key] === 'string') {
-          next[key] = normalizeImportedRuText(next[key]).slice(0, limit);
+          next[key] = normalizeImportedRuText(next[key]);
         }
       }
       if (typeof next.id === 'string' && next.id.length > 80) {
         next.id = `import-${hashText(next.id).slice(0, 24)}`;
       }
-      const descriptionLimit =
-        field === 'profile.friendship'
-          ? 2000
-          : field === 'profile.voiceLines'
-            ? 1000
-            : field === 'profile.skins'
-              ? 4000
-              : 8000;
-      for (const [key, limit] of [
-        ['description', descriptionLimit],
-        ['effect', 1000],
-        ['source', 1000],
-      ]) {
+      for (const key of ['description', 'effect', 'source']) {
         if (typeof next[key] === 'string')
-          next[key] = normalizeImportedRuText(next[key]).slice(0, limit);
+          next[key] = normalizeImportedRuText(next[key]);
       }
       for (const key of ['iconUrl', 'imageUrl', 'rewardIconUrl']) {
         if (typeof next[key] === 'string') {
@@ -5344,13 +5334,9 @@ function normalizeSkinRows(value) {
           String(item.id || '').length > 80
             ? `skin-${hashText(String(item.id)).slice(0, 24)}`
             : item.id,
-        name: name.slice(0, 160),
+        name,
         imageUrl,
-        description: (
-          sourceDescription ||
-          localization?.description ||
-          ''
-        ).slice(0, 4000),
+        description: sourceDescription || localization?.description || '',
       },
     ];
   });
@@ -9422,14 +9408,8 @@ function cleanImportedAbility(entry) {
     ? entry.attributes
         .slice(0, 80)
         .map((attribute, index) => {
-          const label = normalizeImportedRuText(attribute?.label || '').slice(
-            0,
-            160,
-          );
-          const value = normalizeImportedRuText(attribute?.value || '').slice(
-            0,
-            500,
-          );
+          const label = normalizeImportedRuText(attribute?.label || '');
+          const value = normalizeImportedRuText(attribute?.value || '');
           if (!label || !value) return null;
           return {
             id:
@@ -11437,15 +11417,18 @@ function validateEntityRecord(entity, record, isCreate) {
 
   for (const [field, value] of Object.entries(record)) {
     if (typeof value === 'string') {
+      const isResourceUrl = [
+        'image_url',
+        'splash_url',
+        'source_url',
+        'video_url',
+        'media_url',
+      ].includes(field);
       const maxLength =
         field === 'body_markdown' || field === 'transcript_markdown'
           ? 60000
-          : ['image_url', 'splash_url', 'source_url', 'video_url'].includes(
-                field,
-              )
-            ? MAX_PROFILE_RESOURCE_URL_CHARS
-            : 8000;
-      if (value.length > maxLength) {
+          : 8000;
+      if (!isResourceUrl && value.length > maxLength) {
         throwHttp(
           `Поле «${fieldLabel(field)}» содержит слишком много текста`,
           400,
@@ -11555,16 +11538,7 @@ function normalizeCharacterProfile(value) {
     }
     return items.map(mapper);
   };
-  const text = (input, max = 8000, label = 'Поле профиля') => {
-    const result = String(input || '').trim();
-    if (result.length > max) {
-      throwHttp(
-        `Поле «${label}» содержит ${result.length} символов при лимите ${max}. Сократите текст и повторите сохранение.`,
-        400,
-      );
-    }
-    return result;
-  };
+  const text = (input) => String(input || '').trim();
   const url = (input, label = 'URL медиа') => {
     const result = String(input || '').trim();
     if (result.startsWith('data:')) {
@@ -11580,12 +11554,6 @@ function normalizeCharacterProfile(value) {
         );
       }
       return result;
-    }
-    if (result.length > MAX_PROFILE_RESOURCE_URL_CHARS) {
-      throwHttp(
-        `${label} слишком длинный. Используйте прямую ссылку на файл до ${MAX_PROFILE_RESOURCE_URL_CHARS} символов.`,
-        400,
-      );
     }
     if (result) validateResourceUrl(result, label);
     return result;
@@ -11717,7 +11685,7 @@ function normalizeCharacterProfile(value) {
     MAX_PROFILE_JSON_BYTES
   ) {
     throwHttp(
-      'Общий размер изображений профиля слишком большой. Уменьшите файлы или используйте прямые ссылки.',
+      'Общий объём профиля слишком большой для одного сохранения. Сократите число встроенных изображений или записей.',
       400,
     );
   }

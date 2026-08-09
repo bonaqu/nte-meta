@@ -1759,15 +1759,45 @@ function ThreadsPage({
 
   return (
     <div className="page-stack threads-page">
-      <section className="threads-hero" aria-labelledby="threads-page-title">
-        <div className="threads-hero__copy">
-          <p className="eyebrow">Комьюнити NTE Meta</p>
-          <h1 id="threads-page-title">Треды и обсуждения</h1>
-          <p>
-            Практические вопросы по персонажам, ресурсам, отрядам и механикам —
-            отдельно от комментариев к редакционным материалам.
-          </p>
-          <dl className="threads-hero__metrics" aria-label="Сводка обсуждений">
+      <section className="community-hub" aria-labelledby="threads-page-title">
+        <header className="community-hub__masthead">
+          <div className="community-hub__identity">
+            <p className="eyebrow">Комьюнити NTE Meta</p>
+            <h1 id="threads-page-title">Треды и обсуждения игроков</h1>
+            <p>
+              Практические вопросы по персонажам, ресурсам, отрядам и механикам
+              собраны в одной ленте — с поиском, статусами и ответами
+              сообщества.
+            </p>
+          </div>
+          <aside className="community-hub__publish" aria-label="Создание треда">
+            <MessageCircle aria-hidden="true" />
+            <div>
+              <p className="eyebrow">Новая тема</p>
+              <strong>Есть вопрос по игре?</strong>
+              <p>
+                Опишите условия и уже проверенные варианты — черновик сохранится
+                при закрытии формы.
+              </p>
+            </div>
+            {user ? (
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => setEditorOpen(true)}
+              >
+                <MessageCircle aria-hidden="true" /> Создать тред
+              </button>
+            ) : (
+              <a className="ghost-button" href="#/profile">
+                <UserCircle aria-hidden="true" /> Войти для публикации
+              </a>
+            )}
+          </aside>
+        </header>
+
+        <div className="community-hub__overview">
+          <dl className="community-hub__metrics" aria-label="Сводка обсуждений">
             <div>
               <dt>Активные</dt>
               <dd>{openThreadCount}</dd>
@@ -1781,160 +1811,153 @@ function ThreadsPage({
               <dd>{communityCommentCount}</dd>
             </div>
           </dl>
-        </div>
-        <aside className="threads-hero__action" aria-label="Создание треда">
-          <p className="eyebrow">Новая тема</p>
-          <h2>Спросите сообщество</h2>
-          <p>
-            Опишите исходные условия и уже проверенные варианты — черновик не
-            потеряется при закрытии формы.
-          </p>
-          {user ? (
-            <button
-              className="primary-button"
-              type="button"
-              onClick={() => setEditorOpen(true)}
-            >
-              <MessageCircle aria-hidden="true" /> Создать тред
-            </button>
-          ) : (
-            <a className="ghost-button" href="#/profile">
-              <UserCircle aria-hidden="true" /> Войти для публикации
-            </a>
-          )}
-        </aside>
-      </section>
-
-      <section className="content-band threads-board" aria-labelledby="threads-board-title">
-        <header className="threads-board__heading">
-          <div>
+          <div className="community-hub__feed-heading">
             <p className="eyebrow">Лента сообщества</p>
-            <h2 id="threads-board-title">Обсуждения игроков</h2>
+            <h2 id="threads-board-title">Лента обсуждений</h2>
           </div>
-          <span aria-live="polite">
-            Показано: <strong>{visibleThreads.length}</strong>
+          <span className="community-hub__result-count" aria-live="polite">
+            <strong>{visibleThreads.length}</strong> тем в выдаче
           </span>
-        </header>
-        <div className="threads-page__toolbar">
-          <label className="search-field">
-            <Search aria-hidden="true" />
-            <span className="sr-only">Поиск по тредам</span>
-            <input
-              type="search"
-              value={query}
-              placeholder="Тема, описание или тег..."
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
-          <div className="segmented-control" aria-label="Статус тредов">
-            <button
-              type="button"
-              aria-pressed={view === 'open'}
-              onClick={() => setView('open')}
-            >
-              Активные
-            </button>
-            <button
-              type="button"
-              aria-pressed={view === 'archived'}
-              onClick={() => setView('archived')}
-            >
-              Архив
-            </button>
-            <button
-              type="button"
-              aria-pressed={view === 'all'}
-              onClick={() => setView('all')}
-            >
-              Все
-            </button>
-          </div>
         </div>
 
-        <div className="thread-list">
-          {visibleThreads.length ? (
-            visibleThreads.map((thread) => (
-              <article className="thread-list-card" key={thread.id}>
-                <div className="thread-list-card__heading">
-                  <div>
-                    <p className="eyebrow">{thread.author}</p>
-                    <h3>
-                      <a href={`#/threads/${thread.slug}`}>{thread.title}</a>
-                    </h3>
-                    <time dateTime={thread.updatedAt || thread.createdAt}>
-                      Обновлено {formatDate(thread.updatedAt || thread.createdAt)}
-                    </time>
+        <section
+          className="community-hub__feed"
+          aria-labelledby="threads-board-title"
+        >
+          <div className="threads-page__toolbar">
+            <label className="community-search">
+              <span>Поиск по обсуждениям</span>
+              <span className="community-search__control">
+                <Search aria-hidden="true" />
+                <input
+                  name="thread-search"
+                  type="search"
+                  value={query}
+                  placeholder="Тема, описание или тег..."
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </span>
+            </label>
+            <fieldset className="community-view-filter">
+              <legend>Статус обсуждений</legend>
+              <div className="segmented-control">
+                <button
+                  className={view === 'open' ? 'active' : undefined}
+                  type="button"
+                  aria-pressed={view === 'open'}
+                  onClick={() => setView('open')}
+                >
+                  Активные
+                </button>
+                <button
+                  className={view === 'archived' ? 'active' : undefined}
+                  type="button"
+                  aria-pressed={view === 'archived'}
+                  onClick={() => setView('archived')}
+                >
+                  Архив
+                </button>
+                <button
+                  className={view === 'all' ? 'active' : undefined}
+                  type="button"
+                  aria-pressed={view === 'all'}
+                  onClick={() => setView('all')}
+                >
+                  Все
+                </button>
+              </div>
+            </fieldset>
+          </div>
+
+          <div className="thread-list">
+            {visibleThreads.length ? (
+              visibleThreads.map((thread) => (
+                <article className="thread-list-card" key={thread.id}>
+                  <div className="thread-list-card__heading">
+                    <div>
+                      <p className="eyebrow">{thread.author}</p>
+                      <h3>
+                        <a href={`#/threads/${thread.slug}`}>{thread.title}</a>
+                      </h3>
+                      <time dateTime={thread.updatedAt || thread.createdAt}>
+                        Обновлено{' '}
+                        {formatDate(thread.updatedAt || thread.createdAt)}
+                      </time>
+                    </div>
+                    <span
+                      className={`thread-status${
+                        thread.status === 'closed' ? ' is-archived' : ''
+                      }`}
+                    >
+                      {thread.status === 'closed' ? (
+                        <Archive aria-hidden="true" />
+                      ) : (
+                        <MessageCircle aria-hidden="true" />
+                      )}
+                      {thread.status === 'closed' ? 'Архив' : 'Обсуждается'}
+                    </span>
                   </div>
-                  <span
-                    className={`thread-status${
-                      thread.status === 'closed' ? ' is-archived' : ''
-                    }`}
-                  >
-                    {thread.status === 'closed' ? (
-                      <Archive aria-hidden="true" />
-                    ) : (
-                      <MessageCircle aria-hidden="true" />
-                    )}
-                    {thread.status === 'closed' ? 'Архив' : 'Обсуждается'}
-                  </span>
-                </div>
-                <p className="thread-list-card__summary">{thread.summary}</p>
-                <div className="thread-list-card__footer">
-                  <Tags tags={thread.tags} />
-                  <span className="thread-list-card__comments">
-                    <MessageSquare aria-hidden="true" />
-                    {thread.commentsCount || 0} комментариев
-                  </span>
-                  <a className="text-button" href={`#/threads/${thread.slug}`}>
-                    Открыть <ChevronRight aria-hidden="true" />
-                  </a>
-                </div>
-              </article>
-            ))
-          ) : (
-            <EmptyState
-              title={query ? 'Треды не найдены' : 'Здесь пока нет тредов'}
-              text={
-                query
-                  ? 'Измените запрос или переключите статус обсуждений.'
-                  : view === 'archived'
-                    ? 'Архивные обсуждения появятся после закрытия тредов редакцией.'
-                    : 'Создайте первое обсуждение по игре.'
-              }
-              action={
-                query ? (
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() => setQuery('')}
-                  >
-                    Сбросить поиск
-                  </button>
-                ) : view === 'archived' ? (
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() => setView('open')}
-                  >
-                    Показать активные
-                  </button>
-                ) : user ? (
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={() => setEditorOpen(true)}
-                  >
-                    <MessageCircle aria-hidden="true" /> Создать тред
-                  </button>
-                ) : (
-                  <a className="ghost-button" href="#/profile">
-                    Войти для публикации
-                  </a>
-                )
-              }
-            />
-          )}
-        </div>
+                  <p className="thread-list-card__summary">{thread.summary}</p>
+                  <div className="thread-list-card__footer">
+                    <Tags tags={thread.tags} />
+                    <span className="thread-list-card__comments">
+                      <MessageSquare aria-hidden="true" />
+                      {thread.commentsCount || 0} комментариев
+                    </span>
+                    <a
+                      className="text-button"
+                      href={`#/threads/${thread.slug}`}
+                    >
+                      Открыть <ChevronRight aria-hidden="true" />
+                    </a>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <EmptyState
+                title={query ? 'Треды не найдены' : 'Здесь пока нет тредов'}
+                text={
+                  query
+                    ? 'Измените запрос или переключите статус обсуждений.'
+                    : view === 'archived'
+                      ? 'Архивные обсуждения появятся после закрытия тредов редакцией.'
+                      : 'Создайте первое обсуждение по игре.'
+                }
+                action={
+                  query ? (
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => setQuery('')}
+                    >
+                      Сбросить поиск
+                    </button>
+                  ) : view === 'archived' ? (
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => setView('open')}
+                    >
+                      Показать активные
+                    </button>
+                  ) : user ? (
+                    <button
+                      className="primary-button"
+                      type="button"
+                      onClick={() => setEditorOpen(true)}
+                    >
+                      <MessageCircle aria-hidden="true" /> Создать тред
+                    </button>
+                  ) : (
+                    <a className="ghost-button" href="#/profile">
+                      Войти для публикации
+                    </a>
+                  )
+                }
+              />
+            )}
+          </div>
+        </section>
       </section>
 
       <EditorShell

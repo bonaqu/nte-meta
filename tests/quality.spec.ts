@@ -8,6 +8,7 @@ const reviewedPortalRoutes = [
   '/#/guides',
   '/#/guides/hotori-burst-guide',
   '/#/tierlists',
+  '/#/threads',
 ];
 
 const publicRoutes = [
@@ -62,7 +63,7 @@ test.describe('Качество интерфейса NTE Meta', () => {
   test('основные экраны не создают горизонтальную прокрутку', async ({
     page,
   }) => {
-    for (const width of [390, 768, 1440]) {
+    for (const width of [360, 768, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       for (const route of reviewedPortalRoutes) {
         await page.goto(route);

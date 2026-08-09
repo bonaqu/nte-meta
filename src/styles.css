@@ -8383,10 +8383,9 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .threads-hero {
+  .community-hub {
     position: relative;
-    display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+    overflow: hidden;
     border: 1px solid var(--border-strong);
     border-block-start: 3px solid var(--pink);
     border-radius: var(--radius);
@@ -8396,23 +8395,31 @@
         transparent 0 34px,
         rgb(255 255 255 / 0.018) 34px 52px
       ),
-      linear-gradient(112deg, rgb(255 75 154 / 0.07), transparent 36%),
+      linear-gradient(112deg, rgb(255 75 154 / 0.065), transparent 36%),
       var(--surface-strong);
     box-shadow: 0 24px 56px rgb(0 0 0 / 0.24);
-    overflow: hidden;
   }
 
-  .threads-hero::before {
+  .community-hub::before {
     position: absolute;
-    inset-block: 18px;
+    z-index: 1;
+    inset-block: 20px;
     inset-inline-start: 0;
     inline-size: 4px;
     background: linear-gradient(var(--cyan), var(--pink));
     content: '';
   }
 
-  .threads-hero__copy,
-  .threads-hero__action {
+  .community-hub :is(h1, h2, p, dl, dd, fieldset, legend) {
+    margin: 0;
+  }
+
+  .community-hub__masthead {
+    display: grid;
+    grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
+  }
+
+  .community-hub__identity {
     display: grid;
     gap: 12px;
     align-content: center;
@@ -8420,106 +8427,145 @@
     padding: clamp(22px, 4vw, 42px);
   }
 
-  .threads-hero :is(h1, h2, p, dl, dd) {
-    margin: 0;
-  }
-
-  .threads-hero h1 {
-    max-inline-size: 15ch;
-    font-size: clamp(2.25rem, 5vw, 4.2rem);
-    line-height: 0.96;
+  .community-hub h1 {
+    max-inline-size: 18ch;
+    font-size: clamp(2.15rem, 4vw, 3.55rem);
+    line-height: 1;
+    letter-spacing: -0.035em;
     text-wrap: balance;
   }
 
-  .threads-hero__copy > p:not(.eyebrow) {
-    max-inline-size: 64ch;
+  .community-hub__identity > p:not(.eyebrow) {
+    max-inline-size: 68ch;
     color: var(--muted);
     line-height: 1.6;
+    text-wrap: pretty;
   }
 
-  .threads-hero__metrics {
+  .community-hub__publish {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 10px 14px;
+    align-content: center;
+    min-inline-size: 0;
+    padding: clamp(22px, 3vw, 34px);
+    border-inline-start: 1px solid var(--border);
+    background:
+      linear-gradient(150deg, rgb(38 217 255 / 0.075), transparent 58%),
+      rgb(0 0 0 / 0.18);
+  }
+
+  .community-hub__publish > svg {
+    inline-size: 44px;
+    block-size: 44px;
+    padding: 10px;
+    border: 1px solid color-mix(in srgb, var(--pink) 62%, var(--border));
+    border-radius: 50%;
+    background: rgb(255 75 154 / 0.12);
+    color: var(--pink);
+  }
+
+  .community-hub__publish > div {
+    display: grid;
+    gap: 5px;
+    min-inline-size: 0;
+  }
+
+  .community-hub__publish strong {
+    color: var(--text);
+    font-size: clamp(1.12rem, 2vw, 1.35rem);
+    line-height: 1.2;
+    text-wrap: balance;
+  }
+
+  .community-hub__publish > div > p:not(.eyebrow) {
+    max-inline-size: 46ch;
+    color: var(--muted);
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  .community-hub__publish > :is(a, button) {
+    grid-column: 2;
+    justify-self: start;
+    min-block-size: 48px;
+  }
+
+  .community-hub__overview {
+    display: grid;
+    grid-template-columns: minmax(330px, 0.9fr) minmax(220px, 1fr) auto;
+    gap: 18px;
+    align-items: center;
+    padding: 14px clamp(18px, 3vw, 28px);
+    border-block: 1px solid var(--border);
+    background:
+      linear-gradient(90deg, rgb(38 217 255 / 0.055), transparent 42%),
+      rgb(0 0 0 / 0.2);
+  }
+
+  .community-hub__metrics {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-    max-inline-size: 620px;
-    margin-block-start: 8px;
   }
 
-  .threads-hero__metrics > div {
+  .community-hub__metrics > div {
     display: grid;
-    gap: 3px;
+    gap: 2px;
     min-inline-size: 0;
-    padding: 11px 13px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: rgb(0 0 0 / 0.2);
+    padding-inline: 13px;
+    border-inline-end: 1px solid var(--border);
   }
 
-  .threads-hero__metrics dt {
+  .community-hub__metrics > div:first-child {
+    padding-inline-start: 0;
+  }
+
+  .community-hub__metrics dt {
     grid-row: 2;
     color: var(--muted);
     font-size: 0.72rem;
     font-weight: 750;
   }
 
-  .threads-hero__metrics dd {
+  .community-hub__metrics dd {
     color: var(--text);
-    font-size: 1.35rem;
+    font-size: 1.3rem;
     font-weight: 950;
     font-variant-numeric: tabular-nums;
   }
 
-  .threads-hero__action {
-    border-inline-start: 1px solid var(--border);
-    background:
-      linear-gradient(150deg, rgb(38 217 255 / 0.07), transparent 58%),
-      rgb(0 0 0 / 0.18);
-  }
-
-  .threads-hero__action h2 {
-    font-size: clamp(1.35rem, 2.2vw, 1.9rem);
-  }
-
-  .threads-hero__action > p:not(.eyebrow) {
-    color: var(--muted);
-    line-height: 1.55;
-  }
-
-  .threads-hero__action > :is(a, button) {
-    inline-size: fit-content;
-    min-block-size: 48px;
-  }
-
-  .threads-board {
-    gap: 18px;
-  }
-
-  .threads-board__heading {
-    display: flex;
-    gap: 18px;
-    align-items: end;
-    justify-content: space-between;
-    padding-block-end: 14px;
-    border-block-end: 1px solid var(--border);
-  }
-
-  .threads-board__heading > div {
+  .community-hub__feed-heading {
     display: grid;
-    gap: 6px;
+    gap: 3px;
+    min-inline-size: 0;
   }
 
-  .threads-board__heading :is(h2, p) {
-    margin: 0;
+  .community-hub__feed-heading h2 {
+    font-size: clamp(1.2rem, 2.2vw, 1.55rem);
+    line-height: 1.12;
+    text-wrap: balance;
   }
 
-  .threads-board__heading > span {
+  .community-hub__result-count {
+    justify-self: end;
+    padding: 8px 11px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: rgb(0 0 0 / 0.2);
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
   }
 
-  .threads-board__heading > span strong {
+  .community-hub__result-count strong {
     color: var(--cyan);
     font-variant-numeric: tabular-nums;
+  }
+
+  .community-hub__feed {
+    display: grid;
+    gap: 18px;
+    padding: clamp(16px, 3vw, 28px);
   }
 
   .threads-page__toolbar {
@@ -8527,14 +8573,72 @@
     grid-template-columns: minmax(240px, 1fr) auto;
     gap: 14px;
     align-items: end;
-    padding: 12px;
+    padding: 14px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    background: rgb(0 0 0 / 0.14);
+    background:
+      linear-gradient(110deg, rgb(38 217 255 / 0.04), transparent 38%),
+      rgb(0 0 0 / 0.18);
   }
 
-  .threads-page__toolbar .filter-field {
+  .community-search,
+  .community-view-filter {
+    display: grid;
+    gap: 6px;
+    min-inline-size: 0;
     margin: 0;
+  }
+
+  .community-search > span:first-child,
+  .community-view-filter legend {
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+
+  .community-search__control {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-inline-size: 0;
+  }
+
+  .community-search__control svg {
+    position: absolute;
+    inset-inline-start: 14px;
+    inline-size: 18px;
+    block-size: 18px;
+    color: var(--soft);
+    pointer-events: none;
+  }
+
+  .community-search__control input {
+    inline-size: 100%;
+    min-block-size: 48px;
+    padding-inline: 42px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .community-search__control input:focus-visible {
+    border-color: var(--cyan);
+    outline: 3px solid rgb(38 217 255 / 0.16);
+    outline-offset: 1px;
+  }
+
+  .community-view-filter {
+    padding: 0;
+    border: 0;
+  }
+
+  .community-view-filter .segmented-control {
+    justify-self: stretch;
+  }
+
+  .community-view-filter .segmented-control button {
+    min-block-size: 44px;
   }
 
   .thread-list {
@@ -8552,14 +8656,12 @@
     background: color-mix(in srgb, var(--surface-strong) 92%, transparent);
     transition:
       border-color 160ms ease,
-      background-color 160ms ease,
-      transform 160ms ease;
+      background-color 160ms ease;
   }
 
   .thread-list-card:is(:hover, :focus-within) {
     border-color: color-mix(in srgb, var(--cyan) 54%, var(--border));
     background: color-mix(in srgb, var(--surface-strong) 96%, var(--cyan) 4%);
-    transform: translateY(-2px);
   }
 
   .thread-list-card__heading,
@@ -8630,19 +8732,31 @@
     font-size: 0.78rem;
   }
 
+  .thread-list-card__footer .text-button {
+    min-block-size: 44px;
+  }
+
   .thread-status.is-archived {
     border-color: color-mix(in srgb, var(--amber) 50%, var(--border));
     color: var(--amber);
   }
 
   @media (max-width: 900px) {
-    .threads-hero {
+    .community-hub__masthead {
       grid-template-columns: 1fr;
     }
 
-    .threads-hero__action {
+    .community-hub__publish {
       border-block-start: 1px solid var(--border);
       border-inline-start: 0;
+    }
+
+    .community-hub__overview {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .community-hub__metrics {
+      grid-column: 1 / -1;
     }
 
     .guide-hero {
@@ -8664,46 +8778,83 @@
   }
 
   @media (max-width: 640px) {
-    .threads-hero__copy,
-    .threads-hero__action {
+    .community-hub__identity,
+    .community-hub__publish {
       padding: 20px;
     }
 
-    .threads-hero h1 {
-      font-size: clamp(2.2rem, 12vw, 3.2rem);
+    .community-hub h1 {
+      font-size: clamp(2rem, 10vw, 2.85rem);
     }
 
-    .threads-hero__metrics {
+    .community-hub__publish > :is(a, button) {
+      grid-column: 1 / -1;
+      justify-self: stretch;
+      inline-size: 100%;
+    }
+
+    .community-hub__overview {
+      grid-template-columns: 1fr;
+      gap: 14px;
+      padding: 14px 16px;
+    }
+
+    .community-hub__metrics {
+      grid-column: auto;
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .threads-hero__metrics > div {
+    .community-hub__metrics > div {
       align-content: start;
       min-block-size: 64px;
-      padding: 9px;
+      padding-inline: 10px;
     }
 
-    .threads-hero__metrics dt {
+    .community-hub__metrics dt {
       grid-row: 2;
       line-height: 1.2;
     }
 
-    .threads-hero__metrics dd {
+    .community-hub__metrics dd {
       grid-row: 1;
     }
 
-    .threads-board__heading,
+    .community-hub__result-count {
+      justify-self: start;
+    }
+
     .thread-list-card__heading,
     .thread-list-card__footer {
       align-items: flex-start;
       flex-direction: column;
     }
 
-    .threads-board__heading > span,
     .thread-status,
     .thread-list-card__footer .text-button {
       inline-size: 100%;
       justify-content: center;
+    }
+
+    .community-hub__feed {
+      padding: 14px;
+    }
+
+    .threads-page__toolbar {
+      padding: 12px;
+    }
+
+    .community-search__control input {
+      font-size: 1rem;
+    }
+
+    .community-view-filter .segmented-control {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      inline-size: 100%;
+    }
+
+    .community-view-filter .segmented-control button {
+      padding-inline: 8px;
     }
 
     .thread-list-card {

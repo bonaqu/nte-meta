@@ -36,6 +36,66 @@ test.describe('Публичный портал NTE Meta', () => {
     ).toEqual([]);
   });
 
+  test('комьюнити объединяет сводку и ленту, фильтры работают', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 900 });
+    await page.goto('/#/threads');
+
+    const hub = page.locator('.community-hub');
+    await expect(hub).toBeVisible();
+    await expect(
+      hub.getByRole('heading', {
+        name: 'Треды и обсуждения игроков',
+        level: 1,
+      }),
+    ).toBeVisible();
+    await expect(
+      hub.getByRole('heading', { name: 'Лента обсуждений', level: 2 }),
+    ).toBeVisible();
+
+    const active = hub.getByRole('button', { name: 'Активные', exact: true });
+    const archived = hub.getByRole('button', { name: 'Архив', exact: true });
+    await expect(active).toHaveAttribute('aria-pressed', 'true');
+    await archived.click();
+    await expect(archived).toHaveAttribute('aria-pressed', 'true');
+    await expect(
+      hub.getByRole('heading', { name: 'Здесь пока нет тредов' }),
+    ).toBeVisible();
+
+    await active.click();
+    const search = hub.getByRole('searchbox', {
+      name: 'Поиск по обсуждениям',
+    });
+    await search.fill('несуществующая тема');
+    await expect(
+      hub.getByRole('heading', { name: 'Треды не найдены' }),
+    ).toBeVisible();
+    await hub.getByRole('button', { name: 'Сбросить поиск' }).click();
+    await expect(
+      hub.getByRole('heading', {
+        name: 'Кого качать на старте и где не слить ресурсы',
+      }),
+    ).toBeVisible();
+
+    const layout = await page.evaluate(() => {
+      const controls = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '.community-hub button, .community-hub input, .community-hub__publish > a, .thread-list-card__footer .text-button',
+        ),
+      );
+      return {
+        viewport: document.documentElement.clientWidth,
+        content: document.documentElement.scrollWidth,
+        minControlHeight: Math.min(
+          ...controls.map((control) => control.getBoundingClientRect().height),
+        ),
+      };
+    });
+    expect(layout.content).toBeLessThanOrEqual(layout.viewport + 1);
+    expect(layout.minControlHeight).toBeGreaterThanOrEqual(44);
+  });
+
   test('персонажи не показывают устаревшие seed-карточки до ответа API', async ({
     page,
   }) => {

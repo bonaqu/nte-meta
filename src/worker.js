@@ -174,6 +174,9 @@ const tableConfig = {
       'trust_level',
       'auto_import_enabled',
       'last_checked_at',
+      'language',
+      'content_kind',
+      'parser',
     ],
     role: ADMIN_ROLE,
   },
@@ -293,6 +296,8 @@ async function router(request, env, ctx) {
   }
 
   if (parts[0] === 'media') {
+    if (parts[1] === 'uploads')
+      return handleMediaUpload(request, env, parts, ctx);
     return handleMediaProxy(request, ctx);
   }
 
@@ -342,6 +347,9 @@ async function router(request, env, ctx) {
 
   if (parts[0] === 'guide-import' && parts[1] === 'lookup') {
     return handleGuideImportLookup(request, env);
+  }
+  if (parts[0] === 'equipment-import' && parts[1] === 'lookup') {
+    return handleEquipmentImport(request, env);
   }
   if (parts[0] === 'tier-import' && parts[1] === 'lookup') {
     return handleTierImportLookup(request, env);
@@ -1194,6 +1202,7 @@ async function readEntity(env, entity, idOrSlug, request) {
   if (idOrSlug && !data) {
     return json({ error: 'Запись не найдена' }, 404);
   }
+  if (!includeDrafts) data = publicEditorialData(entity, data);
   return json({ data });
 }
 
@@ -1429,7 +1438,7 @@ async function createGuideSection(request, env, guideId, ctx) {
       cleanString(body.type || 'custom', 1, 40),
       String(body.content || ''),
       positionRow.next_position,
-      '{}',
+      JSON.stringify({ visual: validateGuideVisual(body.visual) }),
     )
     .run();
   ctx.waitUntil(
@@ -1468,9 +1477,16 @@ async function handleGuideSection(request, env, parts, ctx) {
         ? null
         : cleanString(body.content, 0, 60000, true);
     await env.DB.prepare(
-      'UPDATE guide_sections SET title = COALESCE(?, title), section_type = COALESCE(?, section_type), content_markdown = COALESCE(?, content_markdown), updated_at = current_timestamp WHERE id = ?',
+      "UPDATE guide_sections SET title = COALESCE(?, title), section_type = COALESCE(?, section_type), content_markdown = COALESCE(?, content_markdown), meta_json = CASE WHEN ? THEN json_set(meta_json, '$.visual', json(?)) ELSE meta_json END, updated_at = current_timestamp WHERE id = ?",
     )
-      .bind(title, type, content, id)
+      .bind(
+        title,
+        type,
+        content,
+        body.visual !== undefined ? 1 : 0,
+        JSON.stringify(validateGuideVisual(body.visual) || null),
+        id,
+      )
       .run();
     ctx.waitUntil(logAudit(env, actor.id, 'guide_sections.update', id, body));
     return json({ data: { success: true } });
@@ -1546,6 +1562,19 @@ async function reorderGuideSections(request, env, guideId, ctx) {
 async function handleLeakCandidates(request, env, parts, ctx) {
   const id = parts[1];
 
+  if (request.method === 'POST' && id && parts[2] === 'translate') {
+    await requireContentPermission(request, env, 'leaks', 'edit');
+    await rateLimit(request, env, 'editor-translation', 20, 10 * 60);
+    const candidate = await env.DB.prepare(
+      'SELECT * FROM leak_candidates WHERE id = ?',
+    )
+      .bind(id)
+      .first();
+    if (!candidate) return json({ error: 'Публикация не найдена' }, 404);
+    const translated = await translateCandidate(candidate, env);
+    return json({ data: translated });
+  }
+
   if (request.method === 'GET' && !id) {
     await requireContentPermission(request, env, 'leaks', 'edit');
     return json({ data: await listLeakCandidates(env) });
@@ -1558,31 +1587,45 @@ async function handleLeakCandidates(request, env, parts, ctx) {
     const query = cleanString(body.query || '', 0, 100);
     const deadline = Date.now() + 18000;
     let redditLane = Promise.resolve();
+    const kind = ['news', 'leak', 'all'].includes(body.kind)
+      ? body.kind
+      : 'leak';
     const configuredSources = await env.DB.prepare(
-      'SELECT source_url, auto_import_enabled FROM sources',
+      'SELECT * FROM sources',
     ).all();
     const disabledUrls = new Set(
       (configuredSources.results || [])
         .filter((item) => !item.auto_import_enabled)
         .map((item) => item.source_url),
     );
+    const networkBudget = { remaining: 40 };
     const sourceResults = await mapWithConcurrency(
-      LEAK_DISCOVERY_SOURCES.map((source) =>
-        !source.referenceOnly && disabledUrls.has(source.url)
-          ? {
-              ...source,
-              referenceOnly: true,
-              message:
-                'Автопоиск отключён редактором. Источник доступен для ручной сверки.',
-            }
-          : source,
-      ),
+      mergeDiscoverySources(configuredSources.results || [])
+        .filter(
+          (source) =>
+            kind === 'all' || (kind === 'news' ? true : !source.official),
+        )
+        .map((source) =>
+          !source.referenceOnly && disabledUrls.has(source.url)
+            ? {
+                ...source,
+                referenceOnly: true,
+                message:
+                  'Автопоиск отключён редактором. Источник доступен для ручной сверки.',
+              }
+            : source,
+        ),
       LEAK_DISCOVERY_CONCURRENCY,
       (source) => {
         if (source.type !== 'reddit')
-          return fetchLeakDiscoverySource(source, query, deadline);
+          return fetchLeakDiscoverySource(
+            source,
+            query,
+            deadline,
+            networkBudget,
+          );
         const result = redditLane.then(() =>
-          fetchLeakDiscoverySource(source, query, deadline),
+          fetchLeakDiscoverySource(source, query, deadline, networkBudget),
         );
         redditLane = result.catch(() => undefined);
         return result;
@@ -1600,7 +1643,12 @@ async function handleLeakCandidates(request, env, parts, ctx) {
           (a, b) =>
             Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0),
         ),
-    ]).slice(0, 100);
+    ])
+      .filter(
+        (candidate) =>
+          kind === 'all' || candidate.metadata.contentKind === kind,
+      )
+      .slice(0, 100);
     await upsertLeakCandidates(env, discovered);
     const checkedSourceUrls = [
       ...new Set(
@@ -1632,7 +1680,9 @@ async function handleLeakCandidates(request, env, parts, ctx) {
     return json({
       data: {
         discoveredCount: discovered.length,
-        candidates: await listLeakCandidates(env),
+        candidates: (await listLeakCandidates(env)).filter(
+          (candidate) => kind === 'all' || candidate.contentKind === kind,
+        ),
         sources: sourceResults.map(serializeLeakDiscoverySource),
       },
     });
@@ -1677,8 +1727,13 @@ async function handleLeakCandidates(request, env, parts, ctx) {
         return json({ data: { leakId: existing.id, slug: existing.slug } });
     }
 
-    const originalTitle = cleanLeakCandidateText(candidate.title, 180);
-    const needsTranslation = candidate.language !== 'ru';
+    const translation = parseJson(candidate.metadata_json, {});
+    const originalTitle = cleanLeakCandidateText(
+      translation.translatedTitle || candidate.title,
+      180,
+    );
+    const needsTranslation =
+      candidate.language !== 'ru' && !translation.translatedTitle;
     const title = cleanLeakCandidateText(
       needsTranslation ? `Требуется перевод: ${originalTitle}` : originalTitle,
       180,
@@ -1693,17 +1748,12 @@ async function handleLeakCandidates(request, env, parts, ctx) {
       ? `${baseSlug.slice(0, 70)}-${candidate.id.slice(0, 7)}`
       : baseSlug;
     const leakId = crypto.randomUUID();
-    const excerpt = cleanLeakCandidateText(candidate.excerpt || '', 4000);
-    const editorialNotice = needsTranslation
-      ? 'Текст источника требует перевода на русский и проверки редактором.'
-      : 'Текст источника требует фактчекинга редактором.';
-    const bodyMarkdown = [
-      `> ${editorialNotice}`,
-      '',
-      excerpt || originalTitle,
-      '',
-      `[Открыть оригинальный источник](${candidate.source_url})`,
-    ].join('\n');
+    const excerpt = cleanLeakCandidateText(
+      translation.translatedExcerpt || candidate.excerpt || '',
+      4000,
+    );
+    const editorialNotice = (excerpt || originalTitle).slice(0, 500);
+    const bodyMarkdown = excerpt || originalTitle;
     if (destination === 'news') {
       // Separate permission above and a draft status prevent discovery from publishing.
       const newsId = crypto.randomUUID();
@@ -1885,7 +1935,12 @@ async function handleLeakCandidates(request, env, parts, ctx) {
       audit.trustLevel = trustLevel;
     }
 
-    if (body.translationStatus !== undefined || body.editorNote !== undefined) {
+    if (
+      body.translationStatus !== undefined ||
+      body.editorNote !== undefined ||
+      body.translatedTitle !== undefined ||
+      body.translatedExcerpt !== undefined
+    ) {
       const current = await env.DB.prepare(
         'SELECT metadata_json, language FROM leak_candidates WHERE id = ?',
       )
@@ -1895,6 +1950,14 @@ async function handleLeakCandidates(request, env, parts, ctx) {
         return json({ error: 'Публикация в очереди не найдена' }, 404);
       }
       const metadata = parseJson(current.metadata_json, {});
+      if (body.translatedTitle !== undefined)
+        metadata.translatedTitle = cleanString(body.translatedTitle, 0, 180);
+      if (body.translatedExcerpt !== undefined)
+        metadata.translatedExcerpt = cleanString(
+          body.translatedExcerpt,
+          0,
+          4000,
+        );
       if (body.translationStatus !== undefined) {
         const translationStatus = cleanString(body.translationStatus, 1, 30);
         if (
@@ -1988,7 +2051,18 @@ function serializeLeakCandidate(row) {
         : [fallbackEvidence],
     createdLeakId: row.created_leak_id || row.createdLeakId || undefined,
     createdNewsId: row.created_news_id || row.createdNewsId || undefined,
-    contentKind: metadata.contentKind || 'leak',
+    contentKind:
+      row.origin === 'discovery' &&
+      LEAK_DISCOVERY_SOURCES.some((source) => source.id === metadata.sourceId)
+        ? classifyDiscoveryContent(
+            LEAK_DISCOVERY_SOURCES.find(
+              (source) => source.id === metadata.sourceId,
+            ),
+            `${row.title} ${row.excerpt || ''}`,
+          )
+        : metadata.contentKind || 'leak',
+    translatedTitle: metadata.translatedTitle || undefined,
+    translatedExcerpt: metadata.translatedExcerpt || undefined,
     createdAt: row.created_at || row.createdAt || new Date().toISOString(),
     updatedAt: row.updated_at || row.updatedAt || undefined,
   };
@@ -2016,6 +2090,7 @@ async function fetchLeakDiscoverySource(
   source,
   query,
   deadline = Date.now() + 18000,
+  budget = { remaining: 40 },
 ) {
   if (source.referenceOnly) {
     return { ...source, status: 'manual', candidates: [] };
@@ -2035,7 +2110,15 @@ async function fetchLeakDiscoverySource(
     Math.min(LEAK_DISCOVERY_TIMEOUT_MS, Math.max(1, deadline - Date.now())),
   );
   try {
-    const response = await fetch(source.fetchUrl || source.url, {
+    const sourceFetch = (url, options) => discoveryFetch(url, options, budget);
+    if (source.custom)
+      await validateDiscoveryUrl(
+        source.fetchUrl || source.url,
+        controller.signal,
+        sourceFetch,
+      );
+    const response = await sourceFetch(source.fetchUrl || source.url, {
+      redirect: source.custom ? 'error' : 'follow',
       headers: {
         accept:
           'application/rss+xml,application/atom+xml,application/json,text/html;q=0.9,*/*;q=0.8',
@@ -2076,7 +2159,7 @@ async function fetchLeakDiscoverySource(
     const parsed =
       source.parser === 'telegram'
         ? parseTelegramLeakCandidates(html, source)
-        : source.parser === 'feed'
+        : ['feed', 'rss', 'atom'].includes(source.parser)
           ? parseFeedCandidates(html, source)
           : source.parser === 'reddit'
             ? parseRedditCandidates(html, source)
@@ -2090,7 +2173,7 @@ async function fetchLeakDiscoverySource(
     if (source.official && query) {
       await mapWithConcurrency(parsed.slice(0, 3), 2, async (candidate) => {
         try {
-          const detail = await fetch(candidate.sourceUrl, {
+          const detail = await sourceFetch(candidate.sourceUrl, {
             signal: controller.signal,
             headers: { accept: 'text/html' },
             cf: {
@@ -2403,7 +2486,10 @@ function buildDiscoveredLeakCandidate({
     : inferred === 'подтверждено'
       ? 'слух'
       : inferred;
-  const explicitLeak = /(?:leak|datamine|слив|утечк|爆料)/i.test(combined);
+  const explicitLeak =
+    /(?:\bleaks?\b|datamin|rumou?r|слив|утечк|слух|爆料|内鬼|リーク|噂)/i.test(
+      combined,
+    );
   const baseConfidence =
     source.trustLevel === 'высокий'
       ? 75
@@ -2428,12 +2514,7 @@ function buildDiscoveredLeakCandidate({
     submittedBy: null,
     metadata: {
       sourceId: source.id,
-      contentKind:
-        source.official || source.contentKind === 'news'
-          ? 'news'
-          : explicitLeak || source.relevance === 'future'
-            ? 'leak'
-            : 'news',
+      contentKind: classifyDiscoveryContent(source, combined),
       requiresTranslation: language !== 'ru',
       translationStatus: language === 'ru' ? 'не требуется' : 'нужен перевод',
       evidence: [
@@ -2586,7 +2667,9 @@ async function upsertLeakCandidates(env, candidates) {
            metadata_json = json_patch(leak_candidates.metadata_json, json_set(excluded.metadata_json, '$.translationStatus',
              CASE WHEN leak_candidates.title = excluded.title AND leak_candidates.excerpt = excluded.excerpt
                THEN COALESCE(json_extract(leak_candidates.metadata_json, '$.translationStatus'), json_extract(excluded.metadata_json, '$.translationStatus'))
-               ELSE json_extract(excluded.metadata_json, '$.translationStatus') END)),
+               ELSE json_extract(excluded.metadata_json, '$.translationStatus') END,
+             '$.translatedTitle', CASE WHEN leak_candidates.title = excluded.title AND leak_candidates.excerpt = excluded.excerpt THEN json_extract(leak_candidates.metadata_json, '$.translatedTitle') ELSE NULL END,
+             '$.translatedExcerpt', CASE WHEN leak_candidates.title = excluded.title AND leak_candidates.excerpt = excluded.excerpt THEN json_extract(leak_candidates.metadata_json, '$.translatedExcerpt') ELSE NULL END)),
          updated_at = current_timestamp`,
     )
       .bind(...group.flatMap(leakCandidateInsertValues))
@@ -3712,6 +3795,21 @@ const LEAK_DISCOVERY_SOURCES = [
     parser: 'telegram',
     relevance: 'future',
   },
+  ...[
+    ['nanoka', 'nanoka.cc: обновления игровых данных', 'nanoka_news', 'en'],
+    ['seele-main', 'Seele Leaks: NTE в общей ленте', 'Seele_Leaks', 'zh'],
+    ['galaxy', 'Galaxy Leak: NTE в общей ленте', 'galaxy_leak', 'en'],
+  ].map(([id, name, channel, language]) => ({
+    id: `telegram-${id}`,
+    name,
+    url: `https://t.me/s/${channel}`,
+    type: 'telegram',
+    language,
+    trustLevel: 'низкий',
+    parser: 'telegram',
+    relevance: 'future',
+    requiresGameTag: true,
+  })),
   {
     id: 'telegram-ru',
     name: 'Neverness to Everness RU',
@@ -3799,6 +3897,8 @@ const LEAK_DISCOVERY_SOURCES = [
   },
 ];
 const IMPORT_SOURCE_PRIORITY = new Map([
+  ['nanoka-profile', 99],
+  ['kaiden-character-images', 93],
   ['official-ru', 100],
   ['fandom-ru-api', 98],
   ['wotpack-character-search-ru', 97],
@@ -4070,11 +4170,22 @@ function normalizeImportFaction(value) {
 function normalizeGuideImportRows(field, value) {
   const rows = [];
   const seen = new Set();
+  const allowOriginalNames = [
+    'guide.bestArcs',
+    'guide.alternativeArcs',
+    'guide.modules',
+    'guide.skillPriority',
+  ].includes(field);
   for (const item of value) {
     if (typeof item === 'string') {
       const text = localizeImportedGuideText(item);
       const key = normalizeImportSearch(text);
-      if (!key || !hasRussianText(text) || seen.has(key)) continue;
+      if (
+        !key ||
+        (!allowOriginalNames && !hasRussianText(text)) ||
+        seen.has(key)
+      )
+        continue;
       seen.add(key);
       rows.push(text);
       continue;
@@ -4117,7 +4228,12 @@ function normalizeGuideImportRows(field, value) {
     const key = normalizeImportSearch(
       `${field}:${primary}:${next.description || next.rotation || ''}`,
     );
-    if (!key || !hasRussianText(primary) || seen.has(key)) continue;
+    if (
+      !key ||
+      (!allowOriginalNames && !hasRussianText(primary)) ||
+      seen.has(key)
+    )
+      continue;
     seen.add(key);
     rows.push(next);
   }
@@ -4475,6 +4591,28 @@ function characterImportSources(slug, character = {}) {
   const interactiveMapId = interactiveMapEsperId({ ...character, slug });
 
   return [
+    {
+      id: 'nanoka-profile',
+      name: 'Nanoka: портреты и полные арты',
+      trust: 'high',
+      url: 'https://nte.nanoka.cc',
+      resolveUrl: resolveNanokaCharacter,
+      parser: parseNanokaCharacter,
+      raw: true,
+      cacheTtl: 900,
+    },
+    {
+      id: 'kaiden-character-images',
+      name: 'Kaiden: портрет и полный арт',
+      trust: 'high',
+      url: `https://www.kaiden.gg/nte/characters/${pathSlugs[0]}/`,
+      urlCandidates: urlsFor(
+        (path) => `https://www.kaiden.gg/nte/characters/${path}/`,
+      ),
+      parser: parseKaidenCharacterImages,
+      raw: true,
+      cacheTtl: 900,
+    },
     {
       id: 'fandom-ru-api',
       name: 'Fandom RU: профиль персонажа',
@@ -5326,9 +5464,11 @@ async function fetchImportSource(source, character, deadline) {
     }
     // Kaiden's server-rendered guide is ~620 KB including hydration scripts.
     // Keep an explicit per-source cap instead of weakening all fetch limits.
-    const maxBytes = ['kaiden-character-guide', 'kaiden-tier-profile'].includes(
-      source.id,
-    )
+    const maxBytes = [
+      'kaiden-character-guide',
+      'kaiden-tier-profile',
+      'kaiden-character-images',
+    ].includes(source.id)
       ? 1500000
       : IMPORT_MAX_HTML_BYTES;
     if (length > maxBytes) {
@@ -5351,6 +5491,9 @@ async function fetchImportSource(source, character, deadline) {
     const updatedAt = extractImportSourceUpdatedAt(html);
     return {
       ...resolvedSource,
+      ...(source.id === 'kaiden-character-guide'
+        ? { skillIcons: parseKaidenSkillIcons(html, resolvedSource.url) }
+        : {}),
       ...(updatedAt ? { updatedAt } : {}),
       status: suggestions.length ? 'ok' : 'partial',
       message: suggestions.length
@@ -8101,9 +8244,24 @@ function parseKaidenGuideImport(html, source, character) {
       const row = {
         name: `${arc ? 'Дуга' : 'Картридж'}: ${decodeHtmlEntities(image[2])}`,
         imageUrl: new URL(image[1], source.url).href,
-        description: /\bBest\b/.test(htmlToPlainText(match[0]))
-          ? 'Основной вариант в источнике. Уточните наложение дуги и условия команды.'
-          : 'Альтернатива в источнике. Не приравнивается к сигнатурному варианту.',
+        category: /\bBest\b/.test(htmlToPlainText(match[0]))
+          ? 'signature'
+          : /3★|4★/.test(htmlToPlainText(match[0]))
+            ? 'budget'
+            : 'replacement',
+        description: htmlToPlainText(match[0].split(/<\/summary>/i)[1] || '')
+          .replace(/^(?:Best|Alt)\s*/, '')
+          .trim()
+          .slice(0, 4000),
+        stats: /([3-5])★/.test(htmlToPlainText(match[0]))
+          ? [
+              {
+                label: 'Редкость',
+                value: `${htmlToPlainText(match[0]).match(/([3-5])★/)[1]}★`,
+              },
+            ]
+          : [],
+        sourceUrl: source.publicUrl || source.url,
       };
       (arc ? arcs : modules).push(row);
     }
@@ -8128,20 +8286,20 @@ function parseKaidenGuideImport(html, source, character) {
   }
   const priority = blocks.find((block) => block.heading === 'Skill Priority');
   if (priority) {
-    const names = Array.from(
-      priority.html.matchAll(/<img\b[^>]*alt="([^"]+)"/gi),
-    )
-      .map((match) => decodeHtmlEntities(match[1]))
-      .filter(Boolean);
+    const names = [...priority.html.matchAll(/<img\b[^>]+>/gi)]
+      .map((match) => ({
+        name: decodeHtmlEntities(match[0].match(/alt="([^"]+)"/i)?.[1] || ''),
+        imageUrl: new URL(
+          match[0].match(/src="([^"]+)"/i)?.[1] || '',
+          source.url,
+        ).href,
+      }))
+      .filter((row) => row.name);
     suggestions.push(
       makeImportSuggestion(
         'guide.skillPriority',
         'Приоритет навыков',
-        names.slice(0, 8).map((name, index) => ({
-          title: `Приоритет ${index + 1}: ${name}`,
-          description:
-            'Порядок прокачки в источнике; название навыка оставлено на языке оригинала.',
-        })),
+        names.slice(0, 8),
         source,
         'medium',
       ),
@@ -8189,7 +8347,7 @@ function parseKaidenGuideImport(html, source, character) {
       .slice(0, 8)
       .map((value, index) => ({
         title: `${index + 1}. ${value}`,
-        description: 'Приоритет основной характеристики по данным источника.',
+        description: '',
       }));
     suggestions.push(
       makeImportSuggestion(
@@ -9869,14 +10027,17 @@ function isCleanImportedAbilityName(value) {
   const name = normalizeImportedRuText(value);
   if (
     !name ||
-    name.length > 160 ||
+    name.length > 90 ||
     !hasRussianText(name) ||
     isImportPlaceholderText(name) ||
     /(?:^|\b)GA_[A-Za-z0-9_]+|(?:_name|_des)\b/i.test(name) ||
     /(?:^|\s)(?:если|когда|после|при)\s.+(?:%|урон|эффект|цель|диссонанс)/i.test(
       name,
     ) ||
-    /[:;]\s*(?:если|когда|после|при|увелич|нанос|получ)/i.test(name)
+    /[:;]\s*(?:если|когда|после|при|увелич|нанос|получ)/i.test(name) ||
+    /(?:рассчитывается|этот урон|может срабатыв|для каждой цели|не чаще|оставшееся время|\d\s*(?:сек\.|%))|[.!?]\s+[А-ЯЁ]/i.test(
+      name,
+    )
   ) {
     return false;
   }
@@ -10742,7 +10903,16 @@ function dedupeGuideImportSuggestions(items) {
               entry?.label ||
               entry?.description ||
               '';
-        if (!hasRussianText(primaryText)) continue;
+        if (
+          !hasRussianText(primaryText) &&
+          ![
+            'guide.bestArcs',
+            'guide.alternativeArcs',
+            'guide.modules',
+            'guide.skillPriority',
+          ].includes(field)
+        )
+          continue;
         const key = normalizeImportSearch(primaryText);
         if (!key) continue;
         const current = rows.get(key);
@@ -10793,7 +10963,14 @@ function dedupeGuideImportSuggestions(items) {
       note: `Источники: ${sourceNames.join(', ')}. Добавляйте только подтверждённые строки; место персонажа берётся из единого тир-листа NTE Meta.`,
     };
     const alternatives = sorted
-      .filter((item) => item.value !== cleanValue && hasRussianText(item.value))
+      .filter(
+        (item) =>
+          item.value !== cleanValue &&
+          (hasRussianText(item.value) ||
+            ['guide.bestArcs', 'guide.modules', 'guide.skillPriority'].includes(
+              field,
+            )),
+      )
       .slice(0, 2);
     result.push(
       mergedSuggestion,
@@ -11217,9 +11394,40 @@ async function handleGuideImportLookup(request, env) {
       IMPORT_FETCH_CONCURRENCY,
       (source) => fetchImportSource(source, importCharacter, deadline),
     );
+    const icons = sourceResults.flatMap((source) => source.skillIcons || []);
     const suggestions = dedupeGuideImportSuggestions(
       sourceResults.flatMap((source) => source.suggestions),
-    );
+    ).map((item) => {
+      if (item.field !== 'guide.skillPriority') return item;
+      const rows = parseImportSuggestionJson(item);
+      if (!Array.isArray(rows)) return item;
+      const enriched = rows.flatMap((row) => {
+        const text =
+          typeof row === 'string'
+            ? row
+            : /→|>/.test(row.description || '')
+              ? row.description
+              : row.name || row.title || '';
+        return text.split(/→|>/).map((name) => {
+          name = localizeImportedGuideText(name)
+            .replace(/Redirect навык/gi, 'Навык перенаправления')
+            .trim();
+          const icon = icons.find(
+            (icon) =>
+              normalizeImportSearch(icon.name) ===
+                normalizeImportSearch(name) ||
+              normalizeImportSearch(icon.type) === normalizeImportSearch(name),
+          );
+          return {
+            name,
+            imageUrl: icon?.iconUrl || row.imageUrl || '',
+            description: icon?.name || '',
+            stats: [],
+          };
+        });
+      });
+      return { ...item, value: JSON.stringify(enriched) };
+    });
 
     return json({
       data: {
@@ -11373,7 +11581,7 @@ async function handleSystemStatus(request, env) {
       generatedAt: new Date().toISOString(),
       counts,
       migrations: {
-        latestKnown: '0032_refresh_discovery_sources.sql',
+        latestKnown: '0035_visual_guides.sql',
       },
     },
   });
@@ -11593,6 +11801,7 @@ function serializeSection(row) {
     type: row.section_type,
     content: row.content_markdown,
     position: row.position,
+    visual: parseJson(row.meta_json, {}).visual || undefined,
   };
 }
 
@@ -11825,6 +12034,9 @@ function serializeSource(row) {
     sourceUrl: row.source_url,
     trustLevel: row.trust_level,
     autoImportEnabled: Boolean(row.auto_import_enabled),
+    language: row.language || 'unknown',
+    contentKind: row.content_kind || 'leak',
+    parser: row.parser || '',
     lastCheckedAt: row.last_checked_at || undefined,
     updatedAt: row.updated_at,
   };
@@ -11994,6 +12206,33 @@ function validateEntityRecord(entity, record, isCreate) {
     )
   ) {
     throwHttp('Неизвестный статус слива', 400);
+  }
+  if (entity === 'sources') {
+    for (const [field, allowed] of Object.entries({
+      language: ['unknown', 'ru', 'en', 'ja', 'zh'],
+      content_kind: ['news', 'leak'],
+      parser: [
+        '',
+        'feed',
+        'rss',
+        'atom',
+        'telegram',
+        'reddit',
+        'official',
+        'articles',
+        'wordpress',
+        'ntewiki',
+      ],
+    })) {
+      if (record[field] !== undefined && !allowed.includes(record[field]))
+        throwHttp('Неизвестный язык или формат источника', 400);
+    }
+    if (
+      record.auto_import_enabled &&
+      record.source_url &&
+      !record.source_url.startsWith('https://')
+    )
+      throwHttp('Для автопоиска нужен HTTPS-адрес источника', 400);
   }
   for (const field of [
     'image_url',
@@ -12369,7 +12608,7 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
       cleanString(section.type || 'custom', 1, 40),
       String(section.content || '').slice(0, 60000),
       index + 1,
-      '{}',
+      JSON.stringify({ visual: validateGuideVisual(section.visual) }),
     ]);
     for (const group of chunks(sections, 14)) {
       statements.push(
@@ -12818,7 +13057,9 @@ function withCors(request, env, response) {
     request.headers.get('Authorization') || readCookie(request, SESSION_COOKIE),
   );
   const isPublicMedia =
-    request.method === 'GET' && url.pathname === '/api/media';
+    request.method === 'GET' &&
+    (url.pathname === '/api/media' ||
+      url.pathname.startsWith('/api/media/uploads/'));
   if (isAllowedOrigin(origin, env)) {
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.set('Access-Control-Allow-Credentials', 'true');
@@ -12962,4 +13203,733 @@ function throwHttp(message, status) {
   const error = new Error(message);
   error.status = status;
   throw error;
+}
+
+function stripEditorialText(text) {
+  return String(text || '')
+    .replace(/\n\nСверено \d{4}-\d{2}-\d{2}[\s\S]*$/, '')
+    .replace(
+      /(?:^|\n)(?:Источник состава:|Сверено \d{4}|Версия 1\.4; источники)[^\n]*/g,
+      '',
+    )
+    .replace(
+      /\s*Вариант Wotpack; уточняйте порядок навыков под доступные пробуждения\./g,
+      '',
+    )
+    .replace(/\s*Вариант Kaiden, октябрь 2026\./g, '')
+    .replace(/\n\n#+\s*(?:Источники|Источники и актуальность)[\s\S]*$/i, '')
+    .trim();
+}
+function publicEditorialData(entity, data) {
+  if (Array.isArray(data))
+    return data.map((item) => publicEditorialData(entity, item));
+  if (!data) return data;
+  if (entity === 'guides')
+    return {
+      ...data,
+      sections: data.sections
+        .filter(
+          (section) =>
+            ![
+              'source',
+              'sources',
+              'references',
+              'team',
+              'teams',
+              'f2p-teams',
+              'premium-teams',
+              'starter-teams',
+              'endgame-teams',
+            ].includes(section.type),
+        )
+        .map((section) => ({
+          ...section,
+          content: stripEditorialText(section.content),
+          visual: section.visual
+            ? {
+                ...section.visual,
+                items: section.visual.items.map((item) => {
+                  const copy = { ...item };
+                  delete copy.sourceUrl;
+                  return copy;
+                }),
+              }
+            : undefined,
+        })),
+    };
+  if (entity === 'characters' && data.profile)
+    return {
+      ...data,
+      profile: {
+        ...data.profile,
+        biography: stripEditorialText(data.profile.biography),
+      },
+    };
+  if (entity === 'teams')
+    return { ...data, synergy: stripEditorialText(data.synergy) };
+  return data;
+}
+
+function validateGuideVisual(value) {
+  if (value === undefined || value === null) return undefined;
+  if (
+    !value ||
+    !['arcs', 'cartridges', 'stats', 'skills', 'rotation'].includes(
+      value.kind,
+    ) ||
+    !Array.isArray(value.items) ||
+    value.items.length > 40
+  )
+    throwHttp('Некорректная визуальная секция (до 40 элементов)', 400);
+  const ids = new Set();
+  const items = value.items.map((item) => {
+    const id = cleanString(item.id || crypto.randomUUID(), 1, 120);
+    if (ids.has(id)) throwHttp('Элементы секции должны иметь разные id', 400);
+    ids.add(id);
+    const imageUrl = cleanString(item.imageUrl || '', 0, 2048);
+    if (
+      imageUrl &&
+      !/^(?:https:\/\/|assets\/|\/api\/media\/uploads\/)/i.test(imageUrl)
+    )
+      throwHttp('Укажите безопасную ссылку на изображение', 400);
+    if (!Array.isArray(item.stats) || item.stats.length > 24)
+      throwHttp('Допустимо до 24 характеристик', 400);
+    return {
+      id,
+      name: cleanString(item.name || '', 0, 600),
+      imageUrl,
+      description: cleanString(item.description || '', 0, 6000),
+      category: ['signature', 'replacement', 'budget'].includes(item.category)
+        ? item.category
+        : undefined,
+      stats: item.stats.map((stat) => ({
+        label: cleanString(stat.label || '', 0, 120),
+        value: cleanString(stat.value || '', 0, 500),
+      })),
+      sourceUrl: /^https:\/\//.test(item.sourceUrl || '')
+        ? cleanString(item.sourceUrl, 0, 2048)
+        : undefined,
+    };
+  });
+  if (JSON.stringify(items).length > 80000)
+    throwHttp('Визуальная секция слишком большая', 400);
+  return { kind: value.kind, items };
+}
+
+async function handleMediaUpload(request, env, parts, ctx) {
+  const id = parts[2];
+  if (request.method === 'GET' && id) {
+    if (!/^[a-f0-9]{64}$/.test(id))
+      return json({ error: 'Изображение не найдено' }, 404);
+    const row = await env.DB.prepare(
+      'SELECT mime_type, data_base64 FROM media_uploads WHERE id = ?',
+    )
+      .bind(id)
+      .first();
+    if (!row) return json({ error: 'Изображение не найдено' }, 404);
+    const binary = atob(row.data_base64);
+    return new Response(
+      Uint8Array.from(binary, (char) => char.charCodeAt(0)),
+      {
+        headers: {
+          'Content-Type': row.mime_type,
+          'Cache-Control': 'public, max-age=31536000, immutable',
+          'X-Content-Type-Options': 'nosniff',
+          'Content-Security-Policy': "default-src 'none'; sandbox",
+        },
+      },
+    );
+  }
+  if (request.method !== 'POST' || id)
+    return json({ error: 'Метод не поддерживается' }, 405);
+  const actor = await requireRole(request, env, 'user');
+  await rateLimit(
+    request,
+    env,
+    `image-upload-${actor.id}`,
+    ROLE_WEIGHT[actor.role] >= ROLE_WEIGHT.editor ? 100 : 12,
+    60 * 60,
+  );
+  const body = await readJson(request);
+  const context = cleanString(body.context || 'editor/images', 1, 160);
+  if (!/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+){0,5}$/.test(context))
+    throwHttp('Некорректная папка изображения', 400);
+  if (!context.startsWith('community/') && !context.startsWith('profiles/')) {
+    const scope = ['characters', 'guides', 'news', 'leaks'].includes(
+      context.split('/')[0],
+    )
+      ? context.split('/')[0]
+      : 'guides';
+    await requireContentPermission(request, env, scope, 'edit');
+  }
+  const match = String(body.dataUrl || '').match(
+    /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/,
+  );
+  if (!match || match[2].length > 900000)
+    throwHttp('Выберите PNG, JPEG или WebP до 675 КБ после сжатия', 400);
+  let bytes;
+  try {
+    bytes = Uint8Array.from(atob(match[2]), (char) => char.charCodeAt(0));
+  } catch {
+    throwHttp('Повреждённое изображение', 400);
+  }
+  const valid =
+    match[1] === 'image/png'
+      ? bytes[0] === 137 &&
+        bytes[1] === 80 &&
+        bytes[2] === 78 &&
+        bytes[3] === 71
+      : match[1] === 'image/jpeg'
+        ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
+        : new globalThis.TextDecoder().decode(bytes.slice(0, 4)) === 'RIFF' &&
+          new globalThis.TextDecoder().decode(bytes.slice(8, 12)) === 'WEBP';
+  if (!valid)
+    throwHttp('Содержимое файла не соответствует формату изображения', 400);
+  const hashBytes = new Uint8Array(
+    await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(`${context}:${match[2]}`),
+    ),
+  );
+  const hash = Array.from(hashBytes, (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
+  const extension = match[1] === 'image/jpeg' ? 'jpg' : match[1].slice(6);
+  const path = `public/uploads/${context}/${hash}.${extension}`;
+  await env.DB.prepare(
+    'INSERT OR IGNORE INTO media_uploads (id,path,mime_type,data_base64,byte_length,created_by) VALUES (?,?,?,?,?,?)',
+  )
+    .bind(hash, path, match[1], match[2], bytes.length, actor.id)
+    .run();
+  ctx.waitUntil(
+    logAudit(env, actor.id, 'media.upload', hash, {
+      path,
+      bytes: bytes.length,
+    }),
+  );
+  return json(
+    {
+      data: {
+        id: hash,
+        url: `${new URL(request.url).origin}/api/media/uploads/${hash}`,
+        path,
+      },
+    },
+    201,
+  );
+}
+
+function mergeDiscoverySources(rows) {
+  const sources = [...LEAK_DISCOVERY_SOURCES];
+  const urls = new Set(sources.map((source) => source.url.replace(/\/$/, '')));
+  for (const row of rows) {
+    if (!row.auto_import_enabled || urls.has(row.source_url.replace(/\/$/, '')))
+      continue;
+    let url;
+    try {
+      url = new URL(row.source_url);
+    } catch {
+      continue;
+    }
+    if (url.protocol !== 'https:' || url.username || url.password || url.port)
+      continue;
+    let parser = row.parser || 'feed';
+    let type = row.source_type;
+    let fetchUrl = url.href;
+    if (url.hostname === 't.me') {
+      const channel = url.pathname.replace(/^\/s\//, '/').split('/')[1];
+      if (!/^[A-Za-z][A-Za-z0-9_]{3,60}$/.test(channel || '')) continue;
+      fetchUrl = `https://t.me/s/${channel}`;
+      parser = 'telegram';
+      type = 'telegram';
+    } else if (/(?:^|\.)reddit\.com$/.test(url.hostname)) {
+      const channel = url.pathname.match(/^\/r\/([a-zA-Z0-9_]+)(?:\/|$)/)?.[1];
+      if (!channel) continue;
+      fetchUrl = `https://www.reddit.com/r/${channel}/new.rss`;
+      parser = 'feed';
+      type = 'reddit';
+    } else if (!['feed', 'rss', 'atom'].includes(parser)) continue;
+    sources.push({
+      id: `custom-${row.id}`,
+      name: row.source_name,
+      url: row.source_url,
+      fetchUrl,
+      parser,
+      type,
+      language: row.language || 'unknown',
+      trustLevel: row.trust_level,
+      contentKind: row.content_kind || 'leak',
+      relevance: row.content_kind === 'news' ? undefined : 'future',
+      custom: true,
+    });
+    urls.add(row.source_url.replace(/\/$/, ''));
+  }
+  return sources.slice(0, 70);
+}
+
+async function validateDiscoveryUrl(value, signal, sourceFetch = fetch) {
+  const url = new URL(value);
+  const hostname = url.hostname.toLowerCase();
+  if (
+    url.protocol !== 'https:' ||
+    url.port ||
+    url.username ||
+    url.password ||
+    !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(hostname) ||
+    /(?:^|\.)(?:localhost|local|internal|invalid)$/.test(hostname)
+  )
+    throw new Error('Разрешены публичные HTTPS-источники');
+  const answers = await Promise.all(
+    ['A', 'AAAA'].map(async (type) => {
+      const response = await sourceFetch(
+        `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=${type}`,
+        { headers: { accept: 'application/dns-json' }, signal },
+      );
+      if (!response.ok) throw new Error('Не удалось проверить адрес источника');
+      const data = await response.json();
+      return (data.Answer || [])
+        .filter((row) => row.type === 1 || row.type === 28)
+        .map((row) => String(row.data));
+    }),
+  );
+  const ips = answers.flat();
+  if (
+    !ips.length ||
+    ips.some((ip) =>
+      /^(?:0\.|10\.|127\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.|192\.168\.|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|198\.(?:18|19)\.|(?:22[4-9]|2[3-5]\d)\.|::|f[cd]|fe[89ab])/i.test(
+        ip,
+      ),
+    )
+  )
+    throw new Error('Внутренние адреса источников запрещены');
+}
+
+async function translateCandidate(candidate, env) {
+  if (candidate.language === 'ru')
+    return {
+      title: candidate.title,
+      excerpt: candidate.excerpt,
+      provider: 'Оригинал на русском',
+    };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const sourceLanguage =
+      { en: 'en', ja: 'ja', zh: 'zh-CN' }[candidate.language] || 'auto';
+    async function translate(text) {
+      if (!text) return '';
+      const url = new URL(
+        'https://translate.googleapis.com/translate_a/single',
+      );
+      for (const [key, value] of Object.entries({
+        client: 'gtx',
+        sl: sourceLanguage,
+        tl: 'ru',
+        dt: 't',
+        q: text
+          .replace(/\bUltimate\b/gi, 'сверхспособность')
+          .replace(/\bRedirect Skill\b/gi, 'навык перенаправления')
+          .replace(/\bSupport Skill\b/gi, 'навык поддержки')
+          .replace(/\bBasic Attack\b/gi, 'базовая атака'),
+      }))
+        url.searchParams.set(key, value);
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok)
+        throw new Error('Переводчик временно недоступен. Попробуйте позднее.');
+      const data = await response.json();
+      const translated = Array.isArray(data[0])
+        ? data[0].map((segment) => segment[0] || '').join('')
+        : '';
+      if (!translated.trim()) throw new Error('Переводчик не вернул текст');
+      return translated;
+    }
+    const parts =
+      String(candidate.excerpt || '').match(/[\s\S]{1,1400}/g) || [];
+    const values = await mapWithConcurrency(
+      [candidate.title, ...parts],
+      2,
+      translate,
+    );
+    const rows = await env.DB.prepare(
+      'SELECT name,original_name FROM characters',
+    ).all();
+    const localize = (text) =>
+      (rows.results || []).reduce((current, character) => {
+        const name = String(character.original_name || '');
+        return name.length >= 3
+          ? current.replace(
+              new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+              character.name,
+            )
+          : current;
+      }, text);
+    return {
+      title: localize(values[0]).slice(0, 180),
+      excerpt: localize(values.slice(1).join('')).slice(0, 4000),
+      provider: 'Google Translate',
+      requiresReview: true,
+    };
+  } catch (error) {
+    if (error.status) throw error;
+    throwHttp(
+      error.name === 'AbortError'
+        ? 'Перевод занял слишком много времени. Повторите запрос.'
+        : error.message,
+      502,
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// Resolve the dataset advertised by the source itself, without pinning a game patch.
+async function nanokaVersion(options = {}) {
+  const response = await fetch('https://nte.nanoka.cc', options);
+  if (!response.ok) throw new Error(`Nanoka: HTTP ${response.status}`);
+  const reader = response.body.getReader();
+  const decoder = new globalThis.TextDecoder();
+  let prefix = '';
+  try {
+    while (prefix.length < 131072) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      prefix += decoder.decode(value, { stream: true });
+      const match = prefix.match(
+        /https:\/\/static\.nanoka\.cc\/nte\/(\d+(?:\.\d+){1,3})\//,
+      );
+      if (match) return match[1];
+    }
+  } finally {
+    await reader.cancel();
+  }
+  throw new Error('Nanoka: текущая версия базы не найдена');
+}
+async function nanokaJson(url, options) {
+  const response = await fetch(url, options);
+  if (!response.ok) throw new Error(`Nanoka: HTTP ${response.status}`);
+  return JSON.parse(await readLimitedImportResponse(response, 1800000));
+}
+function nanokaImage(value) {
+  return typeof value === 'string' && /^\/Game\/[A-Za-z0-9_/-]+$/.test(value)
+    ? `https://static.nanoka.cc/assets/nte${value}.webp`
+    : '';
+}
+async function resolveNanokaCharacter(source, character, options) {
+  const version = await nanokaVersion(options);
+  const index = await nanokaJson(
+    `https://static.nanoka.cc/nte/${version}/character.json`,
+    options,
+  );
+  const aliases = characterNameCandidates(character);
+  const row =
+    Object.values(index).find((item) =>
+      [item.en, item.zh, item.ja, item.ko]
+        .filter(Boolean)
+        .some((name) => aliases.includes(normalizeImportSearch(name))),
+    ) || (character.slug === 'akane' ? index['1057'] : null);
+  if (!row || !/^\d+$/.test(row.id)) return null;
+  return {
+    ...source,
+    url: `https://static.nanoka.cc/nte/${version}/en/character/${row.id}.json`,
+    publicUrl: `https://nte.nanoka.cc/character/${row.id}`,
+    resolveUrl: undefined,
+  };
+}
+function parseNanokaCharacter(text, source) {
+  const data = JSON.parse(text);
+  const suggestions = [];
+  const images = new Set();
+  const add = (field, path, label) => {
+    const url = nanokaImage(path);
+    if (url && !images.has(url)) {
+      images.add(url);
+      suggestions.push(makeImportSuggestion(field, label, url, source, 'high'));
+    }
+  };
+  add('imageUrl', data.icon, 'Портрет');
+  add('splashUrl', data.icon_gacha, 'Полный арт');
+  for (const fashion of (data.fashion || []).slice(0, 12)) {
+    add(
+      'imageUrl',
+      fashion.head_icon_big || fashion.icon,
+      `Портрет: ${fashion.name}`,
+    );
+    add(
+      'splashUrl',
+      fashion.portrait_img || fashion.display_icon,
+      `Арт: ${fashion.name}`,
+    );
+  }
+  return suggestions.filter(Boolean);
+}
+function parseKaidenCharacterImages(html, source, character) {
+  if (
+    !lineMatchesCharacter(
+      htmlToPlainText(html.match(/<h1\b[\s\S]*?<\/h1>/i)?.[0] || ''),
+      character,
+    )
+  )
+    return [];
+  const rows = [];
+  for (const tag of html.matchAll(/<img\b[^>]+>/gi)) {
+    const src = tag[0].match(/\bsrc=["']([^"']+)["']/i)?.[1];
+    const alt = tag[0].match(/\balt=["']([^"']+)["']/i)?.[1] || '';
+    if (
+      !src ||
+      !lineMatchesCharacter(alt, character) ||
+      !/AvatarImage|Splash|Appearance\/Fashion|lihui/i.test(src)
+    )
+      continue;
+    const field = /AvatarImage/.test(src) ? 'imageUrl' : 'splashUrl';
+    rows.push(
+      makeImportSuggestion(
+        field,
+        field === 'imageUrl' ? 'Портрет' : 'Полный арт',
+        new URL(src, source.url).href,
+        source,
+        'high',
+      ),
+    );
+  }
+  const icons = parseKaidenSkillIcons(html, source.url);
+  if (icons.length)
+    rows.push(
+      makeImportSuggestion(
+        'profile.abilityIcons',
+        'Иконки навыков',
+        icons,
+        source,
+        'high',
+      ),
+    );
+  return rows.filter(Boolean).slice(0, 16);
+}
+function parseKaidenSkillIcons(html, url) {
+  const labels = {
+    'Normal Attack': 'Базовая атака',
+    Skill: 'Навык перенаправления',
+    Ultimate: 'Сверхспособность',
+    'Chain Skill': 'Навык поддержки',
+    Passive: 'Пассивный навык',
+  };
+  return [
+    ...html.matchAll(
+      /<img\b[^>]*src="([^"\n]*\/Skill\/[^"\n]+)"[^>]*>[\s\S]{0,900}?<span[^>]*>([^<]+)<\/span>\s*<span[^>]*>([^<]+)<\/span>/g,
+    ),
+  ].map((match) => ({
+    name: decodeHtmlEntities(match[2]),
+    type: labels[match[3]] || match[3],
+    iconUrl: new URL(match[1], url).href,
+  }));
+}
+function equipmentFromNanoka(data, kind) {
+  const stats =
+    kind === 'arcs'
+      ? (data.stats || []).map((stat) => ({
+          label: `${stat.name} (ур. ${stat.values.length})`,
+          value: `${stat.values.at(-1)}${stat.b_is_percent ? '%' : ''}`,
+        }))
+      : (data.set_effect?.conditions || []).map((effect) => ({
+          label: `${effect.condition} предмета`,
+          value: htmlToPlainText(effect.desc),
+        }));
+  const effect = data.effect;
+  const description = effect
+    ? htmlToPlainText(
+        effect.description.replace(
+          /\{(\d+)\}/g,
+          (_, id) =>
+            effect.values?.find((row) => row.id_value === Number(id))
+              ?.values?.[0] || `{${id}}`,
+        ),
+      )
+    : '';
+  return {
+    name: data.name,
+    imageUrl: nanokaImage(data.original_icon || data.icon),
+    description,
+    stats,
+    sourceUrl: `https://nte.nanoka.cc/${kind === 'arcs' ? 'weapon' : 'console'}/${encodeURIComponent(data.id)}`,
+  };
+}
+async function handleEquipmentImport(request, env) {
+  if (request.method !== 'POST')
+    return json({ error: 'Метод не поддерживается' }, 405);
+  await requireContentPermission(request, env, 'guides', 'edit');
+  await rateLimit(request, env, 'equipment-lookup', 24, 600);
+  const body = await readJson(request);
+  const query = cleanString(body.query || '', 2, 160);
+  const kind = body.kind === 'cartridges' ? 'cartridges' : 'arcs';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 18000);
+  const options = {
+    signal: controller.signal,
+    cf: { cacheEverything: true, cacheTtl: 900 },
+  };
+  const sources = [];
+  try {
+    const results = await Promise.allSettled([
+      (async () => {
+        const version = await nanokaVersion(options);
+        const index = await nanokaJson(
+          `https://static.nanoka.cc/nte/${version}/${kind === 'arcs' ? 'weapon' : 'en/console'}.json`,
+          options,
+        );
+        const key = normalizeImportSearch(
+          query.replace(/^(?:Дуга|Картридж):\s*/i, ''),
+        );
+        const knownIds = {
+          'far side of the moon': 'fork_prism',
+          'crime and punishment': 'fork_twinbirds',
+        };
+        const matches = Object.values(index)
+          .filter(
+            (row) =>
+              (!row.type || row.type === 'cartridge') &&
+              (row.id === knownIds[key] ||
+                [row.name, row.en, row.zh, row.ja]
+                  .filter(Boolean)
+                  .some((name) => normalizeImportSearch(name).includes(key))),
+          )
+          .slice(0, 4);
+        const items = await Promise.all(
+          matches.map(async (row) =>
+            equipmentFromNanoka(
+              kind === 'arcs'
+                ? await nanokaJson(
+                    `https://static.nanoka.cc/nte/${version}/en/weapon/${encodeURIComponent(row.id)}.json`,
+                    options,
+                  )
+                : row,
+              kind,
+            ),
+          ),
+        );
+        return {
+          name: 'Nanoka — игровые данные (EN)',
+          status: items.length ? 'ok' : 'empty',
+          items,
+        };
+      })(),
+      (async () => {
+        const base = `https://www.kaiden.gg/nte/${kind}/`;
+        const response = await fetch(base, options);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const html = await readLimitedImportResponse(response, 1500000);
+        const key = normalizeImportSlug(
+          query.replace(/^(?:Дуга|Картридж):\s*/i, ''),
+        );
+        const path = [...html.matchAll(/href=["']([^"']+)["']/g)]
+          .map((m) => m[1])
+          .find(
+            (href) =>
+              href.startsWith(`/nte/${kind}/`) &&
+              normalizeImportSlug(href.split('/').filter(Boolean).at(-1)) ===
+                key,
+          );
+        if (!path)
+          return {
+            name: 'Kaiden — характеристики и эффекты (EN)',
+            status: 'empty',
+            items: [],
+          };
+        const page = await fetch(new URL(path, base), options);
+        if (!page.ok) throw new Error(`HTTP ${page.status}`);
+        const detail = await readLimitedImportResponse(page, 1500000);
+        return {
+          name: 'Kaiden — характеристики и эффекты (EN)',
+          status: 'ok',
+          items: [parseKaidenEquipment(detail, new URL(path, base).href, kind)],
+        };
+      })(),
+    ]);
+    results.forEach((result, index) =>
+      sources.push(
+        result.status === 'fulfilled'
+          ? result.value
+          : {
+              name: index ? 'Kaiden' : 'Nanoka',
+              status: 'failed',
+              message:
+                result.reason?.name === 'AbortError'
+                  ? 'Источник не ответил вовремя'
+                  : String(result.reason?.message || 'Ошибка источника'),
+              items: [],
+            },
+      ),
+    );
+    return json({ data: { sources } });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+function parseKaidenEquipment(html, url, kind) {
+  const start = html.search(/<h1\b/i);
+  const article = html
+    .slice(Math.max(0, start))
+    .split(/<footer\b|<h[2-6][^>]*>\s*(?:Related|More)/i)[0];
+  const name = htmlToPlainText(
+    article.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1] || '',
+  ).replace(/ (?:Arc|Cartridge) Guide.*$/, '');
+  const image = [...article.matchAll(/<img\b[^>]*src=["']([^"']+)["']/gi)]
+    .map((m) => m[1])
+    .find((src) => /\/Fork\/|\/kongmu\//i.test(src));
+  const blocks = extractGuideHeadingBlocks(article);
+  const effect =
+    blocks.find((block) =>
+      /effect|skill|passive|set bonus/i.test(block.heading),
+    ) ||
+    (kind === 'arcs'
+      ? blocks.find(
+          (block) =>
+            block.heading !== name &&
+            !/Base Stats|Breakthrough|Total Cost|Games|Community/i.test(
+              block.heading,
+            ),
+        )
+      : undefined);
+  const description = effect ? htmlToPlainText(effect.html).slice(0, 2500) : '';
+  const plain = htmlToPlainText(article);
+  const stats =
+    kind === 'arcs'
+      ? [
+          ...plain.matchAll(
+            /\b(ATK|CRIT Rate|CRIT DMG|HP|DEF|Cycle Intensity)\s*[:+]?\s*(\d+(?:\.\d+)?%?)/gi,
+          ),
+        ]
+          .slice(0, 8)
+          .map((m) => ({ label: `${m[1]} (ур. 1)`, value: m[2] }))
+      : [];
+  return {
+    name,
+    imageUrl: image ? new URL(image, url).href : '',
+    description,
+    stats,
+    sourceUrl: url,
+  };
+}
+
+function discoveryFetch(url, options, budget) {
+  if (budget.remaining <= 0)
+    throw new Error(
+      'Достигнут лимит запросов. Повторите поиск с более точным запросом.',
+    );
+  budget.remaining -= 1;
+  return fetch(url, options);
+}
+function classifyDiscoveryContent(source, text) {
+  if (source.official) return 'news';
+  if (
+    /(?:\bleaks?\b|datamin|rumou?r|слив|утечк|слух|爆料|内鬼|リーク|噂|easter.?egg|\btips?\b|\btricks?\b|пасхал|совет|лайфхак|小技巧|彩蛋|裏技)/i.test(
+      text,
+    )
+  )
+    return 'leak';
+  if (
+    /(?:official|официальн|announc|maintenance|now (?:live|available)|released|релиз|технич.{0,15}работ|公告|已开服|メンテナンス|お知らせ|nte\.perfectworld\.com)/i.test(
+      text,
+    )
+  )
+    return 'news';
+  return source.relevance === 'future' ? 'leak' : 'news';
 }

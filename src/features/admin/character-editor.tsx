@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { uploadImage } from '../../lib/media';
+import { ImageUploadButton } from '../../components/image-field';
 import {
   CheckCircle2,
   FilePlus2,
@@ -260,6 +262,7 @@ function MarkdownField({
       <label htmlFor={id}>{label}</label>
       <RichTextEditor
         id={id}
+        imageContext={`characters/editor/${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`}
         value={value}
         onChange={onChange}
         minHeight={260}
@@ -659,6 +662,7 @@ function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {
     'profile.voiceLines': 'Озвучка: реплики',
     'profile.materials': 'Материалы прокачки',
     'profile.baseStats': 'Начальные показатели',
+    'profile.abilityIcons': 'Иконки навыков',
     'profile.abilities': 'Способности',
     'profile.awakenings': 'Пробуждения',
     'profile.friendship': 'Симпатия',
@@ -768,66 +772,6 @@ function formatEditorError(error: string) {
       .replace(/Поле\s+/g, '');
   }
   return text;
-}
-
-function readEditorImageFile(
-  file: File,
-  {
-    maxBytes,
-    maxSide,
-    label,
-  }: { maxBytes: number; maxSide: number; label: string },
-) {
-  const allowedTypes = new Set(['image/png', 'image/webp', 'image/jpeg']);
-
-  if (!allowedTypes.has(file.type)) {
-    throw new Error('Поддерживаются только PNG, WebP или JPEG.');
-  }
-  if (file.size > maxBytes) {
-    throw new Error(
-      `${label} должен весить не больше ${Math.round(maxBytes / 1024)} KB.`,
-    );
-  }
-
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Не удалось прочитать файл.'));
-    reader.onload = () => {
-      const dataUrl = String(reader.result || '');
-      const image = new Image();
-      image.onerror = () =>
-        reject(new Error('Не удалось проверить изображение.'));
-      image.onload = () => {
-        if (image.naturalWidth > maxSide || image.naturalHeight > maxSide) {
-          reject(
-            new Error(
-              `Размер файла должен быть не больше ${maxSide}×${maxSide} px.`,
-            ),
-          );
-          return;
-        }
-        resolve(dataUrl);
-      };
-      image.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-function readSmallIconFile(file: File) {
-  return readEditorImageFile(file, {
-    maxBytes: 250 * 1024,
-    maxSide: 512,
-    label: 'Иконка',
-  });
-}
-
-function readSkinImageFile(file: File) {
-  return readEditorImageFile(file, {
-    maxBytes: 900 * 1024,
-    maxSide: 1600,
-    label: 'Изображение',
-  });
 }
 
 function mergeText(current: string, addition: string) {
@@ -1368,6 +1312,23 @@ export function AdminCharacterEditor({
           (item) => item.label,
         );
       } else if (
+        suggestion.field === 'profile.abilityIcons' &&
+        Array.isArray(parsed)
+      ) {
+        const icons = parsed as Array<{
+          name: string;
+          type: string;
+          iconUrl: string;
+        }>;
+        next.profile.abilities = next.profile.abilities.map((ability) => {
+          const match = icons.find(
+            (icon) =>
+              icon.name === ability.name ||
+              icon.type.toLowerCase() === ability.type.toLowerCase(),
+          );
+          return match ? { ...ability, iconUrl: match.iconUrl } : ability;
+        });
+      } else if (
         suggestion.field === 'profile.abilities' &&
         Array.isArray(parsed)
       ) {
@@ -1418,7 +1379,10 @@ export function AdminCharacterEditor({
   ) {
     if (!file) return;
     try {
-      const dataUrl = await readSmallIconFile(file);
+      const dataUrl = await uploadImage(
+        file,
+        `characters/${draft.slug || 'draft'}/icons`,
+      );
       onReady(dataUrl);
       setTone('success');
       setMessage(
@@ -1438,7 +1402,10 @@ export function AdminCharacterEditor({
   ) {
     if (!file) return;
     try {
-      const dataUrl = await readSkinImageFile(file);
+      const dataUrl = await uploadImage(
+        file,
+        `characters/${draft.slug || 'draft'}/images`,
+      );
       onReady(dataUrl);
       setTone('success');
       setMessage(
@@ -2358,6 +2325,10 @@ export function AdminCharacterEditor({
                     }
                   />
                 </label>
+                <ImageUploadButton
+                  context={`characters/${draft.slug || 'draft'}/materials`}
+                  onUploaded={(iconUrl) => update({ ...item, iconUrl })}
+                />
               </>
             )}
           />
@@ -2592,6 +2563,10 @@ export function AdminCharacterEditor({
                     }
                   />
                 </label>
+                <ImageUploadButton
+                  context={`characters/${draft.slug || 'draft'}/gifts`}
+                  onUploaded={(iconUrl) => update({ ...item, iconUrl })}
+                />
               </>
             )}
           />

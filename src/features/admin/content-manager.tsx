@@ -1,3 +1,4 @@
+import { ImageField } from '../../components/image-field';
 import {
   useEffect,
   useId,
@@ -186,7 +187,8 @@ function sourceTrustClass(value: unknown) {
 }
 
 const sourceTypeOptions: FieldOption[] = [
-  { value: 'website', label: 'Сайт' },
+  { value: 'website', label: 'Сайт / RSS' },
+  { value: 'reddit', label: 'Reddit' },
   { value: 'youtube', label: 'YouTube' },
   { value: 'telegram', label: 'Telegram' },
   { value: 'twitter/x', label: 'X / Twitter' },
@@ -213,7 +215,9 @@ function FieldControl({
   values,
   setValue,
   disabled = false,
+  imageContext,
 }: {
+  imageContext: string;
   field: FieldDefinition;
   values: EditorValues;
   setValue: (name: string, value: unknown) => void;
@@ -233,10 +237,7 @@ function FieldControl({
 
   if (field.kind === 'checkbox') {
     return (
-      <label
-        className={`${fieldClassName} toggle-row cms-toggle`}
-        htmlFor={id}
-      >
+      <label className={`${fieldClassName} toggle-row cms-toggle`} htmlFor={id}>
         <input
           id={id}
           name={field.name}
@@ -338,6 +339,7 @@ function FieldControl({
         </label>
         <RichTextEditor
           id={id}
+          imageContext={`${imageContext}/${field.name}`}
           value={textValue(values, field.name)}
           onChange={(value) => setValue(field.name, value)}
           disabled={disabled}
@@ -351,6 +353,17 @@ function FieldControl({
     );
   }
 
+  if (field.kind === 'url' && /image|icon|splash/i.test(field.name)) {
+    return (
+      <ImageField
+        label={field.label}
+        value={textValue(values, field.name)}
+        onChange={(value) => setValue(field.name, value)}
+        context={`${imageContext}/${field.name}`}
+        disabled={disabled}
+      />
+    );
+  }
   return (
     <label className={fieldClassName} htmlFor={id}>
       {field.label}
@@ -734,6 +747,7 @@ export function ContentManager<T extends ManagedItem>({
                   <div className="cms-fields">
                     {fields.map((field) => (
                       <FieldControl
+                        imageContext={`${config.endpoint.replace('/api/', '')}/${selectedId || 'draft'}`}
                         field={field}
                         key={field.name}
                         values={values}
@@ -752,6 +766,7 @@ export function ContentManager<T extends ManagedItem>({
           <div className="cms-fields">
             {config.fields.map((field) => (
               <FieldControl
+                imageContext={`${config.endpoint.replace('/api/', '')}/${selectedId || 'draft'}`}
                 field={field}
                 key={field.name}
                 values={values}
@@ -1216,6 +1231,30 @@ export function AdminSourcesManager({
           options: options(['низкий', 'средний', 'высокий']),
         },
         {
+          name: 'language',
+          label: 'Язык',
+          kind: 'select',
+          options: options(['unknown', 'ru', 'en', 'ja', 'zh']),
+        },
+        {
+          name: 'contentKind',
+          label: 'Содержание',
+          kind: 'select',
+          options: [
+            { value: 'leak', label: 'Сливы, слухи, советы' },
+            { value: 'news', label: 'Новости' },
+          ],
+        },
+        {
+          name: 'parser',
+          label: 'Формат ленты',
+          kind: 'select',
+          options: [
+            { value: 'feed', label: 'RSS / Atom; Telegram и Reddit по ссылке' },
+            { value: '', label: 'Только встроенный разбор / вручную' },
+          ],
+        },
+        {
           name: 'autoImportEnabled',
           label: 'Автоимпорт включен',
           kind: 'checkbox',
@@ -1228,6 +1267,9 @@ export function AdminSourcesManager({
         sourceUrl: '',
         trustLevel: 'средний',
         autoImportEnabled: false,
+        language: 'unknown',
+        contentKind: 'leak',
+        parser: 'feed',
       }),
       fromItem: (item) => ({ ...item }),
       toPayload: (values) => ({
@@ -1236,6 +1278,9 @@ export function AdminSourcesManager({
         sourceUrl: textValue(values, 'sourceUrl'),
         trustLevel: textValue(values, 'trustLevel'),
         autoImportEnabled: booleanValue(values, 'autoImportEnabled'),
+        language: textValue(values, 'language') || 'unknown',
+        contentKind: textValue(values, 'contentKind') || 'leak',
+        parser: textValue(values, 'parser'),
       }),
       itemTitle: (item) => item.sourceName,
       itemMeta: (item) =>

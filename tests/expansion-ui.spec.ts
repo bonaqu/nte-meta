@@ -40,7 +40,10 @@ test('новые персонажи имеют читаемые гайды, би
       ).toBeVisible();
       await expect(
         page.getByText('Источники и актуальность', { exact: true }).first(),
-      ).toBeVisible();
+      ).toHaveCount(0);
+      await expect(page.locator('.guide-visual--arcs')).toBeVisible();
+      await expect(page.locator('.guide-visual--cartridges')).toBeVisible();
+      await expect(page.locator('.guide-visual--rotation')).toBeVisible();
       const size = await page.evaluate(() => ({
         width: document.documentElement.clientWidth,
         scroll: document.documentElement.scrollWidth,

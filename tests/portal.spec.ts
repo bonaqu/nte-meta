@@ -327,7 +327,7 @@ test.describe('Публичный портал NTE Meta', () => {
     ).toBeVisible();
     await expect(
       page.getByRole('link', { name: 'Kaiden: Hotori Build Guide' }),
-    ).toHaveAttribute('href', 'https://www.kaiden.gg/nte/characters/hotori/');
+    ).toHaveCount(0);
     await expect(page.locator('a[href="#/teams"]')).toHaveCount(0);
     await expect(page.locator('a[href="#/rotations"]')).toHaveCount(0);
 

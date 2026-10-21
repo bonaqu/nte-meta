@@ -123,3 +123,167 @@ test('редактор сохраняет несохранённую часть 
       ?.title,
   ).toBe('Ещё не сохранённое название');
 });
+
+test('визуальная дуга: поиск, загрузка файла, сохранение и повторное открытие', async ({
+  page,
+  request,
+}, testInfo) => {
+  const { readFile } = await import('node:fs/promises');
+  const { default: AxeBuilder } = await import('@axe-core/playwright');
+  const guides = (
+    await (await request.get('http://127.0.0.1:8788/api/guides')).json()
+  ).data as Guide[];
+  const guide = guides.find((g) => g.characterId === 'akane')!;
+  await page.route('**/api/auth/me', (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          id: 'visual-owner',
+          username: 'owner',
+          role: 'owner',
+          status: 'active',
+        },
+      },
+    }),
+  );
+  await page.route('**/api/auth/warnings', (route) =>
+    route.fulfill({ json: { data: [] } }),
+  );
+  await page.route('**/api/sources', (route) =>
+    route.fulfill({ json: { data: [] } }),
+  );
+  await page.route('**/api/guides', (route) =>
+    route.fulfill({ json: { data: guides } }),
+  );
+  await page.route('**/api/equipment-import/lookup', (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          sources: [
+            {
+              name: 'Проверенный источник',
+              status: 'ok',
+              items: [
+                {
+                  name: 'Проверочная дуга',
+                  imageUrl: '',
+                  description: 'Усиливает базовые атаки.',
+                  stats: [{ label: 'Атака (ур. 80)', value: '570' }],
+                  sourceUrl: 'https://example.com/arc',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    }),
+  );
+  let uploaded: { dataUrl: string; context: string } | undefined;
+  const imageUrl = 'http://127.0.0.1:8788/api/media/uploads/' + 'a'.repeat(64);
+  await page.route('**/api/media/uploads', (route) => {
+    uploaded = route.request().postDataJSON();
+    return route.fulfill({ status: 201, json: { data: { url: imageUrl } } });
+  });
+  await page.route('**/api/media/uploads/*', (route) =>
+    route.fulfill({
+      path: 'public/assets/characters/akane.webp',
+      contentType: 'image/webp',
+    }),
+  );
+  await page.route('**/api/guide-sections/*', (route) => {
+    const id = route.request().url().split('/').at(-1);
+    const section = guide.sections.find((s) => s.id === id);
+    if (section) Object.assign(section, route.request().postDataJSON());
+    return route.fulfill({ json: { data: { success: true } } });
+  });
+  await page.route(`**/api/guides/${guide.id}/sections`, (route) => {
+    const body = route.request().postDataJSON();
+    guide.sections.push({
+      ...body,
+      id: 'visual-arc-persisted',
+      position: guide.sections.length + 1,
+    });
+    return route.fulfill({
+      status: 201,
+      json: { data: { id: 'visual-arc-persisted' } },
+    });
+  });
+  await page.route(`**/api/guides/${guide.id}/sections/reorder`, (route) =>
+    route.fulfill({ json: { data: { success: true } } }),
+  );
+  await page.goto(`/#/guides/${guide.slug}`);
+  await page
+    .getByRole('button', { name: 'Редактировать гайд', exact: true })
+    .click();
+  const dialog = page.locator('dialog[open]');
+  await dialog
+    .getByRole('button', { name: 'Лучшие дуги', exact: true })
+    .click();
+  await dialog
+    .getByLabel('Название секции', { exact: true })
+    .fill('Дуги для проверки');
+  await dialog
+    .getByRole('button', { name: 'Добавить элемент', exact: true })
+    .click();
+  const item = dialog.locator('.visual-item-editor').first();
+  await item.locator('.equipment-lookup > summary').click();
+  await item
+    .getByLabel('Название экипировки', { exact: true })
+    .fill('Test arc');
+  await item
+    .getByRole('button', { name: 'Найти в источниках', exact: true })
+    .click();
+  await item
+    .getByRole('button', { name: 'Использовать данные', exact: true })
+    .click();
+  await expect(item.getByLabel('Название', { exact: true })).toHaveValue(
+    'Проверочная дуга',
+  );
+  await item
+    .locator('input[type=file]')
+    .setInputFiles({
+      name: 'guide.webp',
+      mimeType: 'image/webp',
+      buffer: await readFile('public/assets/characters/akane.webp'),
+    });
+  await expect(item.getByLabel('Изображение', { exact: true })).toHaveValue(
+    imageUrl,
+  );
+  expect(uploaded?.context).toMatch(/^guides\/akane-build-guide\//);
+  expect(uploaded?.dataUrl).toMatch(/^data:image\/webp;base64,/);
+  for (const width of [360, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth + 1),
+      `editor at ${width}`,
+    ).toBeTruthy();
+  }
+  const a11y = await new AxeBuilder({ page })
+    .include('dialog[open]')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  expect(a11y.violations).toEqual([]);
+  await dialog
+    .getByRole('button', { name: 'Сохранить секции', exact: true })
+    .click();
+  await expect(
+    dialog.getByText('Секции гайда сохранены в D1.', { exact: true }),
+  ).toBeVisible();
+  expect(
+    guide.sections.find((s) => s.id === 'visual-arc-persisted')?.visual
+      ?.items[0],
+  ).toMatchObject({
+    name: 'Проверочная дуга',
+    imageUrl,
+    stats: [{ label: 'Атака (ур. 80)', value: '570' }],
+  });
+  await dialog.getByRole('button', { name: 'Закрыть редактор' }).click();
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Проверочная дуга', exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath('visual-guide-desktop.png'),
+    fullPage: true,
+  });
+});

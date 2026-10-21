@@ -1,0 +1,879 @@
+{
+  "checkedAt": "2026-10-21",
+  "datasetVersion": "1.4.13",
+  "guides": [
+    {
+      "slug": "hotori",
+      "sourceUrl": "https://www.kaiden.gg/nte/characters/hotori/",
+      "sections": {
+        "arcs": {
+          "kind": "arcs",
+          "items": [
+            {
+              "id": "hotori-arcs-1",
+              "name": "Marching Beyond Time",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/Fork/1024/fork_Time.webp",
+              "description": "Даёт 16% атаки. После навыка перенаправления записывает до трёх действий перенаправления или поддержки союзников. Сверхспособность расходует записи: 24% критического урона сверхспособности и ещё по 8% за запись. Три записи дополнительно дают 12% игнорирования защиты на 70 секунд.",
+              "stats": [
+                {
+                  "label": "Атака (ур. 80)",
+                  "value": "570"
+                },
+                {
+                  "label": "Критический шанс (ур. 80)",
+                  "value": "24%"
+                }
+              ],
+              "category": "signature",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/hotori/"
+            },
+            {
+              "id": "hotori-arcs-2",
+              "name": "The Rain That Shook the World",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/Fork/1024/fork_worldrain.webp",
+              "description": "Увеличивает урон Космоса навыка перенаправления и сверхспособности на 30%. После навыка перенаправления даёт 36 силы цикла на 15 секунд.",
+              "stats": [
+                {
+                  "label": "Атака (ур. 80)",
+                  "value": "512"
+                },
+                {
+                  "label": "Критический шанс (ур. 80)",
+                  "value": "22%"
+                }
+              ],
+              "category": "replacement",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/hotori/"
+            }
+          ]
+        },
+        "cartridges": {
+          "kind": "cartridges",
+          "items": [
+            {
+              "id": "hotori-cartridges-1",
+              "name": "Lost Radiance",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/kongmu/256/UI_YH_kongmuicon__03.webp",
+              "description": "",
+              "stats": [
+                {
+                  "label": "2 предмета",
+                  "value": "Урон Космоса +10%."
+                },
+                {
+                  "label": "4 предмета",
+                  "value": "После сверхспособности игнорирует 25% защиты врага на 20 секунд. Эффект не складывается."
+                }
+              ],
+              "category": "signature",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/hotori/"
+            },
+            {
+              "id": "hotori-cartridges-2",
+              "name": "Shadow Creed",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/kongmu/256/UI_YH_kongmuicon__39.webp",
+              "description": "",
+              "stats": [
+                {
+                  "label": "2 предмета",
+                  "value": "Атака +10%."
+                },
+                {
+                  "label": "4 предмета",
+                  "value": "После навыка увеличивает атаку носителя на 25% на 20 секунд."
+                }
+              ],
+              "category": "replacement",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/hotori/"
+            }
+          ]
+        },
+        "skills": {
+          "kind": "skills",
+          "items": [
+            {
+              "id": "hotori-skills-0",
+              "name": "Сверхспособность",
+              "description": "World's Tide — одинаковый приоритет со следующим навыком.",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Jin_UltraSkillA.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/hotori-guide-best-builds"
+            },
+            {
+              "id": "hotori-skills-1",
+              "name": "Навык перенаправления",
+              "description": "Present Replay — одинаковый приоритет с предыдущим навыком.",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Jin_Skill.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/hotori-guide-best-builds"
+            },
+            {
+              "id": "hotori-skills-2",
+              "name": "Базовая атака",
+              "description": "Misty Moon Style",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Jin_Melee.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/hotori-guide-best-builds"
+            },
+            {
+              "id": "hotori-skills-3",
+              "name": "Навык поддержки",
+              "description": "Shopkeeper's Authority",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Jin_QTE.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/hotori-guide-best-builds"
+            }
+          ]
+        },
+        "stats": {
+          "kind": "stats",
+          "items": [
+            {
+              "id": "hotori-stats-0",
+              "name": "Атака %",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            },
+            {
+              "id": "hotori-stats-1",
+              "name": "Бонус урона Космоса",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            },
+            {
+              "id": "hotori-stats-2",
+              "name": "Критический урон",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "slug": "akane",
+      "sourceUrl": "https://www.kaiden.gg/nte/characters/akane/",
+      "sections": {
+        "arcs": {
+          "kind": "arcs",
+          "items": [
+            {
+              "id": "akane-arcs-1",
+              "name": "Far Side of the Moon",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/Fork/1024/fork_prism.webp",
+              "description": "Даёт 15% критического шанса и 28% урона навыка перенаправления. После него на 15 секунд усиливает базовые атаки на 28% и урон Лакшаны на 20%.",
+              "stats": [
+                {
+                  "label": "Атака (ур. 80)",
+                  "value": "570"
+                },
+                {
+                  "label": "Критический урон (ур. 80)",
+                  "value": "48%"
+                }
+              ],
+              "category": "signature",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/akane/"
+            },
+            {
+              "name": "Fluff of Fleetness",
+              "category": "budget",
+              "stats": [
+                {
+                  "label": "Атака (ур. 80)",
+                  "value": "512"
+                },
+                {
+                  "label": "Критический урон (ур. 80)",
+                  "value": "44%"
+                }
+              ],
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/Fork/1024/fork_MotorCandy.webp",
+              "description": "На поле получает по 5% атаки каждую секунду, до пяти стаков. После ухода с поля стаки сбрасываются.",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/akane/",
+              "id": "akane-arcs-2"
+            }
+          ]
+        },
+        "cartridges": {
+          "kind": "cartridges",
+          "items": [
+            {
+              "id": "akane-cartridges-1",
+              "name": "Street Boxer",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/kongmu/256/UI_YH_kongmuicon__01.webp",
+              "description": "",
+              "stats": [
+                {
+                  "label": "2 предмета",
+                  "value": "Урон Лакшаны +10%."
+                },
+                {
+                  "label": "4 предмета",
+                  "value": "Даёт 14% критического шанса. После Реморы или Пятна в отряде даёт ещё 14% на 20 секунд."
+                }
+              ],
+              "category": "signature",
+              "sourceUrl": "https://neverness.gg/akane-rin-nte-build/"
+            }
+          ]
+        },
+        "skills": {
+          "kind": "skills",
+          "items": [
+            {
+              "id": "akane-skills-0",
+              "name": "Базовая атака",
+              "description": "Stringblade",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Chaos_Melee.webp",
+              "stats": [],
+              "sourceUrl": "https://neverness.gg/akane-rin-nte-build/"
+            },
+            {
+              "id": "akane-skills-1",
+              "name": "Сверхспособность",
+              "description": "Sonic Boom",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Chaos_UltraSkill.webp",
+              "stats": [],
+              "sourceUrl": "https://neverness.gg/akane-rin-nte-build/"
+            },
+            {
+              "id": "akane-skills-2",
+              "name": "Навык перенаправления",
+              "description": "Rhythm Wave",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Chaos_Skill.webp",
+              "stats": [],
+              "sourceUrl": "https://neverness.gg/akane-rin-nte-build/"
+            },
+            {
+              "id": "akane-skills-3",
+              "name": "Навык поддержки",
+              "description": "Altered Chord",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Chaos_QTE.webp",
+              "stats": [],
+              "sourceUrl": "https://neverness.gg/akane-rin-nte-build/"
+            }
+          ]
+        },
+        "stats": {
+          "kind": "stats",
+          "items": [
+            {
+              "id": "akane-stats-0",
+              "name": "Критический шанс / урон",
+              "imageUrl": "",
+              "description": "Учитывайте бонусы дуги, консоли и отряда; итоговый шанс не должен превышать 100%.",
+              "stats": []
+            },
+            {
+              "id": "akane-stats-1",
+              "name": "Атака %",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            },
+            {
+              "id": "akane-stats-2",
+              "name": "Бонус урона Лакшаны",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "slug": "blackbird",
+      "sourceUrl": "https://www.kaiden.gg/nte/characters/blackbird/",
+      "sections": {
+        "arcs": {
+          "kind": "arcs",
+          "items": [
+            {
+              "id": "blackbird-arcs-1",
+              "name": "Crime and Punishment",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/Fork/1024/fork_twinbirds.webp",
+              "description": "Даёт 72 силы цикла и 20% урона Психеи. После сверхспособности на 15 секунд увеличивает критический урон отряда на 16%, а носителя — ещё на 32%.",
+              "stats": [
+                {
+                  "label": "Атака (ур. 80)",
+                  "value": "570"
+                },
+                {
+                  "label": "Критический шанс (ур. 80)",
+                  "value": "24%"
+                }
+              ],
+              "category": "signature",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/blackbird/"
+            },
+            {
+              "id": "blackbird-arcs-2",
+              "name": "Ravenous Blade",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/Fork/1024/fork_DemonBlade.webp",
+              "description": "Даёт 16% критического шанса. Урон Инкантации добавляет по 9% критического урона на 15 секунд, до семи стаков; новый стак появляется не чаще раза в 0,3 секунды.",
+              "stats": [
+                {
+                  "label": "Атака (ур. 80)",
+                  "value": "570"
+                },
+                {
+                  "label": "Критический шанс (ур. 80)",
+                  "value": "24%"
+                }
+              ],
+              "category": "replacement",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/blackbird/"
+            }
+          ]
+        },
+        "cartridges": {
+          "kind": "cartridges",
+          "items": [
+            {
+              "id": "blackbird-cartridges-1",
+              "name": "Devil's Blood: Curse",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/kongmu/256/UI_YH_kongmuicon__31.webp",
+              "description": "",
+              "stats": [
+                {
+                  "label": "2 предмета",
+                  "value": "Урон Психеи +10%."
+                },
+                {
+                  "label": "4 предмета",
+                  "value": "Увеличивает урон носителя на 18%; против целей под Новой или Пятном бонус составляет 36%."
+                }
+              ],
+              "category": "signature",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/blackbird/"
+            }
+          ]
+        },
+        "skills": {
+          "kind": "skills",
+          "items": [
+            {
+              "id": "blackbird-skills-0",
+              "name": "Сверхспособность",
+              "description": "Requies Animarum — одинаковый приоритет со следующим навыком.",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/BlackBird_UltraSkill.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/blackbird-guide-best-builds"
+            },
+            {
+              "id": "blackbird-skills-1",
+              "name": "Базовая атака",
+              "description": "Fleeting Shadow — одинаковый приоритет с предыдущим навыком.",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/BlackBird_Melee.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/blackbird-guide-best-builds"
+            },
+            {
+              "id": "blackbird-skills-2",
+              "name": "Навык перенаправления",
+              "description": "Netherplume Rite Для роли поддержки прокачивайте первым, затем сверхспособность.",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/BlackBird_Skill.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/blackbird-guide-best-builds"
+            },
+            {
+              "id": "blackbird-skills-3",
+              "name": "Навык поддержки",
+              "description": "Judgment Upon Me",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/BlackBird_QTE.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/blackbird-guide-best-builds"
+            }
+          ]
+        },
+        "stats": {
+          "kind": "stats",
+          "items": [
+            {
+              "id": "blackbird-stats-0",
+              "name": "Критический урон",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            },
+            {
+              "id": "blackbird-stats-1",
+              "name": "Бонус урона Психеи",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            },
+            {
+              "id": "blackbird-stats-2",
+              "name": "Атака %",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            },
+            {
+              "id": "blackbird-stats-3",
+              "name": "Критический шанс",
+              "imageUrl": "",
+              "description": "Учитывайте бонусы дуги, консоли и отряда; итоговый шанс не должен превышать 100%.",
+              "stats": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "slug": "iroi",
+      "sourceUrl": "https://www.kaiden.gg/nte/characters/iroi/",
+      "sections": {
+        "arcs": {
+          "kind": "arcs",
+          "items": [
+            {
+              "id": "iroi-arcs-1",
+              "name": "The Wrong Gate",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/Fork/1024/fork_Door.webp",
+              "description": "Даёт 16% атаки. Лечение на 20 секунд усиливает урон Анимы носителя на 30%, а урон всех союзников — на 15%. Одинаковые эффекты не складываются.",
+              "stats": [
+                {
+                  "label": "Атака (ур. 80)",
+                  "value": "570"
+                },
+                {
+                  "label": "Бонус атаки (ур. 80)",
+                  "value": "30%"
+                }
+              ],
+              "category": "signature",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/iroi/"
+            },
+            {
+              "name": "Clear Skies",
+              "category": "budget",
+              "stats": [
+                {
+                  "label": "Атака (ур. 80)",
+                  "value": "475"
+                },
+                {
+                  "label": "Бонус атаки (ур. 80)",
+                  "value": "25%"
+                }
+              ],
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/Fork/1024/fork_PaperPlane.webp",
+              "description": "Увеличивает урон Анимы навыка перенаправления и сверхспособности на 20%.",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/iroi/",
+              "id": "iroi-arcs-2"
+            }
+          ]
+        },
+        "cartridges": {
+          "kind": "cartridges",
+          "items": [
+            {
+              "id": "iroi-cartridges-1",
+              "name": "Speedy Hedgehog",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/kongmu/256/UI_YH_kongmuicon__35.webp",
+              "description": "",
+              "stats": [
+                {
+                  "label": "2 предмета",
+                  "value": "Восстановление энергии +12%."
+                },
+                {
+                  "label": "4 предмета",
+                  "value": "После сверхспособности увеличивает атаку союзников на 15% на 20 секунд. Эффект не складывается."
+                }
+              ],
+              "category": "signature",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/iroi/"
+            },
+            {
+              "id": "iroi-cartridges-2",
+              "name": "Fireflies and the Forest",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/kongmu/256/UI_YH_kongmuicon__09.webp",
+              "description": "",
+              "stats": [
+                {
+                  "label": "2 предмета",
+                  "value": "Урон Анимы +10%."
+                },
+                {
+                  "label": "4 предмета",
+                  "value": "Когда отряд наносит ближайшему врагу урон Анимы, носитель получает по 8% критического урона, до семи стаков. Каждый длится 10 секунд; эффект работает из резерва."
+                }
+              ],
+              "category": "replacement",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/iroi/"
+            }
+          ]
+        },
+        "skills": {
+          "kind": "skills",
+          "items": [
+            {
+              "id": "iroi-skills-0",
+              "name": "Навык перенаправления",
+              "description": "Future Self Continuity",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Oneiroi_Skill.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/iroi-guide-best-builds"
+            },
+            {
+              "id": "iroi-skills-1",
+              "name": "Сверхспособность",
+              "description": "3.8-Billion-Year Mirage",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Oneiroi_UltraSkill.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/iroi-guide-best-builds"
+            },
+            {
+              "id": "iroi-skills-2",
+              "name": "Базовая атака",
+              "description": "Collaboration",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Oneiroi_Melee.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/iroi-guide-best-builds"
+            },
+            {
+              "id": "iroi-skills-3",
+              "name": "Навык поддержки",
+              "description": "Bang!",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Oneiroi_QTE.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/iroi-guide-best-builds"
+            }
+          ]
+        },
+        "stats": {
+          "kind": "stats",
+          "items": [
+            {
+              "id": "iroi-stats-0",
+              "name": "Атака %",
+              "imageUrl": "",
+              "description": "Усиливает лечение и личный урон. Усиление атаки союзников зависит от базовой атаки персонажа и дуги, а не от статов модулей.",
+              "stats": []
+            },
+            {
+              "id": "iroi-stats-1",
+              "name": "Бонус урона Анимы",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            },
+            {
+              "id": "iroi-stats-2",
+              "name": "Бонус лечения",
+              "imageUrl": "",
+              "description": "Выбирайте, если отряду не хватает лечения.",
+              "stats": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "slug": "linko",
+      "sourceUrl": "https://www.kaiden.gg/nte/characters/linko/",
+      "sections": {
+        "arcs": {
+          "kind": "arcs",
+          "items": [
+            {
+              "id": "linko-arcs-1",
+              "name": "Voice of the Voyager",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/Fork/1024/fork_GoldRecord.webp",
+              "description": "Даёт 24% атаки и 66% критического урона навыка поддержки. Сработавший навык поддержки усиливает критический урон сверхспособности на 22% на 3 секунды, до трёх стаков.",
+              "stats": [
+                {
+                  "label": "Атака (ур. 80)",
+                  "value": "570"
+                },
+                {
+                  "label": "Критический шанс (ур. 80)",
+                  "value": "24%"
+                }
+              ],
+              "category": "signature",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/linko/"
+            },
+            {
+              "id": "linko-arcs-2",
+              "name": "Ready-Ready",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/Fork/1024/fork_TigerTally.webp",
+              "description": "Даёт 15% атаки. Навык перенаправления или сверхспособность на 15 секунд усиливает базовые атаки и критический ответ на 15%, до двух стаков. Применение обоих навыков за 15 секунд дополнительно даёт 10% урона по боссам на 10 секунд.",
+              "stats": [
+                {
+                  "label": "Атака (ур. 80)",
+                  "value": "570"
+                },
+                {
+                  "label": "Критический шанс (ур. 80)",
+                  "value": "24%"
+                }
+              ],
+              "category": "replacement",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/linko/"
+            }
+          ]
+        },
+        "cartridges": {
+          "kind": "cartridges",
+          "items": [
+            {
+              "id": "linko-cartridges-1",
+              "name": "Fireflies and the Forest",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/kongmu/256/UI_YH_kongmuicon__09.webp",
+              "description": "",
+              "stats": [
+                {
+                  "label": "2 предмета",
+                  "value": "Урон Анимы +10%."
+                },
+                {
+                  "label": "4 предмета",
+                  "value": "Когда отряд наносит ближайшему врагу урон Анимы, носитель получает по 8% критического урона, до семи стаков. Каждый длится 10 секунд; эффект работает из резерва."
+                }
+              ],
+              "category": "signature",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/linko/"
+            }
+          ]
+        },
+        "skills": {
+          "kind": "skills",
+          "items": [
+            {
+              "id": "linko-skills-0",
+              "name": "Навык поддержки",
+              "description": "Spectral Cross",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Linko_QTE.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/linko-guide-best-builds"
+            },
+            {
+              "id": "linko-skills-1",
+              "name": "Сверхспособность",
+              "description": "Oversync",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Linko_UltraSkill.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/linko-guide-best-builds"
+            },
+            {
+              "id": "linko-skills-2",
+              "name": "Базовая атака",
+              "description": "Poltergeist CQC",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Linko_Melee.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/linko-guide-best-builds"
+            },
+            {
+              "id": "linko-skills-3",
+              "name": "Навык перенаправления",
+              "description": "Full-Frequency Pulse",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Linko_Skill.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/linko-guide-best-builds"
+            }
+          ]
+        },
+        "stats": {
+          "kind": "stats",
+          "items": [
+            {
+              "id": "linko-stats-0",
+              "name": "Критический шанс",
+              "imageUrl": "",
+              "description": "Учитывайте бонусы дуги, консоли и отряда; итоговый шанс не должен превышать 100%.",
+              "stats": []
+            },
+            {
+              "id": "linko-stats-1",
+              "name": "Критический урон",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            },
+            {
+              "id": "linko-stats-2",
+              "name": "Атака %",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            },
+            {
+              "id": "linko-stats-3",
+              "name": "Бонус урона Анимы",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "slug": "zankou",
+      "sourceUrl": "https://www.kaiden.gg/nte/characters/zankou/",
+      "sections": {
+        "arcs": {
+          "kind": "arcs",
+          "items": [
+            {
+              "id": "zankou-arcs-1",
+              "name": "Ravenous Blade",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/Fork/1024/fork_DemonBlade.webp",
+              "description": "Даёт 16% критического шанса. Урон Инкантации добавляет по 9% критического урона на 15 секунд, до семи стаков; новый стак появляется не чаще раза в 0,3 секунды.",
+              "stats": [
+                {
+                  "label": "Атака (ур. 80)",
+                  "value": "570"
+                },
+                {
+                  "label": "Критический шанс (ур. 80)",
+                  "value": "24%"
+                }
+              ],
+              "category": "signature",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/zankou/"
+            },
+            {
+              "id": "zankou-arcs-2",
+              "name": "Fluff of Finesse",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/Fork/1024/fork_ThiefCandy.webp",
+              "description": "После критического уклонения увеличивает урон носителя на 8% на 10 секунд, до трёх стаков.",
+              "stats": [
+                {
+                  "label": "Атака (ур. 80)",
+                  "value": "512"
+                },
+                {
+                  "label": "Бонус атаки (ур. 80)",
+                  "value": "27.5%"
+                }
+              ],
+              "category": "replacement",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/zankou/"
+            }
+          ]
+        },
+        "cartridges": {
+          "kind": "cartridges",
+          "items": [
+            {
+              "id": "zankou-cartridges-1",
+              "name": "Crimson: Twin Butterflies",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/kongmu/256/UI_YH_kongmuicon__05.webp",
+              "description": "",
+              "stats": [
+                {
+                  "label": "2 предмета",
+                  "value": "Урон Инкантации +10%."
+                },
+                {
+                  "label": "4 предмета",
+                  "value": "Когда отряд наносит ближайшему врагу урон Инкантации, носитель получает по 6% атаки, до шести стаков. Каждый длится 10 секунд; эффект работает из резерва."
+                }
+              ],
+              "category": "signature",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/zankou/"
+            },
+            {
+              "id": "zankou-cartridges-2",
+              "name": "Shadow Creed",
+              "imageUrl": "https://static.nanoka.cc/assets/nte/Game/UI/UI_Icon/kongmu/256/UI_YH_kongmuicon__39.webp",
+              "description": "",
+              "stats": [
+                {
+                  "label": "2 предмета",
+                  "value": "Атака +10%."
+                },
+                {
+                  "label": "4 предмета",
+                  "value": "После навыка увеличивает атаку носителя на 25% на 20 секунд."
+                }
+              ],
+              "category": "replacement",
+              "sourceUrl": "https://www.kaiden.gg/nte/characters/zankou/"
+            }
+          ]
+        },
+        "skills": {
+          "kind": "skills",
+          "items": [
+            {
+              "id": "zankou-skills-0",
+              "name": "Сверхспособность",
+              "description": "Inferno Flamenco — одинаковый приоритет со следующим навыком.",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Zankou_Ultra.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/zankou-guide-best-builds"
+            },
+            {
+              "id": "zankou-skills-1",
+              "name": "Базовая атака",
+              "description": "Wildfire — одинаковый приоритет с предыдущим навыком.",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Zankou_Melee.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/zankou-guide-best-builds"
+            },
+            {
+              "id": "zankou-skills-2",
+              "name": "Навык перенаправления",
+              "description": "Sanguine Dash",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Zankou_Skill1.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/zankou-guide-best-builds"
+            },
+            {
+              "id": "zankou-skills-3",
+              "name": "Навык поддержки",
+              "description": "Stoked Flame",
+              "imageUrl": "https://www.kaiden.gg/img/nte/UI/UI_Icon/Skill/Zankou_QTE.webp",
+              "stats": [],
+              "sourceUrl": "https://www.icy-veins.com/neverness-to-everness/zankou-guide-best-builds"
+            }
+          ]
+        },
+        "stats": {
+          "kind": "stats",
+          "items": [
+            {
+              "id": "zankou-stats-0",
+              "name": "Бонус урона Инкантации",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            },
+            {
+              "id": "zankou-stats-1",
+              "name": "Критический шанс",
+              "imageUrl": "",
+              "description": "Учитывайте бонусы дуги, консоли и отряда; итоговый шанс не должен превышать 100%.",
+              "stats": []
+            },
+            {
+              "id": "zankou-stats-2",
+              "name": "Критический урон",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            },
+            {
+              "id": "zankou-stats-3",
+              "name": "Атака %",
+              "imageUrl": "",
+              "description": "",
+              "stats": []
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

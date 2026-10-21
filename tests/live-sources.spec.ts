@@ -10,7 +10,7 @@ test('живой сбор источников сохраняет многояз
     process.env.NTE_LIVE_SOURCES !== '1',
     'Explicit live network audit.',
   );
-  test.setTimeout(90000);
+  test.setTimeout(150000);
   const api = await createContext.newContext({
     baseURL: 'http://127.0.0.1:8788',
   });
@@ -42,12 +42,12 @@ test('живой сбор источников сохраняет многояз
     const before = await publicCounts();
     const started = performance.now();
     const response = await api.post('/api/leak-candidates/discover', {
-      data: { query: '' },
+      data: { query: '', kind: 'all' },
       timeout: 25000,
     });
     expect(response.ok(), await response.text()).toBeTruthy();
     const result = (await response.json()).data as LeakDiscoveryResult;
-    expect(result.sources).toHaveLength(29);
+    expect(result.sources).toHaveLength(32);
     expect(result.discoveredCount).toBeGreaterThan(10);
     for (const language of ['ru', 'en', 'ja', 'zh'])
       expect(
@@ -56,7 +56,7 @@ test('живой сбор источников сохраняет многояз
       ).toBeTruthy();
     expect(await publicCounts()).toEqual(before);
     const filtered = await api.post('/api/leak-candidates/discover', {
-      data: { query: 'Аканэ' },
+      data: { query: 'Аканэ', kind: 'news' },
       timeout: 25000,
     });
     expect(filtered.ok(), await filtered.text()).toBeTruthy();
@@ -68,6 +68,35 @@ test('живой сбор источников сохраняет многояз
       official.some((source) => source.foundCount > 0),
       'имя внутри официального анонса находится по тексту',
     ).toBeTruthy();
+    const gear = await api.post('/api/equipment-import/lookup', {
+      data: { query: 'Far Side of the Moon', kind: 'arcs' },
+      timeout: 23000,
+    });
+    expect(gear.ok(), await gear.text()).toBeTruthy();
+    const equipment = (await gear.json()).data.sources;
+    expect(
+      equipment.some(
+        (source: { items: Array<{ imageUrl: string; stats: unknown[] }> }) =>
+          source.items.some((item) => item.imageUrl && item.stats.length > 0),
+      ),
+    ).toBeTruthy();
+    const character = await api.post('/api/character-import/lookup', {
+      data: { query: 'Аканэ' },
+      timeout: 55000,
+    });
+    expect(character.ok(), await character.text()).toBeTruthy();
+    const profile = (await character.json()).data;
+    expect(
+      profile.sources.find(
+        (source: { id: string }) => source.id === 'nanoka-profile',
+      ),
+    ).toMatchObject({ status: 'ok' });
+    expect(
+      profile.suggestions.filter(
+        (item: { field: string; value: string }) =>
+          item.field === 'splashUrl' && item.value.includes('nanoka.cc'),
+      ).length,
+    ).toBeGreaterThan(0);
     const tiers = await api.post('/api/tier-import/lookup', {
       data: { query: 'Линко' },
       timeout: 55000,

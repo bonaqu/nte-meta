@@ -20,7 +20,7 @@ for (const s of c.sources) {
   );
 }
 sourceSql.push(
-  `-- Remove only the known malformed imported ability, preserving every other row.\nUPDATE character_profiles SET abilities_json=(SELECT json_group_array(json(value)) FROM json_each(character_profiles.abilities_json) WHERE json_extract(value,'$.name') NOT LIKE 'Оставшееся время действия Реморы рассчитывается для каждой цели индивидуально.%') WHERE json_valid(abilities_json) AND EXISTS (SELECT 1 FROM json_each(character_profiles.abilities_json) WHERE json_extract(value,'$.name') LIKE 'Оставшееся время действия Реморы рассчитывается для каждой цели индивидуально.%');`,
+  `-- Remove only the known malformed imported ability, preserving every other row.\nUPDATE character_profiles SET abilities_json=(SELECT json_group_array(json(value)) FROM json_each(character_profiles.abilities_json) WHERE instr(COALESCE(json_extract(value,'$.name'),''),'Оставшееся время действия Реморы рассчитывается для каждой цели индивидуально.')<>1) WHERE json_valid(abilities_json) AND EXISTS (SELECT 1 FROM json_each(character_profiles.abilities_json) WHERE instr(COALESCE(json_extract(value,'$.name'),''),'Оставшееся время действия Реморы рассчитывается для каждой цели индивидуально.')=1);`,
 );
 await writeFile(
   'migrations/0034_sources_and_import_repair.sql',

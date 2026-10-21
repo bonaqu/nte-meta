@@ -187,8 +187,7 @@ function sourceTrustClass(value: unknown) {
 }
 
 const sourceTypeOptions: FieldOption[] = [
-  { value: 'website', label: 'Сайт / RSS' },
-  { value: 'reddit', label: 'Reddit' },
+  { value: 'website', label: 'Сайт / RSS / Reddit' },
   { value: 'youtube', label: 'YouTube' },
   { value: 'telegram', label: 'Telegram' },
   { value: 'twitter/x', label: 'X / Twitter' },

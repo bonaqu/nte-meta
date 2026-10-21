@@ -14049,20 +14049,39 @@ async function buildLocalGameCharacterSource(env, character) {
     GAME_RECORD_SELECT +
       " WHERE c.kind='character' AND json_extract(e.value,'$.namespace')='ST_Player' AND instr(json_extract(e.value,'$.gameId'),'Role_Name_')=1",
   ).all();
-  const identity = (rows.results || [])
+  const identities = (rows.results || [])
     .map((r) => gameRecordView(r))
-    .find((r) =>
+    .filter((r) =>
       Object.values(r.values).some((v) => names.includes(v.toLowerCase())),
     );
+  let identity = identities.length === 1 ? identities[0] : undefined;
+  if (identities.length > 1) {
+    const currentRows = await env.DB.prepare(
+      GAME_RECORD_SELECT +
+        " WHERE c.kind='wardrobe' AND json_extract(e.value,'$.namespace')='DT_DefaultAppearanceData'",
+    ).all();
+    const currentIds = new Set(
+      (currentRows.results || []).map((r) => gameRecordView(r).gameId),
+    );
+    const current = identities.filter((r) => currentIds.has(r.ownerId));
+    if (current.length === 1) identity = current[0];
+    else if (current.length > 1) {
+      const ru = current.filter((r) => r.values.ru === character.name);
+      if (ru.length === 1) identity = ru[0];
+    }
+  }
   if (!identity)
     return {
       ...source,
-      message: 'Персонаж не сопоставлен с игровым ID в локальном справочнике.',
+      message:
+        identities.length > 1
+          ? 'В клиенте несколько одноимённых ID. Автоматическая подстановка отключена, чтобы не выбрать старую запись.'
+          : 'Персонаж не сопоставлен с игровым ID в локальном справочнике.',
     };
   const owner = identity.ownerId;
   const own = await env.DB.prepare(
     GAME_RECORD_SELECT +
-      " WHERE c.kind IN ('character','skill','awakening','biography','wardrobe','image') AND json_extract(e.value,'$.ownerId')=? AND (instr(json_extract(e.value,'$.originalId'),'row:')=1 OR c.kind IN ('skill','image')) LIMIT 600",
+      " WHERE c.kind IN ('character','skill','awakening','biography','wardrobe','image') AND COALESCE(json_extract(o.overrides_json,'$.ownerId'),json_extract(e.value,'$.ownerId'))=? AND (instr(json_extract(e.value,'$.originalId'),'row:')=1 OR c.kind IN ('skill','image')) LIMIT 600",
   )
     .bind(owner)
     .all();

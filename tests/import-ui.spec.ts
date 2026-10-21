@@ -437,3 +437,42 @@ test.describe('Cancelable import interactions', () => {
     expect(pageErrors).toEqual([]);
   });
 });
+
+test('импорт показывает извлечённое изображение по локальному адресу до применения', async ({
+  page,
+}) => {
+  await page.route('**/api/character-import/lookup', (route) =>
+    route.fulfill({
+      json: importResponse('Изображение из локальной игры.', {
+        id: 'local-portrait',
+        field: 'imageUrl',
+        label: 'Карточка из игры',
+        value: '/nte-meta/game-assets/58a99ea41891587f5e38.webp',
+      }),
+    }),
+  );
+  await openAuthenticatedProfile(page);
+  await page.goto('/#/characters');
+  await page
+    .getByRole('button', { name: 'Добавить персонажа', exact: true })
+    .click();
+  const dialog = page.locator('dialog[open]');
+  await dialog.getByLabel('Имя на русском').fill('Аканэ Рин');
+  await dialog
+    .getByRole('button', { name: 'Найти базовую информацию', exact: true })
+    .click();
+  const preview = dialog.locator('.import-image-preview img').first();
+  await expect(preview).toBeVisible();
+  await expect
+    .poll(() =>
+      preview.evaluate(
+        (img: HTMLImageElement) => img.complete && img.naturalWidth > 0,
+      ),
+    )
+    .toBeTruthy();
+  await expect(
+    dialog
+      .getByRole('link', { name: 'Открыть изображение из автоимпорта' })
+      .first(),
+  ).toHaveAttribute('href', '/game-assets/58a99ea41891587f5e38.webp');
+});

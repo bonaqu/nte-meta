@@ -965,7 +965,7 @@ function HomePage({
   const latestGuides = data.guides.slice(0, 5);
   const latestNews = data.news.slice(0, 2);
   const latestLeaks = data.leaks.filter((leak) => leak.approved).slice(0, 2);
-  const { grouped } = groupTierItems(data);
+  const { tierlist, grouped } = groupTierItems(data);
   const popularCharacters = data.characters.slice(0, 6);
   const [homeEditor, setHomeEditor] = useState<
     'guide' | 'news' | 'leak' | 'thread' | null
@@ -1204,7 +1204,9 @@ function HomePage({
 
       <section className="content-band">
         <SectionHeader
-          eyebrow="Патч 1.0"
+          eyebrow={
+            tierlist?.patch ? `Патч ${tierlist.patch}` : 'Редакционный список'
+          }
           title="Текущий тир-лист"
           text="Единый обзор актуального редакционного тир-листа."
         />

@@ -94,7 +94,10 @@ async function contract(records: SourceRecord[]) {
     buildLocalGameCharacterSource: (
       e: object,
       c: object,
-    ) => Promise<{ suggestions: Array<{ field: string; value: string }> }>;
+    ) => Promise<{
+      suggestions: Array<{ field: string; value: string }>;
+      message?: string;
+    }>;
     localizeGameImportSuggestions: (
       env: object,
       suggestions: Array<{ field: string; value: string }>,
@@ -270,6 +273,25 @@ test('справочник защищён правами; некорректны
     expect(
       f.db.prepare('SELECT COUNT(*) AS count FROM game_record_overrides').get(),
     ).toMatchObject({ count: 0 });
+  } finally {
+    f.db.close();
+  }
+});
+
+test('одноимённые старые ID не подменяют действующего персонажа', async () => {
+  const records = JSON.parse(
+    await readFile('tests/fixtures/game-data-active-characters.json', 'utf8'),
+  ) as SourceRecord[];
+  const f = await contract(records);
+  try {
+    const source = await f.m.buildLocalGameCharacterSource(f.env, {
+      originalName: 'Adler',
+      name: 'Адлер',
+    });
+    expect(source.message).toContain('Игровой ID 1033.');
+    expect(source.suggestions).toContainEqual(
+      expect.objectContaining({ field: 'name', value: 'Адлер' }),
+    );
   } finally {
     f.db.close();
   }

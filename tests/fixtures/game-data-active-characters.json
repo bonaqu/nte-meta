@@ -1,0 +1,69 @@
+[
+  {
+    "id": "character:1e|loc:ST_Player::Role_Name_015",
+    "kind": "character",
+    "namespace": "ST_Player",
+    "gameId": "Role_Name_015",
+    "ownerId": "1015",
+    "values": {
+      "ru": "Адлер",
+      "en": "Adler",
+      "ja": "アドレー",
+      "zh": "阿德勒"
+    },
+    "details": {},
+    "assets": [],
+    "term": true,
+    "originalId": "loc:ST_Player::Role_Name_015",
+    "search": "role_name_015 st_player 1015 адлер adler アドレー 阿德勒",
+    "sourceHash": "16f1ef13fcac0f287c921c8f87b19bf056480f2043394bbd487be1251b65322a"
+  },
+  {
+    "id": "character:20|loc:ST_Player::Role_Name_033",
+    "kind": "character",
+    "namespace": "ST_Player",
+    "gameId": "Role_Name_033",
+    "ownerId": "1033",
+    "values": {
+      "ru": "Адлер",
+      "en": "Adler",
+      "ja": "アドレー",
+      "zh": "阿德勒"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_LikeabilityChatGroupData",
+          "row": "1033",
+          "field": "GroupNameText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": true,
+    "originalId": "loc:ST_Player::Role_Name_033",
+    "search": "role_name_033 st_player 1033 адлер adler アドレー 阿德勒",
+    "sourceHash": "a45a1e382778049d48ff16e6ed284ebfdd9249e880f2828513592d799fc46b80"
+  },
+  {
+    "id": "wardrobe:15|row:HT/Content/DataTable/Character/Appearance/DT_DefaultAppearanceData.uasset:1033",
+    "kind": "wardrobe",
+    "namespace": "DT_DefaultAppearanceData",
+    "gameId": "1033",
+    "ownerId": "1033",
+    "values": {},
+    "details": {
+      "DefaultFashionID": "Fashion_1033_0",
+      "PlayerAppearanceAsset": {
+        "AssetPathName": "/Game/Characters/Player/033_adler_new/MeshAsset_Player033.MeshAsset_Player033",
+        "SubPathString": ""
+      }
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/Character/Appearance/DT_DefaultAppearanceData.uasset:1033",
+    "search": "1033 dt_defaultappearancedata 1033",
+    "sourceHash": "5000a1b166effbf0c97d451943b25ae1b2a66158055809b020f34091f16544ff"
+  }
+]

@@ -4815,6 +4815,9 @@ function guideImportSources(slug, character = {}) {
   }));
   const pathSlugs = characterPathSlugCandidates({ ...character, slug });
   const urlsFor = (buildUrl) => pathSlugs.map(buildUrl);
+  const prydwenSlug =
+    { akane: 'akane-rin', 'esper-zero': 'zero', daffodill: 'daffodil' }[slug] ||
+    pathSlugs[0];
 
   return [
     ...({
@@ -4911,11 +4914,7 @@ function guideImportSources(slug, character = {}) {
       id: 'prydwen-character-guide',
       name: 'Prydwen: дополнительная проверка гайда',
       trust: 'high',
-      url: `https://www.prydwen.gg/neverness-to-everness/characters/${pathSlugs[0]}`,
-      urlCandidates: urlsFor(
-        (pathSlug) =>
-          `https://www.prydwen.gg/neverness-to-everness/characters/${pathSlug}`,
-      ),
+      url: `https://www.prydwen.gg/neverness-to-everness/characters/${prydwenSlug}`,
       referenceOnly: true,
       referenceMessage:
         'Источник защищён от автоматических запросов. Откройте страницу вручную для дополнительной сверки.',

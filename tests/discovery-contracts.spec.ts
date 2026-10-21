@@ -220,6 +220,18 @@ test('каталоги источников не дублируются, Иро�
         .guideImportSources(slug, { slug, originalName: slug })
         .some((item) => item.id === 'neverness-gg-guide'),
     ).toBeTruthy();
+  for (const [slug, external] of [
+    ['akane', 'akane-rin'],
+    ['esper-zero', 'zero'],
+    ['daffodill', 'daffodil'],
+  ])
+    expect(
+      m
+        .guideImportSources(slug, { slug })
+        .find((item) => item.id === 'prydwen-character-guide')?.url,
+    ).toBe(
+      `https://www.prydwen.gg/neverness-to-everness/characters/${external}`,
+    );
 });
 
 test('Kaiden извлекает экипировку и приоритеты без подмены совместимых предметов на лучшие', async () => {

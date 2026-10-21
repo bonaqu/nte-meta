@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AddDiscoverySource, CandidateTranslation } from './source-tools';
 import {
   CalendarDays,
   CheckCircle2,
@@ -271,6 +272,8 @@ export function LeakDiscoveryPanel({
   canCreateNews = false,
   canCreateLeaks = true,
   draftDirty = false,
+  contentKind = 'leak',
+  canManageSources = false,
 }: {
   onPromoted: (
     id: string,
@@ -279,6 +282,8 @@ export function LeakDiscoveryPanel({
   canCreateNews?: boolean;
   canCreateLeaks?: boolean;
   draftDirty?: boolean;
+  contentKind?: 'news' | 'leak';
+  canManageSources?: boolean;
 }) {
   const [candidates, setCandidates] = useState<LeakCandidate[]>([]);
   const [sources, setSources] = useState<LeakDiscoverySource[]>([]);
@@ -313,6 +318,7 @@ export function LeakDiscoveryPanel({
   const visibleCandidates = useMemo(() => {
     const now = Date.now();
     return candidates
+      .filter((candidate) => (candidate.contentKind || 'leak') === contentKind)
       .filter(
         (candidate) => filter === 'all' || candidate.reviewStatus === filter,
       )
@@ -349,6 +355,7 @@ export function LeakDiscoveryPanel({
     queueSort,
     sourceTypeFilter,
     translationFilter,
+    contentKind,
   ]);
   const selectableCandidates = visibleCandidates;
   const selectedCandidates = candidates.filter((candidate) =>
@@ -396,7 +403,7 @@ export function LeakDiscoveryPanel({
     event.preventDefault();
     setPending(true);
     setMessage('');
-    const result = await discoverLeakCandidates(query);
+    const result = await discoverLeakCandidates(query, contentKind);
     if (result.ok) {
       setCandidates(result.data.candidates);
       setSelectedIds(new Set());
@@ -717,6 +724,8 @@ export function LeakDiscoveryPanel({
         </button>
       </form>
 
+      {canManageSources ? <AddDiscoverySource /> : null}
+
       {sources.length ? (
         <section
           className="leak-source-report"
@@ -988,6 +997,23 @@ export function LeakDiscoveryPanel({
                   </p>
                 </details>
               ) : null}
+              <CandidateTranslation
+                candidate={candidate}
+                onAccepted={(title, excerpt) =>
+                  setCandidates((current) =>
+                    current.map((item) =>
+                      item.id === candidate.id
+                        ? {
+                            ...item,
+                            translatedTitle: title,
+                            translatedExcerpt: excerpt,
+                            translationStatus: 'переведено',
+                          }
+                        : item,
+                    ),
+                  )
+                }
+              />
               {candidate.translationStatus === 'нужен перевод' ? (
                 <p className="translation-notice">
                   <Languages aria-hidden="true" /> Нужен редакционный перевод на

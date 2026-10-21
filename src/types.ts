@@ -162,6 +162,27 @@ export interface GuideSection {
   type: string;
   content: string;
   position: number;
+  visual?: GuideVisual;
+}
+
+export type GuideVisualKind =
+  | 'arcs'
+  | 'cartridges'
+  | 'stats'
+  | 'skills'
+  | 'rotation';
+export interface GuideVisualItem {
+  id: string;
+  name: string;
+  imageUrl: string;
+  description: string;
+  category?: 'signature' | 'replacement' | 'budget';
+  stats: Array<{ label: string; value: string }>;
+  sourceUrl?: string;
+}
+export interface GuideVisual {
+  kind: GuideVisualKind;
+  items: GuideVisualItem[];
 }
 
 export interface Rotation {
@@ -318,6 +339,8 @@ export interface LeakCandidate {
   createdLeakId?: string;
   createdNewsId?: string;
   contentKind?: 'news' | 'leak';
+  translatedTitle?: string;
+  translatedExcerpt?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -524,6 +547,9 @@ export interface Source {
   sourceUrl: string;
   trustLevel: TrustLevel;
   autoImportEnabled: boolean;
+  language?: 'ru' | 'en' | 'ja' | 'zh' | 'unknown';
+  contentKind?: 'news' | 'leak';
+  parser?: string;
   lastCheckedAt?: string;
   updatedAt?: string;
 }

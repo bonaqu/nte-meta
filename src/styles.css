@@ -1,5 +1,180 @@
 @layer reset, tokens, base, layout, components, pages, responsive, polish;
 
+@layer polish {
+  .guide-visual {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .guide-visual > li {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+    border-block-end: 1px solid var(--border);
+    padding: 16px 0;
+    min-inline-size: 0;
+  }
+  .guide-visual > li:has(> img) {
+    grid-template-columns: 32px 64px minmax(0, 1fr);
+  }
+  .guide-visual > li > img {
+    object-fit: contain;
+    block-size: auto;
+    max-block-size: 160px;
+  }
+  .guide-visual__position {
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    min-block-size: 32px;
+    inline-size: 32px;
+    border-radius: 50%;
+  }
+  .guide-visual__body {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
+  .guide-visual__heading > h3 {
+    margin-block: 0 8px;
+    font-size: 1.15rem;
+  }
+  .guide-visual__body > p {
+    white-space: pre-line;
+    margin-block: 8px;
+  }
+  @media (max-width: 767px) {
+    .guide-visual:is(.guide-visual--arcs, .guide-visual--cartridges)
+      > li:has(> img) {
+      align-items: center;
+    }
+    .guide-visual:is(.guide-visual--arcs, .guide-visual--cartridges)
+      > li:has(> img)
+      .guide-visual__body {
+      display: contents;
+    }
+    .guide-visual:is(.guide-visual--arcs, .guide-visual--cartridges)
+      > li:has(> img)
+      .guide-visual__heading {
+      min-inline-size: 0;
+      overflow-wrap: anywhere;
+    }
+    .guide-visual:is(.guide-visual--arcs, .guide-visual--cartridges)
+      > li:has(> img)
+      .guide-visual__body
+      > :is(p, dl) {
+      grid-column: 1 / -1;
+    }
+  }
+  .guide-visual__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    margin-block: 12px 0;
+    gap: 8px;
+  }
+  .guide-visual__stats > div {
+    border-inline-start: 2px solid var(--cyan);
+    padding-inline-start: 10px;
+  }
+  .guide-visual__stats dt {
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .guide-visual__stats dd {
+    margin: 4px 0 0;
+    font-weight: 700;
+  }
+  .guide-visual--rotation > li:not(:last-child) {
+    border-inline-start: 1px solid var(--cyan);
+    margin-inline-start: 16px;
+    padding-inline-start: 12px;
+  }
+  .visual-section-editor,
+  .visual-item-editor,
+  .image-field,
+  .candidate-translation,
+  .discovery-source-editor {
+    display: grid;
+    gap: 12px;
+    min-inline-size: 0;
+  }
+  .visual-item-editor {
+    border: 1px solid var(--border);
+    border-inline-start: 3px solid var(--pink);
+    padding: 16px;
+    margin: 0;
+  }
+  .visual-item-editor label,
+  .candidate-translation label {
+    display: grid;
+    gap: 8px;
+    min-inline-size: 0;
+  }
+  .visual-section-preview {
+    margin-block-start: 20px;
+    padding: 16px;
+    border: 1px solid var(--border);
+  }
+  .image-upload {
+    display: grid;
+    gap: 6px;
+    min-inline-size: 0;
+  }
+  .image-upload > label {
+    cursor: pointer;
+    min-block-size: 44px;
+  }
+  .file-upload-input {
+    inline-size: 100%;
+    min-block-size: 44px;
+    font-size: 16px;
+  }
+  .image-upload:focus-within {
+    outline: 2px solid var(--cyan);
+    outline-offset: 3px;
+  }
+  .image-upload > label.is-disabled {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .image-field .editor-image-preview {
+    object-fit: contain;
+    background: var(--panel);
+  }
+  .rich-text-editor__toolbar .image-upload {
+    max-inline-size: 240px;
+  }
+  .rich-text-editor__toolbar .file-upload-input {
+    max-inline-size: 240px;
+  }
+  .rich-text-editor .tiptap img {
+    max-inline-size: 100%;
+    block-size: auto;
+    margin-block: 12px;
+  }
+  .discovery-source-editor {
+    border: 1px solid var(--border);
+    padding: 16px;
+  }
+  .discovery-source-editor > summary,
+  .visual-section-preview > summary {
+    cursor: pointer;
+    min-block-size: 44px;
+  }
+  @media (min-width: 768px) {
+    .guide-visual--arcs > li:has(> img),
+    .guide-visual--cartridges > li:has(> img) {
+      grid-template-columns: 32px 128px minmax(0, 1fr);
+    }
+    .guide-visual--stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+}
+
 @layer reset {
   *,
   *::before,

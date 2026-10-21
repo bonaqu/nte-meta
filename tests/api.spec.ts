@@ -1899,6 +1899,9 @@ ${'Проверенная редакционная биография остаё
     await page.getByLabel('Пароль').fill(ownerPassword);
     await page.getByRole('button', { name: 'Войти', exact: true }).click();
 
+    await expect(
+      page.getByRole('heading', { name: 'Профиль', level: 1 }),
+    ).toBeVisible();
     await page.goto('/#/guides/hotori-burst-guide');
     const likeButton = page
       .locator('.rating-bar')
@@ -1931,6 +1934,233 @@ ${'Проверенная редакционная биография остаё
     const confirmDialog = page.locator('dialog[open].confirm-dialog');
     await confirmDialog.getByRole('button', { name: 'Подтвердить' }).click();
     await expect(discovery.getByText('Отклонено публикаций: 2.')).toBeVisible();
+  });
+
+  test('тир-лист сохраняет 24 позиции, добавленная Аканэ остаётся в S после повторного открытия', async ({
+    page,
+  }) => {
+    test.setTimeout(60000);
+    const tierStarted = Date.now();
+    page.on('pageerror', (error) =>
+      console.log('[tier-page-error]', error.message),
+    );
+    const original = (
+      await (await owner.get('/api/tierlists/tier-base-10')).json()
+    ).data;
+    const characters = (await (await owner.get('/api/characters')).json()).data;
+    const extraIds: string[] = [];
+    while (characters.length < 24) {
+      const created = await owner.post('/api/characters', {
+        data: {
+          slug: `tier-extra-${runId}-${characters.length}`,
+          name: `Дополнительный ${characters.length}`,
+          originalName: 'Extra',
+          rarity: 'A',
+          role: 'Поддержка',
+          type: 'Поддержка',
+          attribute: 'Анима',
+          imageUrl: '/assets/characters/Mint.webp',
+          splashUrl: '/assets/characters/Mint.webp',
+          shortDescription: 'Тест границы числа параметров',
+          summary: 'Тест границы числа параметров',
+          status: 'published',
+        },
+      });
+      expect(created.status(), await created.text()).toBe(201);
+      const id = (await created.json()).data.id;
+      extraIds.push(id);
+      characters.push({ id });
+    }
+    try {
+      const items = characters
+        .slice(0, 24)
+        .filter((c: { id: string }) => c.id !== 'akane')
+        .map((c: { id: string }) => ({
+          characterId: c.id,
+          tier: 'A',
+          note: '',
+        }));
+      const seeded = await owner.patch('/api/tierlists/tier-base-10', {
+        data: { items, title: original.title },
+        timeout: 10000,
+      });
+      expect(seeded.ok(), await seeded.text()).toBeTruthy();
+
+      await page.goto('/#/profile');
+      await page.getByLabel('Логин').fill(ownerUsername);
+      await page.getByLabel('Пароль').fill(ownerPassword);
+      await page.getByRole('button', { name: 'Войти', exact: true }).click();
+      await expect(
+        page.getByRole('button', { name: 'Выйти', exact: true }),
+      ).toBeVisible();
+
+      await page.goto('/#/tierlists');
+      await page
+        .getByRole('button', { name: 'Редактировать тир-лист', exact: true })
+        .click();
+      const dialog = page
+        .getByRole('dialog')
+        .filter({
+          has: page.getByRole('heading', {
+            name: 'Редактор тир-листа',
+            exact: true,
+          }),
+        });
+      await dialog
+        .getByLabel('Добавить персонажа в тир-лист')
+        .selectOption('akane');
+      await dialog
+        .getByRole('button', { name: 'Добавить в A', exact: true })
+        .click();
+
+      await dialog
+        .getByLabel('Тир для Аканэ Рин', { exact: true })
+        .selectOption('S');
+      await dialog
+        .getByRole('button', { name: 'Сохранить тир-лист', exact: true })
+        .click();
+
+      await expect(dialog).not.toBeVisible();
+      const saved = (
+        await (await guest.get('/api/tierlists/tier-base-10')).json()
+      ).data;
+      expect(saved.items).toHaveLength(24);
+      expect(
+        saved.items.find(
+          (item: { characterId: string }) => item.characterId === 'akane',
+        ).tier,
+      ).toBe('S');
+      await page.reload();
+      await page
+        .getByRole('button', { name: 'Редактировать тир-лист', exact: true })
+        .click();
+      await expect(
+        dialog.getByLabel('Тир для Аканэ Рин', { exact: true }),
+      ).toHaveValue('S');
+      await page.goto('/#/');
+    } finally {
+      if (Date.now() - tierStarted < 55000) {
+        expect(
+          (
+            await owner.patch('/api/tierlists/tier-base-10', {
+              data: { title: original.title, items: original.items },
+              timeout: 5000,
+            })
+          ).ok(),
+        ).toBeTruthy();
+        for (const id of extraIds) await owner.delete(`/api/characters/${id}`);
+      }
+    }
+  });
+
+  test('загрузка изображения хранит файл отдельно, отдаёт его публично и отклоняет подмену формата', async () => {
+    const image = {
+      context: 'guides/media-test/portrait',
+      dataUrl:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS90AAAAASUVORK5CYII=',
+    };
+    expect(
+      (await guest.post('/api/media/uploads', { data: image })).status(),
+    ).toBe(401);
+    const response = await owner.post('/api/media/uploads', { data: image });
+    expect(response.status(), await response.text()).toBe(201);
+    const uploaded = (await response.json()).data;
+    expect(uploaded.path).toContain(
+      'public/uploads/guides/media-test/portrait/',
+    );
+    const file = await guest.get(uploaded.url);
+    expect(file.status()).toBe(200);
+    expect(file.headers()['content-type']).toBe('image/png');
+    expect(file.headers()['cache-control']).toContain('immutable');
+    expect(
+      (
+        await owner.post('/api/media/uploads', {
+          data: {
+            ...image,
+            dataUrl: 'data:image/png;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+',
+          },
+        })
+      ).status(),
+    ).toBe(400);
+    expect(
+      (
+        await owner.post('/api/media/uploads', {
+          data: { ...image, context: '../escape' },
+        })
+      ).status(),
+    ).toBe(400);
+  });
+
+  test('визуальная секция проходит запись и чтение, служебные источники скрыты только у читателя', async () => {
+    const visual = {
+      kind: 'arcs',
+      items: [
+        {
+          id: 'test-arc',
+          name: 'Дуга',
+          imageUrl: 'https://example.com/arc.webp',
+          description: 'Практическое описание',
+          category: 'signature',
+          stats: [{ label: 'Атака', value: '100' }],
+          sourceUrl: 'https://example.com/private-reference',
+        },
+      ],
+    };
+    const response = await owner.post('/api/guides/guide-hotori/sections', {
+      data: { title: 'Лучшие дуги', type: 'best-arcs', content: '', visual },
+    });
+    expect(response.status(), await response.text()).toBe(201);
+    const id = (await response.json()).data.id;
+    try {
+      expect(
+        (
+          await owner.patch(`/api/guide-sections/${id}`, {
+            data: {
+              visual: {
+                ...visual,
+                items: [{ ...visual.items[0], name: 'Исправленная дуга' }],
+              },
+            },
+          })
+        ).ok(),
+      ).toBeTruthy();
+      const privateGuide = (
+        await (await owner.get('/api/guides/guide-hotori')).json()
+      ).data;
+      const publicGuide = (
+        await (await guest.get('/api/guides/guide-hotori')).json()
+      ).data;
+      expect(
+        privateGuide.sections.find((s: { id: string }) => s.id === id).visual
+          .items[0].sourceUrl,
+      ).toContain('private-reference');
+      const section = publicGuide.sections.find(
+        (s: { id: string }) => s.id === id,
+      );
+      expect(section.visual.items[0].name).toBe('Исправленная дуга');
+      expect(section.visual.items[0].sourceUrl).toBeUndefined();
+      expect(
+        publicGuide.sections.some(
+          (s: { type: string }) => s.type === 'sources',
+        ),
+      ).toBe(false);
+      expect(
+        (
+          await owner.patch(`/api/guide-sections/${id}`, {
+            data: {
+              visual: {
+                ...visual,
+                items: [
+                  { ...visual.items[0], imageUrl: 'javascript:alert(1)' },
+                ],
+              },
+            },
+          })
+        ).status(),
+      ).toBe(400);
+    } finally {
+      await owner.delete(`/api/guide-sections/${id}`);
+    }
   });
 
   test('смена пароля отзывает сессии, login и logout работают', async () => {

@@ -8,7 +8,9 @@ async function legacyDatabase(production = true) {
   for (const file of (await readdir('migrations'))
     .filter((file) => file.endsWith('.sql') && file < '0029')
     .sort()) {
-    db.exec(await readFile(`migrations/${file}`, 'utf8'));
+    db.exec(
+      (await readFile(`migrations/${file}`, 'utf8')).replaceAll('\r\n', '\n'),
+    );
   }
   if (production) {
     const { guide, teams } = JSON.parse(
@@ -67,7 +69,7 @@ test('обновление гайда исправляет стандартны�
       'migrations/0029_refresh_hotori_guide.sql',
       'utf8',
     );
-    db.exec(sql);
+    db.exec(sql.replaceAll('\r\n', '\n'));
     expect(
       db
         .prepare("SELECT patch_version FROM guides WHERE id = 'guide-hotori'")
@@ -104,7 +106,7 @@ test('обновление гайда исправляет стандартны�
         )
         .get()?.n,
     ).toBe(8);
-    db.exec(sql);
+    db.exec(sql.replaceAll('\r\n', '\n'));
     expect(
       db
         .prepare(
@@ -121,7 +123,11 @@ test('обновление гайда исправляет стандартны�
 test('обновление также поддерживает исходный демонстрационный каталог', async () => {
   const db = await legacyDatabase(false);
   try {
-    db.exec(await readFile('migrations/0029_refresh_hotori_guide.sql', 'utf8'));
+    db.exec(
+      (
+        await readFile('migrations/0029_refresh_hotori_guide.sql', 'utf8')
+      ).replaceAll('\r\n', '\n'),
+    );
     expect(
       db
         .prepare("SELECT patch_version FROM guides WHERE id = 'guide-hotori'")
@@ -148,7 +154,11 @@ test('обновление не перезаписывает независим�
     db.exec(
       "UPDATE team_members SET role = 'Авторская роль' WHERE team_id = 'team-hotori-accessible' AND character_id = 'hotori'",
     );
-    db.exec(await readFile('migrations/0029_refresh_hotori_guide.sql', 'utf8'));
+    db.exec(
+      (
+        await readFile('migrations/0029_refresh_hotori_guide.sql', 'utf8')
+      ).replaceAll('\r\n', '\n'),
+    );
     expect(
       db
         .prepare(

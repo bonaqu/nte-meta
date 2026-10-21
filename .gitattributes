@@ -1,0 +1,2 @@
+# SQL literals must be identical in local D1 and Linux CI.
+*.sql text eol=lf

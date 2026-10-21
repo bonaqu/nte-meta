@@ -10,6 +10,16 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { GuideVisualEditor, GuideVisualView } from './components/guide-visual';
+import { ImageUploadButton } from './components/image-field';
+import {
+  isPrivateGuideSection,
+  stripEditorialText,
+  visualFromLegacy,
+  visualFromImport,
+  visualKind,
+  visualKinds,
+} from './lib/guide-visual';
 import {
   Archive,
   BadgeCheck,
@@ -269,16 +279,15 @@ const guideSectionTypeOptions = [
   ['weaknesses', 'Минусы'],
   ['skills', 'Навыки'],
   ['skill-priority', 'Приоритет навыков'],
-  ['build', 'Билд'],
+  ['build', 'Билд (старый формат)'],
   ['best-arcs', 'Лучшие дуги'],
-  ['alternative-arcs', 'Альтернативные дуги'],
-  ['modules', 'Модули и картриджи'],
+  ['cartridges', 'Лучшие картриджи'],
+  ['modules', 'Картриджи (старый формат)'],
   ['main-stats', 'Основные статы'],
   ['sub-stats', 'Саб-статы'],
-  ['teams', 'Команды'],
   ['rotations', 'Ротации'],
   ['rotation', 'Ротации'],
-  ['tips', 'Советы и механики'],
+  ['tips', 'Советы и частые ошибки'],
   ['mistakes', 'Частые ошибки'],
   ['video', 'Видео-гайд'],
   ['faq', 'Вопросы и ответы'],
@@ -521,6 +530,29 @@ function App() {
     };
   }, [user]);
 
+  async function updateViewer(next: User | null) {
+    if (next?.id !== user?.id || next?.role !== user?.role) {
+      try {
+        const fresh = await loadSiteData({
+          includePrivate: Boolean(
+            next && roleWeight[next.role] >= roleWeight.editor,
+          ),
+        });
+        setData(fresh);
+        loadedPrivateSourcesForRef.current =
+          next && roleWeight[next.role] >= roleWeight.editor ? next.id : '';
+      } catch (reason) {
+        if (!next) {
+          setData(emptySiteData);
+          setUser(null);
+        }
+        setError(formatPortalLoadError(reason));
+        return;
+      }
+    }
+    setUser(next);
+  }
+
   useLayoutEffect(() => {
     setMobileOpen(false);
     const resetScroll = () => window.scrollTo({ top: 0, behavior: 'auto' });
@@ -726,13 +758,13 @@ function App() {
       <ThreadsPage data={data} user={user} setData={setData} />
     );
   } else if (section === 'profile') {
-    page = <ProfilePage user={user} setUser={setUser} />;
+    page = <ProfilePage user={user} setUser={updateViewer} />;
   } else if (section === 'admin') {
     page = (
       <AdminPage
         data={data}
         user={user}
-        setUser={setUser}
+        setUser={updateViewer}
         setData={setData}
         requestedTab={slug}
       />
@@ -1339,6 +1371,10 @@ function HomePage({
             {canManageContent(user, 'leaks', 'edit') ? (
               <LeakDiscoveryPanel
                 canCreateNews
+                contentKind="news"
+                canManageSources={Boolean(
+                  user && roleWeight[user.role] >= roleWeight.admin,
+                )}
                 canCreateLeaks={canCreateLeak}
                 draftDirty={homeEditorDirty}
                 onPromoted={async (id, destination) => {
@@ -1385,6 +1421,9 @@ function HomePage({
           >
             <LeakDiscoveryPanel
               canCreateNews={canCreateNews}
+              canManageSources={Boolean(
+                user && roleWeight[user.role] >= roleWeight.admin,
+              )}
               draftDirty={homeEditorDirty}
               onPromoted={async (leakId, destination) => {
                 await refreshContent();
@@ -2357,9 +2396,7 @@ function GuideCard({
         referrerPolicy="no-referrer"
       />
       <div className="guide-card__body">
-        <p className="eyebrow">
-          {character?.name || 'Гайд'} · патч {guide.patch}
-        </p>
+        <p className="eyebrow">{character?.name || 'Гайд'}</p>
         <h3>{guide.title}</h3>
         <p className="guide-card__summary">{guide.summary}</p>
         <dl className="meta-row">
@@ -3273,7 +3310,9 @@ function CharacterDetailPage({
           title="Биография"
           text="История персонажа без мета-билдов и боевых ротаций."
         />
-        <MarkdownPreview value={profile.biography || character.summary} />
+        <MarkdownPreview
+          value={stripEditorialText(profile.biography || character.summary)}
+        />
       </section>
 
       <section className="character-detail-section" id="character-abilities">
@@ -3728,9 +3767,7 @@ function GuideHero({
         referrerPolicy="no-referrer"
       />
       <div>
-        <p className="eyebrow">
-          Гайд на {character.name} · патч {guide.patch}
-        </p>
+        <p className="eyebrow">Гайд на {character.name}</p>
         <h1>{guide.title}</h1>
         <p className="guide-hero-summary">{guide.summary}</p>
         <dl className="guide-facts">
@@ -3785,7 +3822,16 @@ function GuideDetail({
   );
   const tierPlacement = getCharacterTierPlacement(data, character.id);
   const orderedSections = useMemo(
-    () => [...guide.sections].sort((a, b) => a.position - b.position),
+    () =>
+      [...guide.sections]
+        .filter(
+          (section) =>
+            !isPrivateGuideSection(section) &&
+            (section.visual
+              ? section.visual.items.length > 0
+              : section.content.trim().length > 0),
+        )
+        .sort((a, b) => a.position - b.position),
     [guide.sections],
   );
   const guideNavigation = useMemo(
@@ -3830,7 +3876,6 @@ function GuideDetail({
       />
       <section className="guide-toolbar">
         <div>
-          <p>Материал редакции · патч {guide.patch}</p>
           <strong>
             {character.name} · {character.attribute} · {character.role}
           </strong>
@@ -3881,7 +3926,13 @@ function GuideDetail({
               key={section.id}
             >
               <h2>{section.title}</h2>
-              <MarkdownPreview value={section.content} />
+              {visualFromLegacy(section, character) ? (
+                <GuideVisualView
+                  value={visualFromLegacy(section, character)!}
+                />
+              ) : (
+                <MarkdownPreview value={section.content} />
+              )}
             </article>
           ))}
           <article
@@ -4080,7 +4131,7 @@ function TeamCard({
           <Users aria-hidden="true" /> Состав
         </span>
         <h3>{team.title}</h3>
-        {team.synergy ? <p>{team.synergy}</p> : null}
+        {team.synergy ? <p>{stripEditorialText(team.synergy)}</p> : null}
       </div>
       <div className="team-members">
         {team.members.map((member) => {
@@ -5230,6 +5281,10 @@ function TierListsPage({
               setData={setData}
               canPublish={canManageContent(user, 'tierlists', 'publish')}
               onDirtyChange={setEditorDirty}
+              onSaved={() => {
+                setEditorDirty(false);
+                setEditorOpen(false);
+              }}
             />
           </Suspense>
         ) : null}
@@ -7181,6 +7236,14 @@ function AdminGuides({
         next[existingIndex] = {
           ...existing,
           content: `${existing.content.trim()}\n\n${importMarkdown}`.trim(),
+          ...(visualKind(sectionType)
+            ? {
+                visual: visualFromImport(
+                  visualKind(sectionType)!,
+                  suggestion.value,
+                ),
+              }
+            : {}),
         };
         setSelectedSectionId(existing.id);
         setMarkdown(next[existingIndex].content);
@@ -7192,6 +7255,14 @@ function AdminGuides({
         type: sectionType,
         content: importMarkdown,
         position: current.length + 1,
+        ...(visualKind(sectionType)
+          ? {
+              visual: visualFromImport(
+                visualKind(sectionType)!,
+                suggestion.value,
+              ),
+            }
+          : {}),
       };
       setSelectedSectionId(nextSection.id);
       setMarkdown(nextSection.content);
@@ -7248,8 +7319,21 @@ function AdminGuides({
           {
             title: 'Обзор персонажа',
             type: 'overview',
-            content: '## Обзор\nДобавьте роль, механику и практический вывод.',
+            content: getFormString('summary'),
           },
+          ...visualKinds.map(([kind, title]) => ({
+            title,
+            type: {
+              arcs: 'best-arcs',
+              cartridges: 'cartridges',
+              stats: 'main-stats',
+              skills: 'skill-priority',
+              rotation: 'rotation',
+            }[kind],
+            content: '',
+            visual: { kind, items: [] },
+          })),
+          { title: 'Советы и частые ошибки', type: 'tips', content: '' },
         ],
       },
       'POST',
@@ -7408,6 +7492,7 @@ function AdminGuides({
               title: section.title,
               type: section.type,
               content: section.content,
+              visual: section.visual,
             },
             'POST',
           );
@@ -7438,6 +7523,7 @@ function AdminGuides({
               title: section.title,
               type: section.type,
               content: section.content,
+              visual: section.visual,
             },
             'PATCH',
           );
@@ -8136,7 +8222,37 @@ function AdminGuides({
           </p>
         </div>
         <div className="admin-panel editor-panel">
-          <h2>Редактор текста</h2>
+          <h2>Редактор секции</h2>
+          <div className="button-row" aria-label="Визуальные секции">
+            {visualKinds.map(([kind, title]) => (
+              <button
+                type="button"
+                className="ghost-button"
+                key={kind}
+                onClick={() => {
+                  const section: GuideSection = {
+                    id: `custom-${crypto.randomUUID()}`,
+                    title,
+                    type: {
+                      arcs: 'best-arcs',
+                      cartridges: 'cartridges',
+                      stats: 'main-stats',
+                      skills: 'skill-priority',
+                      rotation: 'rotation',
+                    }[kind],
+                    content: '',
+                    position: sections.length + 1,
+                    visual: { kind, items: [] },
+                  };
+                  setSections((current) => [...current, section]);
+                  setSelectedSectionId(section.id);
+                  setMarkdown('');
+                }}
+              >
+                {title}
+              </button>
+            ))}
+          </div>
           <div className="guide-section-fields">
             <label>
               Название секции
@@ -8184,50 +8300,79 @@ function AdminGuides({
               </select>
             </label>
           </div>
-          <div
-            className="guide-image-insert"
-            aria-label="Вставка изображения в секцию"
+          {(() => {
+            const selected = sections.find(
+              (section) => section.id === selectedSectionId,
+            );
+            const visual = selected
+              ? visualFromLegacy(selected, activeGuideCharacter)
+              : undefined;
+            return visual ? (
+              <GuideVisualEditor
+                value={visual}
+                character={activeGuideCharacter}
+                context={`guides/${activeGuide?.slug || 'draft'}/${selectedSectionId}`}
+                onChange={(next) => updateSelectedSection({ visual: next })}
+              />
+            ) : null;
+          })()}
+          <details
+            open={
+              !sections.find((section) => section.id === selectedSectionId)
+                ?.visual
+            }
           >
-            <label htmlFor="guide-section-image-url">
-              Ссылка на изображение для секции
-              <input
-                id="guide-section-image-url"
-                type="url"
-                inputMode="url"
-                value={sectionImageUrl}
-                onChange={(event) => setSectionImageUrl(event.target.value)}
-                placeholder="https://... или assets/..."
-              />
-            </label>
-            <label htmlFor="guide-section-image-alt">
-              Описание изображения
-              <input
-                id="guide-section-image-alt"
-                value={sectionImageAlt}
-                onChange={(event) => setSectionImageAlt(event.target.value)}
-                placeholder="Например: схема ротации Хотори"
-              />
-            </label>
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={insertSectionImage}
+            <summary>Текст и дополнительные изображения</summary>
+            <div
+              className="guide-image-insert"
+              aria-label="Вставка изображения в секцию"
             >
-              <ImageIcon aria-hidden="true" /> Вставить изображение
-            </button>
-          </div>
-          <label id="markdown-editor-label" htmlFor="markdown-editor">
-            Текст раздела
-          </label>
-          <RichTextEditorField
-            id="markdown-editor"
-            value={markdown}
-            onChange={updateSelectedMarkdown}
-            minHeight={360}
-            maxLength={24000}
-            placeholder="Добавьте практический разбор, списки, команды и пояснения..."
-            ariaLabel="Текст раздела гайда"
-          />
+              <label htmlFor="guide-section-image-url">
+                Ссылка на изображение для секции
+                <input
+                  id="guide-section-image-url"
+                  type="url"
+                  inputMode="url"
+                  value={sectionImageUrl}
+                  onChange={(event) => setSectionImageUrl(event.target.value)}
+                  placeholder="https://... или assets/..."
+                />
+              </label>
+              <ImageUploadButton
+                context={`guides/${activeGuide?.slug || 'draft'}/sections`}
+                onUploaded={setSectionImageUrl}
+              />
+              <label htmlFor="guide-section-image-alt">
+                Описание изображения
+                <input
+                  id="guide-section-image-alt"
+                  value={sectionImageAlt}
+                  onChange={(event) => setSectionImageAlt(event.target.value)}
+                  placeholder="Например: схема ротации Хотори"
+                />
+              </label>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={insertSectionImage}
+              >
+                <ImageIcon aria-hidden="true" /> Вставить изображение
+              </button>
+            </div>
+            <label id="markdown-editor-label" htmlFor="markdown-editor">
+              Текст раздела
+            </label>
+            <RichTextEditorField
+              id="markdown-editor"
+              imageContext={`guides/${activeGuide?.slug || 'draft'}/${selectedSectionId || 'text'}`}
+              value={markdown}
+              onChange={updateSelectedMarkdown}
+              minHeight={360}
+              maxLength={24000}
+              placeholder="Добавьте практический разбор, списки, команды и пояснения..."
+              ariaLabel="Текст раздела гайда"
+            />
+          </details>
         </div>
       </div>
 
@@ -8697,11 +8842,13 @@ function AdminTierlists({
   setData,
   canPublish,
   onDirtyChange,
+  onSaved,
 }: {
   data: SiteData;
   setData: React.Dispatch<React.SetStateAction<SiteData>>;
   canPublish: boolean;
   onDirtyChange?: (dirty: boolean) => void;
+  onSaved?: () => void;
 }) {
   const tierlist = getUnifiedTierList(data);
   const [items, setItems] = useState(tierlist?.items || []);
@@ -8932,8 +9079,22 @@ function AdminTierlists({
         setPending(false);
         return;
       }
-      setData(await loadSiteData({ includePrivate: true }));
-      setMessage('Тир-лист сохранен в D1.');
+      setData((current) => ({
+        ...current,
+        tierlists: current.tierlists.map((list) =>
+          list.id === tierlist.id
+            ? {
+                ...list,
+                title,
+                patch,
+                status,
+                changelog: payload.changelogJson,
+                items: [...items],
+              }
+            : list,
+        ),
+      }));
+      setMessage('Тир-лист сохранён.');
     } else {
       setData((current) => ({
         ...current,
@@ -8954,6 +9115,7 @@ function AdminTierlists({
     }
     onDirtyChange?.(false);
     setPending(false);
+    onSaved?.();
   }
 
   if (!tierlist) {
@@ -9267,6 +9429,7 @@ function AdminTierlists({
                 <label>
                   Тир
                   <select
+                    aria-label={`Тир для ${character.name}`}
                     value={item.tier}
                     onChange={(event) =>
                       updateItem(item.characterId, {

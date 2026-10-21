@@ -3,6 +3,8 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import { Placeholder } from '@tiptap/extensions';
 import { Markdown } from '@tiptap/markdown';
 import StarterKit from '@tiptap/starter-kit';
+import Image from '@tiptap/extension-image';
+import { ImageUploadButton } from './image-field';
 import {
   Bold,
   Heading2,
@@ -72,6 +74,7 @@ export interface RichTextEditorProps {
   minHeight?: number;
   actions?: RichTextAction[];
   compact?: boolean;
+  imageContext?: string;
 }
 
 export function RichTextEditor({
@@ -85,6 +88,7 @@ export function RichTextEditor({
   minHeight = 220,
   actions = defaultActions,
   compact = false,
+  imageContext = 'community/editor',
 }: RichTextEditorProps) {
   const generatedId = useId();
   const editorId = id || `rich-text-${generatedId.replace(/:/g, '')}`;
@@ -106,6 +110,10 @@ export function RichTextEditor({
         },
       }),
       Markdown,
+      Image.configure({
+        allowBase64: false,
+        HTMLAttributes: { loading: 'lazy', referrerpolicy: 'no-referrer' },
+      }),
       Placeholder.configure({ placeholder }),
     ],
     content: value || '',
@@ -147,7 +155,9 @@ export function RichTextEditor({
 
   function runAction(action: RichTextAction) {
     if (!editor) return;
-    const chain = editor.chain().focus();
+    // Focus synchronously: Tiptap's deferred focus can steal the next form field.
+    editor.view.focus();
+    const chain = editor.chain();
     if (action === 'bold') chain.toggleBold().run();
     if (action === 'italic') chain.toggleItalic().run();
     if (action === 'underline') chain.toggleUnderline().run();
@@ -236,6 +246,13 @@ export function RichTextEditor({
         role="toolbar"
         aria-label="Форматирование"
       >
+        <ImageUploadButton
+          context={imageContext}
+          disabled={disabled}
+          onUploaded={(url) =>
+            editor?.chain().focus().setImage({ src: url, alt: '' }).run()
+          }
+        />
         <div className="rich-text-editor__tools">
           {actions.map((action) => {
             const meta = actionMeta[action];
@@ -245,6 +262,7 @@ export function RichTextEditor({
                 key={action}
                 type="button"
                 className={isActive(action) ? 'is-active' : ''}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => runAction(action)}
                 disabled={disabled}
                 aria-label={meta.label}

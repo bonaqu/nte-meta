@@ -84,6 +84,8 @@ async function request<T>(
   try {
     const response = await fetch(`${API_BASE}${path}`, {
       ...init,
+      // Authenticated/editorial refreshes must never reuse a guest's cached collection.
+      cache: 'no-store',
       headers,
       credentials: 'include',
       signal: controller.signal,
@@ -453,12 +455,15 @@ export async function loadLeakCandidates() {
   return request<LeakCandidate[]>('/api/leak-candidates');
 }
 
-export async function discoverLeakCandidates(query = '') {
+export async function discoverLeakCandidates(
+  query = '',
+  kind: 'leak' | 'news' | 'all' = 'leak',
+) {
   return request<LeakDiscoveryResult>(
     '/api/leak-candidates/discover',
     {
       method: 'POST',
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, kind }),
     },
     { timeoutMs: DISCOVERY_REQUEST_TIMEOUT_MS },
   );
@@ -492,6 +497,8 @@ export async function updateLeakCandidateEditorial(
     trustLevel?: 'низкий' | 'средний' | 'высокий';
     translationStatus?: LeakCandidate['translationStatus'];
     editorNote?: string;
+    translatedTitle?: string;
+    translatedExcerpt?: string;
   },
 ) {
   return request<{ success: boolean }>(
@@ -510,6 +517,14 @@ export async function promoteLeakCandidate(
   return request<{ leakId?: string; newsId?: string; slug: string }>(
     `/api/leak-candidates/${encodeURIComponent(id)}/promote`,
     { method: 'POST', body: JSON.stringify({ destination }) },
+  );
+}
+
+export async function translateLeakCandidate(id: string) {
+  return request<{ title: string; excerpt: string; provider: string }>(
+    `/api/leak-candidates/${encodeURIComponent(id)}/translate`,
+    { method: 'POST', body: '{}' },
+    { timeoutMs: 20000 },
   );
 }
 
@@ -585,6 +600,24 @@ export async function saveEntity<T>(
     method,
     body: JSON.stringify(payload),
   });
+}
+
+export function findEquipment(query: string, kind: 'arcs' | 'cartridges') {
+  return request<{
+    sources: Array<{
+      name: string;
+      status: string;
+      message?: string;
+      items: Array<Omit<import('../types').GuideVisualItem, 'id'>>;
+    }>;
+  }>(
+    '/api/equipment-import/lookup',
+    {
+      method: 'POST',
+      body: JSON.stringify({ query, kind }),
+    },
+    { timeoutMs: 22000 },
+  );
 }
 
 export async function deleteEntity(path: string) {

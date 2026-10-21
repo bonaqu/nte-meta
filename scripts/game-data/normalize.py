@@ -129,6 +129,31 @@ for table in manifest['tables']:
             records.append({'id':'row:'+table['path']+':'+game_id,'kind':category(table['path']),'namespace':obj['Name'],'gameId':game_id,'ownerId':str(details.get('CharacterID') or owner(game_id) or alias_owner(game_id)),'values':values,'details':details,'assets':image_refs(details),'term':bool(values)})
 for path,image in images.items():
     records.append({'id':'asset:'+path,'kind':'image','namespace':path.rsplit('/',2)[-2],'gameId':Path(path).stem,'ownerId':owner(Path(path).stem) or alias_owner(Path(path).stem),'values':{},'details':{'virtualPath':path},'assets':[{'path':path,**image}],'term':False})
+
+# Keep the StringTable key, its owning character and the exact referring field.
+# Shared headings remain shared; unique biography/wardrobe lines gain an owner.
+references={}
+def collect_references(value, record, field=''):
+    if isinstance(value,dict):
+        namespace=value.get('Namespace') or value.get('TableId','').split('.')[-1]
+        if namespace and value.get('Key'):
+            key=namespace+'::'+value['Key']
+            entry=references.setdefault(key,{'owners':set(),'fields':[],'count':0})
+            if record['ownerId']:entry['owners'].add(record['ownerId'])
+            entry['count']+=1
+            if len(entry['fields'])<32:entry['fields'].append({'table':record['namespace'],'row':record['gameId'],'field':field})
+        for key,child in value.items():collect_references(child,record,field+'.'+key if field else key)
+    elif isinstance(value,list):
+        for index,child in enumerate(value):collect_references(child,record,f'{field}[{index}]')
+for record in records:
+    if record['id'].startswith('row:'):collect_references(record['details'],record)
+for record in records:
+    reference=references.get(record['namespace']+'::'+record['gameId']) if record['id'].startswith('loc:') else None
+    if reference:
+        record['details']['references']=reference['fields']
+        record['details']['referenceCount']=reference['count']
+        if len(reference['owners'])==1 and not record['ownerId']:record['ownerId']=next(iter(reference['owners']))
+        elif len(reference['owners'])>1:record['details']['ownerIds']=sorted(reference['owners'])
 for record in records:
     if record['term']:
         clean={locale:re.sub(r'<[^>]+>','',value).strip() for locale,value in record['values'].items()}

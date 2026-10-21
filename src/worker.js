@@ -14062,7 +14062,7 @@ async function buildLocalGameCharacterSource(env, character) {
   const owner = identity.ownerId;
   const own = await env.DB.prepare(
     GAME_RECORD_SELECT +
-      " WHERE c.kind IN ('character','skill','awakening','biography','wardrobe','image') AND json_extract(e.value,'$.ownerId')=? LIMIT 400",
+      " WHERE c.kind IN ('character','skill','awakening','biography','wardrobe','image') AND json_extract(e.value,'$.ownerId')=? AND (instr(json_extract(e.value,'$.originalId'),'row:')=1 OR c.kind IN ('skill','image')) LIMIT 600",
   )
     .bind(owner)
     .all();

@@ -1,0 +1,192 @@
+[
+  {
+    "id": "character:1e|loc:ST_Player::Role_Name_025",
+    "kind": "character",
+    "namespace": "ST_Player",
+    "gameId": "Role_Name_025",
+    "ownerId": "1025",
+    "values": {
+      "ru": "Хатор",
+      "en": "Hathor",
+      "ja": "ハソール",
+      "zh": "哈索尔"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_LikeabilityChatGroupData",
+          "row": "1025",
+          "field": "GroupNameText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": true,
+    "originalId": "loc:ST_Player::Role_Name_025",
+    "search": "role_name_025 st_player 1025 хатор hathor ハソール 哈索尔",
+    "sourceHash": "1d0c4a1161978a9c45aeff294ea7e07d52e2a3c7011f67bd15d4f8f11feb333d"
+  },
+  {
+    "id": "skill:00|loc:Hathor_SkillDes::GA_Hathor_starExtra1_name",
+    "kind": "skill",
+    "namespace": "Hathor_SkillDes",
+    "gameId": "GA_Hathor_starExtra1_name",
+    "ownerId": "1025",
+    "values": {
+      "ru": "Удвоенная вместимость",
+      "en": "Doubled Capacity",
+      "ja": "ダブルアクセル",
+      "zh": "运力加倍"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "1025AwakenEffect",
+          "row": "1025",
+          "field": "AwakenEffectStructList[6].Title"
+        },
+        {
+          "table": "1055AwakenEffect",
+          "row": "1055",
+          "field": "AwakenEffectStructList[6].Title"
+        }
+      ],
+      "referenceCount": 2,
+      "ownerIds": [
+        "1025",
+        "1055"
+      ]
+    },
+    "assets": [],
+    "term": true,
+    "originalId": "loc:Hathor_SkillDes::GA_Hathor_starExtra1_name",
+    "search": "ga_hathor_starextra1_name hathor_skilldes 1025 удвоенная вместимость doubled capacity ダブルアクセル 运力加倍",
+    "sourceHash": "5f34f0a80249dce69fa82ae27c57a0ec65641f665e39131f00131383b501908c"
+  },
+  {
+    "id": "skill:05|loc:Hathor_SkillDes::GA_Hathor_Skill2_name",
+    "kind": "skill",
+    "namespace": "Hathor_SkillDes",
+    "gameId": "GA_Hathor_Skill2_name",
+    "ownerId": "1025",
+    "values": {
+      "ru": "Навык перенаправления: Удар циклона",
+      "en": "Redirect Skill: Cyclone Strike",
+      "ja": "バイレールスキル：フル回転配達",
+      "zh": "变轨技能：轮转打击"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_GameplayAbilityTipsData",
+          "row": "GA_Hathor_Skill",
+          "field": "AbilityDescription[1].DescriptionTitle"
+        },
+        {
+          "table": "DT_GameplayAbilityTipsData",
+          "row": "GA_Hathor_Skill2",
+          "field": "Name"
+        },
+        {
+          "table": "DT_GameplayAbilityTipsData",
+          "row": "GA_Hathor_Skill2",
+          "field": "AbilityDescription[1].DescriptionTitle"
+        }
+      ],
+      "referenceCount": 3
+    },
+    "assets": [],
+    "term": true,
+    "originalValues": {
+      "ru": "<Title>Навык перенаправления: Удар циклона</>",
+      "en": "<Title>Redirect Skill: Cyclone Strike</>",
+      "ja": "<Title>バイレールスキル：フル回転配達</>",
+      "zh": "<Title>变轨技能：轮转打击</>"
+    },
+    "originalId": "loc:Hathor_SkillDes::GA_Hathor_Skill2_name",
+    "search": "ga_hathor_skill2_name hathor_skilldes 1025 навык перенаправления: удар циклона redirect skill: cyclone strike バイレールスキル：フル回転配達 变轨技能：轮转打击",
+    "sourceHash": "fee918e7b872b68a51fb5a0baef43c5aaf3796a39955cbb22c08dec994f668c0"
+  },
+  {
+    "id": "skill:0b|loc:Hathor_SkillDes::GA_Hathor_Melee3_name",
+    "kind": "skill",
+    "namespace": "Hathor_SkillDes",
+    "gameId": "GA_Hathor_Melee3_name",
+    "ownerId": "1025",
+    "values": {
+      "ru": "Базовая атака: В небеса",
+      "en": "Basic Attack: To The Skies",
+      "ja": "通常攻撃：空中を制する者",
+      "zh": "普通攻击：制高清算"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_GameplayAbilityTipsData",
+          "row": "GA_Hathor_Melee",
+          "field": "AbilityDescription[2].DescriptionTitle"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": true,
+    "originalValues": {
+      "ru": "<Title>Базовая атака: В небеса</>",
+      "en": "<Title>Basic Attack: To The Skies</>",
+      "ja": "<Title>通常攻撃：空中を制する者</>",
+      "zh": "<Title>普通攻击：制高清算</>"
+    },
+    "originalId": "loc:Hathor_SkillDes::GA_Hathor_Melee3_name",
+    "search": "ga_hathor_melee3_name hathor_skilldes 1025 базовая атака: в небеса basic attack: to the skies 通常攻撃：空中を制する者 普通攻击：制高清算",
+    "sourceHash": "177337d003122e7d95e32827cb18575588610538fd56a85c744c224d55c9f37b"
+  },
+  {
+    "id": "skill:0b|loc:Hathor_SkillDes::GA_Hathor_Passive_1_name",
+    "kind": "skill",
+    "namespace": "Hathor_SkillDes",
+    "gameId": "GA_Hathor_Passive_1_name",
+    "ownerId": "1025",
+    "values": {
+      "ru": "Предупреждение о задержке",
+      "en": "Delay Warning",
+      "ja": "時間延長警報",
+      "zh": "延时预警"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_GameplayAbilityTipsData",
+          "row": "GA_Hathor_Passive_1",
+          "field": "Name"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": true,
+    "originalId": "loc:Hathor_SkillDes::GA_Hathor_Passive_1_name",
+    "search": "ga_hathor_passive_1_name hathor_skilldes 1025 предупреждение о задержке delay warning 時間延長警報 延时预警",
+    "sourceHash": "2e19b145f48d60e17ceb927a24ccbd1c1cd880b81189bc7066be1cd2f6786886"
+  },
+  {
+    "id": "skill:0c|loc:Hathor_SkillDes::Buff_HathorAnger_Gaze_Menu_name",
+    "kind": "skill",
+    "namespace": "Hathor_SkillDes",
+    "gameId": "Buff_HathorAnger_Gaze_Menu_name",
+    "ownerId": "1025",
+    "values": {
+      "ru": "Блокировка отличного рейтинга",
+      "en": "Excellent Rating Lock",
+      "ja": "高評価ロックオン",
+      "zh": "优评锁定"
+    },
+    "details": {},
+    "assets": [],
+    "term": true,
+    "originalId": "loc:Hathor_SkillDes::Buff_HathorAnger_Gaze_Menu_name",
+    "search": "buff_hathoranger_gaze_menu_name hathor_skilldes 1025 блокировка отличного рейтинга excellent rating lock 高評価ロックオン 优评锁定",
+    "sourceHash": "a814177a7eaed345376c103d271dbb269d30ce871f8ef467aa7423b9dfb3dfd8"
+  }
+]

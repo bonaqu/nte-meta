@@ -305,6 +305,10 @@ async function router(request, env, ctx) {
     return handleUsers(request, env, parts, ctx);
   }
 
+  if (parts[0] === 'game-data') {
+    return handleGameData(request, env, parts);
+  }
+
   if (
     parts[0] === 'guides' &&
     parts[2] === 'sections' &&
@@ -11282,11 +11286,18 @@ async function handleCharacterImportLookup(request, env) {
       slug,
     });
     if (affinitySource) sourceResults.push(affinitySource);
+    sourceResults.unshift(
+      await buildLocalGameCharacterSource(env, importCharacter),
+    );
     const rawSuggestions = sourceResults.flatMap(
       (source) => source.suggestions,
     );
     sourceResults.push(
       await fetchFandomMediaLookupSource(rawSuggestions, deadline),
+    );
+    await localizeGameImportSuggestions(
+      env,
+      sourceResults.flatMap((source) => source.suggestions),
     );
     const suggestions = dedupeImportSuggestions(
       enrichCharacterImportSuggestions(
@@ -11428,6 +11439,7 @@ async function handleGuideImportLookup(request, env) {
       });
       return { ...item, value: JSON.stringify(enriched) };
     });
+    await localizeGameImportSuggestions(env, suggestions);
 
     return json({
       data: {
@@ -13515,10 +13527,23 @@ async function translateCandidate(candidate, env) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
+    const glossary = await gameTermReplacements(
+      env,
+      `${candidate.title}\n${candidate.excerpt || ''}`,
+    );
     const sourceLanguage =
       { en: 'en', ja: 'ja', zh: 'zh-CN' }[candidate.language] || 'auto';
     async function translate(text) {
       if (!text) return '';
+      const protectedTerms = glossary.matches.map((term, index) => ({
+        ...term,
+        token: `__NTE_TERM_${index}__`,
+      }));
+      for (const term of protectedTerms)
+        text = text.replace(
+          new RegExp(term.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu'),
+          () => term.token,
+        );
       const url = new URL(
         'https://translate.googleapis.com/translate_a/single',
       );
@@ -13542,7 +13567,11 @@ async function translateCandidate(candidate, env) {
         ? data[0].map((segment) => segment[0] || '').join('')
         : '';
       if (!translated.trim()) throw new Error('Переводчик не вернул текст');
-      return translated;
+      return protectedTerms.reduce(
+        (value, term) =>
+          value.replace(new RegExp(term.token, 'g'), () => term.to),
+        translated,
+      );
     }
     const parts =
       String(candidate.excerpt || '').match(/[\s\S]{1,1400}/g) || [];
@@ -13769,6 +13798,7 @@ async function handleEquipmentImport(request, env) {
   };
   const sources = [];
   try {
+    sources.push(await findLocalGameEquipment(env, query, kind));
     const results = await Promise.allSettled([
       (async () => {
         const version = await nanokaVersion(options);
@@ -13859,11 +13889,697 @@ async function handleEquipmentImport(request, env) {
             },
       ),
     );
+    const equipmentSuggestions = sources.flatMap((source) =>
+      (source.items || []).map((item) => ({
+        field: 'guide.equipment',
+        value: JSON.stringify(item),
+      })),
+    );
+    await localizeGameImportSuggestions(env, equipmentSuggestions);
+    let equipmentIndex = 0;
+    for (const source of sources)
+      source.items = (source.items || []).map(() =>
+        JSON.parse(equipmentSuggestions[equipmentIndex++].value),
+      );
     return json({ data: { sources } });
   } finally {
     clearTimeout(timeout);
   }
 }
+
+async function localizeGameImportSuggestions(env, suggestions) {
+  const hints = [];
+  function collect(value, key = '') {
+    if (typeof value === 'string' && /^(?:name|title)$/i.test(key))
+      hints.push(value);
+    else if (Array.isArray(value)) value.forEach((v) => collect(v));
+    else if (value && typeof value === 'object')
+      Object.entries(value).forEach(([k, v]) => collect(v, k));
+  }
+  for (const suggestion of suggestions) {
+    if (/(?:url|originalName)$/i.test(suggestion.field)) continue;
+    try {
+      collect(JSON.parse(suggestion.value));
+    } catch {
+      if (suggestion.field === 'name') hints.push(suggestion.value);
+    }
+  }
+  if (!hints.length) return;
+  const glossary = await gameTermReplacements(
+    env,
+    hints.join('\n').slice(0, 12000),
+  );
+  function localize(value, key = '') {
+    if (/(?:url|^id$|Id$|^originalName$|^type$)$/i.test(key)) return value;
+    if (typeof value === 'string') {
+      if (/^https?:|^\/nte-meta\//.test(value)) return value;
+      for (const term of glossary.matches) {
+        const escaped = term.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const latin = /^[\p{Script=Latin}\p{N}\p{P}\p{Z}]+$/u.test(term.from);
+        value = value.replace(
+          new RegExp(
+            latin
+              ? '(?<![\\p{L}\\p{N}])' + escaped + '(?![\\p{L}\\p{N}])'
+              : escaped,
+            'giu',
+          ),
+          () => term.to,
+        );
+      }
+      return value;
+    }
+    if (Array.isArray(value)) return value.map((v) => localize(v));
+    if (value && typeof value === 'object')
+      return Object.fromEntries(
+        Object.entries(value).map(([k, v]) => [k, localize(v, k)]),
+      );
+    return value;
+  }
+  for (const suggestion of suggestions) {
+    if (/(?:url|originalName)$/i.test(suggestion.field)) continue;
+    try {
+      suggestion.value = JSON.stringify(localize(JSON.parse(suggestion.value)));
+    } catch {
+      suggestion.value = localize(suggestion.value);
+    }
+  }
+}
+
+async function findLocalGameEquipment(env, query, kind) {
+  const source = {
+    name: 'Локальные файлы игры · русский текст и изображения',
+    status: 'empty',
+    items: [],
+  };
+  const localKind = kind === 'arcs' ? 'arc' : 'cartridge';
+  const key = query
+    .replace(/^(?:Дуга|Картридж):\s*/i, '')
+    .trim()
+    .toLowerCase();
+  const namespace = kind === 'arcs' ? 'ST_Fork' : 'ST_Equipment';
+  const rows = await env.DB.prepare(
+    GAME_RECORD_SELECT +
+      " WHERE c.kind=? AND (json_extract(e.value,'$.namespace')=? OR json_extract(e.value,'$.namespace')='DT_EquipmentSuitData') AND json_extract(e.value,'$.term')=1",
+  )
+    .bind(localKind, namespace)
+    .all();
+  const names = (rows.results || [])
+    .map((r) => gameRecordView(r))
+    .filter(
+      (r) =>
+        Object.values(r.values).some((v) => v.toLowerCase().includes(key)) &&
+        !/^buff_/i.test(r.gameId),
+    )
+    .slice(0, 6);
+  for (const name of names) {
+    const stem = name.gameId.replace(/_name$/i, '');
+    const related = await env.DB.prepare(
+      GAME_RECORD_SELECT +
+        " WHERE c.kind=? AND json_extract(e.value,'$.namespace')=? AND instr(lower(json_extract(e.value,'$.gameId')),?)>0 LIMIT 30",
+    )
+      .bind(localKind, namespace, stem.toLowerCase())
+      .all();
+    const records = (related.results || []).map((r) => gameRecordView(r));
+    const effect = records
+      .filter((r) => /(?:effect|_des|_desc)/i.test(r.gameId))
+      .map((r) => r.values.ru || '')
+      .filter(Boolean)
+      .join('\n');
+    const imageRows = await env.DB.prepare(
+      GAME_RECORD_SELECT +
+        " WHERE c.kind='image' AND instr(json_extract(e.value,'$.search'),?)>0 LIMIT 8",
+    )
+      .bind(stem.toLowerCase())
+      .all();
+    const image = (imageRows.results || [])
+      .map((r) => gameRecordView(r))
+      .find((r) => r.assets.length);
+    source.items.push({
+      name: name.values.ru || name.values.en,
+      imageUrl: name.assets[0]?.url || image?.assets[0]?.url || '',
+      description: /\{\d+\}/.test(effect)
+        ? ''
+        : effect.replace(/<cf>/g, '\n').replace(/<[^>]+>/g, ''),
+      stats: [],
+      sourceUrl: 'https://bonaqu.github.io/nte-meta/#/admin/game-data',
+    });
+  }
+  return {
+    ...source,
+    status: source.items.length ? 'ok' : 'empty',
+    message: source.items.length
+      ? 'Русские названия из клиента. Параметры, требующие уровня экипировки, нужно выбрать в характеристиках.'
+      : 'Совпадений в локальном справочнике нет.',
+  };
+}
+
+async function buildLocalGameCharacterSource(env, character) {
+  const source = {
+    id: 'local-installed-game',
+    name: 'Локальные файлы игры · RU/EN/JA/ZH',
+    url: 'https://bonaqu.github.io/nte-meta/#/admin/game-data',
+    trust: 'высокий',
+    status: 'reference',
+    suggestions: [],
+  };
+  const names = [character.originalName, character.name]
+    .filter(Boolean)
+    .map((n) => n.trim().toLowerCase());
+  const rows = await env.DB.prepare(
+    GAME_RECORD_SELECT +
+      " WHERE c.kind='character' AND json_extract(e.value,'$.namespace')='ST_Player' AND instr(json_extract(e.value,'$.gameId'),'Role_Name_')=1",
+  ).all();
+  const identity = (rows.results || [])
+    .map((r) => gameRecordView(r))
+    .find((r) =>
+      Object.values(r.values).some((v) => names.includes(v.toLowerCase())),
+    );
+  if (!identity)
+    return {
+      ...source,
+      message: 'Персонаж не сопоставлен с игровым ID в локальном справочнике.',
+    };
+  const owner = identity.ownerId;
+  const own = await env.DB.prepare(
+    GAME_RECORD_SELECT +
+      " WHERE c.kind IN ('character','skill','awakening','biography','wardrobe','image') AND json_extract(e.value,'$.ownerId')=? AND (instr(json_extract(e.value,'$.originalId'),'row:')=1 OR c.kind IN ('skill','image')) LIMIT 600",
+  )
+    .bind(owner)
+    .all();
+  const records = (own.results || []).map((r) => gameRecordView(r));
+  const refs = new Set();
+  function collect(value) {
+    if (!value || typeof value !== 'object') return;
+    if (value.TableId && value.Key)
+      refs.add(value.TableId.split('.').at(-1) + '::' + value.Key);
+    for (const child of Object.values(value)) collect(child);
+  }
+  for (const record of records) collect(record.details);
+  const localized = refs.size
+    ? await env.DB.prepare(
+        GAME_RECORD_SELECT +
+          " WHERE c.kind IN ('biography','wardrobe','character','skill') AND json_extract(e.value,'$.namespace')||'::'||json_extract(e.value,'$.gameId') IN (SELECT value FROM json_each(?))",
+      )
+        .bind(JSON.stringify([...refs]))
+        .all()
+    : { results: [] };
+  const dictionary = new Map(
+    (localized.results || []).map((raw) => {
+      const row = gameRecordView(raw);
+      return [row.namespace + '::' + row.gameId, row.values.ru || ''];
+    }),
+  );
+  const plain = (value) =>
+    String(value || '')
+      .replace(/<cf>/g, '\n\n')
+      .replace(/<[^>]+>/g, '')
+      .trim();
+  function ru(value) {
+    if (!value) return '';
+    if (typeof value === 'string') return plain(value);
+    if (value.CultureInvariantString)
+      return plain(value.CultureInvariantString);
+    return plain(
+      dictionary.get(value.TableId?.split('.').at(-1) + '::' + value.Key) || '',
+    );
+  }
+  function add(field, label, value) {
+    const item = makeImportSuggestion(field, label, value, source, 'high');
+    if (item) source.suggestions.push(item);
+  }
+  add('name', 'Имя', identity.values.ru || '');
+  const icons = records.filter((r) => r.kind === 'image');
+  const portrait = icons.find(
+    (r) => r.gameId.toLowerCase() === `yh_lihui_${owner}_01`,
+  );
+  if (portrait?.assets[0])
+    add('imageUrl', 'Карточка персонажа', portrait.assets[0].url);
+  const file = records.find(
+    (r) => r.namespace.endsWith('FileDataTable') && r.gameId === owner,
+  )?.details;
+  if (file) {
+    add('profile.birthday', 'День рождения', ru(file.Birthday));
+    add('profile.faction', 'Организация', ru(file.HomePlace));
+    const bio = [
+      ru(file.Introduction),
+      ...(file.DetailContent || []).map((p) => ru(p.Content)),
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+    if (bio) add('profile.biography', 'Биография', bio.slice(0, 16000));
+    const languages = {
+      Audio_Chinese: 'Китайский',
+      Audio_English: 'Английский',
+      Audio_Japanese: 'Японский',
+      Audio_Korean: 'Корейский',
+    };
+    add(
+      'profile.voiceActors',
+      'Актёры озвучки',
+      (file.CVNameArr || [])
+        .map((r) => ({
+          language: languages[String(r.AudioType).split('::').at(-1)],
+          name: ru(r.CVName),
+        }))
+        .filter((r) => r.language && r.name),
+    );
+  }
+  const skills = records.filter(
+    (r) =>
+      r.kind === 'skill' &&
+      /_name$/i.test(r.gameId) &&
+      /^GA_/i.test(r.gameId) &&
+      /_(?:Melee|Skill|Ultra|Ultimate|QTE|Passive|ProSkill)/i.test(r.gameId) &&
+      isCleanImportedAbilityName(plain(r.values.ru)),
+  );
+  const abilities = skills.slice(0, 16).map((r) => {
+    const stem = r.gameId.replace(/_name$/i, '');
+    const description = records.find(
+      (d) =>
+        d.namespace === r.namespace &&
+        [stem + '_des', stem + '_desc'].some(
+          (k) => k.toLowerCase() === d.gameId.toLowerCase(),
+        ),
+    );
+    const alias = r.namespace.replace(/_SkillDes$/i, '');
+    const category = /pass|passive/i.test(stem)
+      ? 'Passive'
+      : /ultra|ultimate/i.test(stem)
+        ? 'Ultra'
+        : /qte/i.test(stem)
+          ? 'QTE'
+          : /melee/i.test(stem)
+            ? 'Melee'
+            : 'Skill';
+    const icon = icons.find((i) =>
+      i.gameId.toLowerCase().startsWith((alias + '_' + category).toLowerCase()),
+    );
+    return {
+      id: r.gameId,
+      name: plain(r.values.ru),
+      type:
+        category === 'Passive'
+          ? 'Пассивный навык'
+          : category === 'Ultra'
+            ? 'Сверхспособность'
+            : category === 'Melee'
+              ? 'Базовая атака'
+              : category === 'QTE'
+                ? 'Навык поддержки'
+                : 'Навык перенаправления',
+      iconUrl: icon?.assets[0]?.url || '',
+      description: plain(description?.values.ru || ''),
+    };
+  });
+  const abilityIcons = abilities
+    .filter((a) => a.iconUrl)
+    .map(({ name, type, iconUrl }) => ({ name, type, iconUrl }));
+  if (abilityIcons.length)
+    add(
+      'profile.abilityIcons',
+      'Иконки навыков из локальной игры',
+      abilityIcons,
+    );
+  const completeAbilities = abilities.filter(
+    (a) => a.description && !/\{\d+\}/.test(a.description),
+  );
+  if (completeAbilities.length)
+    add('profile.abilities', 'Навыки из локальной игры', completeAbilities);
+  const skins = records
+    .filter(
+      (r) =>
+        r.kind === 'wardrobe' &&
+        r.details?.AppearanceType === 'EAppearanceType::Fashion',
+    )
+    .map((r) => ({
+      id: r.gameId,
+      name: ru(r.details.Name),
+      description: ru(r.details.Desc),
+      imageUrl:
+        r.assets.find((a) => /PortraitImg|2160|1024|lihui/i.test(a.path || ''))
+          ?.url ||
+        r.assets[0]?.url ||
+        '',
+    }))
+    .filter((r) => r.name && r.imageUrl)
+    .slice(0, 40);
+  if (skins.length) add('profile.skins', 'Гардероб из локальной игры', skins);
+  return {
+    ...source,
+    status: source.suggestions.length ? 'ok' : 'reference',
+    message: `Игровой ID ${owner}. Официальные строки установленного клиента; перед применением проверьте выбранные поля.`,
+  };
+}
+
+const GAME_RECORD_KINDS = new Set([
+  'character',
+  'skill',
+  'awakening',
+  'arc',
+  'cartridge',
+  'affinity',
+  'wardrobe',
+  'biography',
+  'stat',
+  'item',
+  'localization',
+  'image',
+]);
+const GAME_RECORD_SELECT = `SELECT e.value AS source_json,COALESCE(o.overrides_json,'{}') AS overrides_json,
+ json_extract(e.value,'$.sourceHash')||':'||COALESCE(o.revision,0) AS revision,
+ COALESCE(o.revision,0) AS override_revision,COALESCE(o.updated_at,c.updated_at) AS updated_at
+ FROM game_source_chunks c,json_each(c.records_json) e
+ LEFT JOIN game_record_overrides o ON o.id=json_extract(e.value,'$.id')`;
+
+function gameRecordView(row, summary = false) {
+  const source = JSON.parse(row.source_json),
+    overrides = JSON.parse(row.overrides_json);
+  const effective = {
+    ...source,
+    ...overrides,
+    values: { ...source.values, ...overrides.values },
+    revision: row.revision,
+    updatedAt: row.updated_at,
+    modified: Object.keys(overrides).length > 0,
+  };
+  delete effective.search;
+  if (summary)
+    return {
+      id: effective.id,
+      kind: effective.kind,
+      namespace: effective.namespace,
+      gameId: effective.gameId,
+      ownerId: effective.ownerId,
+      values: effective.values,
+      assets: effective.assets?.slice(0, 3) || [],
+      revision: row.revision,
+      modified: effective.modified,
+    };
+  delete source.search;
+  return { ...effective, original: source };
+}
+async function getGameDataRow(env, id) {
+  const chunk = id.match(/^([a-z-]+:[a-f0-9]{2})\|/)?.[1];
+  if (!chunk) throwHttp('Некорректный ID записи', 400);
+  return env.DB.prepare(
+    GAME_RECORD_SELECT + " WHERE c.id=? AND json_extract(e.value,'$.id')=?",
+  )
+    .bind(chunk, id)
+    .first();
+}
+async function handleGameData(request, env, parts) {
+  if (parts[1] === 'localize' && request.method === 'POST') {
+    await requireRole(request, env, CONTENT_ROLE);
+    const body = await readJson(request);
+    return json({
+      data: await gameTermReplacements(env, cleanString(body.text, 1, 12000)),
+    });
+  }
+  const actor = await requireRole(request, env, ADMIN_ROLE),
+    url = new URL(request.url);
+  if (request.method === 'GET' && parts[1] === 'stats') {
+    const rows = await env.DB.prepare(
+      'SELECT kind,SUM(record_count) AS count FROM game_source_chunks GROUP BY kind ORDER BY kind',
+    ).all();
+    const latest = await env.DB.prepare(
+      'SELECT status,record_count,updated_at FROM game_import_runs ORDER BY updated_at DESC LIMIT 1',
+    ).first();
+    return json({
+      data: {
+        kinds: rows.results || [],
+        total: (rows.results || []).reduce((n, r) => n + r.count, 0),
+        import: latest,
+      },
+    });
+  }
+  if (request.method === 'GET' && parts[1] === 'record') {
+    const row = await getGameDataRow(
+      env,
+      cleanString(url.searchParams.get('id'), 1, 500),
+    );
+    if (!row) throwHttp('Запись не найдена', 404);
+    return json({ data: gameRecordView(row) });
+  }
+  if (request.method === 'GET' && parts[1] === 'records') {
+    const query = String(url.searchParams.get('q') || '')
+      .trim()
+      .slice(0, 150)
+      .toLowerCase();
+    const kind = String(url.searchParams.get('kind') || ''),
+      owner = String(url.searchParams.get('owner') || '').slice(0, 100);
+    const offset = Math.max(
+      0,
+      Math.min(1000000, Number(url.searchParams.get('offset')) || 0),
+    );
+    const clauses = [],
+      params = [];
+    if (kind) {
+      if (!GAME_RECORD_KINDS.has(kind))
+        throwHttp('Неизвестный тип записи', 400);
+      clauses.push(
+        "(c.kind=? OR c.id IN (SELECT chunk_id FROM game_record_overrides WHERE json_extract(overrides_json,'$.kind')=?)) AND COALESCE(json_extract(o.overrides_json,'$.kind'),json_extract(e.value,'$.kind'))=?",
+      );
+      params.push(kind, kind, kind);
+    }
+    if (owner) {
+      clauses.push(
+        "COALESCE(json_extract(o.overrides_json,'$.ownerId'),json_extract(e.value,'$.ownerId'))=?",
+      );
+      params.push(owner);
+    }
+    if (query) {
+      const tokens = query.match(/[\p{L}\p{N}]+/gu) || [];
+      if (!tokens.length)
+        return json({ data: { items: [], nextOffset: null } });
+      if (
+        /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(query)
+      ) {
+        clauses.push('(instr(c.search_text,?)>0 OR instr(o.search_text,?)>0)');
+        params.push(query, query);
+      } else {
+        clauses.push(
+          '(c.rowid IN (SELECT rowid FROM game_chunks_fts WHERE game_chunks_fts MATCH ?) OR c.id IN (SELECT chunk_id FROM game_record_overrides WHERE instr(search_text,?)>0))',
+        );
+        params.push(
+          tokens
+            .slice(0, 12)
+            .map((t) => '"' + t + '"*')
+            .join(' AND '),
+          query,
+        );
+      }
+      for (const token of tokens.slice(0, 12)) {
+        clauses.push(
+          "instr(COALESCE(o.search_text,'')||json_extract(e.value,'$.search'),?)>0",
+        );
+        params.push(token);
+      }
+    }
+    const rows = await env.DB.prepare(
+      GAME_RECORD_SELECT +
+        (clauses.length ? ' WHERE ' + clauses.join(' AND ') : '') +
+        ' ORDER BY c.id LIMIT 31 OFFSET ?',
+    )
+      .bind(...params, offset)
+      .all();
+    return json({
+      data: {
+        items: (rows.results || [])
+          .slice(0, 30)
+          .map((r) => gameRecordView(r, true)),
+        nextOffset: rows.results?.length > 30 ? offset + 30 : null,
+      },
+    });
+  }
+  if (parts[1] === 'record' && request.method === 'PATCH') {
+    const body = await readJson(request),
+      id = cleanString(body.id, 1, 500),
+      row = await getGameDataRow(env, id);
+    if (!row) throwHttp('Запись не найдена', 404);
+    if (body.revision !== row.revision)
+      throwHttp(
+        'Запись уже изменена. Откройте её заново, чтобы сохранить свои правки.',
+        409,
+      );
+    const source = JSON.parse(row.source_json),
+      overrides = body.reset ? {} : body.overrides;
+    if (
+      !overrides ||
+      Array.isArray(overrides) ||
+      typeof overrides !== 'object' ||
+      Object.keys(overrides).some(
+        (k) => !['values', 'details', 'assets', 'kind', 'ownerId'].includes(k),
+      )
+    )
+      throwHttp('Некорректные поля записи', 400);
+    if (overrides.kind !== undefined && !GAME_RECORD_KINDS.has(overrides.kind))
+      throwHttp('Неизвестный тип записи', 400);
+    if (
+      overrides.ownerId !== undefined &&
+      (typeof overrides.ownerId !== 'string' || overrides.ownerId.length > 100)
+    )
+      throwHttp('Некорректный ID владельца', 400);
+    if (
+      overrides.values !== undefined &&
+      (!overrides.values ||
+        Array.isArray(overrides.values) ||
+        typeof overrides.values !== 'object' ||
+        Object.entries(overrides.values).some(
+          ([k, v]) =>
+            !['ru', 'en', 'ja', 'zh'].includes(k) ||
+            typeof v !== 'string' ||
+            v.length > 32000,
+        ))
+    )
+      throwHttp('Некорректные переводы', 400);
+    if (
+      overrides.details !== undefined &&
+      (!overrides.details ||
+        typeof overrides.details !== 'object' ||
+        Array.isArray(overrides.details))
+    )
+      throwHttp('Данные должны быть JSON-объектом', 400);
+    if (
+      overrides.assets !== undefined &&
+      (!Array.isArray(overrides.assets) ||
+        overrides.assets.length > 80 ||
+        overrides.assets.some(
+          (a) =>
+            !a ||
+            typeof a.url !== 'string' ||
+            !/^https:\/\/|^\/nte-meta\/game-assets\/[a-f0-9]{20}\.webp$/.test(
+              a.url,
+            ),
+        ))
+    )
+      throwHttp('Некорректные изображения', 400);
+    const encoded = JSON.stringify(overrides);
+    if (new TextEncoder().encode(encoded).length > 250000)
+      throwHttp('Слишком большая запись', 413);
+    const search = [
+      source.gameId,
+      source.namespace,
+      ...Object.values({ ...source.values, ...overrides.values }),
+    ]
+      .join(' ')
+      .toLowerCase();
+    const result = await env.DB.prepare(
+      `INSERT INTO game_record_overrides(id,chunk_id,overrides_json,search_text)
+   SELECT ?,?,?,? FROM game_source_chunks c,json_each(c.records_json) e WHERE c.id=? AND json_extract(e.value,'$.id')=? AND json_extract(e.value,'$.sourceHash')=?
+   ON CONFLICT(id) DO UPDATE SET overrides_json=excluded.overrides_json,search_text=excluded.search_text,revision=game_record_overrides.revision+1,updated_at=CURRENT_TIMESTAMP WHERE game_record_overrides.revision=?`,
+    )
+      .bind(
+        id,
+        id.split('|')[0],
+        encoded,
+        search,
+        id.split('|')[0],
+        id,
+        source.sourceHash,
+        row.override_revision,
+      )
+      .run();
+    if (!result.meta.changes)
+      throwHttp('Запись уже изменена. Откройте её заново.', 409);
+    await logAudit(env, actor.id, 'game_data.update', id, {
+      reset: Boolean(body.reset),
+      fields: Object.keys(overrides),
+    });
+    return json({ data: gameRecordView(await getGameDataRow(env, id)) });
+  }
+  return json({ error: 'API endpoint не найден' }, 404);
+}
+async function gameTermReplacements(env, text) {
+  const cjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(
+    text,
+  );
+  const words = Array.from(
+    new Set(text.match(/[\p{L}\p{N}]{3,40}/gu) || []),
+  ).slice(0, 32);
+  if (!words.length && !cjk) return { text, matches: [] };
+  const en =
+    "COALESCE(json_extract(o.overrides_json,'$.values.en'),json_extract(e.value,'$.values.en'))";
+  const ja =
+    "COALESCE(json_extract(o.overrides_json,'$.values.ja'),json_extract(e.value,'$.values.ja'))";
+  const zh =
+    "COALESCE(json_extract(o.overrides_json,'$.values.zh'),json_extract(e.value,'$.values.zh'))";
+  const candidates = cjk
+    ? '1=1'
+    : `(c.rowid IN (SELECT rowid FROM game_chunks_fts WHERE game_chunks_fts MATCH ?) OR c.id IN (SELECT chunk_id FROM game_record_overrides WHERE
+   (length(json_extract(overrides_json,'$.values.en'))>=3 AND instr(lower(?),lower(json_extract(overrides_json,'$.values.en')))>0)
+   OR (length(json_extract(overrides_json,'$.values.ja'))>=2 AND instr(?,json_extract(overrides_json,'$.values.ja'))>0)
+   OR (length(json_extract(overrides_json,'$.values.zh'))>=2 AND instr(?,json_extract(overrides_json,'$.values.zh'))>0)))`;
+  const rows = await env.DB.prepare(
+    GAME_RECORD_SELECT +
+      ` WHERE c.kind IN ('character','skill','awakening','arc','cartridge','item')
+ AND ${candidates}
+ AND json_extract(e.value,'$.term')=1 AND
+ ((length(${en})>=3 AND instr(lower(?),lower(${en}))>0)
+ OR (length(${ja})>=2 AND instr(?,${ja})>0)
+ OR (length(${zh})>=2 AND instr(?,${zh})>0)) LIMIT 250`,
+  )
+    .bind(
+      ...(cjk
+        ? []
+        : [words.map((w) => '"' + w + '"*').join(' OR '), text, text, text]),
+      text,
+      text,
+      text,
+    )
+    .all();
+  const terms = new Map();
+  for (const raw of rows.results || []) {
+    const row = gameRecordView(raw);
+    const priority = Object.keys(JSON.parse(raw.overrides_json).values || {})
+      .length
+      ? 1
+      : 0;
+    for (const name of [row.values.en, row.values.ja, row.values.zh]) {
+      if (
+        !row.values.ru ||
+        !name ||
+        name.length < 2 ||
+        name.length > 150 ||
+        name === row.values.ru
+      )
+        continue;
+      const key = name.toLowerCase(),
+        old = terms.get(key);
+      if (old && old.priority > priority) continue;
+      terms.set(
+        key,
+        old && old.priority === priority && old.to !== row.values.ru
+          ? { ...old, ambiguous: true }
+          : {
+              from: name,
+              to: row.values.ru,
+              id: row.id,
+              priority,
+              ambiguous: old?.priority === priority ? old?.ambiguous : false,
+            },
+      );
+    }
+  }
+  const matches = [];
+  let result = text;
+  for (const term of [...terms.values()]
+    .filter((t) => !t.ambiguous)
+    .sort((a, b) => b.from.length - a.from.length)) {
+    const escaped = term.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const latin = /^[\p{Script=Latin}\p{N}\p{P}\p{Z}]+$/u.test(term.from);
+    const pattern = new RegExp(
+      latin ? '(?<![\\p{L}\\p{N}])' + escaped + '(?![\\p{L}\\p{N}])' : escaped,
+      'giu',
+    );
+    if (pattern.test(result)) {
+      pattern.lastIndex = 0;
+      result = result.replace(pattern, () => term.to);
+      matches.push({ from: term.from, to: term.to, id: term.id });
+    }
+  }
+  return { text: result, matches };
+}
+
 function parseKaidenEquipment(html, url, kind) {
   const start = html.search(/<h1\b/i);
   const article = html

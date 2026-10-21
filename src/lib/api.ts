@@ -623,3 +623,46 @@ export function findEquipment(query: string, kind: 'arcs' | 'cartridges') {
 export async function deleteEntity(path: string) {
   return request<{ success: boolean }>(path, { method: 'DELETE' });
 }
+
+export type GameDataRecordSource = {
+  id: string;
+  kind: string;
+  namespace: string;
+  gameId: string;
+  ownerId: string;
+  values: Partial<Record<'ru' | 'en' | 'ja' | 'zh', string>>;
+  details: Record<string, unknown>;
+  assets: Array<{ url: string; path?: string }>;
+};
+export type GameDataRecord = GameDataRecordSource & {
+  revision: string;
+  modified: boolean;
+  original?: GameDataRecordSource;
+};
+export function loadGameRecords(query: URLSearchParams) {
+  return request<{ items: GameDataRecord[]; nextOffset: number | null }>(
+    `/api/game-data/records?${query}`,
+  );
+}
+export function loadGameRecord(id: string) {
+  return request<GameDataRecord>(
+    `/api/game-data/record?id=${encodeURIComponent(id)}`,
+  );
+}
+export function loadGameDataStats() {
+  return request<{
+    total: number;
+    kinds: Array<{ kind: string; count: number }>;
+  }>('/api/game-data/stats');
+}
+export function saveGameRecord(
+  id: string,
+  revision: string,
+  overrides: Partial<GameDataRecord>,
+  reset = false,
+) {
+  return request<GameDataRecord>('/api/game-data/record', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, revision, overrides, reset }),
+  });
+}

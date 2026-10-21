@@ -32,6 +32,7 @@ const languageLabels: Record<LeakCandidate['language'], string> = {
   ru: 'Русский',
   en: 'Английский',
   zh: 'Китайский',
+  ja: 'Японский',
   unknown: 'Язык не определён',
 };
 
@@ -267,8 +268,17 @@ export function LeakSubmissionButton() {
 
 export function LeakDiscoveryPanel({
   onPromoted,
+  canCreateNews = false,
+  canCreateLeaks = true,
+  draftDirty = false,
 }: {
-  onPromoted: (leakId: string) => void | Promise<void>;
+  onPromoted: (
+    id: string,
+    destination?: 'news' | 'leaks',
+  ) => void | Promise<void>;
+  canCreateNews?: boolean;
+  canCreateLeaks?: boolean;
+  draftDirty?: boolean;
 }) {
   const [candidates, setCandidates] = useState<LeakCandidate[]>([]);
   const [sources, setSources] = useState<LeakDiscoverySource[]>([]);
@@ -355,6 +365,7 @@ export function LeakDiscoveryPanel({
       ru: sources.filter((source) => source.language === 'ru').length,
       en: sources.filter((source) => source.language === 'en').length,
       zh: sources.filter((source) => source.language === 'zh').length,
+      ja: sources.filter((source) => source.language === 'ja').length,
     }),
     [sources],
   );
@@ -441,9 +452,19 @@ export function LeakDiscoveryPanel({
     setActionId('');
   }
 
-  async function promote(candidate: LeakCandidate) {
+  async function promote(
+    candidate: LeakCandidate,
+    destination: 'news' | 'leaks' = 'leaks',
+  ) {
+    if (draftDirty) {
+      setTone('danger');
+      setMessage(
+        'Сохраните открытый черновик перед созданием другого материала.',
+      );
+      return;
+    }
     setActionId(candidate.id);
-    const result = await promoteLeakCandidate(candidate.id);
+    const result = await promoteLeakCandidate(candidate.id, destination);
     if (result.ok) {
       setCandidates((current) =>
         current.map((item) =>
@@ -452,6 +473,7 @@ export function LeakDiscoveryPanel({
                 ...item,
                 reviewStatus: 'accepted',
                 createdLeakId: result.data.leakId,
+                createdNewsId: result.data.newsId,
               }
             : item,
         ),
@@ -460,7 +482,9 @@ export function LeakDiscoveryPanel({
       setMessage(
         'Создан непубличный черновик. Проверьте перевод и факты справа.',
       );
-      await onPromoted(result.data.leakId);
+      const createdId = result.data.newsId || result.data.leakId;
+      if (createdId)
+        await onPromoted(createdId, result.data.newsId ? 'news' : 'leaks');
     } else {
       setTone('danger');
       setMessage(result.error);
@@ -714,7 +738,7 @@ export function LeakDiscoveryPanel({
             <div>
               <strong>
                 {sourceSummary.ru} RU · {sourceSummary.en} EN ·{' '}
-                {sourceSummary.zh} CN
+                {sourceSummary.zh} CN · {sourceSummary.ja} JP
               </strong>
               <span>языковой охват</span>
             </div>
@@ -734,6 +758,17 @@ export function LeakDiscoveryPanel({
                   · {languageLabels[source.language]}
                 </small>
                 <small>{source.message}</small>
+                {source.lastPublishedAt ? (
+                  <small>
+                    Последняя публикация:{' '}
+                    {new Date(source.lastPublishedAt).toLocaleDateString(
+                      'ru-RU',
+                    )}
+                    {source.stale ? ' · источник неактивен' : ''}
+                  </small>
+                ) : source.mode === 'automatic' && source.status === 'ok' ? (
+                  <small>Дата публикации не определена</small>
+                ) : null}
                 <a href={source.url} target="_blank" rel="noreferrer">
                   Открыть <ExternalLink aria-hidden="true" />
                 </a>
@@ -886,6 +921,11 @@ export function LeakDiscoveryPanel({
                 <span>Выбрать публикацию</span>
               </label>
               <div className="leak-candidate-meta">
+                <span>
+                  {candidate.contentKind === 'news'
+                    ? 'Новость'
+                    : 'Слух или утечка'}
+                </span>
                 <span className={`leak-status ${candidate.suggestedStatus}`}>
                   {candidate.suggestedStatus}
                 </span>
@@ -1047,16 +1087,30 @@ export function LeakDiscoveryPanel({
               <div className="comment-actions">
                 {candidate.reviewStatus === 'pending' ? (
                   <>
-                    <button
-                      className="primary-button"
-                      type="button"
-                      disabled={
-                        actionId === candidate.id || actionId === 'bulk'
-                      }
-                      onClick={() => void promote(candidate)}
-                    >
-                      <FilePenLine aria-hidden="true" /> В черновик
-                    </button>
+                    {canCreateNews ? (
+                      <button
+                        className="primary-button"
+                        type="button"
+                        disabled={
+                          actionId === candidate.id || actionId === 'bulk'
+                        }
+                        onClick={() => void promote(candidate, 'news')}
+                      >
+                        <FilePenLine aria-hidden="true" /> В черновик новости
+                      </button>
+                    ) : null}
+                    {canCreateLeaks ? (
+                      <button
+                        className="primary-button"
+                        type="button"
+                        disabled={
+                          actionId === candidate.id || actionId === 'bulk'
+                        }
+                        onClick={() => void promote(candidate)}
+                      >
+                        <FilePenLine aria-hidden="true" /> В черновик
+                      </button>
+                    ) : null}
                     <button
                       className="ghost-button"
                       type="button"

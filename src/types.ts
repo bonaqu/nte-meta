@@ -298,7 +298,7 @@ export interface LeakCandidate {
     | 'weibo'
     | 'twitter/x'
     | 'manual';
-  language: 'ru' | 'en' | 'zh' | 'unknown';
+  language: 'ru' | 'en' | 'ja' | 'zh' | 'unknown';
   title: string;
   excerpt: string;
   authorName?: string;
@@ -316,6 +316,8 @@ export interface LeakCandidate {
   editorNote?: string;
   evidence?: LeakCandidateEvidence[];
   createdLeakId?: string;
+  createdNewsId?: string;
+  contentKind?: 'news' | 'leak';
   createdAt: string;
   updatedAt?: string;
 }
@@ -331,6 +333,9 @@ export interface LeakDiscoverySource {
   message: string;
   foundCount: number;
   mode: 'automatic' | 'manual';
+  checkedAt?: string;
+  lastPublishedAt?: string;
+  stale?: boolean;
 }
 
 export interface LeakDiscoveryResult {
@@ -362,6 +367,7 @@ export interface CharacterImportSource {
   trust: 'official' | 'high' | 'medium' | 'low';
   status: 'ok' | 'partial' | 'blocked' | 'failed' | 'reference' | 'timeout';
   message?: string;
+  updatedAt?: string;
 }
 
 export interface CharacterImportSuggestion {
@@ -385,6 +391,7 @@ export interface CharacterImportSuggestion {
 }
 
 export interface CharacterImportLookupResult {
+  checkedAt?: string;
   found: boolean;
   message: string;
   sources: CharacterImportSource[];

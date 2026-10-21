@@ -343,6 +343,9 @@ async function router(request, env, ctx) {
   if (parts[0] === 'guide-import' && parts[1] === 'lookup') {
     return handleGuideImportLookup(request, env);
   }
+  if (parts[0] === 'tier-import' && parts[1] === 'lookup') {
+    return handleTierImportLookup(request, env);
+  }
 
   if (parts[0] === 'system' && parts[1] === 'status') {
     return handleSystemStatus(request, env);
@@ -1553,14 +1556,51 @@ async function handleLeakCandidates(request, env, parts, ctx) {
     await rateLimit(request, env, 'leak-discovery', 6, 10 * 60);
     const body = await readJson(request);
     const query = cleanString(body.query || '', 0, 100);
-    const sourceResults = await mapWithConcurrency(
-      LEAK_DISCOVERY_SOURCES,
-      LEAK_DISCOVERY_CONCURRENCY,
-      (source) => fetchLeakDiscoverySource(source, query),
+    const deadline = Date.now() + 18000;
+    let redditLane = Promise.resolve();
+    const configuredSources = await env.DB.prepare(
+      'SELECT source_url, auto_import_enabled FROM sources',
+    ).all();
+    const disabledUrls = new Set(
+      (configuredSources.results || [])
+        .filter((item) => !item.auto_import_enabled)
+        .map((item) => item.source_url),
     );
-    const discovered = dedupeLeakCandidates(
-      sourceResults.flatMap((source) => source.candidates || []),
-    ).slice(0, 40);
+    const sourceResults = await mapWithConcurrency(
+      LEAK_DISCOVERY_SOURCES.map((source) =>
+        !source.referenceOnly && disabledUrls.has(source.url)
+          ? {
+              ...source,
+              referenceOnly: true,
+              message:
+                'Автопоиск отключён редактором. Источник доступен для ручной сверки.',
+            }
+          : source,
+      ),
+      LEAK_DISCOVERY_CONCURRENCY,
+      (source) => {
+        if (source.type !== 'reddit')
+          return fetchLeakDiscoverySource(source, query, deadline);
+        const result = redditLane.then(() =>
+          fetchLeakDiscoverySource(source, query, deadline),
+        );
+        redditLane = result.catch(() => undefined);
+        return result;
+      },
+    );
+    // One result per source first, then fill by date. A busy channel must not
+    // consume the entire queue before Japanese and Chinese sources are reached.
+    const discovered = dedupeLeakCandidates([
+      ...sourceResults.flatMap(
+        (source) => source.candidates?.slice(0, 1) || [],
+      ),
+      ...sourceResults
+        .flatMap((source) => source.candidates?.slice(1) || [])
+        .sort(
+          (a, b) =>
+            Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0),
+        ),
+    ]).slice(0, 100);
     await upsertLeakCandidates(env, discovered);
     const checkedSourceUrls = [
       ...new Set(
@@ -1599,10 +1639,16 @@ async function handleLeakCandidates(request, env, parts, ctx) {
   }
 
   if (request.method === 'POST' && id && parts[2] === 'promote') {
+    const body = await readJson(request);
+    const destination = body.destination || 'leaks';
+    if (!['news', 'leaks'].includes(destination))
+      return json({ error: 'Выберите новости или сливы' }, 400);
+    if (destination === 'news')
+      await requireContentPermission(request, env, 'leaks', 'edit');
     const actor = await requireContentPermission(
       request,
       env,
-      'leaks',
+      destination,
       'create',
     );
     const candidate = await env.DB.prepare(
@@ -1612,6 +1658,15 @@ async function handleLeakCandidates(request, env, parts, ctx) {
       .first();
     if (!candidate)
       return json({ error: 'Публикация в очереди не найдена' }, 404);
+    if (candidate.created_news_id) {
+      const existing = await env.DB.prepare(
+        'SELECT id, slug FROM news WHERE id = ?',
+      )
+        .bind(candidate.created_news_id)
+        .first();
+      if (existing)
+        return json({ data: { newsId: existing.id, slug: existing.slug } });
+    }
     if (candidate.created_leak_id) {
       const existing = await env.DB.prepare(
         'SELECT id, slug FROM leaks WHERE id = ?',
@@ -1649,6 +1704,38 @@ async function handleLeakCandidates(request, env, parts, ctx) {
       '',
       `[Открыть оригинальный источник](${candidate.source_url})`,
     ].join('\n');
+    if (destination === 'news') {
+      // Separate permission above and a draft status prevent discovery from publishing.
+      const newsId = crypto.randomUUID();
+      const newsSlug = `news-${candidate.id}`;
+      await env.DB.batch([
+        env.DB.prepare(
+          `INSERT INTO news (id, slug, title, summary, body_markdown, author_id, author_name, category, source_name, source_url, image_url, tags_json, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, 'draft')`,
+        ).bind(
+          newsId,
+          newsSlug,
+          title,
+          editorialNotice,
+          bodyMarkdown,
+          actor.id,
+          actor.display_name || 'NTE Meta',
+          'Новости',
+          candidate.source_name,
+          candidate.source_url,
+          JSON.stringify(['из очереди', 'требует проверки']),
+        ),
+        env.DB.prepare(
+          `UPDATE leak_candidates SET review_status = 'accepted', reviewed_by = ?, reviewed_at = current_timestamp, created_news_id = ?, updated_at = current_timestamp WHERE id = ?`,
+        ).bind(actor.id, newsId, candidate.id),
+      ]);
+      ctx.waitUntil(
+        logAudit(env, actor.id, 'leak_candidates.promote_news', candidate.id, {
+          newsId,
+        }),
+      );
+      return json({ data: { newsId, slug: newsSlug } }, 201);
+    }
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO leaks
@@ -1900,6 +1987,8 @@ function serializeLeakCandidate(row) {
         ? metadata.evidence
         : [fallbackEvidence],
     createdLeakId: row.created_leak_id || row.createdLeakId || undefined,
+    createdNewsId: row.created_news_id || row.createdNewsId || undefined,
+    contentKind: metadata.contentKind || 'leak',
     createdAt: row.created_at || row.createdAt || new Date().toISOString(),
     updatedAt: row.updated_at || row.updatedAt || undefined,
   };
@@ -1917,35 +2006,60 @@ function serializeLeakDiscoverySource(source) {
     message: source.message,
     foundCount: source.candidates?.length || 0,
     mode: source.referenceOnly ? 'manual' : 'automatic',
+    checkedAt: source.checkedAt,
+    lastPublishedAt: source.lastPublishedAt,
+    stale: source.stale || false,
   };
 }
 
-async function fetchLeakDiscoverySource(source, query) {
+async function fetchLeakDiscoverySource(
+  source,
+  query,
+  deadline = Date.now() + 18000,
+) {
   if (source.referenceOnly) {
     return { ...source, status: 'manual', candidates: [] };
+  }
+  source = { ...source, checkedAt: new Date().toISOString() };
+  if (Date.now() >= deadline) {
+    return {
+      ...source,
+      status: 'timeout',
+      message: 'Достигнут общий лимит поиска. Повторите запрос.',
+      candidates: [],
+    };
   }
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
-    LEAK_DISCOVERY_TIMEOUT_MS,
+    Math.min(LEAK_DISCOVERY_TIMEOUT_MS, Math.max(1, deadline - Date.now())),
   );
   try {
-    const response = await fetch(source.url, {
+    const response = await fetch(source.fetchUrl || source.url, {
       headers: {
-        accept: 'text/html,application/xhtml+xml',
+        accept:
+          'application/rss+xml,application/atom+xml,application/json,text/html;q=0.9,*/*;q=0.8',
         'user-agent':
           'NTE-Meta-Editorial/1.0 (+https://bonaqu.github.io/nte-meta/)',
       },
       signal: controller.signal,
-      cf: { cacheEverything: true, cacheTtl: 300 },
+      cf: {
+        cacheEverything: true,
+        cacheTtlByStatus: { '200-299': 300, '400-599': 0 },
+      },
     });
     const length = Number(response.headers.get('content-length') || 0);
     if (!response.ok) {
       await discardResponseBody(response);
       return {
         ...source,
-        status: response.status === 403 ? 'blocked' : 'failed',
-        message: `Источник временно недоступен: HTTP ${response.status}`,
+        status: [403, 412, 429].includes(response.status)
+          ? 'blocked'
+          : 'failed',
+        message:
+          response.status === 429
+            ? 'Источник ограничил частоту запросов. Откройте ленту вручную или повторите позже.'
+            : `Источник временно недоступен: HTTP ${response.status}`,
         candidates: [],
       };
     }
@@ -1959,20 +2073,76 @@ async function fetchLeakDiscoverySource(source, query) {
       };
     }
     const html = await readLimitedLeakDiscoveryResponse(response);
-    const candidates = (
+    const parsed =
       source.parser === 'telegram'
         ? parseTelegramLeakCandidates(html, source)
-        : parseNteWikiLeakCandidates(html, source)
-    )
+        : source.parser === 'feed'
+          ? parseFeedCandidates(html, source)
+          : source.parser === 'reddit'
+            ? parseRedditCandidates(html, source)
+            : source.parser === 'wordpress'
+              ? parseWordpressCandidates(html, source)
+              : source.parser === 'official' || source.parser === 'articles'
+                ? parseArticleCandidates(html, source)
+                : parseNteWikiLeakCandidates(html, source);
+    // Maintenance headlines often omit character names. For a filtered search,
+    // inspect the bounded official article text before deciding it does not match.
+    if (source.official && query) {
+      await mapWithConcurrency(parsed.slice(0, 3), 2, async (candidate) => {
+        try {
+          const detail = await fetch(candidate.sourceUrl, {
+            signal: controller.signal,
+            headers: { accept: 'text/html' },
+            cf: {
+              cacheEverything: true,
+              cacheTtlByStatus: { '200-299': 300, '400-599': 0 },
+            },
+          });
+          if (!detail.ok) {
+            await discardResponseBody(detail);
+            return;
+          }
+          const article = await readLimitedLeakDiscoveryResponse(detail);
+          const heading = article.search(/<h1\b/i);
+          candidate.excerpt = cleanLeakCandidateText(
+            htmlToPlainText(heading < 0 ? article : article.slice(heading)),
+            4000,
+          );
+        } catch {
+          /* Keep the headline and original URL if an article is unavailable. */
+        }
+      });
+    }
+    const dated = parsed
+      .map((item) => Date.parse(item.publishedAt || ''))
+      .filter(Number.isFinite);
+    const lastPublishedAt = dated.length
+      ? new Date(Math.max(...dated)).toISOString()
+      : undefined;
+    const cutoff = Date.now() - 90 * 86400000;
+    const stale = !!lastPublishedAt && Date.parse(lastPublishedAt) < cutoff;
+    const candidates = parsed
+      .filter(
+        (item) =>
+          !item.publishedAt ||
+          (Date.parse(item.publishedAt) >= cutoff &&
+            Date.parse(item.publishedAt) <= Date.now() + 2 * 86400000),
+      )
       .filter((candidate) => leakCandidateMatchesSource(candidate, source))
       .filter((candidate) => leakCandidateMatchesQuery(candidate, query))
       .slice(0, 12);
     return {
       ...source,
+      lastPublishedAt,
+      stale,
       status: candidates.length ? 'ok' : 'partial',
       message: candidates.length
         ? `Найдено публикаций: ${candidates.length}`
-        : 'Новых подходящих публикаций не найдено.',
+        : stale
+          ? 'Нет публикаций за последние 90 дней. Источник требует пересмотра.'
+          : parsed.length
+            ? 'Свежих публикаций по фильтру не найдено.'
+            : 'Лента пуста, закрыта или её формат изменился; нужна ручная сверка.',
       candidates,
     };
   } catch (error) {
@@ -2021,6 +2191,12 @@ function parseTelegramLeakCandidates(html, source) {
         )?.[1] || '';
       const text = cleanLeakCandidateText(htmlToPlainText(textHtml), 4000);
       if (!post || text.length < 8) return null;
+      if (
+        /(?:#реклама|\badvertisement\b|\bsponsored\b|казино|casino)/iu.test(
+          text,
+        )
+      )
+        return null;
       const title = leakCandidateTitle(text);
       if (!title) return null;
       const sourceUrl = normalizeLeakCandidateUrl(`https://t.me/${post}`);
@@ -2074,6 +2250,142 @@ function parseNteWikiLeakCandidates(html, source) {
   return candidates;
 }
 
+function discoveryDate(value) {
+  const timestamp =
+    typeof value === 'number' ? value : Date.parse(String(value || ''));
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
+}
+
+function parseFeedCandidates(xml, source) {
+  return Array.from(
+    String(xml).matchAll(/<(item|entry)\b[^>]*>([\s\S]*?)<\/\1>/gi),
+  ).flatMap((match) => {
+    const block = match[2];
+    const field = (name) =>
+      block.match(
+        new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)<\\/${name}>`, 'i'),
+      )?.[1] || '';
+    const plain = (value) =>
+      htmlToPlainText(
+        decodeHtmlEntities(value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')),
+      );
+    const title = cleanLeakCandidateText(plain(field('title')), 180);
+    const link =
+      field('link').trim() ||
+      block.match(/<link\b[^>]*href=["']([^"']+)/i)?.[1];
+    if (!title || !link) return [];
+    let sourceUrl;
+    try {
+      sourceUrl = normalizeLeakCandidateUrl(
+        new URL(decodeHtmlEntities(link), source.url).href,
+      );
+    } catch {
+      return [];
+    }
+    return [
+      buildDiscoveredLeakCandidate({
+        source,
+        sourceUrl,
+        title,
+        excerpt: cleanLeakCandidateText(
+          plain(field('description') || field('summary') || field('content')),
+          4000,
+        ),
+        publishedAt: discoveryDate(
+          field('pubDate') || field('published') || field('updated'),
+        ),
+      }),
+    ];
+  });
+}
+
+function parseRedditCandidates(text, source) {
+  if (/^\s*</.test(text)) return parseFeedCandidates(text, source);
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  return (data?.data?.children || []).flatMap(({ data: post }) => {
+    if (!post?.title || !post.permalink || post.stickied || post.over_18)
+      return [];
+    return [
+      buildDiscoveredLeakCandidate({
+        source,
+        sourceUrl: normalizeLeakCandidateUrl(
+          new URL(post.permalink, 'https://www.reddit.com').href,
+        ),
+        title: post.title,
+        excerpt: post.selftext || post.title,
+        publishedAt: discoveryDate(Number(post.created_utc) * 1000),
+      }),
+    ];
+  });
+}
+
+function parseWordpressCandidates(text, source) {
+  let posts;
+  try {
+    posts = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(posts)) return [];
+  return posts.flatMap((post) => {
+    if (!post.link || !post.title?.rendered) return [];
+    return [
+      buildDiscoveredLeakCandidate({
+        source,
+        sourceUrl: normalizeLeakCandidateUrl(post.link),
+        title: htmlToPlainText(post.title.rendered),
+        excerpt: htmlToPlainText(post.excerpt?.rendered || post.title.rendered),
+        publishedAt: discoveryDate(
+          post.date_gmt ? `${post.date_gmt}Z` : post.date,
+        ),
+      }),
+    ];
+  });
+}
+
+function parseArticleCandidates(html, source) {
+  return Array.from(
+    String(html).matchAll(
+      /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
+    ),
+  ).flatMap((match) => {
+    let url;
+    try {
+      url = new URL(decodeHtmlEntities(match[1]), source.url);
+    } catch {
+      return [];
+    }
+    if (url.hostname !== new URL(source.url).hostname) return [];
+    const pattern =
+      source.parser === 'official'
+        ? /\/article\/news\/\w+\/(\d{4})(\d{2})(\d{2})\/\d+\.html$/
+        : /\/games\/817\/G081722\/(\d{4})(\d{2})(\d{2})\d+\/$/;
+    const date = url.pathname.match(pattern);
+    if (!date) return [];
+    const heading =
+      match[2].match(/<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1] || match[2];
+    const title = cleanLeakCandidateText(htmlToPlainText(heading), 180);
+    if (title.length < 8 || /^(?:画像|関連記事|続きを読む)/.test(title))
+      return [];
+    return [
+      buildDiscoveredLeakCandidate({
+        source,
+        sourceUrl: url.href,
+        title,
+        excerpt: title,
+        publishedAt: discoveryDate(
+          `${date[1]}-${date[2]}-${date[3]}T00:00:00Z`,
+        ),
+      }),
+    ];
+  });
+}
+
 function buildDiscoveredLeakCandidate({
   source,
   sourceUrl,
@@ -2082,8 +2394,15 @@ function buildDiscoveredLeakCandidate({
   publishedAt,
 }) {
   const combined = `${title} ${excerpt}`;
-  const language = detectLeakLanguage(combined) || source.language;
-  const suggestedStatus = inferLeakCandidateStatus(combined);
+  const detected = detectLeakLanguage(combined);
+  const language = detected === 'unknown' ? source.language : detected;
+  // A community post mentioning an "official" announcement is not evidence of confirmation.
+  const inferred = inferLeakCandidateStatus(combined);
+  const suggestedStatus = source.official
+    ? 'подтверждено'
+    : inferred === 'подтверждено'
+      ? 'слух'
+      : inferred;
   const explicitLeak = /(?:leak|datamine|слив|утечк|爆料)/i.test(combined);
   const baseConfidence =
     source.trustLevel === 'высокий'
@@ -2109,6 +2428,12 @@ function buildDiscoveredLeakCandidate({
     submittedBy: null,
     metadata: {
       sourceId: source.id,
+      contentKind:
+        source.official || source.contentKind === 'news'
+          ? 'news'
+          : explicitLeak || source.relevance === 'future'
+            ? 'leak'
+            : 'news',
       requiresTranslation: language !== 'ru',
       translationStatus: language === 'ru' ? 'не требуется' : 'нужен перевод',
       evidence: [
@@ -2258,7 +2583,10 @@ async function upsertLeakCandidates(env, candidates) {
          language = excluded.language,
          published_at = COALESCE(excluded.published_at, leak_candidates.published_at),
          confidence_score = MAX(leak_candidates.confidence_score, excluded.confidence_score),
-         metadata_json = json_patch(leak_candidates.metadata_json, excluded.metadata_json),
+           metadata_json = json_patch(leak_candidates.metadata_json, json_set(excluded.metadata_json, '$.translationStatus',
+             CASE WHEN leak_candidates.title = excluded.title AND leak_candidates.excerpt = excluded.excerpt
+               THEN COALESCE(json_extract(leak_candidates.metadata_json, '$.translationStatus'), json_extract(excluded.metadata_json, '$.translationStatus'))
+               ELSE json_extract(excluded.metadata_json, '$.translationStatus') END)),
          updated_at = current_timestamp`,
     )
       .bind(...group.flatMap(leakCandidateInsertValues))
@@ -2336,6 +2664,7 @@ function inferLeakSourceType(sourceUrl) {
 
 function detectLeakLanguage(value) {
   const text = String(value || '');
+  if (/[\u3040-\u30ff]/.test(text)) return 'ja';
   const cyrillic = (text.match(/[А-Яа-яЁё]/g) || []).length;
   const chinese = (text.match(/[\u3400-\u9fff]/g) || []).length;
   const latin = (text.match(/[A-Za-z]/g) || []).length;
@@ -2399,9 +2728,10 @@ function leakCandidateMatchesSource(candidate, source) {
 function leakCandidateMatchesQuery(candidate, query) {
   const normalized = normalizeImportSearch(query || '');
   if (!normalized) return true;
-  return normalizeImportSearch(
-    `${candidate.title} ${candidate.excerpt} ${candidate.sourceName}`,
-  ).includes(normalized);
+  const text = `${candidate.title} ${candidate.excerpt} ${candidate.sourceName}`;
+  return [text, localizeImportedGuideText(text)].some((value) =>
+    normalizeImportSearch(value).includes(normalized),
+  );
 }
 
 async function handleComments(request, env, ctx) {
@@ -3206,8 +3536,120 @@ function importTimeoutSource(source, message) {
 
 const LEAK_DISCOVERY_TIMEOUT_MS = 5500;
 const LEAK_DISCOVERY_MAX_BYTES = 320000;
-const LEAK_DISCOVERY_CONCURRENCY = 4;
+const LEAK_DISCOVERY_CONCURRENCY = 6;
 const LEAK_DISCOVERY_SOURCES = [
+  {
+    id: 'bahamut-tw',
+    name: '巴哈姆特: 異環 (TW/HK)',
+    url: 'https://forum.gamer.com.tw/B.php?bsn=80679',
+    type: 'website',
+    language: 'zh',
+    trustLevel: 'низкий',
+    referenceOnly: true,
+    message:
+      'Активный форум Тайваня и Гонконга: новости, гайды и отдельный раздел утечек. Нужна ручная сверка оригинала и региона сервера.',
+  },
+  ...[
+    ['en', 'EN'],
+    ['ru', 'RU'],
+    ['jp', 'JP'],
+    ['cn', 'CN'],
+  ].map(([locale, label]) => ({
+    id: `official-news-${locale}`,
+    name: `NTE: официальные новости ${label}`,
+    url: `https://nte.perfectworld.com/${locale}/article/news/`,
+    type: 'website',
+    language: locale === 'jp' ? 'ja' : locale === 'cn' ? 'zh' : locale,
+    trustLevel: 'высокий',
+    parser: 'official',
+    official: true,
+  })),
+  {
+    id: 'neverness-gg-news',
+    name: 'Neverness.gg: новости и события',
+    url: 'https://neverness.gg/feed/',
+    type: 'website',
+    language: 'en',
+    trustLevel: 'средний',
+    parser: 'feed',
+    contentKind: 'news',
+  },
+  {
+    id: 'gematsu-news',
+    name: 'Gematsu: Neverness to Everness',
+    url: 'https://www.gematsu.com/tag/neverness-to-everness/feed',
+    type: 'website',
+    language: 'en',
+    trustLevel: 'средний',
+    parser: 'feed',
+    contentKind: 'news',
+  },
+  {
+    id: 'wotpack-news',
+    name: 'Wotpack: NTE',
+    url: 'https://wotpack.ru/?s=Neverness',
+    fetchUrl:
+      'https://wotpack.ru/wp-json/wp/v2/posts?search=Neverness&per_page=15&_fields=link,title,excerpt,date_gmt',
+    type: 'website',
+    language: 'ru',
+    trustLevel: 'средний',
+    parser: 'wordpress',
+    contentKind: 'news',
+  },
+  {
+    id: '4gamer-jp',
+    name: '4Gamer: NTE 日本',
+    url: 'https://www.4gamer.net/games/817/G081722/',
+    type: 'website',
+    language: 'ja',
+    trustLevel: 'средний',
+    parser: 'articles',
+    contentKind: 'news',
+  },
+  {
+    id: 'telegram-nevernesstoeverness',
+    name: 'Neverness to Everness: RU сообщество',
+    url: 'https://t.me/s/nevernesstoeverness',
+    type: 'telegram',
+    language: 'ru',
+    trustLevel: 'средний',
+    parser: 'telegram',
+  },
+  ...['NTELeaks', 'NevernessToEverness', 'gachagaming'].map((subreddit) => ({
+    id: `reddit-feed-${subreddit.toLowerCase()}`,
+    name: `Reddit r/${subreddit}: новые публикации`,
+    url: `https://www.reddit.com/r/${subreddit}/new/`,
+    fetchUrl: `https://www.reddit.com/r/${subreddit}/new/.rss`,
+    type: 'reddit',
+    language: 'en',
+    trustLevel: 'низкий',
+    parser: 'reddit',
+    requiresGameTag: subreddit === 'gachagaming',
+    ...(subreddit.includes('Leaks')
+      ? { relevance: 'future' }
+      : { contentKind: 'news' }),
+  })),
+  {
+    id: 'official-jp-x',
+    name: 'NTE 公式 X',
+    url: 'https://x.com/NTE_JP',
+    type: 'twitter/x',
+    language: 'ja',
+    trustLevel: 'высокий',
+    referenceOnly: true,
+    message: 'Официальный японский канал. X требует ручного просмотра.',
+  },
+  {
+    id: 'tieba-cn',
+    name: 'Baidu Tieba: 异环',
+    url: 'https://tieba.baidu.com/f?kw=%E5%BC%82%E7%8E%AF',
+    type: 'website',
+    language: 'zh',
+    trustLevel: 'низкий',
+    referenceOnly: true,
+    message:
+      'Китайское сообщество; проверьте дату, автора и первоисточник вручную.',
+  },
   {
     id: 'ntewiki-news',
     name: 'NTE Wiki News',
@@ -3261,16 +3703,6 @@ const LEAK_DISCOVERY_SOURCES = [
     requiresGameTag: true,
   },
   {
-    id: 'telegram-nte',
-    name: 'NTE News & Leaks',
-    url: 'https://t.me/s/NTE_Neverness_to_Everness',
-    type: 'telegram',
-    language: 'en',
-    trustLevel: 'средний',
-    parser: 'telegram',
-    relevance: 'future',
-  },
-  {
     id: 'telegram-seele-nte',
     name: 'Seele NTE Leaks',
     url: 'https://t.me/s/Seele_NTE_Leaks',
@@ -3281,17 +3713,6 @@ const LEAK_DISCOVERY_SOURCES = [
     relevance: 'future',
   },
   {
-    id: 'telegram-stardust',
-    name: 'Stardust Leaks (несколько игр)',
-    url: 'https://t.me/s/StardustLeaks',
-    type: 'telegram',
-    language: 'en',
-    trustLevel: 'низкий',
-    parser: 'telegram',
-    relevance: 'future',
-    requiresGameTag: true,
-  },
-  {
     id: 'telegram-ru',
     name: 'Neverness to Everness RU',
     url: 'https://t.me/s/neverness_to_evernessru',
@@ -3299,7 +3720,7 @@ const LEAK_DISCOVERY_SOURCES = [
     language: 'ru',
     trustLevel: 'средний',
     parser: 'telegram',
-    relevance: 'future',
+    contentKind: 'news',
   },
   {
     id: 'telegram-nte-grace-ru',
@@ -3309,7 +3730,7 @@ const LEAK_DISCOVERY_SOURCES = [
     language: 'ru',
     trustLevel: 'средний',
     parser: 'telegram',
-    relevance: 'future',
+    contentKind: 'news',
   },
   {
     id: 'telegram-nte-news-ru',
@@ -3319,40 +3740,7 @@ const LEAK_DISCOVERY_SOURCES = [
     language: 'ru',
     trustLevel: 'средний',
     parser: 'telegram',
-    relevance: 'future',
-  },
-  {
-    id: 'reddit-nteleaks',
-    name: 'Reddit r/NTELeaks',
-    url: 'https://www.reddit.com/r/NTELeaks/new/',
-    type: 'reddit',
-    language: 'en',
-    trustLevel: 'средний',
-    referenceOnly: true,
-    message:
-      'Reddit блокирует серверный сбор. Откройте свежие публикации вручную.',
-  },
-  {
-    id: 'reddit-nevernessleaks',
-    name: 'Reddit r/NevernessLeaks',
-    url: 'https://www.reddit.com/r/NevernessLeaks/new/',
-    type: 'reddit',
-    language: 'en',
-    trustLevel: 'средний',
-    referenceOnly: true,
-    message:
-      'Отдельный раздел утечек NTE. Сверяйте автора, дату и исходный китайский материал вручную.',
-  },
-  {
-    id: 'reddit-neverness-community',
-    name: 'Reddit r/NevernessToEverness',
-    url: 'https://www.reddit.com/r/NevernessToEverness/search/?q=leak&restrict_sr=1&sort=new',
-    type: 'reddit',
-    language: 'en',
-    trustLevel: 'низкий',
-    referenceOnly: true,
-    message:
-      'Основное сообщество игры. Ищите исходную публикацию, а не принимайте обсуждение за подтверждение.',
+    contentKind: 'news',
   },
   {
     id: 'bilibili-search',
@@ -3399,17 +3787,6 @@ const LEAK_DISCOVERY_SOURCES = [
       'Дополнительный китайский поиск. Перед публикацией сохраните ссылку на исходный пост и контекст.',
   },
   {
-    id: 'official-cn',
-    name: 'NTE China official',
-    url: 'https://x.com/NTE_CN',
-    type: 'twitter/x',
-    language: 'zh',
-    trustLevel: 'высокий',
-    referenceOnly: true,
-    message:
-      'Официальный канал используется для подтверждения или опровержения.',
-  },
-  {
     id: 'official-global',
     name: 'NTE Global official',
     url: 'https://x.com/NTE_GL',
@@ -3426,7 +3803,6 @@ const IMPORT_SOURCE_PRIORITY = new Map([
   ['fandom-ru-api', 98],
   ['wotpack-character-search-ru', 97],
   ['icy-veins-character-profile', 95],
-  ['ntewiki-ru', 96],
   ['gamewith-detail-ru', 94],
   ['interactivemap-profile-ru', 92],
   ['neverness-app-profile', 90],
@@ -3999,6 +4375,7 @@ function characterPathSlugCandidates(character) {
     new Set(
       [
         character.slug,
+        ...(character.slug === 'akane' ? ['akane-rin'] : []),
         nevernessAppCharacterCode(character),
         character.originalName,
       ]
@@ -4035,8 +4412,12 @@ function nevernessAppCharacterCode(character) {
     ['nanally', 'nanally'],
     ['sakiri', 'sagiri'],
     ['shinku', 'shinku'],
-    ['iroy', 'iroi'],
-    ['iroi', 'iroi'],
+    ['iroy', 'oneiroi'],
+    ['iroi', 'oneiroi'],
+    ['oneiroi', 'oneiroi'],
+    ['blackbird', 'blackbird'],
+    ['linko', 'linko'],
+    ['zankou', 'zankou'],
     ['skia', 'skia'],
     ['zero', 'zero'],
   ]);
@@ -4098,6 +4479,7 @@ function characterImportSources(slug, character = {}) {
       id: 'fandom-ru-api',
       name: 'Fandom RU: профиль персонажа',
       trust: 'high',
+      publicUrl: `https://neverness-to-everness.fandom.com/ru/wiki/${fandomRuTitle}`,
       url: `https://neverness-to-everness.fandom.com/ru/api.php?action=query&prop=revisions|pageimages|categories&rvprop=content&rvslots=main&piprop=original&cllimit=100&format=json&formatversion=2&titles=${fandomRuTitle}&origin=*`,
       parser: parseFandomRuApiImport,
       raw: true,
@@ -4118,6 +4500,7 @@ function characterImportSources(slug, character = {}) {
       id: 'fandom-ru-images-api',
       name: 'Fandom RU: изображения',
       trust: 'high',
+      publicUrl: `https://neverness-to-everness.fandom.com/ru/wiki/${fandomRuTitle}`,
       url: `https://neverness-to-everness.fandom.com/ru/api.php?action=query&generator=images&gimlimit=50&prop=imageinfo&iiprop=url|mime|size&format=json&formatversion=2&titles=${fandomRuTitle}&origin=*`,
       parser: parseFandomRuImagesImport,
       raw: true,
@@ -4126,6 +4509,7 @@ function characterImportSources(slug, character = {}) {
       id: 'fandom-ru-media-library',
       name: 'Fandom RU: медиатека персонажа',
       trust: 'high',
+      publicUrl: `https://neverness-to-everness.fandom.com/ru/wiki/${fandomRuTitle}`,
       url: `https://neverness-to-everness.fandom.com/ru/api.php?action=query&list=allimages&aifrom=${fandomRuImagePrefix}&ailimit=50&aiprop=url|mime|size|dimensions&format=json&formatversion=2&origin=*`,
       parser: parseFandomRuAllImagesImport,
       raw: true,
@@ -4161,6 +4545,8 @@ function characterImportSources(slug, character = {}) {
         (pathSlug) => `https://gamewith.ai/nte/ru/character/${pathSlug}`,
       ),
       parser: parseGameWithCharacterDetailImport,
+      resolveUrl: resolveCatalogueImportSource,
+      cacheTtl: 1800,
       extractImages: true,
       raw: true,
     },
@@ -4224,31 +4610,6 @@ function characterImportSources(slug, character = {}) {
         'Источник содержит текст и внутренние audio-event ID, но не прямые аудиофайлы и не русскую локализацию. Автозаполнение реплик отключено, чтобы не публиковать английский текст как русский.',
     },
     {
-      id: 'ntewiki-ru',
-      name: 'NTE Wiki RU',
-      trust: 'high',
-      url: `https://ntewiki.org/ru/characters/${pathSlugs[0]}/`,
-      urlCandidates: urlsFor(
-        (pathSlug) => `https://ntewiki.org/ru/characters/${pathSlug}/`,
-      ),
-      parser: parseNteWikiImport,
-      extractImages: true,
-    },
-    {
-      id: 'ntewiki-characters-index',
-      name: 'NTE Wiki RU: персонажи',
-      trust: 'high',
-      url: 'https://ntewiki.org/ru/characters/',
-      parser: parseNteWikiCharactersIndexImport,
-    },
-    {
-      id: 'ntewiki-arcs-ru',
-      name: 'NTE Wiki RU: дуги',
-      trust: 'high',
-      url: 'https://ntewiki.org/ru/arcs/',
-      referenceOnly: true,
-    },
-    {
       id: 'genshin-builds-ru',
       name: 'GenshinBuilds NTE RU',
       trust: 'high',
@@ -4258,6 +4619,8 @@ function characterImportSources(slug, character = {}) {
           `https://genshin-builds.com/ru/neverness-to-everness/characters/${pathSlug}`,
       ),
       parser: parseGenshinBuildsImport,
+      resolveUrl: resolveCatalogueImportSource,
+      cacheTtl: 1800,
       extractImages: true,
     },
     {
@@ -4266,6 +4629,7 @@ function characterImportSources(slug, character = {}) {
       trust: 'medium',
       url: 'https://www.icy-veins.com/neverness-to-everness/tier-list',
       parser: parseIcyVeinsTierImport,
+      raw: true,
     },
     {
       id: 'game8-voice',
@@ -4336,27 +4700,91 @@ function characterImportSources(slug, character = {}) {
       name: 'Kaiden.gg tier list',
       trust: 'medium',
       url: 'https://www.kaiden.gg/nte/characters/tier-list/',
-      parser: parseKaidenTierImport,
+      referenceOnly: true,
+      referenceMessage:
+        'Оценки T0/T1 сверяйте в редакторе тир-листа. Они не равны S/A.',
     },
     {
       id: 'official-ru',
       name: 'Официальный сайт NTE RU',
       trust: 'official',
       url: 'https://nte.perfectworld.com/ru/main.html?nav=2',
-      parser: parseOfficialImport,
+      raw: true,
+      parser: parseOfficialRuBiography,
     },
+  ].filter(Boolean);
+}
+
+function parseOfficialRuBiography(html, source, character) {
+  const keys = {
+    blackbird: 'heiyu',
+    linko: 'lingke',
+    zankou: 'canhong',
+    iroi: 'yi',
+    shinku: 'zhen',
+    chaos: 'ka',
+    lacrimosa: 'an',
+    hotori: 'xun',
+    'esper-zero': 'zero-male',
+    mint: 'mint',
+    nanally: 'nanally',
+    chiz: 'xiaozhi',
+    jiuyuan: 'jiuyuan',
+    hathor: 'hasuoer',
+    baicang: 'baicang',
+    fadia: 'fadiya',
+    daffodill: 'dfde',
+    sakiri: 'zaowu',
+  };
+  const key = keys[character.slug];
+  if (!key) return [];
+  const block = String(html)
+    .split(/<div class="swiper-slide">/i)
+    .find((item) => item.includes(`role-poster-${key}.`));
+  const biography = htmlToPlainText(
+    block?.match(/<dd class="role_text">([\s\S]*?)<\/dd>/i)?.[1] || '',
+  );
+  if (biography.length < 40 || !isPredominantlyRussianText(biography))
+    return [];
+  return [
+    makeImportSuggestion(
+      'profile.biography',
+      'Биография',
+      biography,
+      source,
+      'high',
+      'Только описание выбранного персонажа из официальной русской страницы; соседние персонажи исключены.',
+    ),
   ].filter(Boolean);
 }
 
 function guideImportSources(slug, character = {}) {
   const knownRussianGuides = {
-    hotori: [
+    linko: [
       {
-        id: 'wotpack-hotori-guide-ru',
-        name: 'Wotpack RU: гайд Хотори',
+        id: 'esports-linko-ru',
+        name: 'Esports.ru: Линко',
         trust: 'medium',
-        url: 'https://wotpack.ru/hotori-v-neverness-to-everness-nte-gayd-i-luchshiy-bild/',
+        url: 'https://esports.ru/igrovaya-industriya/guides/linko-v-nte/',
       },
+    ],
+    blackbird: [
+      {
+        id: 'rutab-blackbird-teams-ru',
+        name: 'Rutab: отряды Блэкбёрд',
+        trust: 'medium',
+        url: 'https://rutab.net/b/games/2026/09/30/luchshie-komandy-dlya-blekberd-v-nte-premium-nova-stayn-i-f2p-sborki.html',
+      },
+    ],
+    zankou: [
+      {
+        id: 'rutab-zankou-teams-ru',
+        name: 'Rutab: отряды Занку',
+        trust: 'medium',
+        url: 'https://rutab.net/b/games/2026/08/19/luchshie-komandy-dlya-zankou-v-nte-premium-i-f2p-varianty.html',
+      },
+    ],
+    hotori: [
       {
         id: 'rbkgames-hotori-guide-ru',
         name: 'RBK Games RU: гайд Хотори',
@@ -4389,6 +4817,42 @@ function guideImportSources(slug, character = {}) {
   const urlsFor = (buildUrl) => pathSlugs.map(buildUrl);
 
   return [
+    ...({
+      akane: ['akane-rin-nte-build', 'Аканэ Рин'],
+      blackbird: ['blackbird-nte-build', 'Блэкбёрд'],
+      iroi: ['iroi-nte-build', 'Ирой'],
+      linko: ['linko-best-build-guide', 'Линко'],
+      zankou: ['zankou-nte-build', 'Занку'],
+    }[slug]
+      ? [
+          {
+            id: 'neverness-gg-guide',
+            name: 'Neverness.gg: сборка, отряды и механики (EN)',
+            trust: 'medium',
+            url: `https://neverness.gg/${{ akane: 'akane-rin-nte-build', blackbird: 'blackbird-nte-build', iroi: 'iroi-nte-build', linko: 'linko-best-build-guide', zankou: 'zankou-nte-build' }[slug]}/`,
+            parser: parseNevernessGuideImport,
+            raw: true,
+          },
+        ]
+      : []),
+    ...({
+      blackbird: 'blackbird-rotation-and-team-composition-guide',
+      linko: 'linko-rotation-and-team-composition-guide',
+      zankou: 'zankou-rotation-and-team-composition-guide',
+      iroi: 'iroi-guide-kit-best-teams-and-build',
+    }[slug]
+      ? [
+          {
+            id: 'kaiden-rotation-reference',
+            name: 'Kaiden: подробная ротация и отряды (EN)',
+            trust: 'high',
+            url: `https://www.kaiden.gg/nte/guides/${{ blackbird: 'blackbird-rotation-and-team-composition-guide', linko: 'linko-rotation-and-team-composition-guide', zankou: 'zankou-rotation-and-team-composition-guide', iroi: 'iroi-guide-kit-best-teams-and-build' }[slug]}/`,
+            referenceOnly: true,
+            referenceMessage:
+              'Подробная последовательность действий и условия пробуждений. Для перевода и сверки ротации откройте оригинал.',
+          },
+        ]
+      : []),
     {
       id: 'wotpack-guide-search-ru',
       name: 'Wotpack RU: поиск персонажного гайда',
@@ -4412,6 +4876,8 @@ function guideImportSources(slug, character = {}) {
           `https://genshin-builds.com/ru/neverness-to-everness/characters/${pathSlug}`,
       ),
       parser: parseEditorialGuideImport,
+      resolveUrl: resolveCatalogueImportSource,
+      cacheTtl: 1800,
       extractImages: true,
       raw: true,
     },
@@ -4424,19 +4890,8 @@ function guideImportSources(slug, character = {}) {
         (pathSlug) => `https://gamewith.ai/nte/ru/character/${pathSlug}`,
       ),
       parser: parseGameWithGuideImport,
-      extractImages: true,
-      raw: true,
-    },
-    {
-      id: 'ntewiki-build-guide-ru',
-      name: 'NTE Wiki RU: билд-гайд',
-      trust: 'high',
-      url: `https://ntewiki.org/ru/blog/${pathSlugs[0]}-build-guide-2026/`,
-      urlCandidates: urlsFor(
-        (pathSlug) =>
-          `https://ntewiki.org/ru/blog/${pathSlug}-build-guide-2026/`,
-      ),
-      parser: parseEditorialGuideImport,
+      resolveUrl: resolveCatalogueImportSource,
+      cacheTtl: 1800,
       extractImages: true,
       raw: true,
     },
@@ -4492,7 +4947,7 @@ function guideImportSources(slug, character = {}) {
       cacheTtl: 1800,
     },
     ...additionalGuides,
-  ].map((source) => ({ ...source, character }));
+  ].map((source) => ({ ...source, character, guideOnly: true }));
 }
 
 function buildKnownAffinitySource(character) {
@@ -4777,7 +5232,7 @@ async function fetchImportSource(source, character, deadline) {
   if (source.referenceOnly) {
     return {
       ...source,
-      status: 'partial',
+      status: 'reference',
       message:
         source.referenceMessage ||
         'Справочный источник подключен для ручной проверки; структурированный авторазбор пока не включен.',
@@ -4819,6 +5274,14 @@ async function fetchImportSource(source, character, deadline) {
         suggestions: [],
       };
     }
+    if (activeSource.referenceOnly) {
+      return {
+        ...activeSource,
+        status: 'reference',
+        message: activeSource.referenceMessage,
+        suggestions: [],
+      };
+    }
     const candidateUrls = Array.from(
       new Set(
         [activeSource.url, ...(activeSource.urlCandidates || [])].filter(
@@ -4837,8 +5300,8 @@ async function fetchImportSource(source, character, deadline) {
       ) {
         resolvedSource = {
           ...activeSource,
-          url: candidateUrl,
-          publicUrl: candidateUrl,
+          url: response.url || candidateUrl,
+          publicUrl: activeSource.publicUrl || response.url || candidateUrl,
         };
         break;
       }
@@ -4862,7 +5325,14 @@ async function fetchImportSource(source, character, deadline) {
         suggestions: [],
       };
     }
-    if (length > IMPORT_MAX_HTML_BYTES) {
+    // Kaiden's server-rendered guide is ~620 KB including hydration scripts.
+    // Keep an explicit per-source cap instead of weakening all fetch limits.
+    const maxBytes = ['kaiden-character-guide', 'kaiden-tier-profile'].includes(
+      source.id,
+    )
+      ? 1500000
+      : IMPORT_MAX_HTML_BYTES;
+    if (length > maxBytes) {
       await discardResponseBody(response);
       return {
         ...resolvedSource,
@@ -4871,20 +5341,18 @@ async function fetchImportSource(source, character, deadline) {
         suggestions: [],
       };
     }
-    const html = await readLimitedImportResponse(response);
-    const text = htmlToPlainText(html.slice(0, IMPORT_MAX_HTML_BYTES));
+    const html = await readLimitedImportResponse(response, maxBytes);
+    const text = htmlToPlainText(html);
     const suggestions = [
       ...resolvedSource
-        .parser(
-          resolvedSource.raw ? html.slice(0, IMPORT_MAX_HTML_BYTES) : text,
-          resolvedSource,
-          character,
-        )
+        .parser(resolvedSource.raw ? html : text, resolvedSource, character)
         .filter(Boolean),
       ...extractImportImages(html, resolvedSource, character),
-    ];
+    ].filter((item) => !source.guideOnly || item.field.startsWith('guide.'));
+    const updatedAt = extractImportSourceUpdatedAt(html);
     return {
       ...resolvedSource,
+      ...(updatedAt ? { updatedAt } : {}),
       status: suggestions.length ? 'ok' : 'partial',
       message: suggestions.length
         ? `Найдено предложений: ${suggestions.length}`
@@ -4914,6 +5382,10 @@ async function fetchImportSource(source, character, deadline) {
 
 const KNOWN_WOTPACK_GUIDE_URLS = new Map([
   [
+    'hotori',
+    'https://wotpack.ru/hotori-v-neverness-to-everness-nte-gayd-i-luchshiy-bild/',
+  ],
+  [
     'lacrimosa',
     'https://wotpack.ru/lakrimoza-v-neverness-to-everness-nte-guide-and-build/',
   ],
@@ -4927,33 +5399,72 @@ const KNOWN_WOTPACK_GUIDE_URLS = new Map([
   ],
 ]);
 
+async function resolveCatalogueImportSource(source, character, fetchOptions) {
+  const catalogue = source.id.startsWith('gamewith')
+    ? 'https://gamewith.ai/nte/ru/character'
+    : 'https://genshin-builds.com/ru/neverness-to-everness/characters';
+  const response = await fetch(catalogue, fetchOptions);
+  if (!response.ok) {
+    await discardResponseBody(response);
+    return source;
+  }
+  const html = await readLimitedImportResponse(response);
+  const base = new URL(catalogue);
+  const names = characterPathSlugCandidates(character);
+  for (const match of html.matchAll(/href=["']([^"']+)["']/gi)) {
+    let url;
+    try {
+      url = new URL(decodeHtmlEntities(match[1]), base);
+    } catch {
+      continue;
+    }
+    const prefix = `${base.pathname}/`;
+    if (url.origin !== base.origin || !url.pathname.startsWith(prefix))
+      continue;
+    const slug = url.pathname.slice(prefix.length).replace(/\/$/, '');
+    if (slug.includes('/') || !names.includes(normalizeImportSlug(slug)))
+      continue;
+    return {
+      ...source,
+      url: url.href,
+      publicUrl: url.href,
+      urlCandidates: [],
+      resolveUrl: undefined,
+    };
+  }
+  return {
+    ...source,
+    url: catalogue,
+    publicUrl: catalogue,
+    urlCandidates: [],
+    resolveUrl: undefined,
+    referenceOnly: true,
+    referenceMessage:
+      'В текущем каталоге источника страница этого персонажа отсутствует. Используйте другие найденные источники; каталог проверяется заново при следующем поиске.',
+  };
+}
+
 async function resolveWotpackGuideSource(source, character, fetchOptions) {
   const knownUrl = KNOWN_WOTPACK_GUIDE_URLS.get(
     normalizeImportSlug(
       character?.slug || character?.originalName || character?.name,
     ),
   );
-  if (knownUrl) {
-    return {
-      ...source,
-      name: `Wotpack RU: ${character?.name || character?.originalName || 'гайд персонажа'}`,
-      url: knownUrl,
-      publicUrl: knownUrl,
-      resolveUrl: undefined,
-    };
-  }
+  const fallback = knownUrl
+    ? { ...source, url: knownUrl, publicUrl: knownUrl, resolveUrl: undefined }
+    : null;
   const response = await fetch(source.url, fetchOptions);
   if (!response.ok) {
     await discardResponseBody(response);
-    return null;
+    return fallback;
   }
   const length = Number(response.headers.get('content-length') || 0);
   if (length > 100000) {
     await discardResponseBody(response);
-    return null;
+    return fallback;
   }
   const payload = JSON.parse(await readLimitedImportResponse(response));
-  if (!Array.isArray(payload)) return null;
+  if (!Array.isArray(payload)) return fallback;
   const names = characterNameCandidates(character);
   const match = payload.find((item) => {
     const title = normalizeImportSearch(item?.title || '');
@@ -4965,7 +5476,7 @@ async function resolveWotpackGuideSource(source, character, fetchOptions) {
       /^https:\/\/wotpack\.ru\//i.test(url)
     );
   });
-  if (!match) return null;
+  if (!match) return fallback;
   return {
     ...source,
     name: `Wotpack RU: ${String(match.title).slice(0, 120)}`,
@@ -4975,7 +5486,20 @@ async function resolveWotpackGuideSource(source, character, fetchOptions) {
   };
 }
 
-async function readLimitedImportResponse(response) {
+function extractImportSourceUpdatedAt(html) {
+  const value =
+    html.match(/"dateModified"\s*:\s*"([^"\\]+)"/i)?.[1] ||
+    html.match(
+      /<meta\b[^>]*(?:property|name)=["']article:modified_time["'][^>]*content=["']([^"']+)["']/i,
+    )?.[1];
+  const time = value ? Date.parse(value) : NaN;
+  return Number.isFinite(time) ? new Date(time).toISOString() : undefined;
+}
+
+async function readLimitedImportResponse(
+  response,
+  maxBytes = IMPORT_MAX_HTML_BYTES,
+) {
   if (!response.body) return '';
   const reader = response.body.getReader();
   const decoder = new globalThis.TextDecoder();
@@ -4986,7 +5510,7 @@ async function readLimitedImportResponse(response) {
     const { done, value } = await reader.read();
     if (done) break;
     received += value.byteLength;
-    if (received > IMPORT_MAX_HTML_BYTES) {
+    if (received > maxBytes) {
       await reader.cancel();
       throw new Error('IMPORT_SOURCE_TOO_LARGE');
     }
@@ -5095,9 +5619,7 @@ function readWikiParam(content, key) {
 function normalizeImportedStringList(value) {
   const items = [
     ...new Set(
-      value
-        .map((item) => normalizeImportedRuText(item))
-        .filter(Boolean),
+      value.map((item) => normalizeImportedRuText(item)).filter(Boolean),
     ),
   ].slice(0, 12);
   return items.some((item) => hasRussianText(item))
@@ -6606,267 +7128,6 @@ function parseGame8SkinsImport(text, source, character) {
   ].filter(Boolean);
 }
 
-function parseNteWikiImport(text, source) {
-  const lines = compactImportLines(text);
-  const suggestions = [
-    makeImportSuggestion(
-      'rarity',
-      'Редкость',
-      (lines.find((line) => /^Ранг\s+[SA]/i.test(line)) || '').match(
-        /Ранг\s+([SA])/i,
-      )?.[1] || '',
-      source,
-      'high',
-    ),
-    makeImportSuggestion(
-      'attribute',
-      'Атрибут',
-      nextImportLine(lines, 'Элемент'),
-      source,
-      'high',
-    ),
-    makeImportSuggestion(
-      'profile.birthday',
-      'День рождения',
-      nextImportLine(lines, 'День рождения'),
-      source,
-      'high',
-    ),
-    makeImportSuggestion(
-      'profile.faction',
-      'Фракция',
-      nextImportLine(lines, 'Фракция'),
-      source,
-      'high',
-    ),
-  ];
-  const quote = lines.find((line) => line.startsWith('> '));
-  suggestions.push(
-    makeImportSuggestion(
-      'profile.biographyShort',
-      'Биография',
-      quote ? quote.replace(/^>\s*/, '') : '',
-      source,
-      'medium',
-    ),
-  );
-  const overviewIndex = lines.findIndex(
-    (line) => line === 'Обзор Хотори' || /^Обзор\s+/i.test(line),
-  );
-  const overviewText =
-    overviewIndex >= 0
-      ? lines.slice(overviewIndex + 1, overviewIndex + 4).join('\n\n')
-      : '';
-  if (overviewText && !isSeoImportText(overviewText)) {
-    suggestions.push(
-      makeImportSuggestion(
-        'profile.biography',
-        'Биография',
-        overviewText,
-        source,
-        'medium',
-      ),
-    );
-  }
-  const stats = ['HP', 'ATK', 'DEF', 'Crit', 'CDMG']
-    .map((label) => ({
-      id: crypto.randomUUID(),
-      label,
-      value: nextImportLine(lines, label),
-    }))
-    .filter((item) => item.value);
-  suggestions.push(
-    makeImportSuggestion(
-      'profile.baseStats',
-      'Начальные показатели',
-      stats,
-      source,
-      'medium',
-    ),
-  );
-  const abilityStart = lines.findIndex(
-    (line) => normalizeImportSearch(line) === 'навыки',
-  );
-  const abilityEnd =
-    abilityStart >= 0
-      ? lines.findIndex(
-          (line, index) =>
-            index > abilityStart &&
-            (/^обзор\s+/i.test(line) ||
-              /^как использовать/i.test(line) ||
-              normalizeImportSearch(line) === 'пробуждение' ||
-              normalizeImportSearch(line) === 'материалы прорыва'),
-        )
-      : -1;
-  const pageAbilityNames =
-    abilityStart >= 0
-      ? lines
-          .slice(
-            abilityStart + 1,
-            abilityEnd > abilityStart ? abilityEnd : abilityStart + 14,
-          )
-          .map((line) =>
-            cleanImportImageTitle(line)
-              .replace(/^#+\s*/, '')
-              .replace(/^Image:\s*/i, '')
-              .replace(/\s+Детали$/i, '')
-              .trim(),
-          )
-          .filter(
-            (line) =>
-              line &&
-              !/^#+$/.test(line) &&
-              !/^навыки$/i.test(line) &&
-              !/^пассив/i.test(line) &&
-              !/^пробуж/i.test(line) &&
-              !/^материал/i.test(line) &&
-              !/^обзор/i.test(line),
-          )
-      : [];
-  const faqAbilityNames = parseGenshinBuildsFaqAbilityNames(text);
-  const abilityNames = pageAbilityNames.length
-    ? pageAbilityNames
-    : faqAbilityNames;
-  const abilityTypes = [
-    'Базовая атака',
-    'Навык',
-    'Сверхспособность',
-    'Навык поддержки',
-    'Пассивный навык',
-    'Пассивный навык',
-    'Повседневный навык',
-    'Повседневный навык',
-  ];
-  const abilities = Array.from(new Set(abilityNames))
-    .slice(0, 8)
-    .map((name, index) => ({
-      id: crypto.randomUUID(),
-      name,
-      type: abilityTypes[index] || 'Навык',
-      iconUrl: '',
-      description:
-        'Название найдено в NTE Wiki; описание подтягивается из других источников или заполняется вручную.',
-    }));
-  if (abilities.length) {
-    suggestions.push(
-      makeImportSuggestion(
-        'profile.abilities',
-        'Способности',
-        abilities,
-        source,
-        'medium',
-        'NTE Wiki даёт русские названия и иконки; описания нужно сверить с GameWith или игрой.',
-      ),
-    );
-  }
-  const materialStart = lines.findIndex((line) =>
-    line.includes('Сводка материалов'),
-  );
-  if (materialStart >= 0) {
-    const materials = [];
-    for (
-      let index = materialStart + 1;
-      index < Math.min(lines.length, materialStart + 30);
-      index += 3
-    ) {
-      const name = lines[index];
-      const amount = lines[index + 1];
-      const sourceText = lines[index + 2];
-      if (!name || !hasRussianText(name) || !/^×?\d+/.test(amount || ''))
-        continue;
-      materials.push({
-        id: crypto.randomUUID(),
-        name,
-        iconUrl: '',
-        amount,
-        source: hasRussianText(sourceText)
-          ? sourceText
-          : 'Источник получения указан на странице NTE Wiki.',
-      });
-    }
-    suggestions.push(
-      makeImportSuggestion(
-        'profile.materials',
-        'Материалы прокачки',
-        materials,
-        source,
-        'medium',
-      ),
-    );
-  }
-  return suggestions;
-}
-
-function parseNteWikiCharactersIndexImport(text, source, character) {
-  const lines = compactImportLines(text);
-  const candidates = characterNameCandidates(character);
-  const line = lines.find((item) => {
-    const normalized = normalizeImportSearch(item);
-    return candidates.some(
-      (candidate) =>
-        normalized === candidate ||
-        normalized.startsWith(`${candidate} `) ||
-        normalized.includes(` ${candidate} `),
-    );
-  });
-  if (!line) return [];
-
-  const esperTypes = [
-    'Хаос',
-    'Чары',
-    'Психея',
-    'Психика',
-    'Космос',
-    'Лакшана',
-    'Анима',
-  ];
-  const knownRoles = [
-    'Перенаправление урона',
-    'Усиление разрушения',
-    'Урон со временем',
-    'Взрывной урон',
-    'Усиление урона',
-    'Последующая атака',
-    'Мгновенный цикл',
-    'Основной УВС',
-    'Выживание',
-    'Управление',
-    'Исцеление',
-    'Усиление',
-    'Контроль',
-    'Щит',
-    'Урон',
-  ];
-  const compactLine = line.replace(/\s+/g, ' ').trim();
-  const attribute = esperTypes.find((item) => compactLine.includes(item)) || '';
-  let roleText = compactLine;
-  const matchedName = [character.name, character.originalName, character.slug]
-    .filter(Boolean)
-    .sort((a, b) => String(b).length - String(a).length)
-    .find((name) =>
-      normalizeImportSearch(compactLine).startsWith(
-        normalizeImportSearch(String(name)),
-      ),
-    );
-  if (matchedName) roleText = roleText.slice(String(matchedName).length).trim();
-  if (attribute) roleText = roleText.split(attribute)[0].trim();
-  const roleTags = knownRoles.filter((role) =>
-    normalizeImportSearch(roleText).includes(normalizeImportSearch(role)),
-  );
-
-  return [
-    makeImportSuggestion(
-      'profile.roleTags',
-      'Роли из индекса персонажей',
-      roleTags,
-      source,
-      'medium',
-      'Индекс NTE Wiki полезен для первичного набора тегов роли. Можно принять блок целиком или проверить строки по одной.',
-    ),
-    makeImportSuggestion('attribute', 'Атрибут', attribute, source, 'medium'),
-  ];
-}
-
 function parseGenshinBuildsFaqAbilityNames(text) {
   const match = String(text || '').match(
     /skills include:\s*([^"<.]+)(?:\.|"|<)/i,
@@ -7605,6 +7866,11 @@ function classifyGuideHeading(value) {
 
 function localizeImportedGuideText(value) {
   const replacements = new Map([
+    ['Akane Rin', 'Аканэ Рин'],
+    ['Akane', 'Аканэ Рин'],
+    ['Blackbird', 'Блэкбёрд'],
+    ['Linko', 'Линко'],
+    ['Zankou', 'Занку'],
     ['Baicang', 'Байканг'],
     ['Hotori', 'Хотори'],
     ['Shinku', 'Шинку'],
@@ -7820,6 +8086,68 @@ function parseKaidenGuideImport(html, source, character) {
   }
 
   const suggestions = [];
+  const blocks = extractGuideHeadingBlocks(html);
+  const equipment = blocks.find((block) => block.heading === 'Equipment');
+  if (equipment) {
+    const arcs = [];
+    const modules = [];
+    for (const match of equipment.html.matchAll(
+      /<details\b[\s\S]*?<\/details>/gi,
+    )) {
+      const image = match[0].match(
+        /<img\b[^>]*src="([^"]+)"[^>]*alt="([^"]+)"/i,
+      );
+      if (!image) continue;
+      const arc = /\/Fork\//.test(image[1]);
+      const row = {
+        name: `${arc ? 'Дуга' : 'Картридж'}: ${decodeHtmlEntities(image[2])}`,
+        imageUrl: new URL(image[1], source.url).href,
+        description: /\bBest\b/.test(htmlToPlainText(match[0]))
+          ? 'Основной вариант в источнике. Уточните наложение дуги и условия команды.'
+          : 'Альтернатива в источнике. Не приравнивается к сигнатурному варианту.',
+      };
+      (arc ? arcs : modules).push(row);
+    }
+    suggestions.push(
+      makeImportSuggestion(
+        'guide.bestArcs',
+        'Лучшие дуги',
+        arcs,
+        source,
+        'medium',
+      ),
+    );
+    suggestions.push(
+      makeImportSuggestion(
+        'guide.modules',
+        'Картриджи',
+        modules,
+        source,
+        'medium',
+      ),
+    );
+  }
+  const priority = blocks.find((block) => block.heading === 'Skill Priority');
+  if (priority) {
+    const names = Array.from(
+      priority.html.matchAll(/<img\b[^>]*alt="([^"]+)"/gi),
+    )
+      .map((match) => decodeHtmlEntities(match[1]))
+      .filter(Boolean);
+    suggestions.push(
+      makeImportSuggestion(
+        'guide.skillPriority',
+        'Приоритет навыков',
+        names.slice(0, 8).map((name, index) => ({
+          title: `Приоритет ${index + 1}: ${name}`,
+          description:
+            'Порядок прокачки в источнике; название навыка оставлено на языке оригинала.',
+        })),
+        source,
+        'medium',
+      ),
+    );
+  }
   const teamStart = html.search(/Recommended Team/i);
   if (teamStart >= 0) {
     const teamWindow = html.slice(teamStart, teamStart + 60000);
@@ -7875,6 +8203,89 @@ function parseKaidenGuideImport(html, source, character) {
     );
   }
 
+  return suggestions.filter(Boolean);
+}
+
+function parseNevernessGuideImport(html, source, character) {
+  // Only inspect the article: related posts in the footer mention every character.
+  const start = html.search(/<h1\b/i);
+  const article = html
+    .slice(Math.max(0, start))
+    .split(/<h[2-6][^>]*>\s*(?:Related|Latest|More)/i)[0];
+  const heading = article.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1] || '';
+  if (!lineMatchesCharacter(htmlToPlainText(heading), character)) return [];
+  const suggestions = [];
+  const blocks = extractGuideHeadingBlocks(article);
+  let team = false;
+  let gear = '';
+  for (const block of blocks) {
+    if (block.level === 2) {
+      team = /best team/i.test(block.heading);
+      gear = /best.*arc|best.*weapon/i.test(block.heading)
+        ? 'guide.bestArcs'
+        : /best.*cartridge/i.test(block.heading)
+          ? 'guide.modules'
+          : '';
+    }
+    if (gear) {
+      const names = Array.from(
+        block.html.matchAll(/<img\b[^>]*alt=["']([^"']+)["'][^>]*>/gi),
+      )
+        .map((match) => decodeHtmlEntities(match[1]).trim())
+        .filter(
+          (name) =>
+            name.length > 2 &&
+            name.length < 90 &&
+            !/best.*build|overview|character|\bicon\b/i.test(name),
+        );
+      const rows = [...new Set(names)].slice(0, 6).map((name) => ({
+        name: `${gear === 'guide.bestArcs' ? 'Дуга' : 'Картридж'}: ${name}`,
+        description:
+          'Вариант, перечисленный в сборке источника. Сравните условия и наложение; порядок не является результатом замеров NTE Meta.',
+      }));
+      suggestions.push(
+        makeImportSuggestion(
+          gear,
+          gear === 'guide.bestArcs' ? 'Дуги' : 'Картриджи',
+          rows,
+          source,
+          'medium',
+        ),
+      );
+    }
+    if (team) {
+      const rows = extractGuideTeamRows(block.html);
+      if (rows.length)
+        suggestions.push(
+          makeImportSuggestion(
+            'guide.teams',
+            'Отряды',
+            rows,
+            source,
+            'medium',
+            'Состав из внешнего гайда; условия пробуждений и порядок действий сверяйте по оригиналу.',
+          ),
+        );
+    }
+  }
+  const priority = htmlToPlainText(article).match(
+    /(?:Skill Priority:\s*)?((?:Basic Attack|Support Skill|Ultimate|Redirect Skill)(?:\s*>\s*(?:Basic Attack|Support Skill|Ultimate|Redirect Skill)){2,3})/i,
+  )?.[1];
+  if (priority)
+    suggestions.push(
+      makeImportSuggestion(
+        'guide.skillPriority',
+        'Приоритет навыков',
+        [
+          {
+            title: 'Порядок прокачки',
+            description: localizeImportedGuideText(priority),
+          },
+        ],
+        source,
+        'medium',
+      ),
+    );
   return suggestions.filter(Boolean);
 }
 
@@ -8062,22 +8473,135 @@ function parseGameWithStructuredGuideImport(text, source, character) {
 }
 
 function parseIcyVeinsTierImport(text, source, character) {
-  const name = character.originalName || character.name;
-  const pattern = new RegExp(
-    `\\b([SABCD])\\b[^\\n]{0,220}\\b${escapeRegExp(name)}\\b`,
-    'i',
-  );
-  const match = text.match(pattern);
+  const match = extractNativeTier(text, character);
   return [
     makeImportSuggestion(
       'tier',
       'Подсказка для тир-листа',
-      match?.[1] || '',
+      match?.tier || '',
       source,
       'low',
       'Внешний тир-лист нужен как ориентир, финальную оценку подтверждает редакция NTE Meta.',
     ),
   ];
+}
+
+function extractNativeTier(html, character) {
+  // Match only a tier table row, never a navigation link or the changelog.
+  for (const table of String(html).matchAll(/<table\b[\s\S]*?<\/table>/gi)) {
+    if (
+      !/Main DPS/i.test(htmlToPlainText(table[0])) ||
+      !/Support/i.test(htmlToPlainText(table[0]))
+    )
+      continue;
+    for (const row of table[0].matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+      const cells = Array.from(
+        row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi),
+      ).map((cell) => cell[1]);
+      const tier = htmlToPlainText(cells[0] || '').trim();
+      if (!/^[SABCD]$/.test(tier)) continue;
+      for (const [index, cell] of cells.entries()) {
+        const names = characterNameCandidates(character);
+        for (const link of cell.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a>/gi)) {
+          if (!names.includes(normalizeImportSearch(htmlToPlainText(link[1]))))
+            continue;
+          const tail = cell
+            .slice(link.index + link[0].length)
+            .split(/<a\b/i)[0];
+          return {
+            tier,
+            awakening: htmlToPlainText(tail).match(/\bA[0-6]\b/)?.[0] || '',
+            role: ['', 'Основной ДД', 'Саб-ДД', 'Поддержка'][index] || '',
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+async function handleTierImportLookup(request, env) {
+  await requireContentPermission(request, env, 'tierlists', 'edit');
+  if (request.method !== 'POST')
+    return json({ error: 'Метод не поддерживается' }, 405);
+  await rateLimit(request, env, 'tier-import', 12, 60);
+  const body = await readJson(request);
+  const query = cleanString(body.query, 2, 120);
+  const row = await findImportCharacter(env, query);
+  if (!row.slug) return json({ error: 'Персонаж не найден' }, 404);
+  const character = { ...row, originalName: row.original_name };
+  return withImportDeadline(request.signal, async (deadline) => {
+    const sources = [
+      {
+        id: 'icy-veins-tier',
+        name: 'Icy Veins: S/A/B/C/D по ролям',
+        trust: 'high',
+        url: 'https://www.icy-veins.com/neverness-to-everness/tier-list',
+        raw: true,
+        parser: (html, source) => {
+          const value = extractNativeTier(html, character);
+          return value
+            ? [
+                makeImportSuggestion(
+                  'tier',
+                  'Внешняя оценка',
+                  value.tier,
+                  source,
+                  'medium',
+                  `${value.role}; ${value.awakening || 'пробуждение не указано'}. Это внешний ориентир, сохранение выполняет редактор.`,
+                ),
+              ]
+            : [];
+        },
+      },
+      {
+        id: 'kaiden-tier-profile',
+        name: 'Kaiden: исходная шкала T0/T1',
+        trust: 'high',
+        url: `https://www.kaiden.gg/nte/characters/${row.slug === 'esper-zero' ? 'zero' : row.slug}/`,
+        raw: true,
+        parser: (html, source) => {
+          const value = htmlToPlainText(html).match(
+            /Tier Position[\s\S]{0,100}?\b(T\d(?:\.\d)?)\b/,
+          )?.[1];
+          return value
+            ? [
+                makeImportSuggestion(
+                  'externalRank',
+                  'Оценка Kaiden',
+                  value,
+                  source,
+                  'medium',
+                  'Шкала источника отличается от S–D; автоматического пересчёта нет.',
+                ),
+              ]
+            : [];
+        },
+      },
+    ];
+    const results = await Promise.all(
+      sources.map((source) => fetchImportSource(source, character, deadline)),
+    );
+    return json({
+      data: {
+        checkedAt: new Date().toISOString(),
+        found: results.some((source) => source.suggestions.length),
+        sources: results.map((source) => ({
+          id: source.id,
+          name: source.name,
+          url: source.publicUrl || source.url,
+          trust: source.trust,
+          status: source.status,
+          message: source.message,
+          updatedAt: source.updatedAt,
+        })),
+        suggestions: results.flatMap((source) => source.suggestions),
+        fields: {},
+        message:
+          'Внешние оценки не меняют единый тир-лист без вашего выбора и сохранения.',
+      },
+    });
+  });
 }
 
 function parseGame8VoiceImport(text, source, character) {
@@ -8742,27 +9266,6 @@ function parseGameWithCharacterImport(text, source, character) {
   ];
 }
 
-function parseKaidenTierImport(text, source, character) {
-  const candidates = characterNameCandidates(character);
-  const tierRows = text.match(/\b[SABCD]\b[\s\S]{0,600}/g) || [];
-  const row = tierRows.find((item) =>
-    candidates.some((candidate) =>
-      normalizeImportSearch(item).includes(candidate),
-    ),
-  );
-  const tier = row?.match(/\b([SABCD])\b/)?.[1] || '';
-  return [
-    makeImportSuggestion(
-      'tier',
-      'Подсказка для тир-листа',
-      tier,
-      source,
-      'low',
-      'Внешний тир-лист нужен только как сигнал; итоговую позицию подтверждает редакция.',
-    ),
-  ];
-}
-
 function parseDubbingWikiVoiceImport(text, source, character) {
   const line = text
     .split(/\n/)
@@ -8850,11 +9353,6 @@ function parseVoiceTableImport(text, source, character, label) {
       'medium',
     ),
   ];
-}
-
-function parseOfficialImport(_text, source) {
-  void source;
-  return [];
 }
 
 function translateEsperType(value) {
@@ -10541,6 +11039,22 @@ function buildImportCoverage(suggestions, mode) {
   return coverage;
 }
 
+async function findImportCharacter(env, query) {
+  // SQLite lower() only folds ASCII; normalize Cyrillic names and aliases in JS.
+  const rows = await env.DB.prepare(
+    'SELECT slug, name, original_name FROM characters',
+  ).all();
+  const normalized = normalizeImportSearch(query);
+  return (
+    (rows.results || []).find((row) =>
+      characterNameCandidates({
+        ...row,
+        originalName: row.original_name,
+      }).includes(normalized),
+    ) || {}
+  );
+}
+
 async function handleCharacterImportLookup(request, env) {
   await requireContentPermission(request, env, 'characters', 'edit');
   if (request.method !== 'POST') {
@@ -10549,12 +11063,7 @@ async function handleCharacterImportLookup(request, env) {
   await rateLimit(request, env, 'character-import', 12, 60);
   const body = await readJson(request);
   const query = cleanString(body.query, 2, 120);
-  const character =
-    (await env.DB.prepare(
-      'SELECT slug, name, original_name FROM characters WHERE slug = ? OR name = ? OR original_name = ? LIMIT 1',
-    )
-      .bind(query, query, query)
-      .first()) || {};
+  const character = await findImportCharacter(env, query);
   const slug = character.slug || normalizeImportSlug(query);
   if (!slug) {
     return json({
@@ -10621,6 +11130,7 @@ async function handleCharacterImportLookup(request, env) {
     return json({
       data: {
         found: suggestions.length > 0,
+        checkedAt: new Date().toISOString(),
         message: suggestions.length
           ? `Найдено ${suggestions.length} предложений. Выберите подходящие варианты: блок можно принять целиком или проверить построчно.`
           : `Для "${query}" не найдено структурированных данных. Проверьте источники вручную.`,
@@ -10631,6 +11141,7 @@ async function handleCharacterImportLookup(request, env) {
           trust: source.trust,
           status: source.status,
           message: source.message,
+          updatedAt: source.updatedAt,
         })),
         suggestions,
         fields,
@@ -10680,12 +11191,7 @@ async function handleGuideImportLookup(request, env) {
   }
 
   if (!character.slug) {
-    character =
-      (await env.DB.prepare(
-        'SELECT slug, name, original_name FROM characters WHERE slug = ? OR name = ? OR original_name = ? LIMIT 1',
-      )
-        .bind(query, query, query)
-        .first()) || {};
+    character = await findImportCharacter(env, query);
   }
 
   const slug = character.slug || normalizeImportSlug(query);
@@ -10719,16 +11225,18 @@ async function handleGuideImportLookup(request, env) {
     return json({
       data: {
         found: suggestions.length > 0,
+        checkedAt: new Date().toISOString(),
         message: suggestions.length
           ? `Найдено ${suggestions.length} предложений для гайда. Выберите подходящие варианты: блок можно принять целиком или проверить построчно.`
           : `Для "${query}" не найдено структурированных guide-данных. Проверьте источники вручную.`,
         sources: sourceResults.map((source) => ({
           id: source.id,
           name: source.name,
-          url: source.url,
+          url: source.publicUrl || source.url,
           trust: source.trust,
           status: source.status,
           message: source.message,
+          updatedAt: source.updatedAt,
         })),
         suggestions,
         fields: Object.fromEntries(
@@ -10866,7 +11374,7 @@ async function handleSystemStatus(request, env) {
       generatedAt: new Date().toISOString(),
       counts,
       migrations: {
-        latestKnown: '0023_fix_hotori_guide_markdown_newlines.sql',
+        latestKnown: '0032_refresh_discovery_sources.sql',
       },
     },
   });

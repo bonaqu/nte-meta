@@ -503,10 +503,24 @@ export async function updateLeakCandidateEditorial(
   );
 }
 
-export async function promoteLeakCandidate(id: string) {
-  return request<{ leakId: string; slug: string }>(
+export async function promoteLeakCandidate(
+  id: string,
+  destination: 'news' | 'leaks' = 'leaks',
+) {
+  return request<{ leakId?: string; newsId?: string; slug: string }>(
     `/api/leak-candidates/${encodeURIComponent(id)}/promote`,
-    { method: 'POST', body: JSON.stringify({}) },
+    { method: 'POST', body: JSON.stringify({ destination }) },
+  );
+}
+
+export async function lookupTierSources(query: string) {
+  return request<CharacterImportLookupResult>(
+    '/api/tier-import/lookup',
+    {
+      method: 'POST',
+      body: JSON.stringify({ query }),
+    },
+    { timeoutMs: IMPORT_REQUEST_TIMEOUT_MS },
   );
 }
 

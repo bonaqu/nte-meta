@@ -87,6 +87,7 @@ import {
   loadWarnings,
   login,
   lookupGuideInfo,
+  lookupTierSources,
   logout,
   me,
   register,
@@ -106,6 +107,8 @@ import type { ReactionSummary } from './lib/api';
 import { MarkdownPreview } from './lib/markdown';
 import type { RichTextEditorProps } from './components/rich-text-editor';
 import { ImportSourceLinks } from './components/import-source-links';
+import { ImportSourceReport } from './components/import-source-report';
+import { recordGuideSources } from './lib/guide-sources';
 import { normalizeExternalAssetUrl, resolveAssetUrl } from './lib/assets';
 import {
   formatDate,
@@ -1028,7 +1031,10 @@ function HomePage({
               href={`#/characters/${character.slug}`}
             >
               <img
-                src={resolveAssetUrl(character.splashUrl || character.imageUrl)}
+                src={resolveAssetUrl(
+                  character.splashUrl || character.imageUrl,
+                  'large',
+                )}
                 alt=""
                 width="280"
                 height="360"
@@ -1328,6 +1334,18 @@ function HomePage({
           <Suspense
             fallback={<SkeletonGrid label="Загрузка редактора новости" />}
           >
+            {canManageContent(user, 'leaks', 'edit') ? (
+              <LeakDiscoveryPanel
+                canCreateNews
+                canCreateLeaks={canCreateLeak}
+                draftDirty={homeEditorDirty}
+                onPromoted={async (id, destination) => {
+                  await refreshContent();
+                  setHomeEditorItemId(id);
+                  if (destination === 'leaks') setHomeEditor('leak');
+                }}
+              />
+            ) : null}
             <AdminNewsManager
               items={data.news}
               initialSelectedId={homeEditorItemId}
@@ -1364,9 +1382,12 @@ function HomePage({
             fallback={<SkeletonGrid label="Загрузка редактора слива" />}
           >
             <LeakDiscoveryPanel
-              onPromoted={async (leakId) => {
+              canCreateNews={canCreateNews}
+              draftDirty={homeEditorDirty}
+              onPromoted={async (leakId, destination) => {
                 await refreshContent();
                 setHomeEditorItemId(leakId);
+                if (destination === 'news') setHomeEditor('news');
               }}
             />
             <AdminLeaksManager
@@ -1452,9 +1473,9 @@ function ThreadEditor({
   );
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
-  const [messageTone, setMessageTone] = useState<
-    'info' | 'danger' | 'success'
-  >('info');
+  const [messageTone, setMessageTone] = useState<'info' | 'danger' | 'success'>(
+    'info',
+  );
   const threadBaseline = useMemo(
     () => ({
       title: thread?.title || '',
@@ -1556,7 +1577,10 @@ function ThreadEditor({
           <small>Коротко обозначьте вопрос и проверьте будущую ссылку.</small>
         </legend>
         <div className="thread-editor__grid">
-          <label className="thread-editor__field is-wide" htmlFor="thread-title">
+          <label
+            className="thread-editor__field is-wide"
+            htmlFor="thread-title"
+          >
             <span>Заголовок</span>
             <input
               id="thread-title"
@@ -1569,7 +1593,9 @@ function ThreadEditor({
               onChange={(event) => updateTitle(event.target.value)}
               required
             />
-            <small>{title.length}/120 · сформулируйте вопрос одним предложением</small>
+            <small>
+              {title.length}/120 · сформулируйте вопрос одним предложением
+            </small>
           </label>
           <label className="thread-editor__field" htmlFor="thread-slug">
             <span>Адрес страницы</span>
@@ -1613,7 +1639,9 @@ function ThreadEditor({
               onChange={(event) => setSummary(event.target.value)}
               required
             />
-            <small>{summary.length}/240 · этот текст увидят в общей ленте</small>
+            <small>
+              {summary.length}/240 · этот текст увидят в общей ленте
+            </small>
           </label>
           <div className="thread-editor__field">
             <label id="thread-body-label" htmlFor="thread-body">
@@ -1630,7 +1658,8 @@ function ThreadEditor({
               ariaLabel="Текст треда"
             />
             <small>
-              Оформление в редакторе сразу соответствует опубликованной странице.
+              Оформление в редакторе сразу соответствует опубликованной
+              странице.
             </small>
           </div>
         </div>
@@ -1657,7 +1686,9 @@ function ThreadEditor({
               placeholder="хотори, команда, f2p"
               onChange={(event) => setTags(event.target.value)}
             />
-            <small>Разделяйте теги запятыми; достаточно 2–4 точных меток.</small>
+            <small>
+              Разделяйте теги запятыми; достаточно 2–4 точных меток.
+            </small>
           </label>
           {roleWeight[user.role] >= roleWeight.editor ? (
             <label className="thread-editor__field" htmlFor="thread-status">
@@ -2201,6 +2232,7 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
             className="home-focus-lead__art"
             src={resolveAssetUrl(
               focusCharacter.splashUrl || focusCharacter.imageUrl,
+              'large',
             )}
             alt=""
             width="720"
@@ -2313,6 +2345,7 @@ function GuideCard({
       <img
         src={resolveAssetUrl(
           character?.splashUrl || character?.imageUrl || 'assets/logo.svg',
+          'large',
         )}
         alt={character?.name || guide.title}
         width="460"
@@ -3121,7 +3154,7 @@ function CharacterDetailPage({
     <div className="page-stack character-profile-page">
       <section className="character-lore-hero">
         <img
-          src={resolveAssetUrl(character.splashUrl)}
+          src={resolveAssetUrl(character.splashUrl, 'large')}
           alt={character.name}
           width="520"
           height="620"
@@ -3685,7 +3718,7 @@ function GuideHero({
   return (
     <section className="guide-hero">
       <img
-        src={resolveAssetUrl(character.splashUrl)}
+        src={resolveAssetUrl(character.splashUrl, 'large')}
         alt={character.name}
         width="520"
         height="620"
@@ -3748,25 +3781,10 @@ function GuideDetail({
       (!team.guideId &&
         team.members.some((member) => member.characterId === character.id)),
   );
-  const hasStructuredTeams = relatedTeams.length > 0;
   const tierPlacement = getCharacterTierPlacement(data, character.id);
   const orderedSections = useMemo(
-    () =>
-      [...guide.sections]
-        .filter((section) => {
-          const type = section.type.trim().toLocaleLowerCase('ru-RU');
-          const title = section.title.trim();
-          return (
-            !['source', 'sources', 'references', 'actuality'].includes(type) &&
-            (!hasStructuredTeams ||
-              !['team', 'teams', 'rotation', 'rotations'].includes(type)) &&
-            (!hasStructuredTeams ||
-              !/(?:лучш(?:ие|ая)\s+команд|отряд|ротаци)/i.test(title)) &&
-            !/^источники(?:\s+и\s+актуальность)?$/i.test(title)
-          );
-        })
-        .sort((a, b) => a.position - b.position),
-    [guide.sections, hasStructuredTeams],
+    () => [...guide.sections].sort((a, b) => a.position - b.position),
+    [guide.sections],
   );
   const guideNavigation = useMemo(
     () => [
@@ -3810,7 +3828,7 @@ function GuideDetail({
       />
       <section className="guide-toolbar">
         <div>
-          <p>Проверенный материал редакции</p>
+          <p>Материал редакции · патч {guide.patch}</p>
           <strong>
             {character.name} · {character.attribute} · {character.role}
           </strong>
@@ -5130,6 +5148,10 @@ function TierListsPage({
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorDirty, setEditorDirty] = useState(false);
   const { tierlist, grouped } = groupTierItems(data);
+  const unratedCharacters = data.characters.filter(
+    (character) =>
+      !tierlist?.items.some((item) => item.characterId === character.id),
+  );
 
   return (
     <div className="page-stack">
@@ -5161,6 +5183,23 @@ function TierListsPage({
           text="Комментарии и история обновлений хранятся отдельно, чтобы редакция могла объяснять каждое изменение."
         />
         <TierPreview grouped={grouped} />
+        {unratedCharacters.length ? (
+          <div className="change-log">
+            <h3>Оценка уточняется</h3>
+            <p>Эти персонажи ещё не получили позицию в едином списке.</p>
+            <div className="button-row">
+              {unratedCharacters.map((character) => (
+                <a
+                  key={character.id}
+                  className="ghost-button"
+                  href={`#/characters/${character.slug}`}
+                >
+                  {character.name}
+                </a>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="change-log">
           {(tierlist?.changelog || []).map((item) => (
             <p key={item}>
@@ -6169,16 +6208,21 @@ const BUILD_SECTION_TEMPLATE = `## Рекомендуемый билд
 ### Альтернативная дуга
 Добавьте F2P-вариант и условия, при которых он не уступает.
 
-### Модули и основные статы
-- Основной стат: ...
-- Комплект модулей: ...
+### Консоль, картриджи и модули
+Укажите комплект картриджей, бонусы 2/4 частей и подходящие формы модулей для бонуса консоли персонажа.
+
+### Основные статы
+Укажите приоритеты характеристик и условия: дуга, пробуждения и роль в отряде.
 
 ### Саб-статы
 1. Приоритет №1
 2. Приоритет №2
 
 ### Что менять без сигнатурки
-Опишите практическую замену и поправку ротации.`;
+Опишите практическую замену и поправку ротации.
+
+### Условия проверки
+Укажите патч, пробуждения, уровень дуги и сценарий: боссы, группы врагов или старт игры. Приложите источники расчётов и дату их обновления.`;
 
 type GuideEditorDraft = {
   guideMeta: {
@@ -6578,6 +6622,9 @@ function AdminGuides({
   const [pending, setPending] = useState(false);
   const [guideImportPending, setGuideImportPending] = useState(false);
   const [guideImportStatus, setGuideImportStatus] = useState('');
+  const [guideImportReport, setGuideImportReport] = useState<
+    Pick<CharacterImportLookupResult, 'sources' | 'checkedAt'>
+  >({ sources: [] });
   const [message, setMessage] = useState('');
   const [sectionImageUrl, setSectionImageUrl] = useState('');
   const [sectionImageAlt, setSectionImageAlt] = useState('');
@@ -6602,6 +6649,7 @@ function AdminGuides({
   const deleteSectionDialogRef = useRef<HTMLDialogElement>(null);
   const sectionDragPreviewRef = useRef<HTMLElement | null>(null);
   const skipNextGuideDraftSaveRef = useRef(false);
+  const guideRefreshDraftRef = useRef<GuideEditorDraft | null>(null);
   const guideImportControllerRef = useRef<AbortController | null>(null);
   const guideImportRequestIdRef = useRef(0);
   const guideImportButtonRef = useRef<HTMLButtonElement>(null);
@@ -6648,11 +6696,15 @@ function AdminGuides({
     setGuideImportSuggestions([]);
     setGuideImportDecisions({});
     setGuideImportCoverage(undefined);
+    setGuideImportReport({ sources: [] });
 
     const nextSections = [...guide.sections].sort(
       (a, b) => a.position - b.position,
     );
-    const savedDraft = readGuideEditorDraft(`nte-guide-draft:${guide.id}`);
+    const refreshDraft = guideRefreshDraftRef.current;
+    const savedDraft =
+      refreshDraft || readGuideEditorDraft(`nte-guide-draft:${guide.id}`);
+    guideRefreshDraftRef.current = null;
     skipNextGuideDraftSaveRef.current = true;
     if (savedDraft) {
       const selectedSection =
@@ -6664,7 +6716,7 @@ function AdminGuides({
       setSelectedSectionId(selectedSection?.id || '');
       setMarkdown(selectedSection?.content || savedDraft.markdown || '');
       setGuideMeta(savedDraft.guideMeta);
-      setMessage('Восстановлен локальный черновик гайда.');
+      if (!refreshDraft) setMessage('Восстановлен локальный черновик гайда.');
       return;
     }
     const selectedSection =
@@ -6982,6 +7034,10 @@ function AdminGuides({
         setGuideImportSuggestions(result.data.suggestions || []);
         setGuideImportDecisions({});
         setGuideImportCoverage(result.data.coverage);
+        setGuideImportReport({
+          sources: result.data.sources || [],
+          checkedAt: result.data.checkedAt,
+        });
         setMessage(resultMessage);
         setGuideImportStatus(resultMessage);
       } else if (!result.aborted) {
@@ -7035,6 +7091,7 @@ function AdminGuides({
   }
 
   function applyGuideImportSuggestion(suggestion: CharacterImportSuggestion) {
+    setSections((current) => recordGuideSources(current, suggestion));
     if (suggestion.field === 'guide.summary') {
       setGuideMeta((current) => ({
         ...current,
@@ -7251,18 +7308,34 @@ function AdminGuides({
     );
     if (result.ok) {
       const nextData = await loadSiteData({ includePrivate: true });
+      const hasUnsavedSections =
+        JSON.stringify(sections) !==
+        JSON.stringify(baselineGuideState?.sections);
+      if (hasUnsavedSections) {
+        guideRefreshDraftRef.current = {
+          guideMeta,
+          sections,
+          selectedSectionId,
+          markdown,
+        };
+      }
       setData(nextData);
       const savedGuide = nextData.guides.find(
         (item) => item.id === activeGuide.id,
       );
-      localStorage.removeItem(guideDraftKey);
-      setMessage('Метаданные гайда сохранены.');
-      await onSaved?.({
-        id: activeGuide.id,
-        slug: savedGuide?.slug || activeGuide.slug,
-        status: savedGuide?.status || guideMeta.status,
-        action: 'saved',
-      });
+      if (!hasUnsavedSections) localStorage.removeItem(guideDraftKey);
+      setMessage(
+        hasUnsavedSections
+          ? 'Метаданные гайда сохранены. Изменённые секции остаются в черновике: нажмите «Сохранить секции».'
+          : 'Метаданные гайда сохранены.',
+      );
+      if (!hasUnsavedSections)
+        await onSaved?.({
+          id: activeGuide.id,
+          slug: savedGuide?.slug || activeGuide.slug,
+          status: savedGuide?.status || guideMeta.status,
+          action: 'saved',
+        });
     } else {
       setMessage(result.error);
     }
@@ -7345,6 +7418,17 @@ function AdminGuides({
 
           idMap.set(section.id, result.data.id);
           persistedSections.push({ ...section, id: result.data.id });
+          // Retain successful creates if a later section or reorder fails.
+          // A retry must PATCH the saved row rather than create it again.
+          setSections((current) =>
+            current.map((item) =>
+              item.id === section.id ? { ...item, id: result.data.id } : item,
+            ),
+          );
+          if (selectedSectionIdRef.current === section.id) {
+            selectedSectionIdRef.current = result.data.id;
+            setSelectedSectionId(result.data.id);
+          }
         } else {
           const result = await saveEntity<{ success: boolean }>(
             `/api/guide-sections/${section.id}`,
@@ -7381,6 +7465,22 @@ function AdminGuides({
       persistedSections.push(...sections);
     }
 
+    const nextSelectedSectionId =
+      idMap.get(selectedSectionId) ||
+      selectedSectionId ||
+      persistedSections[0]?.id ||
+      '';
+    const hasUnsavedMeta =
+      JSON.stringify(guideMeta) !==
+      JSON.stringify(baselineGuideState?.guideMeta);
+    if (hasUnsavedMeta) {
+      guideRefreshDraftRef.current = {
+        guideMeta,
+        sections: persistedSections,
+        selectedSectionId: nextSelectedSectionId,
+        markdown,
+      };
+    }
     const updatedGuide = { ...activeGuide, sections: persistedSections };
     setData((current) => ({
       ...current,
@@ -7389,12 +7489,7 @@ function AdminGuides({
       ),
     }));
     setSections(persistedSections);
-    localStorage.removeItem(guideDraftKey);
-    const nextSelectedSectionId =
-      idMap.get(selectedSectionId) ||
-      selectedSectionId ||
-      persistedSections[0]?.id ||
-      '';
+    if (!hasUnsavedMeta) localStorage.removeItem(guideDraftKey);
     selectedSectionIdRef.current = nextSelectedSectionId;
     setSelectedSectionId(nextSelectedSectionId);
     setMessage(
@@ -7679,6 +7774,7 @@ function AdminGuides({
         >
           {guideImportStatus}
         </p>
+        <ImportSourceReport {...guideImportReport} />
         {guideImportCoverage ? (
           <div className="import-coverage">
             <div>
@@ -8623,6 +8719,22 @@ function AdminTierlists({
   } | null>(null);
   const dragPreviewRef = useRef<HTMLElement | null>(null);
   const [characterToAdd, setCharacterToAdd] = useState('');
+  const [tierSourceQuery, setTierSourceQuery] = useState(
+    data.characters[0]?.slug || '',
+  );
+  const [tierSourcePending, setTierSourcePending] = useState(false);
+  const [tierSourceResult, setTierSourceResult] =
+    useState<CharacterImportLookupResult | null>(null);
+
+  async function findTierSources() {
+    setTierSourcePending(true);
+    setTierSourceResult(null);
+    setMessage('');
+    const result = await lookupTierSources(tierSourceQuery);
+    if (result.ok) setTierSourceResult(result.data);
+    else setMessage(result.error);
+    setTierSourcePending(false);
+  }
 
   useEffect(() => {
     setItems(tierlist?.items || []);
@@ -8860,6 +8972,73 @@ function AdminTierlists({
             <h2>Редактор тир-листа</h2>
           </div>
         </div>
+        <div className="button-row">
+          <label>
+            Персонаж для сверки
+            <select
+              disabled={tierSourcePending}
+              value={tierSourceQuery}
+              onChange={(event) => {
+                setTierSourceQuery(event.target.value);
+                setTierSourceResult(null);
+              }}
+            >
+              {data.characters.map((character) => (
+                <option key={character.id} value={character.slug}>
+                  {character.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={tierSourcePending || !hasApiBase()}
+            onClick={() => void findTierSources()}
+          >
+            {tierSourcePending
+              ? 'Проверяем оценки…'
+              : 'Найти источники тир-листа'}
+          </button>
+        </div>
+        {tierSourceResult ? (
+          <section aria-label="Источники оценки">
+            <ImportSourceReport
+              sources={tierSourceResult.sources}
+              checkedAt={tierSourceResult.checkedAt}
+            />
+            <p>{tierSourceResult.message}</p>
+            {tierSourceResult.suggestions.map((suggestion) => (
+              <article key={suggestion.id}>
+                <strong>
+                  {suggestion.sourceName}: {suggestion.value}
+                </strong>
+                <p>{suggestion.note}</p>
+                {suggestion.field === 'tier' &&
+                tierOrder.includes(suggestion.value as Tier) ? (
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => {
+                      const character = data.characters.find(
+                        (item) => item.slug === tierSourceQuery,
+                      );
+                      if (!character) return;
+                      moveCharacter(character.id, suggestion.value as Tier);
+                      updateItem(character.id, {
+                        note: `${suggestion.note} ${suggestion.sourceUrl} · сверено ${tierSourceResult.checkedAt?.slice(0, 10) || ''}`,
+                      });
+                    }}
+                  >
+                    Применить в черновик
+                  </button>
+                ) : (
+                  <p>Шкала источника показана без пересчёта в S–D.</p>
+                )}
+              </article>
+            ))}
+          </section>
+        ) : null}
         <div className="tierlist-meta-fields">
           <label>
             Название

@@ -10,6 +10,7 @@ type ImportSuggestionFixture = {
 function importResponse(message: string, suggestion?: ImportSuggestionFixture) {
   return {
     data: {
+      checkedAt: '2026-10-21T09:00:00.000Z',
       found: Boolean(suggestion),
       message,
       sources: [
@@ -382,6 +383,17 @@ test.describe('Cancelable import interactions', () => {
     await page.keyboard.press('Enter');
     await expect(dialog.getByText('Исходный проверенный вывод.')).toBeVisible();
     await expect(importButton).toBeFocused();
+    const report = dialog.locator('.import-source-report');
+    await report.locator('summary').click();
+    await expect(
+      report.getByRole('link', { name: 'Тестовый источник' }),
+    ).toHaveAttribute('href', 'https://example.com/source');
+    await expect(report).toContainText('Данные найдены');
+    await expect(report.locator('time')).toHaveAttribute(
+      'datetime',
+      '2026-10-21T09:00:00.000Z',
+    );
+    await report.locator('summary').click();
 
     await importButton.focus();
     await page.keyboard.press('Enter');
@@ -409,6 +421,17 @@ test.describe('Cancelable import interactions', () => {
     await page.waitForTimeout(1_000);
     await expect(dialog.getByText('ОТМЕНЕННЫЙ GUIDE-ОТВЕТ')).toHaveCount(0);
     await expect(importButton).toBeEnabled();
+
+    await dialog
+      .getByRole('button', { name: 'Принять Поле: краткий вывод', exact: true })
+      .click();
+    await expect(summary).toHaveValue('Свежий вывод после повтора.');
+    const sourcesSection = dialog
+      .locator('.section-sorter button[draggable="true"]')
+      .filter({ hasText: 'Источники и актуальность' });
+    await expect(sourcesSection).toHaveCount(1);
+    await sourcesSection.click();
+    await expect(dialog.locator('.tiptap')).toContainText('Тестовый источник');
 
     expect(consoleErrors).toEqual([]);
     expect(pageErrors).toEqual([]);

@@ -12209,6 +12209,7 @@ function validateEntityRecord(entity, record, isCreate) {
   }
   if (entity === 'sources') {
     for (const [field, allowed] of Object.entries({
+      source_type: ['telegram', 'website', 'youtube', 'twitter/x', 'manual'],
       language: ['unknown', 'ru', 'en', 'ja', 'zh'],
       content_kind: ['news', 'leak'],
       parser: [
@@ -12225,7 +12226,7 @@ function validateEntityRecord(entity, record, isCreate) {
       ],
     })) {
       if (record[field] !== undefined && !allowed.includes(record[field]))
-        throwHttp('Неизвестный язык или формат источника', 400);
+        throwHttp('Неизвестный тип, язык или формат источника', 400);
     }
     if (
       record.auto_import_enabled &&

@@ -589,7 +589,12 @@ function getSuggestionPreviewUrls(suggestion: CharacterImportSuggestion) {
   const urls: string[] = [];
   const addUrl = (value: unknown) => {
     if (typeof value !== 'string') return;
-    if (!/^(?:https?:|data:|blob:|\/?assets\/)/i.test(value)) return;
+    if (
+      !/^(?:https?:|data:|blob:|\/?assets\/|\/nte-meta\/game-assets\/)/i.test(
+        value,
+      )
+    )
+      return;
     if (directAudioPattern.test(value)) return;
     const normalized =
       getYoutubeThumbnailUrl(value) || normalizeExternalAssetUrl(value);

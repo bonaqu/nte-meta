@@ -9,6 +9,8 @@ backups
 .dev.vars*
 !.env.example
 *.log
+**/bin/
+**/obj/
 .idea/
 .codex/
 AGENTS.md

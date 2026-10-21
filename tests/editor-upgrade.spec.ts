@@ -150,9 +150,14 @@ test('перевод остаётся предложением, имена ло�
   };
   const env = {
     DB: {
-      prepare: () => ({
+      prepare: (sql: string) => ({
+        bind() {
+          return this;
+        },
         all: async () => ({
-          results: [{ name: 'Аканэ Рин', original_name: 'Akane Rin' }],
+          results: sql.includes('game_source_chunks')
+            ? []
+            : [{ name: 'Аканэ Рин', original_name: 'Akane Rin' }],
         }),
       }),
     },
@@ -421,6 +426,9 @@ test('производственная сборка: визуальные гай
     .data as Array<{ slug: string; characterId: string }>;
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  page.on('requestfailed', (request) =>
+    errors.push(`${request.failure()?.errorText} ${request.url()}`),
+  );
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });

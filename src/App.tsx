@@ -216,6 +216,7 @@ const AdminSourcesManager = lazy(() =>
   })),
 );
 const LazyRichTextEditor = lazy(() => import('./components/rich-text-editor'));
+const AdminGameData = lazy(() => import('./features/admin/game-data'));
 
 function RichTextEditorField(props: RichTextEditorProps) {
   return (
@@ -5623,6 +5624,7 @@ const adminTabs = [
   'users',
   'settings',
   'sources',
+  'game-data',
   'system',
   'audit',
 ] as const;
@@ -5634,6 +5636,7 @@ const adminLabels: Record<(typeof adminTabs)[number], string> = {
   users: 'Пользователи',
   settings: 'Настройки',
   sources: 'Источники',
+  'game-data': 'Данные игры',
   system: 'Статус API/D1',
   audit: 'Журнал действий',
 };
@@ -5645,6 +5648,7 @@ const adminTabRole: Record<(typeof adminTabs)[number], User['role']> = {
   users: 'admin',
   settings: 'admin',
   sources: 'admin',
+  'game-data': 'admin',
   system: 'admin',
   audit: 'admin',
 };
@@ -5785,6 +5789,7 @@ function AdminPage({
             />
           ) : null}
           {tab === 'system' ? <AdminSystemStatus /> : null}
+          {tab === 'game-data' ? <AdminGameData /> : null}
           {tab === 'audit' ? <AdminAuditLog /> : null}
         </Suspense>
       </section>

@@ -784,7 +784,11 @@
     border: 2px solid #343841;
     border-radius: 50%;
     background:
-      radial-gradient(circle at 44% 38%, rgb(255 255 255 / 0.09), transparent 34%),
+      radial-gradient(
+        circle at 44% 38%,
+        rgb(255 255 255 / 0.09),
+        transparent 34%
+      ),
       linear-gradient(145deg, #1a1d23, #090b0f 68%);
     color: #d9dde4;
     box-shadow:
@@ -8919,4 +8923,36 @@
       animation: none;
     }
   }
+}
+/* Source checks use the editor's existing paper surfaces and native disclosure. */
+.import-source-report {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+}
+.import-source-report summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: list-item;
+  align-content: center;
+}
+.import-source-report li {
+  margin-block: 12px;
+  overflow-wrap: anywhere;
+}
+.import-source-report li > a {
+  display: inline-block;
+  min-height: 44px;
+  align-content: center;
+}
+.import-source-report li > span {
+  display: block;
+}
+.import-source-report .source-check--ok {
+  color: var(--cyan);
+}
+.import-source-report .source-check--failed,
+.import-source-report .source-check--blocked,
+.import-source-report .source-check--timeout {
+  font-weight: 700;
 }

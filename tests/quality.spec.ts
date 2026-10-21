@@ -191,6 +191,13 @@ test.describe('Качество интерфейса NTE Meta', () => {
     await page.goto('/characters/hotori/');
     const images = page.locator('main img');
     await expect(images.first()).toBeVisible();
+    await expect
+      .poll(() =>
+        images
+          .first()
+          .evaluate((node) => (node as HTMLImageElement).naturalWidth),
+      )
+      .toBeGreaterThanOrEqual(1000);
     expect(
       await page
         .locator('main img:not([width]), main img:not([height])')
@@ -221,6 +228,87 @@ test.describe('Качество интерфейса NTE Meta', () => {
           }).length,
       ),
     ).toBe(0);
+  });
+
+  test('устаревшие CDN-портреты используют локальные изображения без запросов к недоступным хостам', async ({
+    page,
+  }) => {
+    const names = [
+      'Адлер',
+      'Аурелия',
+      'Даффодил',
+      'Минт',
+      'Наналли',
+      'Сакири',
+      'Хотори',
+      'Шинку',
+    ];
+    const externalRequests: string[] = [];
+    page.on('request', (request) => {
+      if (/static\.wikia\.nocookie\.net|ntewiki\.org/.test(request.url()))
+        externalRequests.push(request.url());
+    });
+    await page.route('**/api/characters', (route) =>
+      route.fulfill({
+        json: {
+          data: [
+            ...names.map((name, index) => ({
+              id: `portrait-${index}`,
+              slug: `portrait-${index}`,
+              name,
+              originalName: name,
+              rarity: 'S',
+              role: 'DPS',
+              type: 'DPS',
+              attribute: 'Космос',
+              tags: [],
+              status: 'published',
+              patch: '1.0',
+              summary: '',
+              shortDescription: '',
+              imageUrl: `https://static.wikia.nocookie.net/neverness-to-everness/images/1/aa/${encodeURIComponent(name)}_Иконка.png/revision/latest?path-prefix=ru`,
+              splashUrl: '',
+            })),
+            {
+              id: 'baicang',
+              slug: 'baicang',
+              name: 'Байканг',
+              originalName: 'Baicang',
+              rarity: 'S',
+              role: 'DPS',
+              type: 'DPS',
+              attribute: 'Чары',
+              tags: [],
+              status: 'published',
+              patch: '1.0',
+              summary: '',
+              shortDescription: '',
+              imageUrl:
+                'https://ntewiki.org/images/characters/avatars/YH_lihui_character_baizhang.png',
+              splashUrl: '',
+            },
+          ],
+        },
+      }),
+    );
+    await page.goto('/#/characters');
+    const images = page.locator('.character-card img');
+    await expect(images).toHaveCount(9);
+    await images.evaluateAll((nodes) =>
+      nodes.forEach((node) => {
+        (node as HTMLImageElement).loading = 'eager';
+      }),
+    );
+    await expect
+      .poll(() =>
+        images.evaluateAll(
+          (nodes) =>
+            nodes.filter((node) => (node as HTMLImageElement).naturalWidth > 0)
+              .length,
+        ),
+      )
+      .toBe(9);
+    expect(externalRequests).toEqual([]);
   });
 
   test('встроенные видео резервируют место до загрузки', async ({ page }) => {

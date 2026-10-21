@@ -17,6 +17,7 @@ import {
 } from '../../lib/api';
 import { RichTextEditor } from '../../components/rich-text-editor';
 import { ImportSourceLinks } from '../../components/import-source-links';
+import { ImportSourceReport } from '../../components/import-source-report';
 import { normalizeExternalAssetUrl, resolveAssetUrl } from '../../lib/assets';
 import type {
   Character,
@@ -1040,6 +1041,9 @@ export function AdminCharacterEditor({
   const [mutationPending, setMutationPending] = useState(false);
   const [importPending, setImportPending] = useState(false);
   const [importStatus, setImportStatus] = useState('');
+  const [importReport, setImportReport] = useState<
+    Pick<CharacterImportLookupResult, 'sources' | 'checkedAt'>
+  >({ sources: [] });
   const [importSuggestions, setImportSuggestions] = useState<
     CharacterImportSuggestion[]
   >([]);
@@ -1142,6 +1146,7 @@ export function AdminCharacterEditor({
     setImportSuggestions([]);
     setImportDecisions({});
     setImportCoverage(undefined);
+    setImportReport({ sources: [] });
   }, [selectedId]);
 
   useEffect(
@@ -1204,6 +1209,10 @@ export function AdminCharacterEditor({
         setImportSuggestions(result.data.suggestions || []);
         setImportDecisions({});
         setImportCoverage(result.data.coverage);
+        setImportReport({
+          sources: result.data.sources || [],
+          checkedAt: result.data.checkedAt,
+        });
       } else if (!result.aborted) {
         const errorMessage = formatEditorError(result.error);
         setTone('danger');
@@ -1665,6 +1674,7 @@ export function AdminCharacterEditor({
         </p>
 
         {message ? <StatusBanner tone={tone} text={message} /> : null}
+        <ImportSourceReport {...importReport} />
         {importCoverage ? (
           <div
             className="import-coverage"
@@ -2024,7 +2034,7 @@ export function AdminCharacterEditor({
               {draft.splashUrl ? (
                 <img
                   className="editor-image-preview editor-image-preview--wide"
-                  src={resolveAssetUrl(draft.splashUrl)}
+                  src={resolveAssetUrl(draft.splashUrl, 'large')}
                   alt=""
                   width="180"
                   height="112"

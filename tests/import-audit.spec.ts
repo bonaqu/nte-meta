@@ -250,6 +250,10 @@ function validateLookup(
     ).toBeLessThanOrEqual(lookupBudgetMs);
     expect(Array.isArray(lookupReport.payload.sources)).toBeTruthy();
     expect(Array.isArray(lookupReport.payload.suggestions)).toBeTruthy();
+    expect(
+      lookupReport.payload.suggestions.length,
+      `${character}: нет ни одного полезного предложения`,
+    ).toBeGreaterThan(0);
     lookupReport.payload.sources.forEach((source) => {
       expect(
         allowedSourceStatuses.has(source.status),
@@ -288,11 +292,26 @@ test('ручной аудит автоимпорта всего опублико
     expect(catalogResponse.ok()).toBeTruthy();
     const catalog = (await catalogResponse.json()).data as Array<{
       name: string;
+      slug: string;
       status?: string;
     }>;
-    const characters = catalog.filter(
+    // The published catalogue can contain editor-created characters absent from
+    // the seed, while the candidate has newly added characters not deployed yet.
+    const localCatalog = (await (await local.get('/api/characters')).json())
+      .data as typeof catalog;
+    const combined = [
+      ...new Map(
+        [...catalog, ...localCatalog].map((character) => [
+          character.slug || character.name,
+          character,
+        ]),
+      ).values(),
+    ];
+    const characters = combined.filter(
       (character) =>
-        !character.status || character.status.toLowerCase() === 'published',
+        (!character.status || character.status.toLowerCase() === 'published') &&
+        (!process.env.NTE_IMPORT_FILTER ||
+          character.name.includes(process.env.NTE_IMPORT_FILTER)),
     );
     expect(characters.length).toBeGreaterThan(0);
 

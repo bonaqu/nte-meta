@@ -1,0 +1,107 @@
+{
+  "id": "tier-base-10",
+  "slug": "nte-meta-tier-list",
+  "title": "Единый тир-лист NTE Meta",
+  "kind": "base",
+  "patch": "1.1",
+  "updatedAt": "2026-07-30 08:16:13",
+  "changelog": ["Первый публичный редакционный список"],
+  "status": "published",
+  "items": [
+    {
+      "characterId": "lacrimosa",
+      "tier": "S",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "hotori",
+      "tier": "S",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "nanally",
+      "tier": "S",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "chaos",
+      "tier": "S",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "jiuyuan",
+      "tier": "S",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "sakiri",
+      "tier": "S",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "haniel",
+      "tier": "S",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "esper-zero",
+      "tier": "A",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "daffodill",
+      "tier": "A",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "baicang",
+      "tier": "A",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "hathor",
+      "tier": "A",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "chiz",
+      "tier": "A",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "adler",
+      "tier": "A",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "ec50ff3d-4340-4dad-89b4-1e14b95d6c21",
+      "tier": "S",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "fadia",
+      "tier": "B",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "aurelia",
+      "tier": "B",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "skia",
+      "tier": "C",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "mint",
+      "tier": "C",
+      "note": "Редакционная оценка NTE Meta"
+    },
+    {
+      "characterId": "edgar",
+      "tier": "D",
+      "note": "Редакционная оценка NTE Meta"
+    }
+  ]
+}

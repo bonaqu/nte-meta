@@ -51,6 +51,9 @@ jobs:
       - name: Test two browser flows and one editorial API contract
         if: github.event.inputs.full_suite != 'true' && github.event.inputs.import_audit != 'true'
         run: npm run test:ci
+      - name: Verify imports, citations and guide draft preservation
+        if: github.event.inputs.full_suite != 'true'
+        run: npm run test:contracts
       - name: Full manually requested regression
         if: github.event.inputs.full_suite == 'true'
         run: npm run test:full

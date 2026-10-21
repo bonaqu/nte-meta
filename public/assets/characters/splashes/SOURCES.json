@@ -1,0 +1,54 @@
+{
+  "checkedAt": "2026-10-21",
+  "provider": "Neverness Codex",
+  "assets": [
+    {
+      "asset": "Adler.webp",
+      "page": "https://www.neverness.app/codex/characters/adler",
+      "url": "https://www.neverness.app/assets/codex/outfits/YH_UI_shizhuang_big_adele/splash.webp",
+      "bytes": 178140
+    },
+    {
+      "asset": "Aurelia.webp",
+      "page": "https://www.neverness.app/codex/characters/mitsuki",
+      "url": "https://www.neverness.app/assets/codex/outfits/YH_UI_shizhuang_big_haiyue/splash.webp",
+      "bytes": 228472
+    },
+    {
+      "asset": "Baicang.webp",
+      "page": "https://www.neverness.app/codex/characters/cang",
+      "url": "https://www.neverness.app/assets/codex/outfits/YH_UI_shizhuang_big_baizang/splash.webp",
+      "bytes": 231248
+    },
+    {
+      "asset": "Daffodill.webp",
+      "page": "https://www.neverness.app/codex/characters/daffodill",
+      "url": "https://www.neverness.app/assets/codex/outfits/YH_UI_shizhuang_big_dafudier/splash.webp",
+      "bytes": 177742
+    },
+    {
+      "asset": "Mint.webp",
+      "page": "https://www.neverness.app/codex/characters/mint",
+      "url": "https://www.neverness.app/assets/codex/outfits/YH_UI_shizhuang_big_bohe/splash.webp",
+      "bytes": 219924
+    },
+    {
+      "asset": "Nanally.webp",
+      "page": "https://www.neverness.app/codex/characters/nanally",
+      "url": "https://www.neverness.app/assets/codex/outfits/YH_UI_shizhuang_big_nanali/splash.webp",
+      "bytes": 168752
+    },
+    {
+      "asset": "Sakiri.webp",
+      "page": "https://www.neverness.app/codex/characters/sagiri",
+      "url": "https://www.neverness.app/assets/codex/outfits/YH_UI_shizhuang_big_zaowu/splash.webp",
+      "bytes": 114200
+    },
+    {
+      "asset": "Hotori.webp",
+      "page": "https://www.neverness.app/codex/characters/jin",
+      "url": "https://www.neverness.app/assets/codex/outfits/YH_UI_shizhuang_big_xun/splash.webp",
+      "bytes": 324912
+    }
+  ]
+}

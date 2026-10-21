@@ -309,9 +309,25 @@ test.describe('Публичный портал NTE Meta', () => {
         'Состав, роли и последовательность действий собраны в одном месте.',
       ),
     ).toBeVisible();
+    const teamRotations = page
+      .locator('#guide-teams')
+      .getByText('Командная ротация', { exact: true });
+    await expect(teamRotations).toHaveCount(2);
+    await expect(teamRotations.nth(0)).toBeVisible();
+    await expect(teamRotations.nth(1)).toBeVisible();
     await expect(
-      page.getByText('Командная ротация', { exact: true }),
+      page
+        .locator('#guide-teams')
+        .getByRole('heading', { name: 'Цветение с Наналли' }),
     ).toBeVisible();
+    await expect(
+      page
+        .locator('#guide-teams')
+        .getByRole('heading', { name: 'Цветение с Сакири' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Kaiden: Hotori Build Guide' }),
+    ).toHaveAttribute('href', 'https://www.kaiden.gg/nte/characters/hotori/');
     await expect(page.locator('a[href="#/teams"]')).toHaveCount(0);
     await expect(page.locator('a[href="#/rotations"]')).toHaveCount(0);
 

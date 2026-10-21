@@ -167,6 +167,43 @@ test.describe('NTE Meta Worker API', () => {
     await owner.delete(`/api/leaks/${promotedData.leakId}`);
   });
 
+  test('очередь создаёт отдельный непубличный черновик новости и повторно его использует', async () => {
+    const submitted = await owner.post('/api/leak-candidates', {
+      data: {
+        title: `Новая официальная публикация ${runId}`,
+        sourceUrl: `https://example.com/news-${runId}`,
+        sourceName: 'Официальный источник',
+        note: 'Текст требует проверки редактором.',
+        status: 'подтверждено',
+      },
+    });
+    expect(submitted.status()).toBe(201);
+    const candidateId = (await submitted.json()).data.id;
+    const promoted = await owner.post(
+      `/api/leak-candidates/${candidateId}/promote`,
+      { data: { destination: 'news' } },
+    );
+    expect(promoted.status()).toBe(201);
+    const created = (await promoted.json()).data;
+    expect(created.newsId).toBeTruthy();
+    expect(created.leakId).toBeUndefined();
+    const draft = await owner.get(`/api/news/${created.newsId}`);
+    expect(draft.ok()).toBeTruthy();
+    expect((await draft.json()).data.publishStatus).toBe('draft');
+    expect((await guest.get(`/api/news/${created.slug}`)).status()).toBe(404);
+    const repeated = await owner.post(
+      `/api/leak-candidates/${candidateId}/promote`,
+      { data: { destination: 'news' } },
+    );
+    expect((await repeated.json()).data.newsId).toBe(created.newsId);
+    const queue = (await (await owner.get('/api/leak-candidates')).json()).data;
+    expect(
+      queue.find((item: { id: string }) => item.id === candidateId)
+        .createdNewsId,
+    ).toBe(created.newsId);
+    await owner.delete(`/api/news/${created.newsId}`);
+  });
+
   test('профиль, комьюнити, ответы и реакции работают через D1', async () => {
     const profile = await owner.patch('/api/auth/profile', {
       data: { displayName: 'Playwright Owner' },

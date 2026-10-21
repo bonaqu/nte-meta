@@ -129,7 +129,9 @@ export function RichTextEditor({
   });
 
   useEffect(() => {
-    editor?.setEditable(!disabled);
+    // Changing editability must not emit a content update before controlled
+    // Markdown has hydrated (notably when a newly created guide opens).
+    editor?.setEditable(!disabled, false);
   }, [disabled, editor]);
 
   useEffect(() => {

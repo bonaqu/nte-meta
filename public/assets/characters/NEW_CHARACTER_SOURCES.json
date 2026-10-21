@@ -1,0 +1,65 @@
+[
+  {
+    "file": "public/assets/characters/akane.webp",
+    "url": "https://neverness.gg/wp-content/uploads/sites/88/2026/06/Akane-Rin-Character-NTE.webp",
+    "page": "https://neverness.gg/akane-rin-nte-build/",
+    "checkedAt": "2026-10-21",
+    "copyright": "Hotta Studio / Perfect World Games"
+  },
+  {
+    "file": "public/assets/characters/blackbird.webp",
+    "url": "https://www.kaiden.gg/img/nte/UI/UI_Icon/AvatarImage/200/player_heiyu.webp",
+    "page": "https://www.kaiden.gg/nte/characters/blackbird/",
+    "checkedAt": "2026-10-21",
+    "copyright": "Hotta Studio / Perfect World Games; game artwork, editorial reference"
+  },
+  {
+    "file": "public/assets/characters/iroi.webp",
+    "url": "https://www.kaiden.gg/img/nte/UI/UI_Icon/AvatarImage/200/player_yiluoyi.webp",
+    "page": "https://www.kaiden.gg/nte/characters/iroi/",
+    "checkedAt": "2026-10-21",
+    "copyright": "Hotta Studio / Perfect World Games; game artwork, editorial reference"
+  },
+  {
+    "file": "public/assets/characters/linko.webp",
+    "url": "https://www.kaiden.gg/img/nte/UI/UI_Icon/AvatarImage/200/player_lingke.webp",
+    "page": "https://www.kaiden.gg/nte/characters/linko/",
+    "checkedAt": "2026-10-21",
+    "copyright": "Hotta Studio / Perfect World Games; game artwork, editorial reference"
+  },
+  {
+    "file": "public/assets/characters/zankou.webp",
+    "url": "https://www.kaiden.gg/img/nte/UI/UI_Icon/AvatarImage/200/player_canhong.webp",
+    "page": "https://www.kaiden.gg/nte/characters/zankou/",
+    "checkedAt": "2026-10-21",
+    "copyright": "Hotta Studio / Perfect World Games; game artwork, editorial reference"
+  },
+  {
+    "file": "public/assets/characters/splashes/blackbird.webp",
+    "url": "https://www.neverness.app/assets/codex/outfits/YH_UI_shizhuang_big_heiyu/splash.webp",
+    "page": "https://www.neverness.app/codex/characters/blackbird",
+    "checkedAt": "2026-10-21",
+    "copyright": "Hotta Studio / Perfect World Games"
+  },
+  {
+    "file": "public/assets/characters/splashes/iroi.webp",
+    "url": "https://www.neverness.app/assets/codex/outfits/YH_UI_shizhuang_big_yiluoyi/splash.webp",
+    "page": "https://www.neverness.app/codex/characters/oneiroi",
+    "checkedAt": "2026-10-21",
+    "copyright": "Hotta Studio / Perfect World Games"
+  },
+  {
+    "file": "public/assets/characters/splashes/linko.webp",
+    "url": "https://www.neverness.app/assets/codex/outfits/YH_UI_shizhuang_big_lingke/splash.webp",
+    "page": "https://www.neverness.app/codex/characters/linko",
+    "checkedAt": "2026-10-21",
+    "copyright": "Hotta Studio / Perfect World Games"
+  },
+  {
+    "file": "public/assets/characters/splashes/zankou.webp",
+    "url": "https://www.neverness.app/assets/codex/outfits/YH_UI_shizhuang_big_canhong/splash.webp",
+    "page": "https://www.neverness.app/codex/characters/zankou",
+    "checkedAt": "2026-10-21",
+    "copyright": "Hotta Studio / Perfect World Games"
+  }
+]

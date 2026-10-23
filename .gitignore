@@ -17,3 +17,5 @@ AGENTS.md
 AGENTS.override.md
 NODE_WORKFLOW.md
 scripts/analyze_user_voice.py
+__pycache__/
+*.py[cod]

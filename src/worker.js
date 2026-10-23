@@ -2802,12 +2802,14 @@ function leakCandidateMatchesSource(candidate, source) {
   const text = `${candidate.title} ${candidate.excerpt}`;
   if (
     source.requiresGameTag &&
-    !/(?:neverness\s*to\s*everness|\bNTE\b|异环|невернесс)/iu.test(text)
+    !/(?:neverness\s*to\s*everness|\bNTE\b|异环|異環|ネバエバ|невернесс)/iu.test(
+      text,
+    )
   ) {
     return false;
   }
   if (source.relevance !== 'future') return true;
-  return /(?:leak|rumou?r|upcoming|roadmap|unreleased|preview|future|datamine|слив|слух|утечк|неофициаль|будущ|предполож|爆料|内鬼|未来版本|新角色|前瞻|未公开)/i.test(
+  return /(?:leak|rumou?r|upcoming|roadmap|unreleased|preview|future|datamine|слив|слух|утечк|неофициаль|будущ|предполож|爆料|内鬼|未来版本|新角色|前瞻|未公开|リーク|噂|未実装|今後|裏技|小技|攻略のコツ)/i.test(
     text,
   );
 }
@@ -3625,6 +3627,41 @@ const LEAK_DISCOVERY_TIMEOUT_MS = 5500;
 const LEAK_DISCOVERY_MAX_BYTES = 320000;
 const LEAK_DISCOVERY_CONCURRENCY = 6;
 const LEAK_DISCOVERY_SOURCES = [
+  ...[
+    [
+      'gamedoo-jp',
+      'NTEまとめ · обсуждения и утечки JP',
+      'https://nte.gamedoo.net/feed/',
+      'ja',
+      'website',
+      'feed',
+    ],
+    [
+      'ntesokuho-jp',
+      'NTE速報 · сообщество JP',
+      'https://ntesokuho.com/feed/',
+      'ja',
+      'website',
+      'feed',
+    ],
+    [
+      'taigedo-ru',
+      'Тайгедо Вещает · NTE RU',
+      'https://t.me/s/nevernesstoeverness_leaks',
+      'ru',
+      'telegram',
+      'telegram',
+    ],
+  ].map(([id, name, url, language, type, parser]) => ({
+    id,
+    name,
+    url,
+    language,
+    type,
+    parser,
+    trustLevel: 'низкий',
+    relevance: 'future',
+  })),
   {
     id: 'bahamut-tw',
     name: '巴哈姆特: 異環 (TW/HK)',
@@ -5866,7 +5903,7 @@ function normalizeProfileCollectionRows(field, value) {
     {
       'profile.roleIcons': 12,
       'profile.abilities': 30,
-      'profile.awakenings': 7,
+      'profile.awakenings': 9,
       'profile.materials': 80,
       'profile.friendship': 10,
       'profile.friendshipRewards': 12,
@@ -5944,7 +5981,9 @@ function profileCollectionImportKey(field, item) {
   if (field === 'profile.abilities') {
     return `${normalizeImportSearch(item.type)}:${normalizeImportSearch(item.name)}`;
   }
-  if (field === 'profile.awakenings' || field === 'profile.friendship') {
+  if (field === 'profile.awakenings')
+    return `${item.kind || 'awakening'}:level:${Number(item.level)}`;
+  if (field === 'profile.friendship') {
     return `level:${Number(item.level)}`;
   }
   if (field === 'profile.voiceLines') {
@@ -6797,8 +6836,8 @@ const knownOutfitIdsBySourceName = new Map([
 
 function parseHtmlJsonAttribute(html, attribute) {
   const raw = String(html || '').match(
-    new RegExp(`${escapeRegExp(attribute)}=["']([^"']+)["']`, 'i'),
-  )?.[1];
+    new RegExp(`${escapeRegExp(attribute)}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, 'i'),
+  )?.[2];
   if (!raw) return [];
   try {
     const parsed = JSON.parse(decodeHtmlEntities(raw));
@@ -10050,13 +10089,18 @@ function isCleanImportedAbilityName(value) {
 
 function normalizedAbilityType(value) {
   const type = normalizeImportSearch(value);
+  if (type.includes('город'))
+    return type.includes('пассив')
+      ? 'Городской пассивный навык'
+      : 'Городской активный навык';
   if (type.includes('базов') && type.includes('атак')) return 'Базовая атака';
   if (type.includes('перенаправ')) return 'Навык перенаправления';
   if (type.includes('сверхспособ') || type.includes('ультим'))
     return 'Сверхспособность';
   if (type.includes('поддерж')) return 'Навык поддержки';
   if (type.includes('пассив')) return 'Пассивный навык';
-  if (type.includes('черт')) return 'Черта персонажа';
+  if (type.includes('черт') || type.includes('особенность'))
+    return 'Черта персонажа';
   if (type.includes('повседнев')) return 'Повседневный навык';
   return 'Навык';
 }
@@ -10064,7 +10108,17 @@ function normalizedAbilityType(value) {
 function cleanImportedAbility(entry) {
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
   const name = normalizeImportedRuText(entry.name || '');
-  if (!isCleanImportedAbilityName(name)) return null;
+  const canonicalName =
+    /^GA_[A-Za-z0-9_]+$/.test(entry.id || '') && !/_name$/i.test(entry.id);
+  if (
+    canonicalName
+      ? !name ||
+        name.length > 160 ||
+        !hasRussianText(name) ||
+        isImportPlaceholderText(name)
+      : !isCleanImportedAbilityName(name)
+  )
+    return null;
   const description = normalizeImportedRuText(entry.description || '');
   const attributes = Array.isArray(entry.attributes)
     ? entry.attributes
@@ -11286,9 +11340,9 @@ async function handleCharacterImportLookup(request, env) {
       slug,
     });
     if (affinitySource) sourceResults.push(affinitySource);
-    sourceResults.unshift(
-      await buildLocalGameCharacterSource(env, importCharacter),
-    );
+    const { variants = [], ...localSource } =
+      await buildLocalGameCharacterSource(env, importCharacter);
+    sourceResults.unshift(localSource, ...variants);
     const rawSuggestions = sourceResults.flatMap(
       (source) => source.suggestions,
     );
@@ -11299,21 +11353,10 @@ async function handleCharacterImportLookup(request, env) {
       env,
       sourceResults.flatMap((source) => source.suggestions),
     );
-    const suggestions = dedupeImportSuggestions(
-      enrichCharacterImportSuggestions(
-        sourceResults.flatMap((source) => source.suggestions),
-        importCharacter,
-      ),
+    const { suggestions, fields } = prepareCharacterImportProposal(
+      sourceResults,
+      importCharacter,
     );
-    const fields = {};
-    for (const suggestion of suggestions) {
-      if (
-        !suggestion.field.startsWith('guide.') &&
-        fields[suggestion.field] === undefined
-      ) {
-        fields[suggestion.field] = suggestion.value;
-      }
-    }
     return json({
       data: {
         found: suggestions.length > 0,
@@ -11341,6 +11384,32 @@ async function handleCharacterImportLookup(request, env) {
       },
     });
   });
+}
+
+function prepareCharacterImportProposal(sources, character) {
+  const isVariant = (source) => /^local-installed-game-\d+$/.test(source.id);
+  const primary = dedupeImportSuggestions(
+    enrichCharacterImportSuggestions(
+      sources
+        .filter((source) => !isVariant(source))
+        .flatMap((source) => source.suggestions),
+      character,
+    ),
+  );
+  const fields = {};
+  for (const suggestion of primary)
+    if (
+      !suggestion.field.startsWith('guide.') &&
+      fields[suggestion.field] === undefined
+    )
+      fields[suggestion.field] = suggestion.value;
+  return {
+    suggestions: [
+      ...primary,
+      ...sources.filter(isVariant).flatMap((source) => source.suggestions),
+    ],
+    fields,
+  };
 }
 
 async function handleGuideImportLookup(request, env) {
@@ -12354,13 +12423,14 @@ function normalizeCharacterProfile(value) {
     };
   });
 
-  const awakenings = collection('awakenings', 7, (item) => {
+  const awakenings = collection('awakenings', 9, (item) => {
     const level = Number(item.level);
     if (!Number.isInteger(level) || level < 0 || level > 6) {
       throwHttp('Пробуждение должно иметь уровень от 0 до 6', 400);
     }
     return {
       level,
+      kind: item.kind === 'resonance' ? 'resonance' : 'awakening',
       name: text(item.name, 160, `Пробуждение ${level}: название`),
       iconUrl: url(item.iconUrl),
       description: text(item.description, 8000, `Пробуждение ${level}`),
@@ -12404,7 +12474,7 @@ function normalizeCharacterProfile(value) {
         ? item.attributes.slice(0, 80).map((attribute) => ({
             id: id(attribute?.id),
             label: text(attribute?.label, 160, 'Параметр способности'),
-            value: text(attribute?.value, 500, 'Значение способности'),
+            value: text(attribute?.value, 4000, 'Значение способности'),
           }))
         : [];
       return {
@@ -14005,6 +14075,33 @@ async function findLocalGameEquipment(env, query, kind) {
       .map((r) => r.values.ru || '')
       .filter(Boolean)
       .join('\n');
+    const reference =
+      kind === 'arcs'
+        ? await env.DB.prepare(
+            GAME_RECORD_SELECT +
+              " WHERE c.kind='arc' AND json_extract(e.value,'$.namespace')='NTE_ReferenceWeapon' AND json_extract(e.value,'$.gameId')=?",
+          )
+            .bind(stem)
+            .first()
+        : null;
+    const gear = reference ? gameRecordView(reference) : null;
+    const resolvedEffect = effect.replace(
+      /\{(\d+)\}/g,
+      (original, id) =>
+        gear?.details.effect?.values?.find(
+          (value) => value.id_value === Number(id),
+        )?.values?.[0] ?? original,
+    );
+    const statNames = {
+      AtkBase: 'АТК',
+      AtkUp: 'АТК',
+      HPMaxBase: 'ОЗ',
+      HPMaxUp: 'ОЗ',
+      DefBase: 'ЗАЩ',
+      DefUp: 'ЗАЩ',
+      CritBase: 'Шанс крит. попадания',
+      CritDamageBase: 'Крит. урон',
+    };
     const imageRows = await env.DB.prepare(
       GAME_RECORD_SELECT +
         " WHERE c.kind='image' AND instr(json_extract(e.value,'$.search'),?)>0 LIMIT 8",
@@ -14016,11 +14113,18 @@ async function findLocalGameEquipment(env, query, kind) {
       .find((r) => r.assets.length);
     source.items.push({
       name: name.values.ru || name.values.en,
-      imageUrl: name.assets[0]?.url || image?.assets[0]?.url || '',
-      description: /\{\d+\}/.test(effect)
+      imageUrl:
+        gear?.assets[0]?.url ||
+        name.assets[0]?.url ||
+        image?.assets[0]?.url ||
+        '',
+      description: /\{\d+\}/.test(resolvedEffect)
         ? ''
-        : effect.replace(/<cf>/g, '\n').replace(/<[^>]+>/g, ''),
-      stats: [],
+        : resolvedEffect.replace(/<cf>/g, '\n').replace(/<[^>]+>/g, ''),
+      stats: (gear?.details.stats || []).map((stat) => ({
+        label: `${statNames[stat.id_stats] || stat.name} (ур. ${stat.values.length})`,
+        value: `${stat.values.at(-1)}${stat.b_is_percent ? '%' : ''}`,
+      })),
       sourceUrl: 'https://bonaqu.github.io/nte-meta/#/admin/game-data',
     });
   }
@@ -14045,25 +14149,102 @@ async function buildLocalGameCharacterSource(env, character) {
   const names = [character.originalName, character.name]
     .filter(Boolean)
     .map((n) => n.trim().toLowerCase());
+  if (names.some((name) => /^(?:esper[ -]?zero|эспер[ -]?зеро)$/.test(name)))
+    names.push('zero');
   const rows = await env.DB.prepare(
     GAME_RECORD_SELECT +
       " WHERE c.kind='character' AND json_extract(e.value,'$.namespace')='ST_Player' AND instr(json_extract(e.value,'$.gameId'),'Role_Name_')=1",
   ).all();
-  const identities = (rows.results || [])
+  let identities = (rows.results || [])
     .map((r) => gameRecordView(r))
     .filter((r) =>
       Object.values(r.values).some((v) => names.includes(v.toLowerCase())),
     );
-  let identity = identities.length === 1 ? identities[0] : undefined;
-  if (identities.length > 1) {
-    const currentRows = await env.DB.prepare(
+  const activeRows = await env.DB.prepare(
+    GAME_RECORD_SELECT +
+      " WHERE c.kind='wardrobe' AND json_extract(e.value,'$.namespace')='DT_DefaultAppearanceData'",
+  ).all();
+  const activeIds = new Set(
+    (activeRows.results || []).map((r) => gameRecordView(r).gameId),
+  );
+  if (!identities.some((r) => activeIds.has(r.ownerId))) {
+    const referenceRows = await env.DB.prepare(
       GAME_RECORD_SELECT +
-        " WHERE c.kind='wardrobe' AND json_extract(e.value,'$.namespace')='DT_DefaultAppearanceData'",
+        " WHERE c.kind='character' AND json_extract(e.value,'$.namespace')='NTE_ReferenceCharacter'",
     ).all();
-    const currentIds = new Set(
-      (currentRows.results || []).map((r) => gameRecordView(r).gameId),
-    );
-    const current = identities.filter((r) => currentIds.has(r.ownerId));
+    const references = (referenceRows.results || [])
+      .map((r) => gameRecordView(r))
+      .filter(
+        (r) =>
+          activeIds.has(r.ownerId) &&
+          Object.values(r.values).some((v) => names.includes(v.toLowerCase())),
+      );
+    if (references.length) identities = references;
+  }
+  if (
+    !character.gameDataOwnerId &&
+    identities.length > 1 &&
+    identities.every((row) => row.namespace === 'NTE_ReferenceCharacter') &&
+    names.includes('zero')
+  ) {
+    const variants = [];
+    for (const identity of identities)
+      variants.push(
+        await buildLocalGameCharacterSource(env, {
+          ...character,
+          gameDataOwnerId: identity.ownerId,
+        }),
+      );
+    const commonFields = new Set([
+      'profile.baseStats',
+      'profile.abilities',
+      'profile.awakenings',
+      'profile.materials',
+      'profile.gifts',
+      'profile.friendship',
+    ]);
+    const comparable = (row) =>
+      JSON.stringify(
+        Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'id')),
+      );
+    for (const suggestion of variants[0]?.suggestions || []) {
+      if (!commonFields.has(suggestion.field)) continue;
+      const others = variants
+        .slice(1)
+        .map((variant) =>
+          variant.suggestions.find((row) => row.field === suggestion.field),
+        );
+      if (others.some((row) => !row)) continue;
+      const common = JSON.parse(suggestion.value).filter((row) =>
+        others.every((other) =>
+          JSON.parse(other.value).some(
+            (value) => comparable(value) === comparable(row),
+          ),
+        ),
+      );
+      if (common.length)
+        source.suggestions.push({
+          ...suggestion,
+          id: 'common:' + suggestion.id,
+          value: JSON.stringify(common),
+          sourceId: source.id,
+        });
+    }
+    return {
+      ...source,
+      status: source.suggestions.length ? 'ok' : 'reference',
+      variants,
+      message:
+        'Общие данные двух вариантов Зеро. Отдельные источники ниже позволяют выбрать мужской или женский вариант для внешности и озвучки.',
+    };
+  }
+  let identity = character.gameDataOwnerId
+    ? identities.find((row) => row.ownerId === character.gameDataOwnerId)
+    : identities.length === 1
+      ? identities[0]
+      : undefined;
+  if (identities.length > 1) {
+    const current = identities.filter((r) => activeIds.has(r.ownerId));
     if (current.length === 1) identity = current[0];
     else if (current.length > 1) {
       const ru = current.filter((r) => r.values.ru === character.name);
@@ -14079,25 +14260,116 @@ async function buildLocalGameCharacterSource(env, character) {
           : 'Персонаж не сопоставлен с игровым ID в локальном справочнике.',
     };
   const owner = identity.ownerId;
+  if (character.gameDataOwnerId) {
+    const appearance =
+      (activeRows.results || [])
+        .map((row) => gameRecordView(row))
+        .find((row) => row.gameId === owner)?.details.PlayerAppearanceAsset
+        ?.AssetPathName || '';
+    source.id += '-' + owner;
+    source.name +=
+      ' · ' +
+      (/_female\//i.test(appearance)
+        ? 'женский вариант'
+        : /_male\//i.test(appearance)
+          ? 'мужской вариант'
+          : owner);
+  }
   const own = await env.DB.prepare(
     GAME_RECORD_SELECT +
-      " WHERE c.kind IN ('character','skill','awakening','biography','wardrobe','image') AND COALESCE(json_extract(o.overrides_json,'$.ownerId'),json_extract(e.value,'$.ownerId'))=? AND (instr(json_extract(e.value,'$.originalId'),'row:')=1 OR c.kind IN ('skill','image')) LIMIT 600",
+      " WHERE COALESCE(json_extract(o.overrides_json,'$.ownerId'),json_extract(e.value,'$.ownerId'))=? AND (instr(json_extract(e.value,'$.originalId'),'row:')=1 OR instr(json_extract(e.value,'$.originalId'),'reference:')=1 OR c.kind IN ('skill','image','audio')) AND json_extract(e.value,'$.namespace') NOT LIKE 'DT_LikeabilityChat%' LIMIT 1400",
   )
     .bind(owner)
     .all();
   const records = (own.results || []).map((r) => gameRecordView(r));
+  const supplementRecord = records.find(
+    (r) => r.namespace === 'NTE_ReferenceCharacter',
+  );
+  const supplement = supplementRecord?.details;
+  const abilityMenu = Array.isArray(supplement?.abilityMenu)
+    ? supplement.abilityMenu
+    : [];
+  const menuIds = new Set(
+    abilityMenu.map((row) => String(row.id).toLowerCase()),
+  );
+  const missingIds = [...menuIds].filter(
+    (id) => !records.some((row) => row.gameId.toLowerCase() === id),
+  );
+  if (missingIds.length) {
+    const shared = await env.DB.prepare(
+      GAME_RECORD_SELECT +
+        " WHERE json_extract(e.value,'$.namespace') IN ('DT_GameplayAbilityTipsData','DT_CharacterAbilityCityGroupConfig') AND lower(json_extract(e.value,'$.gameId')) IN (SELECT value FROM json_each(?))",
+    )
+      .bind(JSON.stringify(missingIds))
+      .all();
+    records.push(...(shared.results || []).map((row) => gameRecordView(row)));
+  }
+  const affinityRecord = records.find(
+    (r) => r.namespace === 'NTE_ReferenceAffinity',
+  );
+  const communityRecord = records.find(
+    (r) => r.namespace === 'NTE_ReferenceCommunityProfile',
+  );
+  const breakthrough = gameProgressionStages(
+    supplement?.breakthrough || [],
+    communityRecord?.details.phases || [],
+  );
+  const referenceSource = (record) => ({
+    ...source,
+    name: record?.details.reference?.provider || source.name,
+    url: record?.details.reference?.url || source.url,
+  });
+  const preferred = supplement?.preferrable_gifts?.length
+    ? supplement.preferrable_gifts
+    : (communityRecord?.details.gifts || []).map((gift) => ({
+        item_id: gift.itemId,
+        amount: gift.bondPoints,
+      }));
+  const friendshipLevels = supplement?.gift_reward?.length
+    ? supplement.gift_reward
+    : (communityRecord?.details.levels || []).map((level) => ({
+        level: Number(level.level) + 1,
+        max_value: level.bondsRequired,
+      }));
+  const materialIds = [
+    ...new Set([
+      ...breakthrough.flatMap((row) => [
+        ...(row.items_id || []),
+        ...(row.cost_gold ? ['gold'] : []),
+      ]),
+      ...preferred.map((row) => row.item_id),
+    ]),
+  ];
+  const itemRows = materialIds.length
+    ? await env.DB.prepare(
+        GAME_RECORD_SELECT +
+          " WHERE c.kind='item' AND json_extract(e.value,'$.gameId') IN (SELECT value FROM json_each(?))",
+      )
+        .bind(JSON.stringify(materialIds))
+        .all()
+    : { results: [] };
+  const itemMap = new Map();
+  for (const raw of itemRows.results || []) {
+    const row = gameRecordView(raw);
+    const previous = itemMap.get(row.gameId);
+    if (!previous || row.values.ru) itemMap.set(row.gameId, row);
+  }
   const refs = new Set();
   function collect(value) {
     if (!value || typeof value !== 'object') return;
-    if (value.TableId && value.Key)
-      refs.add(value.TableId.split('.').at(-1) + '::' + value.Key);
+    if (value.Key && (value.TableId || value.Namespace !== undefined))
+      refs.add(
+        (value.Namespace ?? value.TableId?.split('.').at(-1) ?? '') +
+          '::' +
+          value.Key,
+      );
     for (const child of Object.values(value)) collect(child);
   }
   for (const record of records) collect(record.details);
   const localized = refs.size
     ? await env.DB.prepare(
         GAME_RECORD_SELECT +
-          " WHERE c.kind IN ('biography','wardrobe','character','skill') AND json_extract(e.value,'$.namespace')||'::'||json_extract(e.value,'$.gameId') IN (SELECT value FROM json_each(?))",
+          " WHERE json_extract(e.value,'$.namespace')||'::'||json_extract(e.value,'$.gameId') IN (SELECT value FROM json_each(?))",
       )
         .bind(JSON.stringify([...refs]))
         .all()
@@ -14119,12 +14391,161 @@ async function buildLocalGameCharacterSource(env, character) {
     if (value.CultureInvariantString)
       return plain(value.CultureInvariantString);
     return plain(
-      dictionary.get(value.TableId?.split('.').at(-1) + '::' + value.Key) || '',
+      dictionary.get(
+        (value.Namespace ?? value.TableId?.split('.').at(-1) ?? '') +
+          '::' +
+          value.Key,
+      ) || '',
     );
   }
-  function add(field, label, value) {
-    const item = makeImportSuggestion(field, label, value, source, 'high');
+  function add(field, label, value, provenance = source) {
+    const item = makeImportSuggestion(field, label, value, provenance, 'high');
     if (item) source.suggestions.push(item);
+  }
+  const itemName = (id) =>
+    itemMap.get(id)?.values.ru ||
+    itemMap.get(id)?.values.en ||
+    (id === 'gold' ? 'Жук-монета' : id);
+  const itemIcon = (id) => itemMap.get(id)?.assets[0]?.url || '';
+  if (preferred.length)
+    add(
+      'profile.gifts',
+      'Любимые подарки · симпатия',
+      preferred
+        .map((gift) => ({
+          id: gift.item_id,
+          name: itemName(gift.item_id),
+          iconUrl: itemIcon(gift.item_id),
+          effect: `Симпатия +${gift.amount}`,
+        }))
+        .slice(0, 40),
+      referenceSource(
+        supplement?.preferrable_gifts?.length
+          ? supplementRecord
+          : communityRecord,
+      ),
+    );
+  if (breakthrough.length) {
+    const totals = new Map();
+    for (const stage of breakthrough)
+      for (const [id, amount] of [
+        ...stage.items_id.map((id, index) => [id, stage.amount[index]]),
+        ...(stage.cost_gold ? [['gold', stage.cost_gold]] : []),
+      ]) {
+        const current = totals.get(id) || { total: 0, levels: [] };
+        current.total += Number(amount) || 0;
+        current.levels.push(`${stage.fromLevel} → ${stage.level}: ${amount}`);
+        totals.set(id, current);
+      }
+    add(
+      'profile.materials',
+      'Материалы возвышения персонажа',
+      [...totals].map(([id, data]) => ({
+        id,
+        name: itemName(id),
+        iconUrl: itemIcon(id),
+        amount: String(data.total),
+        source: `Уровень возвышения → количество: ${data.levels.join(' · ')}`,
+      })),
+      referenceSource(
+        communityRecord?.details.phases?.length
+          ? communityRecord
+          : supplementRecord,
+      ),
+    );
+  }
+  if (friendshipLevels.length)
+    add(
+      'profile.friendship',
+      'Уровни симпатии',
+      friendshipLevels
+        .map((row) => {
+          const rewards = (
+            affinityRecord?.details.levels?.find(
+              (level) => level.level === Number(row.level),
+            )?.rewards || []
+          ).map((reward, index) => ({
+            id: `reward-${row.level}-${index}`,
+            name: reward.name,
+            quantity: reward.quantity,
+            iconUrl: reward.iconUrl,
+          }));
+          return {
+            level: Number(row.level),
+            rewardName: '',
+            rewardIconUrl: '',
+            description: `Опыт симпатии для уровня: ${row.max_value}`,
+            rewards,
+          };
+        })
+        .slice(0, 10),
+      referenceSource(
+        affinityRecord?.details.levels?.length
+          ? affinityRecord
+          : supplement?.gift_reward?.length
+            ? supplementRecord
+            : communityRecord,
+      ),
+    );
+  const assetUrl = (record, reference) => {
+    const path = reference?.AssetPathName?.split('.')[0]?.toLowerCase();
+    return (
+      record.assets.find(
+        (a) =>
+          a.path
+            ?.replace(/^HT\/Content\//i, '/Game/')
+            .replace(/\.uasset$/i, '')
+            .toLowerCase() === path,
+      )?.url || ''
+    );
+  };
+  const pack = records.find(
+    (r) => r.namespace === 'DT_PlayerPackData',
+  )?.details;
+  if (pack) {
+    const statFields = [
+      ['HPMaxBase', 'Здоровье', false],
+      ['AtkBase', 'Атака', false],
+      ['DefBase', 'Защита', false],
+      ['CritBase', 'Шанс крит. попадания', true],
+      ['CritDamageBase', 'Крит. урон', true],
+    ];
+    add(
+      'profile.baseStats',
+      'Начальные показатели · уровень 1',
+      statFields
+        .filter(([key]) => Number.isFinite(pack[key]))
+        .map(([id, label, percent]) => ({
+          id,
+          label,
+          value: `${Number((pack[id] * (percent ? 100 : 1)).toFixed(4))}${percent ? '%' : ''}`,
+        })),
+    );
+  } else if (supplement?.stats?.length) {
+    const statNames = {
+      HPMaxBase: 'Здоровье',
+      AtkBase: 'Атака',
+      DefBase: 'Защита',
+      CritBase: 'Шанс крит. попадания',
+      CritDamageBase: 'Крит. урон',
+    };
+    add(
+      'profile.baseStats',
+      'Начальные показатели · уровень 1',
+      supplement.stats
+        .filter(
+          (stat) =>
+            statNames[stat.id_stats] && Number.isFinite(stat.values?.[0]),
+        )
+        .map((stat) => ({
+          id: stat.id_stats,
+          label: statNames[stat.id_stats],
+          value:
+            String(stat.values[0]) +
+            (stat.id_stats.startsWith('Crit') ? '%' : ''),
+        })),
+      referenceSource(supplementRecord),
+    );
   }
   add('name', 'Имя', identity.values.ru || '');
   const icons = records.filter((r) => r.kind === 'image');
@@ -14133,6 +14554,22 @@ async function buildLocalGameCharacterSource(env, character) {
   );
   if (portrait?.assets[0])
     add('imageUrl', 'Карточка персонажа', portrait.assets[0].url);
+  const defaultFashion = records.find(
+    (r) =>
+      r.namespace === 'DT_AppearanceData' &&
+      r.details.IsDefault &&
+      r.details.AppearanceType === 'EAppearanceType::Fashion',
+  );
+  if (defaultFashion) {
+    const image =
+      assetUrl(defaultFashion, defaultFashion.details.HeadIconBig) ||
+      assetUrl(defaultFashion, defaultFashion.details.HeadIcon);
+    const splash =
+      assetUrl(defaultFashion, defaultFashion.details.PortraitImg) ||
+      assetUrl(defaultFashion, defaultFashion.details.DisplayIcon);
+    if (image) add('imageUrl', 'Портрет из гардероба', image);
+    if (splash) add('splashUrl', 'Полный арт из гардероба', splash);
+  }
   const file = records.find(
     (r) => r.namespace.endsWith('FileDataTable') && r.gameId === owner,
   )?.details;
@@ -14210,7 +14647,226 @@ async function buildLocalGameCharacterSource(env, character) {
       description: plain(description?.values.ru || ''),
     };
   });
-  const abilityIcons = abilities
+  const structuredSkills = records.filter(
+    (r) =>
+      r.namespace === 'DT_GameplayAbilityTipsData' &&
+      (!abilityMenu.length || menuIds.has(r.gameId.toLowerCase())) &&
+      Array.isArray(r.details.AbilityDescription),
+  );
+  const numberText = (n) => String(Number(n.toFixed(4)));
+  function curveValues(curve, percent) {
+    const keys = [...(curve.Keys || [])].sort((a, b) => a.Time - b.Time);
+    if (!keys.length) return [];
+    const valueAt = (level) => {
+      const left =
+        [...keys].reverse().find((key) => key.Time <= level) || keys[0];
+      const right = keys.find((key) => key.Time > level);
+      const mode = left.InterpMode || curve.InterpMode || '';
+      if (!right || mode.endsWith('RCIM_Constant')) return left.Value;
+      if (!mode.endsWith('RCIM_Linear')) return undefined;
+      return (
+        left.Value +
+        ((right.Value - left.Value) * (level - left.Time)) /
+          (right.Time - left.Time)
+      );
+    };
+    const levels =
+      keys.length === 1 ? [1] : Array.from({ length: 13 }, (_, i) => i + 1);
+    const values = levels.map(valueAt);
+    return values.every(Number.isFinite)
+      ? values.map((value) => numberText(value * (percent ? 100 : 1)))
+      : [];
+  }
+  function valuesFor(data) {
+    const level = data?.LevelUpData || data || {};
+    const damage = [level.DamageGEList, level.DefGEList, level.HPGEList].find(
+      (list) => list?.length,
+    );
+    if (damage?.length)
+      return damage.map((key) => {
+        const row = records.find(
+          (r) => r.namespace === 'DT_SkillDamageData' && r.gameId === key,
+        )?.details;
+        const values = row?.AtkRateBaseArray?.length
+          ? row.AtkRateBaseArray
+          : row?.DefRateBaseArray?.length
+            ? row.DefRateBaseArray
+            : row?.HPRateBaseArray;
+        return values?.map((n) => numberText(n * 100)) || [];
+      });
+    return (level.EffectFigureDataList || []).map((effect) => {
+      const curve = records.find(
+        (r) => r.gameId === effect.NameID && Array.isArray(r.details.Keys),
+      )?.details;
+      return curve ? curveValues(curve, effect.bIsPercent) : [];
+    });
+  }
+  function substitute(template, arrays, at = 0) {
+    return template.replace(
+      /\{(\d+)\}/g,
+      (original, index) =>
+        arrays[Number(index)]?.[at] ??
+        (arrays[Number(index)]?.length === 1
+          ? arrays[Number(index)][0]
+          : original),
+    );
+  }
+  if (structuredSkills.length) {
+    abilities.length = 0;
+    for (const record of structuredSkills) {
+      const data = record.details;
+      const description = [
+        ...new Set(
+          data.AbilityDescription.map((part) => {
+            const text = substitute(
+              ru(part.Description),
+              valuesFor(part.AbilityDesReplaceValue?.[0]),
+            );
+            if (!text || /\{\d+\}/.test(text)) return '';
+            return [ru(part.DescriptionTitle), text].filter(Boolean).join('\n');
+          }).filter(Boolean),
+        ),
+      ].join('\n\n');
+      const attributes = (data.GALevelUpArray || []).flatMap(
+        (parameter, index) => {
+          const arrays = valuesFor(parameter);
+          const template = ru(parameter.DescValue);
+          const count = Math.max(0, ...arrays.map((a) => a.length));
+          if (
+            !count ||
+            !template ||
+            /\{\d+\}/.test(substitute(template, arrays))
+          )
+            return [];
+          return [
+            {
+              id: `parameter-${index}`,
+              label: ru(parameter.Desc),
+              value: Array.from({ length: count }, (_, i) =>
+                count === 1
+                  ? substitute(template, arrays, i)
+                  : `${i + 1}: ${substitute(template, arrays, i)}`,
+              ).join(' · '),
+            },
+          ];
+        },
+      );
+      abilities.push({
+        id: record.gameId,
+        name: ru(data.Name),
+        type:
+          abilityMenu.find(
+            (row) => row.id.toLowerCase() === record.gameId.toLowerCase(),
+          )?.type === 'peculiarity'
+            ? 'Особенность персонажа'
+            : /passive|pas\d/i.test(record.gameId)
+              ? 'Пассивный навык'
+              : /ultra|ultimate/i.test(record.gameId)
+                ? 'Сверхспособность'
+                : /qte/i.test(record.gameId)
+                  ? 'Навык поддержки'
+                  : /melee/i.test(record.gameId)
+                    ? 'Базовая атака'
+                    : /proskill/i.test(record.gameId)
+                      ? 'Особенность персонажа'
+                      : 'Навык перенаправления',
+        iconUrl: assetUrl(record, data.icon),
+        description: description.slice(0, 8000),
+        attributes,
+      });
+    }
+  }
+  for (const record of records.filter(
+    (r) =>
+      r.namespace === 'DT_CharacterAbilityCityGroupConfig' &&
+      (!abilityMenu.some((row) => row.type === 'city') ||
+        menuIds.has(r.gameId.toLowerCase())),
+  )) {
+    const data = record.details;
+    const attributes = (data.AbilityCityAttributeArray || [])
+      .map((part, index) => ({
+        id: `city-${index}`,
+        label: `Уровень ${part.AttributeLevel}`,
+        value: ru(part.Description),
+      }))
+      .filter((a) => a.value);
+    if (attributes.length)
+      abilities.push({
+        id: record.gameId,
+        name: ru(data.AbilityName),
+        type: 'Городской пассивный навык',
+        iconUrl: assetUrl(record, data.icon),
+        description: attributes[0].value,
+        attributes,
+      });
+  }
+  const uniqueAbilities = [
+    ...new Map(abilities.filter((a) => a.name).map((a) => [a.id, a])).values(),
+  ].slice(0, 30);
+  const awakenings = records
+    .filter((r) => /AwakenEffect\d*$/.test(r.namespace))
+    .flatMap((r) =>
+      (r.details.AwakenEffectStructList || []).map((a) => ({
+        level: Number(a.EffectID.match(/\d+/)?.[0] || 0),
+        kind: a.AwakenType?.endsWith('Awaken_Resonance')
+          ? 'resonance'
+          : 'awakening',
+        name: ru(a.Title),
+        iconUrl: assetUrl(r, a.AwakenIcon),
+        description: substitute(
+          ru(a.Desc),
+          valuesFor({ DamageGEList: a.GEIdArray }),
+        ),
+      })),
+    )
+    .filter(
+      (a) =>
+        a.level >= 1 &&
+        a.level <= 6 &&
+        a.name &&
+        a.description &&
+        !/\{\d+\}/.test(a.description),
+    );
+  if (awakenings.length)
+    add(
+      'profile.awakenings',
+      'Пробуждения и бонусы за 3 / 6',
+      awakenings.slice(0, 9),
+    );
+  const languageNames = {
+    en: 'Английский',
+    ja: 'Японский',
+    ko: 'Корейский',
+    zh: 'Китайский',
+  };
+  const lines = file
+    ? [...(file.DailyContent || []), ...(file.BattleContent || [])]
+    : [];
+  const voiceLines = records
+    .filter((r) => r.kind === 'audio')
+    .flatMap((r) => {
+      const line = lines.find(
+        (l) => l.AudioEvent?.AssetPathName?.split('.').at(-1) === r.gameId,
+      );
+      return line && r.assets[0]
+        ? [
+            {
+              id: `${r.details.locale}-${r.gameId}`.slice(0, 80),
+              title: ru(line.Title),
+              description: ru(line.Content).slice(0, 1000),
+              language: languageNames[r.details.locale],
+              audioUrl: r.assets[0].url,
+            },
+          ]
+        : [];
+    });
+  if (voiceLines.length)
+    add(
+      'profile.voiceLines',
+      'Реплики профиля из игры',
+      voiceLines.slice(0, 500),
+    );
+  const abilityIcons = uniqueAbilities
     .filter((a) => a.iconUrl)
     .map(({ name, type, iconUrl }) => ({ name, type, iconUrl }));
   if (abilityIcons.length)
@@ -14219,7 +14875,7 @@ async function buildLocalGameCharacterSource(env, character) {
       'Иконки навыков из локальной игры',
       abilityIcons,
     );
-  const completeAbilities = abilities.filter(
+  const completeAbilities = uniqueAbilities.filter(
     (a) => a.description && !/\{\d+\}/.test(a.description),
   );
   if (completeAbilities.length)
@@ -14228,15 +14884,23 @@ async function buildLocalGameCharacterSource(env, character) {
     .filter(
       (r) =>
         r.kind === 'wardrobe' &&
-        r.details?.AppearanceType === 'EAppearanceType::Fashion',
+        (r.details?.AppearanceType === 'EAppearanceType::Fashion' ||
+          r.namespace === 'NTE_ReferenceFashion'),
     )
     .map((r) => ({
       id: r.gameId,
-      name: ru(r.details.Name),
-      description: ru(r.details.Desc),
+      name:
+        r.namespace === 'NTE_ReferenceFashion'
+          ? r.values.ru || ''
+          : ru(r.details.Name),
+      description:
+        r.namespace === 'NTE_ReferenceFashion'
+          ? plain(r.details.localizedDescription?.ru || '')
+          : ru(r.details.Desc),
       imageUrl:
-        r.assets.find((a) => /PortraitImg|2160|1024|lihui/i.test(a.path || ''))
-          ?.url ||
+        assetUrl(r, r.details.PortraitImg) ||
+        assetUrl(r, r.details.DisplayIcon) ||
+        r.assets.find((a) => /2160|1024|lihui/i.test(a.path || ''))?.url ||
         r.assets[0]?.url ||
         '',
     }))
@@ -14263,6 +14927,7 @@ const GAME_RECORD_KINDS = new Set([
   'item',
   'localization',
   'image',
+  'audio',
 ]);
 const GAME_RECORD_SELECT = `SELECT e.value AS source_json,COALESCE(o.overrides_json,'{}') AS overrides_json,
  json_extract(e.value,'$.sourceHash')||':'||COALESCE(o.revision,0) AS revision,
@@ -14306,7 +14971,183 @@ async function getGameDataRow(env, id) {
     .bind(chunk, id)
     .first();
 }
+function gameProgressionStages(stages, phases = []) {
+  if (phases.length > 1) {
+    const sorted = [...phases].sort((a, b) => a.maxLevel - b.maxLevel);
+    return sorted.slice(1).map((phase, index) => ({
+      level: String(phase.maxLevel),
+      fromLevel: Number(sorted[index].maxLevel),
+      items_id: (phase.materials || []).map((item) => item.itemId),
+      amount: (phase.materials || []).map((item) => item.quantity),
+      cost_gold: Number(phase.goldCost) || 0,
+    }));
+  }
+  return [...stages]
+    .sort((a, b) => Number(a.level) - Number(b.level))
+    .map((stage, index, array) => ({
+      ...stage,
+      fromLevel: index ? Number(array[index - 1].level) : 20,
+    }));
+}
+
 async function handleGameData(request, env, parts) {
+  if (parts[1] === 'progression' && request.method === 'GET') {
+    const cache = globalThis.caches?.default;
+    let cacheRequest;
+    if (cache) {
+      const latest = await env.DB.prepare(
+        'SELECT dataset_hash,status FROM game_import_runs ORDER BY updated_at DESC LIMIT 1',
+      ).first();
+      if (latest && latest.status !== 'complete')
+        throwHttp(
+          'Справочник прокачки обновляется. Повторите загрузку позже.',
+          503,
+        );
+      const edits = await env.DB.prepare(
+        'SELECT id,revision,updated_at FROM game_record_overrides ORDER BY id',
+      ).all();
+      const digest = await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(
+          JSON.stringify([latest?.dataset_hash, edits.results || []]),
+        ),
+      );
+      const version = Array.from(new Uint8Array(digest), (byte) =>
+        byte.toString(16).padStart(2, '0'),
+      ).join('');
+      const cacheUrl = new URL(request.url);
+      cacheUrl.searchParams.set('__reference', 'progression-v2-' + version);
+      cacheRequest = new globalThis.Request(cacheUrl.toString());
+      const hit = await cache.match(cacheRequest).catch(() => null);
+      if (hit) {
+        const response = new Response(hit.body, hit);
+        response.headers.set('Cache-Control', 'no-store');
+        return response;
+      }
+    }
+    const rows = await env.DB.prepare(
+      GAME_RECORD_SELECT +
+        " WHERE json_extract(e.value,'$.namespace') IN ('NTE_ReferenceCharacter','NTE_ReferenceCommunityProfile','NTE_ReferenceWeapon','DT_CharacterUpgradeDataTable','DT_ForkUpgradeData','DT_DefaultAppearanceData')",
+    ).all();
+    const records = (rows.results || []).map((row) => gameRecordView(row));
+    const variantLabel = (id) => {
+      const asset =
+        records.find(
+          (row) =>
+            row.namespace === 'DT_DefaultAppearanceData' && row.gameId === id,
+        )?.details.PlayerAppearanceAsset?.AssetPathName || '';
+      return /_female\//i.test(asset)
+        ? ' (женский вариант)'
+        : /_male\//i.test(asset)
+          ? ' (мужской вариант)'
+          : '';
+    };
+    const costs = records
+      .filter(
+        (row) =>
+          row.namespace === 'NTE_ReferenceCharacter' ||
+          row.namespace === 'NTE_ReferenceWeapon',
+      )
+      .map((row) => ({
+        id: row.gameId,
+        kind: row.namespace === 'NTE_ReferenceCharacter' ? 'character' : 'arc',
+        name:
+          (row.values.ru || row.values.en || row.gameId) +
+          (row.namespace === 'NTE_ReferenceCharacter'
+            ? variantLabel(row.gameId)
+            : ''),
+        originalName: row.values.en || '',
+        rarity: row.details.rarity,
+        stages: gameProgressionStages(
+          row.details.breakthrough || row.details.materials || [],
+          row.namespace === 'NTE_ReferenceCharacter'
+            ? records.find(
+                (record) =>
+                  record.namespace === 'NTE_ReferenceCommunityProfile' &&
+                  record.ownerId === row.ownerId,
+              )?.details.phases || []
+            : [],
+        ),
+      }));
+    if (!costs.length)
+      throwHttp(
+        'Таблицы прокачки ещё не подготовлены. Повторите загрузку после импорта справочника.',
+        503,
+      );
+    const experienceIds = [
+      'CharacterUpMaterial_lv1',
+      'CharacterUpMaterial_lv2',
+      'CharacterUpMaterial_lv3',
+      'WeaponUpMaterial_lv1',
+      'WeaponUpMaterial_lv2',
+      'WeaponUpMaterial_lv3',
+    ];
+    const ids = [
+      ...new Set([
+        'gold',
+        ...experienceIds,
+        ...costs.flatMap((row) =>
+          row.stages.flatMap((stage) => stage.items_id || []),
+        ),
+      ]),
+    ];
+    const itemRows = ids.length
+      ? await env.DB.prepare(
+          GAME_RECORD_SELECT +
+            " WHERE c.kind='item' AND json_extract(e.value,'$.gameId') IN (SELECT value FROM json_each(?))",
+        )
+          .bind(JSON.stringify(ids))
+          .all()
+      : { results: [] };
+    const items = { gold: { name: 'Жук-монета', iconUrl: '' } };
+    const experienceItems = [];
+    for (const raw of itemRows.results || []) {
+      const row = gameRecordView(raw);
+      if (!items[row.gameId] || row.values.ru)
+        items[row.gameId] = {
+          name: row.values.ru || row.values.en || row.gameId,
+          iconUrl: row.assets[0]?.url || '',
+        };
+      if (
+        row.namespace === 'NTE_ReferenceItem' &&
+        experienceIds.includes(row.gameId)
+      ) {
+        const match = row.details.context?.match(
+          /(?:Grants|Provides)\s+([\d,]+)\s+(?:points of character EXP|Arc EXP)/i,
+        );
+        if (match)
+          experienceItems.push({
+            id: row.gameId,
+            kind: row.gameId.startsWith('Character') ? 'character' : 'arc',
+            experience: Number(match[1].replaceAll(',', '')),
+            currencyCost: row.details.upgradeUsage?.currencyCost,
+          });
+      }
+    }
+    const characterExp = records
+      .filter((row) => row.namespace === 'DT_CharacterUpgradeDataTable')
+      .map((row) => ({
+        level: Number(row.gameId.match(/_(\d+)$/)?.[1]),
+        exp: row.details.NeedExp,
+      }));
+    const arcExp = records
+      .filter((row) => row.namespace === 'DT_ForkUpgradeData')
+      .map((row) => ({ key: row.gameId, exp: row.details.NeedExp }));
+    const response = json({
+      data: { costs, items, characterExp, arcExp, experienceItems },
+    });
+    if (cache && cacheRequest) {
+      const copy = response.clone();
+      copy.headers.set('Cache-Control', 'public, max-age=86400');
+      try {
+        await cache.put(cacheRequest, copy);
+      } catch {
+        /* Cache availability must not block the calculator. */
+      }
+    }
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
+  }
   if (parts[1] === 'localize' && request.method === 'POST') {
     await requireRole(request, env, CONTENT_ROLE);
     const body = await readJson(request);
@@ -14466,7 +15307,7 @@ async function handleGameData(request, env, parts) {
           (a) =>
             !a ||
             typeof a.url !== 'string' ||
-            !/^https:\/\/|^\/nte-meta\/game-assets\/[a-f0-9]{20}\.webp$/.test(
+            !/^https:\/\/|^\/nte-meta\/(?:game-assets\/[a-f0-9]{20}\.webp|game-audio\/[a-f0-9]{20}\.ogg)$/.test(
               a.url,
             ),
         ))
@@ -14655,6 +15496,12 @@ function discoveryFetch(url, options, budget) {
 }
 function classifyDiscoveryContent(source, text) {
   if (source.official) return 'news';
+  if (
+    /(?:источник\s*[:：-]?\s*официально|source\s*[:：-]?\s*official|来源\s*[:：-]?\s*官方|公式.{0,12}(?:発表|公開|配信開始))/i.test(
+      text,
+    )
+  )
+    return 'news';
   if (
     /(?:\bleaks?\b|datamin|rumou?r|слив|утечк|слух|爆料|内鬼|リーク|噂|easter.?egg|\btips?\b|\btricks?\b|пасхал|совет|лайфхак|小技巧|彩蛋|裏技)/i.test(
       text,

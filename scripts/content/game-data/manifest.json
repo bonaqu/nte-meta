@@ -1,30 +1,57 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "locales": [
     "ru",
     "en",
     "ja",
     "zh"
   ],
-  "localizationKeys": 113016,
-  "records": 195522,
+  "localizationKeys": 113100,
+  "records": 202471,
   "kinds": {
+    "localization": 142689,
     "skill": 3622,
-    "localization": 142578,
     "awakening": 210,
-    "wardrobe": 733,
-    "affinity": 14680,
-    "item": 5206,
-    "arc": 5446,
+    "wardrobe": 754,
+    "affinity": 14705,
+    "item": 7417,
+    "arc": 5497,
     "stat": 8457,
     "cartridge": 2340,
     "biography": 3522,
-    "character": 1220,
-    "image": 7508
+    "character": 1269,
+    "image": 7968,
+    "audio": 4021
   },
-  "textures": 7508,
-  "extractionErrors": [],
+  "textures": 7968,
+  "extractionErrors": [
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC028_QTE_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC028_QTE_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC028_QTE_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC028_skill_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC028_skill_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC028_skill_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    }
+  ],
   "imageErrors": [],
+  "audioErrors": [],
   "emptyTables": [
     "HT/Content/DataTable/Character/Appearance/DT_DecorationCameraData.uasset",
     "HT/Content/DataTable/Character/Appearance/DT_DecorationData.uasset",
@@ -62,7 +89,28 @@
     "HT/Content/DataTable/Skill/GlobalCharacterData/DT_GlobalValueLinkoData.uasset"
   ],
   "source": "Local installed game archives including PatchPaks; original strings preserved",
-  "datasetSha256": "55b8140bab5a6183caa07a467742a9e66fcd2894ceb120645baf07689ba995bf",
-  "chunks": 1024,
-  "chunksSha256": "053afec81c9ad75662df8115c1bdbd574edb6cc865f24dad9104c3841fe9cfe4"
+  "datasetSha256": "e55340946c3ff34b225654a6cbb83bbb176ea0d72207a82007e932a1a87288f0",
+  "chunks": 1088,
+  "repairedCsvRows": {
+    "ru": 425,
+    "en": 598,
+    "ja": 213,
+    "zh": 237
+  },
+  "supplement": {
+    "providers": [
+      "Nanoka",
+      "Kaiden",
+      "Neverness.app"
+    ],
+    "version": "1.4.13",
+    "checkedAt": "2026-10-23T04:19:41.391Z",
+    "characters": 25,
+    "items": 2071,
+    "weapons": 51,
+    "affinity": 25,
+    "gifts": 138,
+    "failures": []
+  },
+  "chunksSha256": "400b4c7512f4d3b0311ee989869e831dab0c1fc49f8798a43b83a4549c647847"
 }

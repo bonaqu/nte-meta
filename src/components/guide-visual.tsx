@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus, Trash2, Copy } from 'lucide-react';
 import type { Character, GuideVisual, GuideVisualItem } from '../types';
 import { resolveAssetUrl } from '../lib/assets';
 import { newVisualItem } from '../lib/guide-visual';
@@ -117,7 +117,14 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
   return (
     <ol className={`guide-visual guide-visual--${value.kind}`}>
       {items.map((item, index) => (
-        <li key={item.id}>
+        <li
+          key={item.id}
+          className={
+            equipment
+              ? `guide-visual__equipment guide-visual__equipment--${item.category || 'replacement'}`
+              : undefined
+          }
+        >
           <span
             className="guide-visual__position"
             aria-label={`Позиция ${index + 1}`}
@@ -189,12 +196,44 @@ export function GuideVisualEditor({
   }
   return (
     <div className="visual-section-editor">
+      <div className="visual-section-editor__summary">
+        <strong>
+          {value.kind === 'rotation'
+            ? 'Пошаговая ротация'
+            : value.kind === 'skills'
+              ? 'Порядок прокачки'
+              : value.kind === 'stats'
+                ? 'Основные характеристики'
+                : 'Подбор экипировки'}
+        </strong>
+        <span>
+          {value.items.length} {value.kind === 'rotation' ? 'шагов' : 'позиций'}
+        </span>
+        <a href="#visual-section-preview">К предпросмотру</a>
+      </div>
       {value.items.map((item, index) => (
         <fieldset key={item.id} className="visual-item-editor">
           <legend>
             {value.kind === 'rotation' ? 'Шаг' : 'Позиция'} {index + 1}
+            {item.name ? ` · ${item.name}` : ''}
           </legend>
           <div className="button-row">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                const items = [...value.items];
+                items.splice(index + 1, 0, {
+                  ...item,
+                  id: newVisualItem().id,
+                  stats: item.stats.map((stat) => ({ ...stat })),
+                });
+                onChange({ ...value, items });
+              }}
+            >
+              <Copy aria-hidden="true" />
+              Дублировать
+            </button>
             <button
               className="icon-button"
               type="button"
@@ -386,7 +425,11 @@ export function GuideVisualEditor({
         <Plus aria-hidden="true" />{' '}
         {value.kind === 'rotation' ? 'Добавить шаг' : 'Добавить элемент'}
       </button>
-      <details className="visual-section-preview" open>
+      <details
+        id="visual-section-preview"
+        className="visual-section-preview"
+        open
+      >
         <summary>Предпросмотр секции</summary>
         <GuideVisualView value={value} />
       </details>

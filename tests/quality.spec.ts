@@ -235,13 +235,28 @@ test.describe('Качество интерфейса NTE Meta', () => {
   }) => {
     const names = [
       'Адлер',
+      'Аканэ Рин',
       'Аурелия',
+      'Байканг',
+      'Блэкбёрд',
       'Даффодил',
+      'Занку',
+      'Ирой',
+      'Лакримоза',
+      'Линко',
       'Минт',
       'Наналли',
       'Сакири',
+      'Ския',
+      'Фадия',
+      'Ханиэль',
+      'Хаос',
+      'Хатор',
       'Хотори',
+      'Цзююань',
+      'Чиз',
       'Шинку',
+      'Эдгар',
     ];
     const externalRequests: string[] = [];
     page.on('request', (request) => {
@@ -266,7 +281,7 @@ test.describe('Качество интерфейса NTE Meta', () => {
               patch: '1.0',
               summary: '',
               shortDescription: '',
-              imageUrl: `https://static.wikia.nocookie.net/neverness-to-everness/images/1/aa/${encodeURIComponent(name)}_Иконка.png/revision/latest?path-prefix=ru`,
+              imageUrl: `https://static.wikia.nocookie.net/neverness-to-everness/images/1/aa/${encodeURIComponent(name.replaceAll(' ', '_'))}_Иконка.png/revision/latest?path-prefix=ru`,
               splashUrl: '',
             })),
             {
@@ -293,7 +308,7 @@ test.describe('Качество интерфейса NTE Meta', () => {
     );
     await page.goto('/#/characters');
     const images = page.locator('.character-card img');
-    await expect(images).toHaveCount(9);
+    await expect(images).toHaveCount(names.length + 1);
     await images.evaluateAll((nodes) =>
       nodes.forEach((node) => {
         (node as HTMLImageElement).loading = 'eager';
@@ -307,7 +322,7 @@ test.describe('Качество интерфейса NTE Meta', () => {
               .length,
         ),
       )
-      .toBe(9);
+      .toBe(names.length + 1);
     expect(externalRequests).toEqual([]);
   });
 

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { uploadImage } from '../../lib/media';
 import { ImageUploadButton } from '../../components/image-field';
 import {
   CheckCircle2,
@@ -739,8 +738,8 @@ function getImportRowLabel(item: unknown, index: number) {
 
 function formatEditorError(error: string) {
   const text = error || 'Не удалось сохранить изменения.';
-  if (/profile\.awakenings.+не больше 7 записей/i.test(text)) {
-    return 'В пробуждениях можно сохранить не больше 7 строк: пустой уровень и пробуждения 1-6. Удалите лишние записи.';
+  if (/profile\.awakenings.+не больше 9 записей/i.test(text)) {
+    return 'Можно сохранить до 9 строк: базовое состояние, шесть пробуждений и бонусы резонанса 3/6. Удалите лишние записи.';
   }
   if (/profile\.abilities.+не больше/i.test(text)) {
     return 'В способностях слишком много строк. Оставьте основные навыки персонажа и удалите лишнее.';
@@ -1326,22 +1325,27 @@ export function AdminCharacterEditor({
           iconUrl: string;
         }>;
         next.profile.abilities = next.profile.abilities.map((ability) => {
-          const match = icons.find(
-            (icon) =>
-              icon.name === ability.name ||
-              icon.type.toLowerCase() === ability.type.toLowerCase(),
+          const matchingType = icons.filter(
+            (icon) => icon.type.toLowerCase() === ability.type.toLowerCase(),
           );
+          const match =
+            icons.find((icon) => icon.name === ability.name) ||
+            (matchingType.length === 1 ? matchingType[0] : undefined);
           return match ? { ...ability, iconUrl: match.iconUrl } : ability;
         });
       } else if (
         suggestion.field === 'profile.abilities' &&
         Array.isArray(parsed)
       ) {
-        next.profile.abilities = mergeRowsByKey(
-          next.profile.abilities,
-          parsed as CharacterAbility[],
-          (item) => `${item.type}:${item.name}`,
-        );
+        next.profile.abilities = suggestion.sourceName.startsWith(
+          'Локальные файлы игры',
+        )
+          ? (parsed as CharacterAbility[])
+          : mergeRowsByKey(
+              next.profile.abilities,
+              parsed as CharacterAbility[],
+              (item) => `${item.type}:${item.name}`,
+            );
       } else if (
         suggestion.field === 'profile.awakenings' &&
         Array.isArray(parsed)
@@ -1349,7 +1353,7 @@ export function AdminCharacterEditor({
         next.profile.awakenings = mergeRowsByKey(
           next.profile.awakenings,
           parsed as CharacterAwakening[],
-          (item) => `${item.level}`,
+          (item) => `${item.kind || 'awakening'}:${item.level}`,
         ).sort((a, b) => a.level - b.level);
       } else if (suggestion.field === 'imageUrl') {
         next.imageUrl = normalizeExternalAssetUrl(String(parsed));
@@ -1376,54 +1380,6 @@ export function AdminCharacterEditor({
     setMessage(
       `Поле «${suggestion.label}» добавлено в черновик. Проверьте и сохраните персонажа.`,
     );
-  }
-
-  async function uploadInlineIcon(
-    file: File | undefined,
-    onReady: (dataUrl: string) => void,
-  ) {
-    if (!file) return;
-    try {
-      const dataUrl = await uploadImage(
-        file,
-        `characters/${draft.slug || 'draft'}/icons`,
-      );
-      onReady(dataUrl);
-      setTone('success');
-      setMessage(
-        'Иконка загружена в черновик. Проверьте предпросмотр и сохраните персонажа.',
-      );
-    } catch (error) {
-      setTone('danger');
-      setMessage(
-        error instanceof Error ? error.message : 'Не удалось загрузить иконку.',
-      );
-    }
-  }
-
-  async function uploadInlineImage(
-    file: File | undefined,
-    onReady: (dataUrl: string) => void,
-  ) {
-    if (!file) return;
-    try {
-      const dataUrl = await uploadImage(
-        file,
-        `characters/${draft.slug || 'draft'}/images`,
-      );
-      onReady(dataUrl);
-      setTone('success');
-      setMessage(
-        'Изображение загружено в черновик. Проверьте предпросмотр и сохраните персонажа.',
-      );
-    } catch (error) {
-      setTone('danger');
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : 'Не удалось загрузить изображение.',
-      );
-    }
   }
 
   async function persist(status: 'draft' | 'published') {
@@ -1859,19 +1815,13 @@ export function AdminCharacterEditor({
                         }
                       />
                     </label>
-                    <label>
-                      Загрузить иконку
-                      <input
-                        type="file"
-                        accept="image/png,image/webp,image/jpeg"
-                        onChange={(event) =>
-                          void uploadInlineIcon(
-                            event.target.files?.[0],
-                            (iconUrl) => update({ ...item, iconUrl }),
-                          )
-                        }
+                    <div className="file-upload-field">
+                      <ImageUploadButton
+                        label="Загрузить иконку"
+                        context={`characters/${draft.slug || 'draft'}/icons`}
+                        onUploaded={(iconUrl) => update({ ...item, iconUrl })}
                       />
-                    </label>
+                    </div>
                     {item.iconUrl ? (
                       <img
                         className="editor-icon-preview"
@@ -1951,20 +1901,13 @@ export function AdminCharacterEditor({
               />
             </label>
             <div className="media-field-preview">
-              <label>
-                Загрузить иконку/карточку
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(event) => {
-                    void uploadInlineImage(
-                      event.target.files?.[0],
-                      (imageUrl) => patch({ imageUrl }),
-                    );
-                    event.currentTarget.value = '';
-                  }}
+              <div className="file-upload-field">
+                <ImageUploadButton
+                  label="Загрузить иконку/карточку"
+                  context={`characters/${draft.slug || 'draft'}/images`}
+                  onUploaded={(imageUrl) => patch({ imageUrl })}
                 />
-              </label>
+              </div>
               {draft.imageUrl ? (
                 <img
                   className="editor-image-preview"
@@ -1989,20 +1932,13 @@ export function AdminCharacterEditor({
               />
             </label>
             <div className="media-field-preview">
-              <label>
-                Загрузить splash art
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(event) => {
-                    void uploadInlineImage(
-                      event.target.files?.[0],
-                      (splashUrl) => patch({ splashUrl }),
-                    );
-                    event.currentTarget.value = '';
-                  }}
+              <div className="file-upload-field">
+                <ImageUploadButton
+                  label="Загрузить splash art"
+                  context={`characters/${draft.slug || 'draft'}/images`}
+                  onUploaded={(splashUrl) => patch({ splashUrl })}
                 />
-              </label>
+              </div>
               {draft.splashUrl ? (
                 <img
                   className="editor-image-preview editor-image-preview--wide"
@@ -2128,19 +2064,13 @@ export function AdminCharacterEditor({
                     }
                   />
                 </label>
-                <label>
-                  Загрузить иконку
-                  <input
-                    type="file"
-                    accept="image/png,image/webp,image/jpeg"
-                    onChange={(event) =>
-                      void uploadInlineIcon(
-                        event.target.files?.[0],
-                        (iconUrl) => update({ ...item, iconUrl }),
-                      )
-                    }
+                <div className="file-upload-field">
+                  <ImageUploadButton
+                    label="Загрузить иконку"
+                    context={`characters/${draft.slug || 'draft'}/icons`}
+                    onUploaded={(iconUrl) => update({ ...item, iconUrl })}
                   />
-                </label>
+                </div>
                 {item.iconUrl ? (
                   <img
                     className="editor-icon-preview"
@@ -2185,7 +2115,7 @@ export function AdminCharacterEditor({
             )}
           />
           <Collection<CharacterAwakening>
-            title="Пробуждения 0-6"
+            title="Пробуждения и резонанс"
             description="Каждое пробуждение можно добавить, изменить или удалить отдельно."
             items={profile.awakenings}
             addLabel="Добавить пробуждение"
@@ -2198,6 +2128,23 @@ export function AdminCharacterEditor({
             onChange={(awakenings) => patchProfile({ awakenings })}
             render={(item, _index, update) => (
               <>
+                <label>
+                  Тип эффекта
+                  <select
+                    value={item.kind || 'awakening'}
+                    onChange={(event) =>
+                      update({
+                        ...item,
+                        kind: event.target.value as 'awakening' | 'resonance',
+                      })
+                    }
+                  >
+                    <option value="awakening">Пробуждение</option>
+                    <option value="resonance">
+                      Бонус за 3 / 6 пробуждений
+                    </option>
+                  </select>
+                </label>
                 <label>
                   Уровень
                   <select
@@ -2235,19 +2182,13 @@ export function AdminCharacterEditor({
                     }
                   />
                 </label>
-                <label>
-                  Загрузить иконку
-                  <input
-                    type="file"
-                    accept="image/png,image/webp,image/jpeg"
-                    onChange={(event) =>
-                      void uploadInlineIcon(
-                        event.target.files?.[0],
-                        (iconUrl) => update({ ...item, iconUrl }),
-                      )
-                    }
+                <div className="file-upload-field">
+                  <ImageUploadButton
+                    label="Загрузить иконку"
+                    context={`characters/${draft.slug || 'draft'}/icons`}
+                    onUploaded={(iconUrl) => update({ ...item, iconUrl })}
                   />
-                </label>
+                </div>
                 {item.iconUrl ? (
                   <img
                     className="editor-icon-preview"
@@ -2478,26 +2419,21 @@ export function AdminCharacterEditor({
                                 }
                               />
                             </label>
-                            <label className="friendship-reward-upload">
-                              Загрузить иконку
-                              <input
-                                type="file"
-                                accept="image/png,image/webp,image/jpeg"
-                                onChange={(event) =>
-                                  void uploadInlineIcon(
-                                    event.target.files?.[0],
-                                    (iconUrl) =>
-                                      setRewards(
-                                        rewards.map((entry, index) =>
-                                          index === rewardIndex
-                                            ? { ...entry, iconUrl }
-                                            : entry,
-                                        ),
-                                      ),
+                            <div className="file-upload-field">
+                              <ImageUploadButton
+                                label="Загрузить иконку"
+                                context={`characters/${draft.slug || 'draft'}/icons`}
+                                onUploaded={(iconUrl) =>
+                                  setRewards(
+                                    rewards.map((entry, index) =>
+                                      index === rewardIndex
+                                        ? { ...entry, iconUrl }
+                                        : entry,
+                                    ),
                                   )
                                 }
                               />
-                            </label>
+                            </div>
                             <button
                               className="icon-button danger"
                               type="button"
@@ -2609,19 +2545,13 @@ export function AdminCharacterEditor({
                     }
                   />
                 </label>
-                <label>
-                  Загрузить изображение
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={(event) =>
-                      void uploadInlineImage(
-                        event.target.files?.[0],
-                        (imageUrl) => update({ ...item, imageUrl }),
-                      )
-                    }
+                <div className="file-upload-field">
+                  <ImageUploadButton
+                    label="Загрузить изображение"
+                    context={`characters/${draft.slug || 'draft'}/images`}
+                    onUploaded={(imageUrl) => update({ ...item, imageUrl })}
                   />
-                </label>
+                </div>
                 {item.imageUrl ? (
                   <img
                     className="editor-image-preview"

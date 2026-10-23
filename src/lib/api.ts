@@ -1,4 +1,9 @@
 import { seedData } from '../data/seed';
+import type { ProgressionData } from './progression';
+
+export function loadProgressionData() {
+  return request<ProgressionData>('/api/game-data/progression');
+}
 import type {
   AdminUser,
   AuditLogEntry,

@@ -84,7 +84,7 @@ for (const row of records) {
   )?.url;
   const stem = String(row.gameId).replace(/_name$/i, '');
   const localized = /_name$/i.test(row.gameId) ? itemImage(stem) : undefined;
-  if (row.term)
+  if (row.term || row.kind === 'wardrobe')
     for (const name of Object.values(row.values))
       nameAsset(name, localized || direct);
 }
@@ -126,6 +126,7 @@ for (const [url, rows] of imported) {
       'interactivemap.app',
       'www.neverness.app',
       'static.wikia.nocookie.net',
+      'img.game8.co',
     ].includes(u.hostname)
   )
     continue;

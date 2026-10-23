@@ -114,3 +114,75 @@ test('Адлер: старые навыки, пробуждения и мате�
   }
   expect(errors).toEqual([]);
 });
+
+test('опубликованный сайт: все изображения профилей действительно декодируются в браузере', async ({
+  page,
+  request,
+}, testInfo) => {
+  const origin = process.env.NTE_MEDIA_REVIEW_ORIGIN;
+  test.skip(!origin, 'Explicit published profile-media review.');
+  test.setTimeout(180000);
+  const characters = (
+    await (
+      await request.get(
+        'https://nte-meta-api.bonaqu.workers.dev/api/characters',
+      )
+    ).json()
+  ).data as Array<{ id: string; name: string; slug: string }>;
+  const failures: Array<{ character: string; source: string; error: string }> =
+    [];
+  const pageErrors: string[] = [];
+  page.on('pageerror', (e) => pageErrors.push(e.message));
+  let checked = 0;
+  await page.setViewportSize({ width: 1440, height: 900 });
+  for (const character of characters) {
+    await page.goto(`${origin}/#/characters/${character.slug}`);
+    await expect(
+      page.getByRole('heading', {
+        name: character.name,
+        exact: true,
+        level: 1,
+      }),
+    ).toBeVisible();
+    const images = await page
+      .locator(
+        '.character-lore-hero img, #character-abilities img, #character-awakenings img, #character-progression img, #character-wardrobe img',
+      )
+      .all();
+    for (const image of images) {
+      const source = (await image.getAttribute('src')) || '';
+      try {
+        await image.scrollIntoViewIfNeeded();
+        await expect
+          .poll(() =>
+            image.evaluate(
+              (img: HTMLImageElement) => img.complete && img.naturalWidth > 0,
+            ),
+          )
+          .toBeTruthy();
+      } catch (error) {
+        failures.push({
+          character: character.id,
+          source,
+          error: String(error).slice(0, 300),
+        });
+      }
+      checked++;
+    }
+  }
+  const report = {
+    profiles: characters.length,
+    images: checked,
+    failures,
+    pageErrors,
+  };
+  await writeFile(
+    process.env.NTE_MEDIA_REVIEW_REPORT ||
+      testInfo.outputPath('media-review.json'),
+    JSON.stringify(report, null, 2),
+  );
+  console.log('[profile-media-review]', JSON.stringify(report));
+  expect(checked).toBeGreaterThan(500);
+  expect(failures).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});

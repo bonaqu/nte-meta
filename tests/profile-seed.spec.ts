@@ -3,6 +3,80 @@ import { readFile, readdir } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import { mergeNativeCollection } from '../scripts/game-data/seed-profiles.mjs';
 
+test('исправление иконки городского навыка Минт сохраняет все прочие значения и свои изображения', async () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec(
+      'CREATE TABLE character_profiles(character_id TEXT, abilities_json TEXT)',
+    );
+    const skill = {
+      id: '1bd4a48a-146f-4658-a31d-23ce5e6e51b0',
+      name: 'Торнадо Минт',
+      description: 'Ручное описание',
+      iconUrl:
+        'https://i2.wp.com/images.genshin-builds.com/nte/characters/player_019.webp?strip=all&quality=100&w=520',
+      attributes: [{ label: 'Бонус', value: '10%' }],
+    };
+    const other = {
+      id: 'another',
+      name: 'Другой навык',
+      iconUrl: 'https://example.com/custom.webp',
+    };
+    db.prepare('INSERT INTO character_profiles VALUES(?,?)').run(
+      'mint',
+      JSON.stringify([other, skill]),
+    );
+    db.prepare('INSERT INTO character_profiles VALUES(?,?)').run(
+      'another-character',
+      JSON.stringify([skill]),
+    );
+    const migration = await readFile(
+      'migrations/0041_mint_city_skill_icon.sql',
+      'utf8',
+    );
+    db.exec(migration);
+    db.exec(migration);
+    const result = JSON.parse(
+      db
+        .prepare(
+          "SELECT abilities_json FROM character_profiles WHERE character_id='mint'",
+        )
+        .get()!.abilities_json as string,
+    );
+    expect(result).toEqual([
+      other,
+      { ...skill, iconUrl: '/nte-meta/game-assets/eb1adcc872b389762965.webp' },
+    ]);
+    expect(
+      JSON.parse(
+        db
+          .prepare(
+            "SELECT abilities_json FROM character_profiles WHERE character_id='another-character'",
+          )
+          .get()!.abilities_json as string,
+      ),
+    ).toEqual([skill]);
+    const custom = [
+      { ...skill, iconUrl: 'https://example.com/my-mint-icon.webp' },
+    ];
+    db.prepare(
+      "UPDATE character_profiles SET abilities_json=? WHERE character_id='mint'",
+    ).run(JSON.stringify(custom));
+    db.exec(migration);
+    expect(
+      JSON.parse(
+        db
+          .prepare(
+            "SELECT abilities_json FROM character_profiles WHERE character_id='mint'",
+          )
+          .get()!.abilities_json as string,
+      ),
+    ).toEqual(custom);
+  } finally {
+    db.close();
+  }
+});
+
 test('русские названия экипировки сохраняют порядок, характеристики и ручные тексты', async () => {
   const db = new DatabaseSync(':memory:');
   try {

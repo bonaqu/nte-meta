@@ -1,3 +1,6 @@
+import installedMediaAliases from '../data/native-media-aliases.json';
+
+const nativeMediaAliases: Record<string, string> = installedMediaAliases;
 const viteBase =
   import.meta.env.BASE_URL === './' ? '/' : import.meta.env.BASE_URL;
 const publicBase = viteBase.endsWith('/') ? viteBase : `${viteBase}/`;
@@ -123,6 +126,7 @@ export function resolveAssetUrl(
   size: 'default' | 'large' = 'default',
 ) {
   let url = resolveBundledPortrait(normalizeExternalAssetUrl(value));
+  url = nativeMediaAliases[url.split('?')[0]] || url;
   if (size === 'large') {
     const portrait = url.match(
       /^(?:\/nte-meta\/|\/)?assets\/characters\/(Adler|Aurelia|Baicang|Daffodill|Mint|Nanally|Sakiri|Hotori|blackbird|iroi|linko|zankou)\.(?:webp|png)$/,
@@ -142,6 +146,28 @@ export function resolveAssetUrl(
     return `${publicBase}${url}`;
   }
   return url;
+}
+
+/** Wiki-made role badges have no native equivalent; keep their text label. */
+export function resolveRoleIconUrl(value?: string | null) {
+  if (value) {
+    try {
+      const url = new URL(value);
+      const filename = decodeURIComponent(url.pathname.split('/')[5] || '');
+      if (
+        url.hostname === 'static.wikia.nocookie.net' &&
+        [
+          'Роль_Урон.png',
+          'Роль_Взрывной_ДД.png',
+          'Роль_Усиление_разрушения.png',
+        ].includes(filename)
+      )
+        return '';
+    } catch {
+      /* Relative images follow normal asset resolution. */
+    }
+  }
+  return resolveAssetUrl(value);
 }
 
 export function normalizeExternalAssetUrl(value?: string | null) {

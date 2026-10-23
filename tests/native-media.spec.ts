@@ -1,0 +1,116 @@
+import { expect, test } from '@playwright/test';
+import {
+  readFile,
+  access,
+  mkdtemp,
+  writeFile,
+  unlink,
+  rmdir,
+} from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { gunzipSync } from 'node:zlib';
+const aliases = JSON.parse(
+  await readFile('src/data/native-media-aliases.json', 'utf8'),
+) as Record<string, string>;
+
+test('повторная подготовка сопоставлений без каталога не меняет правильные иконки', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'nte-asset-refresh-'));
+  const path = join(directory, 'aliases.json');
+  try {
+    await writeFile(path, JSON.stringify(aliases));
+    await promisify(execFile)(process.execPath, [
+      'scripts/game-data/build-asset-aliases.mjs',
+      '--output',
+      path,
+    ]);
+    expect(JSON.parse(await readFile(path, 'utf8'))).toEqual(aliases);
+  } finally {
+    await unlink(path);
+    await rmdir(directory);
+  }
+});
+
+test('старые иконки сопоставлены существующим изображениям установленного клиента', async () => {
+  const images = new Set<string>();
+  for (const line of gunzipSync(
+    await readFile('scripts/content/game-data/chunks.jsonl.gz'),
+  )
+    .toString('utf8')
+    .trim()
+    .split('\n')) {
+    const chunk = JSON.parse(line);
+    if (chunk.kind === 'image')
+      for (const row of chunk.records)
+        for (const asset of row.assets) images.add(asset.url);
+  }
+  expect(Object.keys(aliases).length).toBeGreaterThan(150);
+  for (const [source, target] of Object.entries(aliases)) {
+    expect(new URL(source).protocol).toBe('https:');
+    expect(images.has(target), source).toBeTruthy();
+    await access(`public/${target.replace('/nte-meta/', '')}`);
+  }
+  const skill =
+    'https://interactivemap.app/neverness-to-everness/database/assets/skills/Adler_Skill.png';
+  expect(aliases[skill]).toBe(
+    '/nte-meta/game-assets/468c785575065ad51b31.webp',
+  );
+  // The third-party Food_128 identifier and native Food_0128 refer to the same
+  // localized gift; its native 256px icon must win over a similarly named dish.
+  expect(
+    aliases['https://www.neverness.app/assets/codex/likeability/Food_128.webp'],
+  ).toBe('/nte-meta/game-assets/f79631e0db88b5cd494f.webp');
+});
+
+test('Адлер: старые навыки, пробуждения и материалы загружают локальные иконки на четырёх ширинах', async ({
+  page,
+  request,
+}) => {
+  const origin = process.env.NTE_MEDIA_REVIEW_ORIGIN || '';
+  if (!origin) {
+    const characters = (
+      await (await request.get('http://127.0.0.1:8788/api/characters')).json()
+    ).data;
+    const profile = JSON.parse(
+      await readFile('tests/fixtures/adler-legacy-media.json', 'utf8'),
+    );
+    const adler = characters.find((c: { id: string }) => c.id === 'adler');
+    adler.profile = { ...adler.profile, ...profile };
+    await page.route('**/api/characters', (route) =>
+      route.fulfill({ json: { data: characters } }),
+    );
+  }
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('requestfailed', (r) => errors.push(r.url()));
+  for (const width of [360, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`${origin}/#/characters/adler`);
+    await expect(page.locator('.ability-card__icon img')).toHaveCount(7);
+    const icons = page.locator(
+      '.ability-card__icon img, #character-awakenings img, #character-progression img',
+    );
+    expect(await icons.count()).toBeGreaterThan(30);
+    for (const image of await icons.all()) {
+      await expect(image).toHaveAttribute('src', /\/game-assets\/[^/]+\.webp$/);
+      await image.scrollIntoViewIfNeeded();
+      await expect
+        .poll(() =>
+          image.evaluate(
+            (img: HTMLImageElement) => img.complete && img.naturalWidth > 0,
+          ),
+        )
+        .toBeTruthy();
+    }
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth + 1,
+      ),
+    ).toBeTruthy();
+  }
+  expect(errors).toEqual([]);
+});

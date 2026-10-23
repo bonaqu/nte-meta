@@ -120,7 +120,11 @@ import type { RichTextEditorProps } from './components/rich-text-editor';
 import { ImportSourceLinks } from './components/import-source-links';
 import { ImportSourceReport } from './components/import-source-report';
 import { recordGuideSources } from './lib/guide-sources';
-import { normalizeExternalAssetUrl, resolveAssetUrl } from './lib/assets';
+import {
+  normalizeExternalAssetUrl,
+  resolveAssetUrl,
+  resolveRoleIconUrl,
+} from './lib/assets';
 import {
   formatDate,
   getCharacter,
@@ -2549,11 +2553,12 @@ function Tags({
         const icon = icons.find(
           (item) => normalizeSearchText(item.name) === normalizeSearchText(tag),
         );
+        const iconUrl = resolveRoleIconUrl(icon?.iconUrl);
         return (
           <span key={tag}>
-            {icon?.iconUrl ? (
+            {iconUrl ? (
               <img
-                src={resolveAssetUrl(icon.iconUrl)}
+                src={iconUrl}
                 alt=""
                 width="18"
                 height="18"

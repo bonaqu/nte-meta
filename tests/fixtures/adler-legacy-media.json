@@ -1,0 +1,614 @@
+{
+  "baseStats": [
+    {
+      "id": "257b18b8-079f-4222-bdce-3bd2d9addb9f",
+      "label": "ОЗ",
+      "value": "1180"
+    },
+    {
+      "id": "3ab3cec5-35e8-43f8-9037-1f269129269d",
+      "label": "АТК",
+      "value": "55"
+    },
+    {
+      "id": "8f0c1cb7-eb59-43ed-93c7-91db1454a115",
+      "label": "ЗАЩ",
+      "value": "82"
+    },
+    {
+      "id": "8a33fb8e-63bb-46f0-a426-f1d35bbf7c1c",
+      "label": "Шанс крит.",
+      "value": "5%"
+    },
+    {
+      "id": "8186457d-0add-4a55-a8f3-14017aeab741",
+      "label": "Урон крит.",
+      "value": "50%"
+    },
+    {
+      "id": "39399d84-cf64-488d-af71-572214afcce2",
+      "label": "Усиление урона",
+      "value": "0%"
+    }
+  ],
+  "abilities": [
+    {
+      "id": "ability-1i6khf1",
+      "name": "Проклятие зла",
+      "type": "Навык",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/skills/Adler_Skill.png",
+      "description": "Нужна помощь? Адлер призывает фантомов Суньи для атаки врагов, нанося 1 экземпляр урона от чар по области, а затем накладывает на противников эффект периодического урона от чар и наделяет активных персонажей щитом с Благословением.\n\nТратит все уровни Кармы при использовании навыка. Каждый потраченный уровень увеличивает урон от навыка Адлера на 2 %.\n\n«Это поручение… надо сначала познакомиться с нашей целью. Мы…»\n\n«Колуччи! Выдвигаемся!»\n\n«Не высовывайся, а я займусь всем остальным».",
+      "attributes": [
+        {
+          "id": "parameter-0",
+          "label": "Множитель 1-го удара",
+          "value": "1: 70 % защиты*3 · 2: 75.6 % защиты*3 · 3: 81.6 % защиты*3 · 4: 88.2 % защиты*3 · 5: 95.2 % защиты*3 · 6: 102.9 % защиты*3 · 7: 111.1 % защиты*3 · 8: 120 % защиты*3 · 9: 129.6 % защиты*3 · 10: 139.9 % защиты*3 · 11: 151.1 % защиты*3 · 12: 163.2 % защиты*3 · 13: 176.3 % защиты*3"
+        },
+        {
+          "id": "parameter-1",
+          "label": "Множитель периодического урона",
+          "value": "1: 20 % защиты · 2: 21.6 % защиты · 3: 23.3 % защиты · 4: 25.2 % защиты · 5: 27.2 % защиты · 6: 29.4 % защиты · 7: 31.7 % защиты · 8: 34.3 % защиты · 9: 37 % защиты · 10: 40 % защиты · 11: 43.2 % защиты · 12: 46.6 % защиты · 13: 50.4 % защиты"
+        },
+        {
+          "id": "parameter-2",
+          "label": "Множитель щита",
+          "value": "1: 1000+80 % защиты · 2: 1080+86 % защиты · 3: 1166+93 % защиты · 4: 1260+100 % защиты · 5: 1361+108 % защиты · 6: 1470+117 % защиты · 7: 1587+126 % защиты · 8: 1714+137 % защиты · 9: 1851+148 % защиты · 10: 2000+159 % защиты · 11: 2160+172 % защиты · 12: 2332+186 % защиты · 13: 2519+201 % защиты"
+        },
+        {
+          "id": "parameter-3",
+          "label": "Длительность периодического урона",
+          "value": "1: 10 сек. · 2: 10 сек. · 3: 10 сек. · 4: 10 сек. · 5: 10 сек. · 6: 10 сек. · 7: 10 сек. · 8: 10 сек. · 9: 10 сек. · 10: 10 сек. · 11: 10 сек. · 12: 10 сек. · 13: 10 сек."
+        },
+        {
+          "id": "parameter-4",
+          "label": "Интервал периодического урона",
+          "value": "1: 1 сек. · 2: 1 сек. · 3: 1 сек. · 4: 1 сек. · 5: 1 сек. · 6: 1 сек. · 7: 1 сек. · 8: 1 сек. · 9: 1 сек. · 10: 1 сек. · 11: 1 сек. · 12: 1 сек. · 13: 1 сек."
+        },
+        {
+          "id": "parameter-5",
+          "label": "Длительность щита",
+          "value": "1: 8 сек. · 2: 8 сек. · 3: 8 сек. · 4: 8 сек. · 5: 8 сек. · 6: 8 сек. · 7: 8 сек. · 8: 8 сек. · 9: 8 сек. · 10: 8 сек. · 11: 8 сек. · 12: 8 сек. · 13: 8 сек."
+        }
+      ]
+    },
+    {
+      "id": "ability-1eojm57",
+      "name": "Праведное сердце",
+      "type": "Пассивный навык",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/skills/Adler_Pas2.png",
+      "description": "+20 % к защите Адлера\n\n«Иногда тактика силы предпочтительнее длительных переговоров».",
+      "attributes": []
+    },
+    {
+      "id": "ability-1w2as9b",
+      "name": "Умеренность",
+      "type": "Пассивный навык",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/skills/Adler_Pas1.png",
+      "description": "Усиление ожога: При каждом срабатывании «Ожога» на цель накладывается одно из трёх случайных ослаблений: −20 % атаки, -10 % сопротивляемости эсперам или +10 % к эффективности разрушения. Действует 15 сек., эффекты не складываются.\n\nТщательно отглаженная форма и идеально уложенные волосы даже в бою. Первый урок дворецкого – поддерживать безупречный внешний вид.",
+      "attributes": []
+    },
+    {
+      "id": "ability-7ny4ug",
+      "name": "Идеальное отражение",
+      "type": "Навык поддержки",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/skills/Adler_QTE.png",
+      "description": "Этот бой нельзя больше затягивать. Прицелиться и выпустить 1 компрессионный заряд по врагу, который при попадании наносит 1 экземпляр урона от чар по области.",
+      "attributes": [
+        {
+          "id": "parameter-0",
+          "label": "Множитель урона",
+          "value": "1: 200 % · 2: 216 % · 3: 233.3 % · 4: 251.9 % · 5: 272.1 % · 6: 293.9 % · 7: 317.4 % · 8: 342.8 % · 9: 370.2 % · 10: 399.8 % · 11: 431.8 % · 12: 466.3 % · 13: 503.6 %"
+        }
+      ]
+    },
+    {
+      "id": "ability-1m6y4tw",
+      "name": "Избавление",
+      "type": "Базовая атака",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/skills/Adler_Melee.png",
+      "description": "Базовая атака: Избавление\n\nПроводит до 5 последовательных атак подряд своим оружием, нанося урон от чар.\n\nБазовая атака: Освобождение\n\nПереходит в режим прицеливания и наносит 1 экземпляр урона от чар одному противнику в прицеле.\n\nБазовая атака: Невежество\n\nПикирует, нанося 1 экземпляр урона от чар по области при ударе. Урон увеличивается в зависимости от высоты падения (до 100 %).\n\nКритический контрудар: откровение\n\nАктивируется при использовании «Избавления» после срабатывания критического уклонения. Уклоняется от атаки быстрым рывком, ловит момент и наносит быстрый удар оружием, нанося 1 экземпляр урона от чар по области, снижая показатель разрушения цели.\n\nКарма\n\nДает Адлеру 1 уровень кармы, когда Избавление или Невежество поражает врага.\n\nДает Адлеру 2 уровня кармы, когда Освобождение поражает врага.\n\nМакс. уровней кармы: 20.\n\nТрость – весьма подходящий аксессуар. Оружие джентльмена.",
+      "attributes": [
+        {
+          "id": "parameter-0",
+          "label": "Множитель 1-го удара",
+          "value": "1: 20.1 % · 2: 21.7 % · 3: 23.4 % · 4: 25.3 % · 5: 27.3 % · 6: 29.5 % · 7: 31.9 % · 8: 34.4 % · 9: 37.2 % · 10: 40.2 % · 11: 43.4 % · 12: 46.9 % · 13: 50.6 %"
+        },
+        {
+          "id": "parameter-1",
+          "label": "Множитель 2-го удара",
+          "value": "1: 57.7 % · 2: 62.3 % · 3: 67.3 % · 4: 72.7 % · 5: 78.5 % · 6: 84.8 % · 7: 91.6 % · 8: 98.9 % · 9: 106.8 % · 10: 115.3 % · 11: 124.6 % · 12: 134.5 % · 13: 145.3 %"
+        },
+        {
+          "id": "parameter-2",
+          "label": "Множитель 3-го удара",
+          "value": "1: 15.4 %*2 · 2: 16.6 %*2 · 3: 18 %*2 · 4: 19.4 %*2 · 5: 21 %*2 · 6: 22.6 %*2 · 7: 24.4 %*2 · 8: 26.4 %*2 · 9: 28.5 %*2 · 10: 30.8 %*2 · 11: 33.2 %*2 · 12: 35.9 %*2 · 13: 38.8 %*2"
+        },
+        {
+          "id": "parameter-3",
+          "label": "Множитель 4-го удара",
+          "value": "1: 21.9 %+23.1 %+74.6 % · 2: 23.7 %+24.9 %+80.6 % · 3: 25.5 %+26.9 %+87 % · 4: 27.6 %+29.1 %+94 % · 5: 29.8 %+31.4 %+101.5 % · 6: 32.2 %+33.9 %+109.6 % · 7: 34.8 %+36.7 %+118.4 % · 8: 37.5 %+39.6 %+127.9 % · 9: 40.5 %+42.8 %+138.1 % · 10: 43.8 %+46.2 %+149.1 % · 11: 47.3 %+49.9 %+161.1 % · 12: 51.1 %+53.9 %+173.9 % · 13: 55.1 %+58.2 %+187.9 %"
+        },
+        {
+          "id": "parameter-4",
+          "label": "Множитель 5-го удара",
+          "value": "1: 87.5 % · 2: 94.5 % · 3: 102.1 % · 4: 110.2 % · 5: 119 % · 6: 128.6 % · 7: 138.9 % · 8: 150 % · 9: 162 % · 10: 174.9 % · 11: 188.9 % · 12: 204 % · 13: 220.3 %"
+        },
+        {
+          "id": "parameter-5",
+          "label": "Множитель урона заряженной атаки",
+          "value": "1: 10.4 % · 2: 11.2 % · 3: 12.1 % · 4: 13.1 % · 5: 14.1 % · 6: 15.3 % · 7: 16.5 % · 8: 17.8 % · 9: 19.2 % · 10: 20.8 % · 11: 22.5 % · 12: 24.2 % · 13: 26.2 %"
+        },
+        {
+          "id": "parameter-6",
+          "label": "Множитель урона атаки в падении",
+          "value": "1: 36 % · 2: 38.9 % · 3: 42 % · 4: 45.3 % · 5: 49 % · 6: 52.9 % · 7: 57.1 % · 8: 61.7 % · 9: 66.6 % · 10: 72 % · 11: 77.7 % · 12: 83.9 % · 13: 90.7 %"
+        },
+        {
+          "id": "parameter-7",
+          "label": "Множитель урона контратаки после критического уклонения",
+          "value": "1: 176 % · 2: 190.1 % · 3: 205.3 % · 4: 221.7 % · 5: 239.4 % · 6: 258.6 % · 7: 279.3 % · 8: 301.6 % · 9: 325.8 % · 10: 351.8 % · 11: 380 % · 12: 410.4 % · 13: 443.2 %"
+        }
+      ]
+    },
+    {
+      "id": "ability-1inhugo",
+      "name": "Спокойствие",
+      "type": "Сверхспособность",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/skills/Adler_UltraSkill.png",
+      "description": "Хотелось бы обойтись без боя… Адлер призывает Рупу, Ведану, Санну, Виннану и Санкхару — всего 5 сунья, — чтобы атаковать всех врагов. Каждая цель получает 5 экземпляров урона от чар. Если на поле боя остается только один противник, сунья проводят вторую атаку, нанося в сумме 10 экземпляров урона от чар.\n\nВ «Эйбоне» любят угадывать имена cунья Адлера. Те, кто угадывает правильно, получают от Адлера десерты ручной работы!",
+      "attributes": [
+        {
+          "id": "parameter-0",
+          "label": "Множитель урона за удар",
+          "value": "1: 100 % защиты · 2: 108 % защиты · 3: 116.6 % защиты · 4: 126 % защиты · 5: 136 % защиты · 6: 146.9 % защиты · 7: 158.7 % защиты · 8: 171.4 % защиты · 9: 185.1 % защиты · 10: 199.9 % защиты · 11: 215.9 % защиты · 12: 233.2 % защиты · 13: 251.8 % защиты"
+        }
+      ]
+    },
+    {
+      "id": "daabeaa1-c9c5-4c66-80a1-02822ac929cd",
+      "name": "Кофейный мастер",
+      "type": "Повседневный навык",
+      "iconUrl": "/nte-meta/game-assets/24ca96ea1e7934e5cf5a.webp",
+      "description": "Адлер дополнительно увеличивает цены блюд на 0,12 фонса.",
+      "attributes": [
+        {
+          "id": "city-0",
+          "label": "Уровень 1",
+          "value": "Адлер дополнительно увеличивает цены блюд на 0,12 фонса."
+        },
+        {
+          "id": "city-1",
+          "label": "Уровень 2",
+          "value": "Адлер снижает скорость расхода ингредиентов на 1 %."
+        },
+        {
+          "id": "city-2",
+          "label": "Уровень 3",
+          "value": "В режиме подборки владельца кофе готовится автоматически."
+        },
+        {
+          "id": "city-3",
+          "label": "Уровень 4",
+          "value": "Адлер снижает скорость расхода ингредиентов на 1 %."
+        },
+        {
+          "id": "city-4",
+          "label": "Уровень 5",
+          "value": "Адлер дополнительно увеличивает цены блюд на 0,18 фонса."
+        }
+      ]
+    }
+  ],
+  "awakenings": [
+    {
+      "level": 1,
+      "kind": "awakening",
+      "name": "Форма",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/mindscape/1033_1.png",
+      "description": "При применении Спокойствия дает Адлеру 20 уровней кармы."
+    },
+    {
+      "level": 2,
+      "kind": "awakening",
+      "name": "Чувство",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/mindscape/1033_2.png",
+      "description": "Каждый уровень кармы дает Адлеру бонус к урону 3 %."
+    },
+    {
+      "level": 3,
+      "kind": "awakening",
+      "name": "Восприятие",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/mindscape/1033_3.png",
+      "description": "Увеличивает щит Благословения на 20 %."
+    },
+    {
+      "level": 4,
+      "kind": "awakening",
+      "name": "Формация",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/mindscape/1033_4.png",
+      "description": "Когда Благословение разрушается, поглощает часть избыточного урона на основании 50 % от защита Адлера."
+    },
+    {
+      "level": 5,
+      "kind": "awakening",
+      "name": "Распознание",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/mindscape/1033_5.png",
+      "description": "При применении Спокойствия дает Адлеру 20 ед. энергии сверхспособности."
+    },
+    {
+      "level": 6,
+      "kind": "awakening",
+      "name": "Все формы пусты",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/mindscape/1033_6.png",
+      "description": "Увеличивает длительность Благословения до 12 сек."
+    },
+    {
+      "level": 3,
+      "kind": "resonance",
+      "name": "Очищение",
+      "iconUrl": "/nte-meta/game-assets/8973f2ebfb1fbdaed6e8.webp",
+      "description": "Повышает уровень навыков «Избавление», «Проклятие зла» и «Спокойствие» на 1."
+    },
+    {
+      "level": 6,
+      "kind": "resonance",
+      "name": "Просвещённый хранитель",
+      "iconUrl": "/nte-meta/game-assets/8973f2ebfb1fbdaed6e8.webp",
+      "description": "Увеличивает урон от чар команды на 10 %, когда её защищает Благословение."
+    }
+  ],
+  "materials": [
+    {
+      "id": "b850edef-73b9-4ac7-bf48-db222ec455c4",
+      "name": "Размытая цифра",
+      "iconUrl": "https://static.wikia.nocookie.net/neverness-to-everness/images/a/a6/%D0%A0%D0%B0%D0%B7%D0%BC%D1%8B%D1%82%D0%B0%D1%8F_%D1%86%D0%B8%D1%84%D1%80%D0%B0.png/revision/latest?path-prefix=ru",
+      "amount": "Ур. 2: ×2; Ур. 3: ×3",
+      "source": "Материалы навыков"
+    },
+    {
+      "id": "14b43717-458c-4bdb-ba9e-548f03ada844",
+      "name": "Жук-монета",
+      "iconUrl": "https://static.wikia.nocookie.net/neverness-to-everness/images/5/5d/%D0%96%D1%83%D0%BA-%D0%BC%D0%BE%D0%BD%D0%B5%D1%82%D0%B0.png/revision/latest?path-prefix=ru",
+      "amount": "Материалы навыков поддержки: ×30 000; Материалы навыков поддержки: ×60 000",
+      "source": "Материалы навыков поддержки"
+    },
+    {
+      "id": "Worldboss_material_04",
+      "name": "Медиатор водяной луны",
+      "iconUrl": "/nte-meta/game-assets/32caabafeb97c4c67ae7.webp",
+      "amount": "86",
+      "source": "Уровень возвышения → количество: 30 → 40: 2 · 40 → 50: 8 · 50 → 60: 16 · 60 → 70: 24 · 70 → 80: 36"
+    },
+    {
+      "id": "b9dc3dfe-3685-4a2f-833f-087e935f4cdc",
+      "name": "Неразгаданная цифра",
+      "iconUrl": "https://static.wikia.nocookie.net/neverness-to-everness/images/8/88/%D0%9D%D0%B5%D1%80%D0%B0%D0%B7%D0%B3%D0%B0%D0%B4%D0%B0%D0%BD%D0%BD%D0%B0%D1%8F_%D1%86%D0%B8%D1%84%D1%80%D0%B0.png/revision/latest?path-prefix=ru",
+      "amount": "Ур. 4: ×5; Ур. 5: ×2; Ур. 6: ×3; Ур. 7: ×5",
+      "source": "Материалы навыков"
+    },
+    {
+      "id": "3466f112-9721-4499-8ee9-f08996a327bb",
+      "name": "Искажённая цифра",
+      "iconUrl": "https://static.wikia.nocookie.net/neverness-to-everness/images/6/6f/%D0%98%D1%81%D0%BA%D0%B0%D0%B6%D1%91%D0%BD%D0%BD%D0%B0%D1%8F_%D1%86%D0%B8%D1%84%D1%80%D0%B0.png/revision/latest?path-prefix=ru",
+      "amount": "Ур. 8: ×3; Ур. 9: ×5; Ур. 10: ×8",
+      "source": "Материалы навыков"
+    },
+    {
+      "id": "a111ccb2-6604-4f66-a9b1-9aa35cfb2da4",
+      "name": "Пик Водяной Луны",
+      "iconUrl": "https://static.wikia.nocookie.net/neverness-to-everness/images/f/f9/%D0%9F%D0%B8%D0%BA_%D0%92%D0%BE%D0%B4%D1%8F%D0%BD%D0%BE%D0%B9_%D0%9B%D1%83%D0%BD%D1%8B.png/revision/latest?path-prefix=ru",
+      "amount": "Ур. 30: ×2; Ур. 40: ×8; Ур. 50: ×16; Ур. 60: ×24; Ур. 70: ×36",
+      "source": "Материалы прорыва"
+    },
+    {
+      "id": "6280b345-9191-4374-933d-579700caafa7",
+      "name": "Первые ожидания",
+      "iconUrl": "",
+      "amount": "Ур. 2: ×2; Ур. 3: ×3",
+      "source": "Материалы навыков"
+    },
+    {
+      "id": "82c81fa9-a3e2-4950-8cc9-025976b982f2",
+      "name": "Известная усталость",
+      "iconUrl": "",
+      "amount": "Материалы навыков поддержки: ×2",
+      "source": "Материалы навыков поддержки"
+    },
+    {
+      "id": "867092f1-a926-41e7-b78a-001ddbd81a0d",
+      "name": "Показушное платье с рукавами",
+      "iconUrl": "",
+      "amount": "Материалы навыков поддержки: ×1; Материалы навыков поддержки: ×2",
+      "source": "Материалы навыков поддержки"
+    },
+    {
+      "id": "873fe386-41fc-42b5-8f16-c6a58ff60e33",
+      "name": "Черная шляпа",
+      "iconUrl": "",
+      "amount": "Материалы навыков поддержки: ×1",
+      "source": "Материалы навыков поддержки"
+    }
+  ],
+  "gifts": [
+    {
+      "id": "food_061",
+      "name": "Банджо странника",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/food_0061.png",
+      "effect": "+100 очков симпатии"
+    },
+    {
+      "id": "food_095",
+      "name": "Пастилки для защиты от воспаления",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/food_0095.png",
+      "effect": "+100 очков симпатии"
+    },
+    {
+      "id": "food_097",
+      "name": "Великий защитник!",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/food_0097.png",
+      "effect": "+100 очков симпатии"
+    },
+    {
+      "id": "Food_128",
+      "name": "Памятный кофе от «Пука»",
+      "iconUrl": "https://www.neverness.app/assets/codex/likeability/Food_128.webp",
+      "effect": "Симпатия +100"
+    },
+    {
+      "id": "flower0003",
+      "name": "Месяц священного богослужения",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Flower0003_256.png",
+      "effect": "+200 очков симпатии"
+    },
+    {
+      "id": "furniture_flowerpot_004",
+      "name": "Золотая заря",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Furniture_FlowerPot_004_256.png",
+      "effect": "+200 очков симпатии"
+    },
+    {
+      "id": "furniture_draw_006",
+      "name": "Обещание",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Furniture_draw_006_256.png",
+      "effect": "+400 очков симпатии"
+    },
+    {
+      "id": "specialgift_ticket",
+      "name": "Билет в кинотеатр «Флоу»",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/YH_UI_Item_Likeability_Gift_02.png",
+      "effect": "+400 очков симпатии"
+    },
+    {
+      "id": "SpecialGift_letter",
+      "name": "Рукописное письмо",
+      "iconUrl": "/nte-meta/game-assets/3deebe64fe65e4e200c3.webp",
+      "effect": "Симпатия +2000"
+    },
+    {
+      "id": "specialgift_letter",
+      "name": "Письмо, написанное от руки",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/YH_UI_Item_01_YiFengShouXieXin.png",
+      "effect": "+2 000 очков симпатии"
+    }
+  ],
+  "friendship": [
+    {
+      "level": 1,
+      "rewardName": "Аннулит ×10; Руководство старшего охотника ×3",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png",
+      "description": "Опыт симпатии для уровня: 100",
+      "rewards": [
+        {
+          "id": "annulith",
+          "name": "Аннулит",
+          "quantity": "10",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png"
+        },
+        {
+          "id": "characterupmaterial_lv2",
+          "name": "Руководство старшего охотника",
+          "quantity": "3",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/CharacterUpMaterial_lv2.png"
+        }
+      ]
+    },
+    {
+      "level": 2,
+      "rewardName": "Аннулит ×10; Хаотическая краска ×2; Знакомство: Адлер ×1",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png",
+      "description": "Опыт симпатии для уровня: 500",
+      "rewards": [
+        {
+          "id": "annulith",
+          "name": "Аннулит",
+          "quantity": "10",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png"
+        },
+        {
+          "id": "weaponupmaterial_lv3",
+          "name": "Хаотическая краска",
+          "quantity": "2",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/weaponexp_lv3_256x256.png"
+        },
+        {
+          "id": "friendship_1_1033",
+          "name": "Знакомство: Адлер",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/YH_lihui_Adl_01.png"
+        }
+      ]
+    },
+    {
+      "level": 3,
+      "rewardName": "Аннулит ×10; Руководство элитного охотника ×2",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png",
+      "description": "Опыт симпатии для уровня: 1000",
+      "rewards": [
+        {
+          "id": "annulith",
+          "name": "Аннулит",
+          "quantity": "10",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png"
+        },
+        {
+          "id": "characterupmaterial_lv3",
+          "name": "Руководство элитного охотника",
+          "quantity": "2",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/CharacterUpMaterial_lv3.png"
+        }
+      ]
+    },
+    {
+      "level": 4,
+      "rewardName": "Аннулит ×10; Руководство элитного охотника ×3",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png",
+      "description": "Опыт симпатии для уровня: 2000",
+      "rewards": [
+        {
+          "id": "annulith",
+          "name": "Аннулит",
+          "quantity": "10",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png"
+        },
+        {
+          "id": "characterupmaterial_lv3",
+          "name": "Руководство элитного охотника",
+          "quantity": "3",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/CharacterUpMaterial_lv3.png"
+        }
+      ]
+    },
+    {
+      "level": 5,
+      "rewardName": "Аннулит ×20; Семя без снов ×5; Манеры дворецкого ×1",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png",
+      "description": "Опыт симпатии для уровня: 3500",
+      "rewards": [
+        {
+          "id": "annulith",
+          "name": "Аннулит",
+          "quantity": "20",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png"
+        },
+        {
+          "id": "cityability_upmaterial",
+          "name": "Семя без снов",
+          "quantity": "5",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/CityAbility_UpMaterial.png"
+        },
+        {
+          "id": "furniture_draw_0030_kv_solo",
+          "name": "Манеры дворецкого",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/KVpicture014.png"
+        }
+      ]
+    },
+    {
+      "level": 6,
+      "rewardName": "Аннулит ×20; Жук-монета ×20 000",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png",
+      "description": "Опыт симпатии для уровня: 5000",
+      "rewards": [
+        {
+          "id": "annulith",
+          "name": "Аннулит",
+          "quantity": "20",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png"
+        },
+        {
+          "id": "gold",
+          "name": "Жук-монета",
+          "quantity": "20 000",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png"
+        }
+      ]
+    },
+    {
+      "level": 7,
+      "rewardName": "Жук-монета ×20 000; И это так ×1",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png",
+      "description": "Опыт симпатии для уровня: 7000",
+      "rewards": [
+        {
+          "id": "gold",
+          "name": "Жук-монета",
+          "quantity": "20 000",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png"
+        },
+        {
+          "id": "universal_stickers_1033",
+          "name": "И это так",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Likeability_Medal_1033_256.png"
+        }
+      ]
+    },
+    {
+      "level": 8,
+      "rewardName": "Жук-монета ×30 000; релдА ×1",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png",
+      "description": "Опыт симпатии для уровня: 9000",
+      "rewards": [
+        {
+          "id": "gold",
+          "name": "Жук-монета",
+          "quantity": "30 000",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png"
+        },
+        {
+          "id": "universal_avatar1_1033",
+          "name": "релдА",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/player_042.png"
+        }
+      ]
+    },
+    {
+      "level": 9,
+      "rewardName": "Жук-монета ×40 000; Свобода осознания себя ×1",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png",
+      "description": "Опыт симпатии для уровня: 12000",
+      "rewards": [
+        {
+          "id": "gold",
+          "name": "Жук-монета",
+          "quantity": "40 000",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png"
+        },
+        {
+          "id": "universal_frame_1033",
+          "name": "Свобода осознания себя",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/UI_Icon_Frame_1033_256.png"
+        }
+      ]
+    },
+    {
+      "level": 10,
+      "rewardName": "Жук-монета ×50 000; Добро пожаловать ×1; Проигрыватель «Лотус C198» ×1",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png",
+      "description": "Опыт симпатии для уровня: 16000",
+      "rewards": [
+        {
+          "id": "gold",
+          "name": "Жук-монета",
+          "quantity": "50 000",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png"
+        },
+        {
+          "id": "universal_businesscard_1033",
+          "name": "Добро пожаловать",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/YH_UI_bg_card_icon_11.png"
+        },
+        {
+          "id": "likeprice_1033_0",
+          "name": "Проигрыватель «Лотус C198»",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/YH_UI_item_Jukebox_002.png"
+        }
+      ]
+    }
+  ]
+}

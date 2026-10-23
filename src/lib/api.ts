@@ -1,5 +1,10 @@
 import { seedData } from '../data/seed';
 import type { ProgressionData } from './progression';
+import {
+  translateInBrowser,
+  type BrowserTranslationPlan,
+  type TranslationProposal,
+} from './translation';
 
 export function loadProgressionData() {
   return request<ProgressionData>('/api/game-data/progression');
@@ -525,12 +530,28 @@ export async function promoteLeakCandidate(
   );
 }
 
-export async function translateLeakCandidate(id: string) {
-  return request<{ title: string; excerpt: string; provider: string }>(
+export async function translateLeakCandidate(
+  id: string,
+): Promise<ApiResult<TranslationProposal>> {
+  const result = await request<TranslationProposal | BrowserTranslationPlan>(
     `/api/leak-candidates/${encodeURIComponent(id)}/translate`,
-    { method: 'POST', body: '{}' },
+    { method: 'POST', body: JSON.stringify({ mode: 'browser' }) },
     { timeoutMs: 20000 },
   );
+  if (!result.ok) return result;
+  if (!('kind' in result.data)) return { ok: true, data: result.data };
+  try {
+    return { ok: true, data: await translateInBrowser(result.data) };
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Не удалось подготовить перевод.',
+      status: 502,
+    };
+  }
 }
 
 export async function lookupTierSources(query: string) {

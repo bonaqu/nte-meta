@@ -3,6 +3,7 @@ test('автоперевод найденного, переход в черно�
   page,
   request,
 }) => {
+  const live = process.env.NTE_TRANSLATION_LIVE === '1';
   const leaks = (
     await (await request.get('http://127.0.0.1:8788/api/leaks')).json()
   ).data;
@@ -77,17 +78,60 @@ test('автоперевод найденного, переход в черно�
     '**/api/leak-candidates/workbench-candidate/translate',
     (route) => {
       translations++;
+      expect(route.request().postDataJSON()).toEqual({ mode: 'browser' });
       return route.fulfill({
         json: {
           data: {
-            title: 'Будущий персонаж NTE',
-            excerpt: 'Неподтверждённая информация',
-            provider: 'fixture',
+            kind: 'browser-translation',
+            sourceLanguage: live ? 'en' : 'ja',
+            title: live
+              ? '__NTE_TERM_0__ receives a gift.'
+              : '未来の__NTE_TERM_0__キャラクター',
+            excerpt: 'Unconfirmed information',
+            terms: [
+              {
+                token: '__NTE_TERM_0__',
+                from: live ? 'Hathor' : 'NTE',
+                to: live ? 'Хатор' : 'NTE',
+              },
+            ],
+            names: [],
           },
         },
       });
     },
   );
+  let browserTranslations = 0;
+  page.on('request', (request) => {
+    if (
+      request
+        .url()
+        .startsWith('https://translate.googleapis.com/translate_a/single')
+    )
+      browserTranslations++;
+  });
+  if (!live)
+    await page.route(
+      'https://translate.googleapis.com/translate_a/single',
+      (route) => {
+        expect(route.request().headers().authorization).toBeUndefined();
+        const q = new URLSearchParams(route.request().postData() || '').get(
+          'q',
+        )!;
+        return route.fulfill({
+          headers: { 'access-control-allow-origin': '*' },
+          json: [
+            [
+              [
+                q.includes('__NTE_TERM_0__')
+                  ? 'Будущий персонаж __NTE_TERM_0__'
+                  : 'Неподтверждённая информация',
+              ],
+            ],
+          ],
+        });
+      },
+    );
   await page.route('**/api/leak-candidates/workbench-candidate', (route) =>
     route.fulfill({ json: { data: { success: true } } }),
   );
@@ -109,9 +153,13 @@ test('автоперевод найденного, переход в черно�
     .click();
   const row = dialog.locator('.leak-candidate');
   await expect(
-    row.getByRole('heading', { name: 'Будущий персонаж NTE', exact: true }),
+    row.getByRole('heading', {
+      name: live ? /Хатор.*подар/ : 'Будущий персонаж NTE',
+      exact: !live,
+    }),
   ).toBeVisible();
   expect(translations).toBe(1);
+  expect(browserTranslations).toBe(2);
   await row.getByRole('button', { name: 'В черновик', exact: true }).click();
   await expect(
     dialog.getByLabel('Редактируемый заголовок', { exact: true }),

@@ -1575,6 +1575,9 @@ async function handleLeakCandidates(request, env, parts, ctx) {
       .bind(id)
       .first();
     if (!candidate) return json({ error: 'Публикация не найдена' }, 404);
+    const body = await readJson(request);
+    if (body.mode === 'browser')
+      return json({ data: await prepareBrowserTranslation(candidate, env) });
     const translated = await translateCandidate(candidate, env);
     return json({ data: translated });
   }
@@ -13585,6 +13588,77 @@ async function validateDiscoveryUrl(value, signal, sourceFetch = fetch) {
     )
   )
     throw new Error('Внутренние адреса источников запрещены');
+}
+
+async function prepareBrowserTranslation(candidate, env) {
+  if (candidate.language === 'ru')
+    return {
+      title: candidate.title,
+      excerpt: candidate.excerpt || '',
+      provider: 'Оригинал на русском',
+    };
+  const glossary = await gameTermReplacements(
+    env,
+    `${candidate.title}\n${candidate.excerpt || ''}`,
+  );
+  const rows = await env.DB.prepare(
+    'SELECT name,original_name FROM characters',
+  ).all();
+  const namePattern = (value) => {
+    const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(
+      /^[\p{Script=Latin}\p{N}\p{P}\p{Z}]+$/u.test(value)
+        ? `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`
+        : escaped,
+      'giu',
+    );
+  };
+  const sourceText = `${candidate.title}\n${candidate.excerpt || ''}`;
+  const candidates = [
+    ...glossary.matches,
+    ...(rows.results || [])
+      .filter(
+        (row) =>
+          row.original_name?.length >= 3 &&
+          namePattern(row.original_name).test(sourceText),
+      )
+      .map((row) => ({ from: row.original_name, to: row.name })),
+  ];
+  const terms = [
+    ...new Map(
+      candidates.reverse().map((term) => [term.from.toLowerCase(), term]),
+    ).values(),
+  ]
+    .sort((a, b) => b.from.length - a.from.length)
+    .map((term, index) => ({ ...term, token: `__NTE_TERM_${index}__` }));
+  function protect(text) {
+    if (terms.length) {
+      const byName = new Map(
+        terms.map((term) => [term.from.toLowerCase(), term.token]),
+      );
+      text = text.replace(
+        new RegExp(
+          terms.map((term) => namePattern(term.from).source).join('|'),
+          'giu',
+        ),
+        (match) => byName.get(match.toLowerCase()) || match,
+      );
+    }
+    return text
+      .replace(/\bUltimate\b/gi, 'сверхспособность')
+      .replace(/\bRedirect Skill\b/gi, 'навык перенаправления')
+      .replace(/\bSupport Skill\b/gi, 'навык поддержки')
+      .replace(/\bBasic Attack\b/gi, 'базовая атака');
+  }
+  return {
+    kind: 'browser-translation',
+    sourceLanguage:
+      { en: 'en', ja: 'ja', zh: 'zh-CN' }[candidate.language] || 'auto',
+    title: protect(candidate.title),
+    excerpt: protect(candidate.excerpt || ''),
+    terms,
+    names: rows.results || [],
+  };
 }
 
 async function translateCandidate(candidate, env) {

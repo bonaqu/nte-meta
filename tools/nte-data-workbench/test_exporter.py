@@ -19,7 +19,7 @@ class ExportTests(unittest.TestCase):
                   {'id':'localization:00|row:test','kind':'localization','ownerId':'1025','namespace':'DT_SkillDamageData','gameId':'=danger','values':{'ru':'=SUM(1,2)'},'assets':[{'url':'/nte-meta/game-assets/test.webp','path':'HT/Content/Skill/test.uasset'}],'details':{'long':'я'*33000}}]
             with gzip.open(content/'chunks.jsonl.gz','wt',encoding='utf-8') as stream:stream.write(json.dumps({'records':rows},ensure_ascii=False)+'\n')
             (content/'manifest.json').write_text(json.dumps({'records':2,'emptyTables':[]}),encoding='utf-8')
-            counts=export(repo,out,True,lambda _:None)
+            counts=export(repo,out,True,lambda _:None,readable=False)
             self.assertEqual(counts,{'character':1,'skill':1})
             workbook=load_workbook(out/'NTE — справочник.xlsx',read_only=True)
             cells=list(workbook['Навыки'].iter_rows())[1]

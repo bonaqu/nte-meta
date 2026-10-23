@@ -3053,20 +3053,20 @@ function CharacterSkinMedia({
 
   useEffect(() => {
     setLoadState('loading');
-    const timeout = globalThis.setTimeout(() => {
-      setLoadState((current) => (current === 'loading' ? 'failed' : current));
-    }, 3_500);
-    return () => globalThis.clearTimeout(timeout);
   }, [skin.id, skin.imageUrl]);
 
   if (loadState === 'failed') {
     return (
       <div className="skin-media-fallback" role="status">
         <ImageIcon aria-hidden="true" />
-        <span>
-          Изображение пока недоступно. Обновите страницу, чтобы повторить
-          загрузку.
-        </span>
+        <span>Изображение пока недоступно.</span>
+        <button
+          type="button"
+          className="button secondary"
+          onClick={() => setLoadState('loading')}
+        >
+          Повторить загрузку
+        </button>
       </div>
     );
   }

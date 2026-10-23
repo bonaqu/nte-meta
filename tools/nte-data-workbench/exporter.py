@@ -40,7 +40,7 @@ def records(repository: Path):
             yield from json.loads(line)['records']
 
 
-def export(repository: Path, destination: Path, include_media: bool = True, progress=print):
+def export(repository: Path, destination: Path, include_media: bool = True, progress=print, readable: bool = True):
     from openpyxl import Workbook
     from openpyxl.cell import WriteOnlyCell
     repository, destination = repository.resolve(), destination.resolve()
@@ -153,6 +153,11 @@ def export(repository: Path, destination: Path, include_media: bool = True, prog
 <h2>Как читать записи</h2><p>ownerId — игровой ID персонажа. namespace — исходная таблица; gameId — ключ строки. RU/EN/JA/ZH — официальные значения. details.references содержит точные ссылки: таблица, строка и поле. assets.path — путь в архиве игры, assets.url — адрес на сайте. Медиа лежат в папке «Медиа» с теми же именами файлов.</p>
 <p>Категория не всегда означает принадлежность персонажу: общие материалы, шаблоны и интерфейсная локализация остаются общими. Старые и действующие ID сохраняются отдельно. Таблица DT_DefaultAppearanceData помогает определить действующий ID.</p>
 <h2>Что пока не прочитано</h2><p>Пустые таблицы перечислены ниже. Параметры вида {{0}} сохранены как исходные, если связь с числом не установлена. Отсутствие связей явно остаётся отсутствием данных.</p><ul>{empty}</ul></html>'''
+    (destination / 'Открыть отчёт.html').write_text(document, encoding='utf-8')
+    if readable:
+        from readable import export_readable
+        export_readable(repository, destination, owners, lambda: records(repository), include_media, progress)
+        document = document.replace('<h1>Данные установленного клиента NTE</h1>', '<h1>Данные установленного клиента NTE</h1><p><a href="Для%20игрока/Начать%20здесь.html">Открыть понятный игровой каталог: персонажи, навыки, предметы и озвучка</a></p>')
     (destination / 'Открыть отчёт.html').write_text(document, encoding='utf-8')
     progress(f'Готово: {sum(counts.values()):,} записей; {destination}')
     return dict(counts)

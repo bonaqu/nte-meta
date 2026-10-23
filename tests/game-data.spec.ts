@@ -613,6 +613,7 @@ test('нативный профиль в браузере: резонансы, �
     );
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
+    await page.clock.install();
     await page.goto('/#/characters/hathor');
     await expect(
       page.getByText('Бонус за 3 пробуждений', { exact: true }),
@@ -620,6 +621,21 @@ test('нативный профиль в браузере: резонансы, �
     await expect(
       page.getByText('Бонус за 6 пробуждений', { exact: true }),
     ).toBeVisible();
+    // A lazy image below the fold must survive time spent reading the biography.
+    await page.clock.fastForward(4_000);
+    await expect(page.locator('.skin-media img').first()).toBeAttached();
+    await page.locator('.skin-media img').first().scrollIntoViewIfNeeded();
+    await expect
+      .poll(() =>
+        page
+          .locator('.skin-media img')
+          .first()
+          .evaluate(
+            (image: HTMLImageElement) =>
+              image.complete && image.naturalWidth > 0,
+          ),
+      )
+      .toBeTruthy();
     const basic = page.locator('.ability-card').filter({
       has: page
         .locator('summary strong')

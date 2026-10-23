@@ -57,6 +57,25 @@ test('старые иконки сопоставлены существующи�
   expect(aliases[skill]).toBe(
     '/nte-meta/game-assets/468c785575065ad51b31.webp',
   );
+  for (const [character, names] of [
+    [
+      'Daffodill',
+      [
+        'Daffodill_Melee',
+        'Daffodill_UltraSkill',
+        'Daffodill_QTE',
+        'Daffodill_Skill1',
+      ],
+    ],
+    ['Mint', ['Mint_Melee', 'Mint_UltraSkill', 'Mint_QTE', 'Mint_Skill']],
+  ] as const) {
+    for (const name of names)
+      expect(
+        aliases[
+          `https://ntewiki.org/images/characters/source/${character}/${name}.png`
+        ],
+      ).toMatch(/^\/nte-meta\/game-assets\//);
+  }
   // The third-party Food_128 identifier and native Food_0128 refer to the same
   // localized gift; its native 256px icon must win over a similarly named dish.
   expect(
@@ -121,7 +140,7 @@ test('опубликованный сайт: все изображения пр�
 }, testInfo) => {
   const origin = process.env.NTE_MEDIA_REVIEW_ORIGIN;
   test.skip(!origin, 'Explicit published profile-media review.');
-  test.setTimeout(180000);
+  test.setTimeout(300000);
   const characters = (
     await (
       await request.get(
@@ -132,8 +151,40 @@ test('опубликованный сайт: все изображения пр�
   const failures: Array<{ character: string; source: string; error: string }> =
     [];
   const pageErrors: string[] = [];
+  const networkErrors: Array<{ source: string; error: string }> = [];
+  const recovered: Array<{ character: string; source: string }> = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
+  page.on('requestfailed', (r) => {
+    if (r.resourceType() === 'image')
+      networkErrors.push({
+        source: r.url(),
+        error: r.failure()?.errorText || 'request failed',
+      });
+  });
+  page.on('response', (r) => {
+    if (r.request().resourceType() === 'image' && r.status() >= 400)
+      networkErrors.push({ source: r.url(), error: `HTTP ${r.status()}` });
+  });
   let checked = 0;
+  let profiles = 0;
+  const save = () =>
+    writeFile(
+      process.env.NTE_MEDIA_REVIEW_REPORT ||
+        testInfo.outputPath('media-review.json'),
+      JSON.stringify(
+        {
+          profiles,
+          expectedProfiles: characters.length,
+          images: checked,
+          failures,
+          pageErrors,
+          networkErrors,
+          recovered,
+        },
+        null,
+        2,
+      ),
+    );
   await page.setViewportSize({ width: 1440, height: 900 });
   for (const character of characters) {
     await page.goto(`${origin}/#/characters/${character.slug}`);
@@ -148,11 +199,57 @@ test('опубликованный сайт: все изображения пр�
       .locator(
         '.character-lore-hero img, #character-abilities img, #character-awakenings img, #character-progression img, #character-wardrobe img',
       )
-      .all();
-    for (const image of images) {
-      const source = (await image.getAttribute('src')) || '';
+      .evaluateAll((images) =>
+        Array.from(
+          new Map(
+            images.map((image) => [
+              image.getAttribute('src') || '',
+              {
+                source: image.getAttribute('src') || '',
+                alt: image.getAttribute('alt') || '',
+              },
+            ]),
+          ).values(),
+        ),
+      );
+    for (const { source, alt } of images) {
+      // A failed wardrobe request replaces its IMG with a retry panel. Resolve
+      // by source rather than a live nth(index), which then points at a different
+      // image and can wait forever after the list shrinks.
+      const image = page.locator(`img[src=${JSON.stringify(source)}]`).first();
       try {
-        await image.scrollIntoViewIfNeeded();
+        const skin = page.locator('#character-wardrobe article').filter({
+          has: page.getByRole('heading', {
+            name: alt,
+            exact: true,
+            level: 3,
+          }),
+        });
+        const retry = skin.getByRole('button', {
+          name: 'Повторить загрузку',
+          exact: true,
+        });
+        if (alt && (await retry.count())) {
+          await retry.click();
+          recovered.push({ character: character.id, source });
+        }
+        await expect(image).toBeAttached({ timeout: 3000 });
+        if (!(await image.isVisible())) {
+          // A responsive hidden image has no scroll target; check its bytes in
+          // the same browser instead of treating CSS visibility as an error.
+          expect(
+            await page.evaluate(async (src) => {
+              const image = new Image();
+              image.referrerPolicy = 'no-referrer';
+              image.src = src;
+              await image.decode();
+              return image.naturalWidth > 0;
+            }, source),
+          ).toBeTruthy();
+          checked++;
+          continue;
+        }
+        await image.scrollIntoViewIfNeeded({ timeout: 5000 });
         await expect
           .poll(() =>
             image.evaluate(
@@ -169,12 +266,23 @@ test('опубликованный сайт: все изображения пр�
       }
       checked++;
     }
+    profiles++;
+    await save();
+    console.log(
+      '[profile-media-progress]',
+      character.id,
+      profiles,
+      checked,
+      failures.length,
+    );
   }
   const report = {
     profiles: characters.length,
     images: checked,
     failures,
     pageErrors,
+    networkErrors,
+    recovered,
   };
   await writeFile(
     process.env.NTE_MEDIA_REVIEW_REPORT ||

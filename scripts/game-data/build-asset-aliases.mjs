@@ -127,6 +127,7 @@ for (const [url, rows] of imported) {
       'www.neverness.app',
       'static.wikia.nocookie.net',
       'img.game8.co',
+      'ntewiki.org',
     ].includes(u.hostname)
   )
     continue;

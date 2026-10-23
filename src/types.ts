@@ -109,6 +109,7 @@ export interface CharacterRoleIcon {
 
 export interface CharacterAwakening {
   level: number;
+  kind?: 'awakening' | 'resonance';
   name: string;
   iconUrl: string;
   description: string;

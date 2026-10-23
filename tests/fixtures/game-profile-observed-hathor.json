@@ -1,0 +1,121 @@
+{
+  "id": "hathor",
+  "slug": "hathor",
+  "name": "Хатор",
+  "originalName": "Hathor",
+  "rarity": "S",
+  "role": "Защита",
+  "type": "Защита",
+  "attribute": "Лакшана",
+  "imageUrl": "assets/characters/Hathor.png",
+  "splashUrl": "assets/characters/Hathor.png",
+  "shortDescription": "Эффективная доставщица, которой нравится составлять сложные расписания заданий и строго выполнять их до конца.",
+  "summary": "Эффективная доставщица, которой нравится составлять сложные расписания заданий и строго выполнять их до конца.",
+  "tags": [
+    "tank",
+    "survival",
+    "beginner"
+  ],
+  "profile": {
+    "faction": "«Стерри Экспресс»",
+    "arcType": "Плазменный",
+    "birthday": "29 августа",
+    "releaseDate": "",
+    "releaseVersion": "",
+    "biographyShort": "Женщина",
+    "biography": "Эффективная доставщица, которой нравится составлять сложные расписания заданий и строго выполнять их до конца.",
+    "trivia": "",
+    "roleTags": [
+      "Защита"
+    ],
+    "roleIcons": [],
+    "voiceActors": [
+      {
+        "language": "Английский",
+        "name": "Allegra Clark"
+      },
+      {
+        "language": "Японский",
+        "name": "Kana Ichinose (市ノ瀬加那)"
+      },
+      {
+        "language": "Китайский",
+        "name": "Hong Haitian (洪海天)"
+      },
+      {
+        "language": "Корейский",
+        "name": "Lee Daeun (이다은)"
+      }
+    ],
+    "materials": [],
+    "baseStats": [
+      {
+        "id": "a73f4c8b-a31a-4c5b-a621-1459ae665a07",
+        "label": "ОЗ",
+        "value": "1320"
+      },
+      {
+        "id": "6e42be67-b3d6-458d-b653-90dd7b7d2252",
+        "label": "АТК",
+        "value": "81"
+      },
+      {
+        "id": "137d7fdc-db1a-4880-a135-c6ef38d687ed",
+        "label": "ЗАЩ",
+        "value": "73"
+      },
+      {
+        "id": "b76f8942-39d8-4a88-b9a6-60e8e8537dfd",
+        "label": "Шанс крит.",
+        "value": "5%"
+      },
+      {
+        "id": "e94fab11-2127-4920-804a-75e9d2922767",
+        "label": "Урон крит.",
+        "value": "50%"
+      }
+    ],
+    "abilities": [],
+    "skins": [],
+    "friendship": [],
+    "gifts": [],
+    "voiceLines": [
+      {
+        "id": "585f1bd5-e520-4544-b2c4-60cd5f226fea",
+        "title": "Hathor Voice Records / Profile Voice Lines — Английский",
+        "language": "Английский",
+        "audioUrl": "",
+        "sourceUrl": "https://www.youtube.com/watch?v=Ywp_xIiIVHY",
+        "description": "Видео-источник для ручной проверки реплик. Прямой аудиофайл редактор добавляет отдельно."
+      },
+      {
+        "id": "5ed69ab5-ffa3-4941-8c03-ad7cc4d4130d",
+        "title": "Hathor Voice Records / Profile Voice Lines — Японский",
+        "language": "Японский",
+        "audioUrl": "",
+        "sourceUrl": "https://www.youtube.com/watch?v=Ywp_xIiIVHY",
+        "description": "Видео-источник для ручной проверки реплик. Прямой аудиофайл редактор добавляет отдельно."
+      },
+      {
+        "id": "12c39b61-d267-4eb6-8abf-7c92b1d5ac40",
+        "title": "Hathor Voice Records / Profile Voice Lines — Корейский",
+        "language": "Корейский",
+        "audioUrl": "",
+        "sourceUrl": "https://www.youtube.com/watch?v=Ywp_xIiIVHY",
+        "description": "Видео-источник для ручной проверки реплик. Прямой аудиофайл редактор добавляет отдельно."
+      },
+      {
+        "id": "5224a7e6-4b3a-4bb7-bbe0-af76b71037eb",
+        "title": "Hathor Voice Records / Profile Voice Lines — Китайский",
+        "language": "Китайский",
+        "audioUrl": "",
+        "sourceUrl": "https://www.youtube.com/watch?v=Ywp_xIiIVHY",
+        "description": "Видео-источник для ручной проверки реплик. Прямой аудиофайл редактор добавляет отдельно."
+      }
+    ],
+    "awakenings": []
+  },
+  "status": "published",
+  "patch": "1.0",
+  "updatedAt": "2026-06-30 13:08:06"
+}

@@ -21,6 +21,7 @@ import {
   reviewLeakCandidate,
   submitLeakCandidate,
   updateLeakCandidateEditorial,
+  translateLeakCandidate,
 } from '../../lib/api';
 import type {
   LeakCandidate,
@@ -305,6 +306,8 @@ export function LeakDiscoveryPanel({
   >('all');
   const [queueSort, setQueueSort] = useState<'new' | 'confidence'>('new');
   const [pending, setPending] = useState(false);
+  const [autoTranslate, setAutoTranslate] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const [actionId, setActionId] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkChoice, setBulkChoice] =
@@ -422,11 +425,59 @@ export function LeakDiscoveryPanel({
           ? `Найдено и обновлено публикаций: ${result.data.discoveredCount}.`
           : 'Новых публикаций не найдено. Доступность источников показана ниже.',
       );
+      if (autoTranslate)
+        await translateBatch(
+          result.data.candidates.filter(
+            (item) => (item.contentKind || 'leak') === contentKind,
+          ),
+        );
     } else {
       setTone('danger');
       setMessage(result.error);
     }
     setPending(false);
+  }
+
+  async function translateBatch(items: LeakCandidate[]) {
+    setTranslating(true);
+    let done = 0;
+    let failed = 0;
+    const queue = items
+      .filter((item) => item.language !== 'ru' && !item.translatedTitle)
+      .slice(0, 12);
+    for (const item of queue) {
+      setMessage(
+        `Перевод на русский: ${done + failed + 1} из ${queue.length}…`,
+      );
+      const result = await translateLeakCandidate(item.id);
+      if (!result.ok) {
+        failed++;
+        continue;
+      }
+      const translated = {
+        translatedTitle: result.data.title,
+        translatedExcerpt: result.data.excerpt,
+        translationStatus: 'переведено' as const,
+      };
+      const saved = await updateLeakCandidateEditorial(item.id, translated);
+      if (!saved.ok) {
+        failed++;
+        continue;
+      }
+      done++;
+      setCandidates((current) =>
+        current.map((candidate) =>
+          candidate.id === item.id
+            ? { ...candidate, ...translated }
+            : candidate,
+        ),
+      );
+    }
+    setTranslating(false);
+    setTone(failed ? 'danger' : 'success');
+    setMessage(
+      `Переведено: ${done}. Ошибок: ${failed}. За один запуск обрабатывается до 12 публикаций. Оригиналы сохранены; перевод можно исправить перед публикацией.`,
+    );
   }
 
   async function review(
@@ -700,8 +751,8 @@ export function LeakDiscoveryPanel({
           <p className="eyebrow">Редакционный радар</p>
           <h2 id="leak-discovery-title">Поиск и очередь источников</h2>
           <p>
-            Автопоиск собирает только кандидатов. Перевод, фактчек и публикация
-            остаются отдельными ручными решениями.
+            Найденные публикации можно автоматически перевести на русский.
+            Проверка и публикация остаются за редактором.
           </p>
         </div>
         <ShieldCheck aria-hidden="true" />
@@ -718,11 +769,47 @@ export function LeakDiscoveryPanel({
             placeholder="Персонаж, версия, баннер..."
           />
         </label>
-        <button className="primary-button" type="submit" disabled={pending}>
+        <button
+          className="primary-button"
+          type="submit"
+          disabled={pending || translating}
+        >
           <Radar aria-hidden="true" />
           {pending ? 'Проверяем источники...' : 'Найти новые публикации'}
         </button>
       </form>
+      <div className="discovery-translation-controls">
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={autoTranslate}
+            onChange={(event) => setAutoTranslate(event.target.checked)}
+            disabled={pending || translating}
+          />{' '}
+          Автоперевод после поиска
+        </label>
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={
+            pending ||
+            translating ||
+            !visibleCandidates.some(
+              (item) => item.language !== 'ru' && !item.translatedTitle,
+            )
+          }
+          onClick={() =>
+            void translateBatch(
+              selectedCandidates.length
+                ? selectedCandidates
+                : visibleCandidates,
+            )
+          }
+        >
+          <Languages aria-hidden="true" />
+          {translating ? 'Переводим…' : 'Перевести найденное на русский'}
+        </button>
+      </div>
 
       {canManageSources ? <AddDiscoverySource /> : null}
 
@@ -953,11 +1040,21 @@ export function LeakDiscoveryPanel({
                   <span>Предложено игроком</span>
                 ) : null}
               </div>
-              <h3>{candidate.title}</h3>
+              <h3>{candidate.translatedTitle || candidate.title}</h3>
               <p>
-                {candidate.excerpt ||
+                {candidate.translatedExcerpt ||
+                  candidate.excerpt ||
                   'Описание не извлечено: откройте источник.'}
               </p>
+              {candidate.translatedTitle ? (
+                <details className="candidate-original">
+                  <summary>
+                    Оригинал · {languageLabels[candidate.language]}
+                  </summary>
+                  <strong>{candidate.title}</strong>
+                  <p>{candidate.excerpt}</p>
+                </details>
+              ) : null}
               <div className="leak-candidate-source">
                 <strong>{candidate.sourceName}</strong>
                 <a href={candidate.sourceUrl} target="_blank" rel="noreferrer">
@@ -1111,6 +1208,32 @@ export function LeakDiscoveryPanel({
                 </fieldset>
               ) : null}
               <div className="comment-actions">
+                {candidate.createdLeakId || candidate.createdNewsId ? (
+                  <button
+                    className="primary-button"
+                    type="button"
+                    disabled={Boolean(actionId) || pending || translating}
+                    onClick={async () => {
+                      if (draftDirty) {
+                        setTone('danger');
+                        setMessage(
+                          'Сохраните текущие изменения перед открытием другого черновика.',
+                        );
+                        return;
+                      }
+                      const id =
+                        candidate.createdNewsId || candidate.createdLeakId;
+                      if (id)
+                        await onPromoted(
+                          id,
+                          candidate.createdNewsId ? 'news' : 'leaks',
+                        );
+                    }}
+                  >
+                    <FilePenLine aria-hidden="true" />
+                    Открыть черновик
+                  </button>
+                ) : null}
                 {candidate.reviewStatus === 'pending' ? (
                   <>
                     {canCreateNews ? (
@@ -1118,7 +1241,10 @@ export function LeakDiscoveryPanel({
                         className="primary-button"
                         type="button"
                         disabled={
-                          actionId === candidate.id || actionId === 'bulk'
+                          actionId === candidate.id ||
+                          actionId === 'bulk' ||
+                          pending ||
+                          translating
                         }
                         onClick={() => void promote(candidate, 'news')}
                       >
@@ -1130,7 +1256,10 @@ export function LeakDiscoveryPanel({
                         className="primary-button"
                         type="button"
                         disabled={
-                          actionId === candidate.id || actionId === 'bulk'
+                          actionId === candidate.id ||
+                          actionId === 'bulk' ||
+                          pending ||
+                          translating
                         }
                         onClick={() => void promote(candidate)}
                       >

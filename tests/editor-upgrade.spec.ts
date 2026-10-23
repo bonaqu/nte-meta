@@ -19,7 +19,7 @@ async function contracts(fetcher: typeof fetch) {
       'export default {',
       'const worker={',
     ) +
-      '\nglobalThis.contracts={ classifyDiscoveryContent,mergeDiscoverySources,validateDiscoveryUrl,translateCandidate,resolveNanokaCharacter,parseNanokaCharacter,discoveryFetch,isCleanImportedAbilityName };',
+      '\nglobalThis.contracts={ classifyDiscoveryContent,mergeDiscoverySources,validateDiscoveryUrl,translateCandidate,resolveNanokaCharacter,parseNanokaCharacter,discoveryFetch,isCleanImportedAbilityName,parseHtmlJsonAttribute,cleanImportedAbility };',
   ).runInContext(context);
   return context.contracts as {
     classifyDiscoveryContent: (source: object, text: string) => string;
@@ -46,6 +46,11 @@ async function contracts(fetcher: typeof fetch) {
       budget: { remaining: number },
     ) => Promise<Response>;
     isCleanImportedAbilityName: (name: string) => boolean;
+    cleanImportedAbility: (entry: object) => { name: string } | null;
+    parseHtmlJsonAttribute: (
+      html: string,
+      attribute: string,
+    ) => Array<{ itemId: string; name: string }>;
   };
 }
 test('новости отделены от слухов даже внутри канала сливов', async () => {
@@ -68,6 +73,38 @@ test('новости отделены от слухов даже внутри к
       'Оставшееся время действия Реморы рассчитывается для каждой цели индивидуально. Этот урон может срабатывать на одной цели не чаще одного раза в X сек.',
     ),
   ).toBe(false);
+});
+test('апостроф в названии подарка не обрывает JSON-атрибут', async () => {
+  const m = await contracts(fetch);
+  const gifts = m.parseHtmlJsonAttribute(
+    await readFile('tests/fixtures/neverness-hathor-gifts.html', 'utf8'),
+    'data-gifts',
+  );
+  expect(gifts).toHaveLength(9);
+  expect(gifts).toContainEqual(expect.objectContaining({ itemId: 'Food_003' }));
+  expect(
+    gifts.some((gift) => gift.name.includes("Nightingale's")),
+  ).toBeTruthy();
+});
+test('канонические названия навыков Минт с восклицаниями сохраняются', async () => {
+  const m = await contracts(fetch);
+  for (const [id, name] of [
+    ['GA_Mint_Passive_1', 'Трансформируйся! Супер Минт!'],
+    ['GA_Mint_Passive_2', 'Бинго! Мы здесь закончили!'],
+  ])
+    expect(
+      m.cleanImportedAbility({
+        id,
+        name,
+        type: 'Пассивный навык',
+        description: 'Описание из StringTable.',
+      }),
+    ).toMatchObject({ name });
+  expect(
+    m.isCleanImportedAbilityName(
+      'Оставшееся время действия Реморы рассчитывается для каждой цели индивидуально. Этот урон может срабатывать на одной цели не чаще одного раза в X сек.',
+    ),
+  ).toBeFalsy();
 });
 test('собственные Telegram/Reddit/RSS подключаются, внутренние адреса и превышение бюджета запрещены', async () => {
   let calls = 0;
@@ -403,7 +440,11 @@ test('редактор подключает свой канал, скрывае�
   await row
     .getByRole('button', { name: 'Использовать перевод', exact: true })
     .click();
-  await expect(row.getByText('Слух об Аканэ', { exact: true })).toBeAttached();
+  await expect(
+    dialog
+      .locator('.leak-candidate')
+      .getByRole('heading', { name: 'Слух об Аканэ', exact: true }),
+  ).toBeVisible();
   expect(translation).toMatchObject({
     translatedTitle: 'Слух об Аканэ',
     translationStatus: 'переведено',

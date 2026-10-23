@@ -535,7 +535,15 @@ export function ContentManager<T extends ManagedItem>({
   }, [selectedId]);
 
   useEffect(() => {
-    if (initialSelectedId) setSelectedId(initialSelectedId);
+    if (initialSelectedId) {
+      setSelectedId(initialSelectedId);
+      if (initialSelectedId !== 'new')
+        requestAnimationFrame(() =>
+          document
+            .querySelector('.cms-workspace')
+            ?.scrollIntoView({ block: 'start' }),
+        );
+    }
   }, [initialSelectedId]);
 
   function setValue(name: string, value: unknown) {
@@ -793,7 +801,10 @@ export function ContentManager<T extends ManagedItem>({
               {pending
                 ? 'Сохраняем...'
                 : config.supportsPublishing === false
-                  ? 'Сохранить'
+                  ? config.endpoint === '/api/leaks' &&
+                    booleanValue(values, 'approved')
+                    ? 'Сохранить и опубликовать'
+                    : 'Сохранить'
                   : 'Опубликовать'}
             </button>
           ) : null}

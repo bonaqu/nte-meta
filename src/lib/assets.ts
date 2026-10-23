@@ -113,7 +113,8 @@ export function resolveAssetUrl(
   if (!url) return '';
   if (/^https?:/i.test(url)) return resolveExternalAssetProxy(url);
   if (/^(?:data:|blob:)/i.test(url)) return url;
-  if(url.startsWith('/nte-meta/game-assets/'))return `${publicBase}${url.slice('/nte-meta/'.length)}`;
+  if (/^\/nte-meta\/game-(assets|audio)\//.test(url))
+    return `${publicBase}${url.slice('/nte-meta/'.length)}`;
   if (url.startsWith(publicBase) || url.startsWith('/nte-meta/')) return url;
   if (url.startsWith('/assets/')) {
     return `${publicBase}${url.slice(1)}`;

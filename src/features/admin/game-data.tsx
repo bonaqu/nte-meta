@@ -21,6 +21,7 @@ const kinds: Record<string, string> = {
   stat: 'Характеристики',
   item: 'Предметы и ресурсы',
   image: 'Изображения',
+  audio: 'Озвучка',
   localization: 'Остальная локализация',
 };
 const locales = {
@@ -336,25 +337,47 @@ function GameRecordEditor({
         />
       </label>
       <fieldset>
-        <legend>Изображения</legend>
+        <legend>
+          {record.kind === 'audio' ? 'Аудиофайлы' : 'Изображения'}
+        </legend>
         {assets.map((asset, index) => (
           <div key={index}>
-            <ImageField
-              label={`Изображение ${index + 1}`}
-              value={asset.url}
-              context={`game-data/${record.gameId.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 60) || 'record'}`}
-              onChange={(url) =>
-                setAssets(
-                  assets.map((a, i) => (i === index ? { ...a, url } : a)),
-                )
-              }
-            />
+            {record.kind === 'audio' ? (
+              <label>
+                Аудиофайл {index + 1}
+                <input
+                  value={asset.url}
+                  onChange={(event) =>
+                    setAssets(
+                      assets.map((a, i) =>
+                        i === index ? { ...a, url: event.target.value } : a,
+                      ),
+                    )
+                  }
+                />
+                <audio controls preload="none" src={resolveAssetUrl(asset.url)}>
+                  Ваш браузер не поддерживает аудио.
+                </audio>
+              </label>
+            ) : (
+              <ImageField
+                label={`Изображение ${index + 1}`}
+                value={asset.url}
+                context={`game-data/${record.gameId.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 60) || 'record'}`}
+                onChange={(url) =>
+                  setAssets(
+                    assets.map((a, i) => (i === index ? { ...a, url } : a)),
+                  )
+                }
+              />
+            )}
             <button
               className="ghost-button"
               type="button"
               onClick={() => setAssets(assets.filter((_, i) => i !== index))}
             >
-              Убрать изображение {index + 1}
+              Убрать {record.kind === 'audio' ? 'аудиофайл' : 'изображение'}{' '}
+              {index + 1}
             </button>
           </div>
         ))}
@@ -364,7 +387,7 @@ function GameRecordEditor({
           disabled={assets.length >= 80}
           onClick={() => setAssets([...assets, { url: '' }])}
         >
-          Добавить изображение
+          Добавить {record.kind === 'audio' ? 'аудиофайл' : 'изображение'}
         </button>
       </fieldset>
       {error ? (

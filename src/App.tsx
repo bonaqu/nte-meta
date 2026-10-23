@@ -11,6 +11,7 @@ import React, {
   useState,
 } from 'react';
 import { GuideVisualEditor, GuideVisualView } from './components/guide-visual';
+import { ProgressionCalculator } from './components/progression-calculator';
 import { ImageUploadButton } from './components/image-field';
 import {
   isPrivateGuideSection,
@@ -179,7 +180,10 @@ const directAudioPattern =
 
 function canPlayDirectAudio(url: string) {
   const value = url.trim();
-  return /^https?:\/\//i.test(value) && directAudioPattern.test(value);
+  return (
+    /^(?:https?:\/\/|\/(?:nte-meta\/)?game-audio\/)/i.test(value) &&
+    directAudioPattern.test(value)
+  );
 }
 
 function formatProfileDate(value: string) {
@@ -2816,19 +2820,6 @@ function VoiceLinePlayer({ line }: { line: CharacterVoiceLine }) {
     );
   }
 
-  if (line.sourceUrl) {
-    return (
-      <a
-        className="ghost-button"
-        href={line.sourceUrl}
-        target="_blank"
-        rel="noreferrer"
-      >
-        <Headphones aria-hidden="true" /> Открыть источник записи
-      </a>
-    );
-  }
-
   return (
     <span className="audio-placeholder">
       <Headphones aria-hidden="true" />
@@ -2942,6 +2933,20 @@ function CharacterAbilityCard({
   const [activePane, setActivePane] = useState<'description' | 'attributes'>(
     'description',
   );
+  const [skillLevel, setSkillLevel] = useState(1);
+  const levelAttributes = attributes.map((attribute) => {
+    const parts = attribute.value.split(' · ');
+    const levels =
+      parts.length > 1 &&
+      parts.every((part, index) => part.startsWith(`${index + 1}: `))
+        ? parts.map((part) => part.replace(/^\d+: /, ''))
+        : [];
+    return { ...attribute, levels };
+  });
+  const maxSkillLevel = Math.max(
+    0,
+    ...levelAttributes.map((attribute) => attribute.levels.length),
+  );
 
   return (
     <details className="ability-card" open={defaultOpen || undefined}>
@@ -2995,14 +3000,34 @@ function CharacterAbilityCard({
           </div>
         ) : null}
         {activePane === 'attributes' && attributes.length ? (
-          <dl className="ability-attribute-grid">
-            {attributes.map((attribute) => (
-              <div key={attribute.id}>
-                <dt>{attribute.label}</dt>
-                <dd>{attribute.value}</dd>
-              </div>
-            ))}
-          </dl>
+          <>
+            {maxSkillLevel > 1 ? (
+              <label className="ability-level-control">
+                Уровень навыка
+                <select
+                  aria-label={`Уровень навыка «${ability.name}»`}
+                  value={skillLevel}
+                  onChange={(event) =>
+                    setSkillLevel(Number(event.target.value))
+                  }
+                >
+                  {Array.from({ length: maxSkillLevel }, (_, index) => (
+                    <option key={index + 1} value={index + 1}>
+                      {index + 1}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <dl className="ability-attribute-grid">
+              {levelAttributes.map((attribute) => (
+                <div key={attribute.id}>
+                  <dt>{attribute.label}</dt>
+                  <dd>{attribute.levels[skillLevel - 1] || attribute.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </>
         ) : (
           <div className="ability-card__description">
             <MarkdownPreview
@@ -3351,8 +3376,8 @@ function CharacterDetailPage({
 
       <section className="character-detail-section" id="character-awakenings">
         <SectionHeader
-          title="Пробуждения 0-6"
-          text="Каждый уровень показан отдельно, чтобы сравнение было прозрачным."
+          title="Пробуждения и резонанс"
+          text="Эффекты пробуждений и дополнительные бонусы за 3 и 6 пробуждений."
         />
         {profile.awakenings.length ? (
           <div className="awakening-grid awakening-path">
@@ -3385,9 +3410,11 @@ function CharacterDetailPage({
                   </span>
                   <div className="character-detail-card-copy">
                     <p className="eyebrow">
-                      {awakening.level > 0
-                        ? `Пробуждение ${awakening.level}`
-                        : 'Без пробуждений'}
+                      {awakening.kind === 'resonance'
+                        ? `Бонус за ${awakening.level} пробуждений`
+                        : awakening.level > 0
+                          ? `Пробуждение ${awakening.level}`
+                          : 'Без пробуждений'}
                     </p>
                     <h3>
                       {awakening.name || `Пробуждение ${awakening.level}`}
@@ -3409,6 +3436,10 @@ function CharacterDetailPage({
         <SectionHeader
           title="Прокачка и симпатия"
           text="Материалы, источники, награды дружбы и любимые подарки."
+        />
+        <ProgressionCalculator
+          name={character.name}
+          originalName={character.originalName}
         />
         {profile.materials.length ? (
           <div className="material-grid">
@@ -3589,8 +3620,14 @@ function CharacterDetailPage({
               <p className="eyebrow">Фонотека</p>
               <h3 id="voice-records-title">Реплики персонажа</h3>
             </div>
-            {profile.voiceLines.length ? (
-              <CharacterVoiceLibrary lines={profile.voiceLines} />
+            {profile.voiceLines.some((line) =>
+              canPlayDirectAudio(line.audioUrl),
+            ) ? (
+              <CharacterVoiceLibrary
+                lines={profile.voiceLines.filter((line) =>
+                  canPlayDirectAudio(line.audioUrl),
+                )}
+              />
             ) : (
               <p className="empty-inline-copy">
                 Аудио пока не добавлено. Редакторы смогут разместить реплики для

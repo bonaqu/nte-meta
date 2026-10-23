@@ -82,7 +82,7 @@ async function contract(records: SourceRecord[]) {
       'export default {',
       'const worker={',
     ) +
-      '\ngetAuthUser=async()=>globalThis.testUser;logAudit=async()=>{};globalThis.contracts={handleGameData,gameTermReplacements,translateCandidate,buildLocalGameCharacterSource,localizeGameImportSuggestions};',
+      '\ngetAuthUser=async()=>globalThis.testUser;logAudit=async()=>{};globalThis.contracts={handleGameData,gameTermReplacements,translateCandidate,buildLocalGameCharacterSource,localizeGameImportSuggestions,normalizeCharacterProfile};',
   ).runInContext(context);
   const m = context.contracts as {
     handleGameData: (r: Request, e: object, p: string[]) => Promise<Response>;
@@ -97,11 +97,21 @@ async function contract(records: SourceRecord[]) {
     ) => Promise<{
       suggestions: Array<{ field: string; value: string }>;
       message?: string;
+      variants?: Array<{
+        name: string;
+        status: string;
+        suggestions: Array<{ field: string; value: string }>;
+      }>;
     }>;
     localizeGameImportSuggestions: (
       env: object,
       suggestions: Array<{ field: string; value: string }>,
     ) => Promise<void>;
+    normalizeCharacterProfile: (profile: object) => {
+      awakenings: unknown[];
+      abilities: unknown[];
+      friendship: unknown[];
+    };
   };
   context.testUser = { id: 'owner', role: 'owner' };
   async function api(path: string, body?: object) {
@@ -292,6 +302,275 @@ test('одноимённые старые ID не подменяют дейст�
     expect(source.suggestions).toContainEqual(
       expect.objectContaining({ field: 'name', value: 'Адлер' }),
     );
+  } finally {
+    f.db.close();
+  }
+});
+
+test('варианты Зеро доступны отдельно; общие данные не смешивают внешность и голос', async () => {
+  const f = await contract(
+    JSON.parse(
+      await readFile('tests/fixtures/game-data-native-zero.json', 'utf8'),
+    ),
+  );
+  try {
+    const source = await f.m.buildLocalGameCharacterSource(f.env, {
+      originalName: 'Esper Zero',
+      name: 'Эспер Зеро',
+    });
+    expect(source.variants).toHaveLength(2);
+    expect(source.variants!.map((row) => row.name).join(' ')).toContain(
+      'женский вариант',
+    );
+    expect(source.variants!.map((row) => row.name).join(' ')).toContain(
+      'мужской вариант',
+    );
+    const stats = JSON.parse(
+      source.suggestions.find((row) => row.field === 'profile.baseStats')!
+        .value,
+    );
+    expect(stats).toHaveLength(5);
+    expect(stats).toContainEqual(
+      expect.objectContaining({ label: 'АТК', value: '85' }),
+    );
+    expect(
+      JSON.parse(
+        source.suggestions.find((row) => row.field === 'profile.awakenings')!
+          .value,
+      ),
+    ).toHaveLength(8);
+    expect(
+      source.suggestions.some((row) =>
+        [
+          'imageUrl',
+          'splashUrl',
+          'profile.voiceLines',
+          'profile.skins',
+        ].includes(row.field),
+      ),
+    ).toBe(false);
+    const progression = (await (await f.api('progression')).json()).data;
+    expect(
+      progression.costs.find((row: { id: string }) => row.id === '1046').name,
+    ).toContain('мужской вариант');
+    expect(
+      progression.costs.find((row: { id: string }) => row.id === '1051').name,
+    ).toContain('женский вариант');
+  } finally {
+    f.db.close();
+  }
+});
+
+test('нативный профиль Хатор: исходные статы, навыки без дублей, коэффициенты, 6 пробуждений и 2 резонанса, аудио', async () => {
+  const records = JSON.parse(
+    await readFile('tests/fixtures/game-data-native-hathor.json', 'utf8'),
+  ) as SourceRecord[];
+  const f = await contract(records);
+  try {
+    const source = await f.m.buildLocalGameCharacterSource(f.env, {
+      originalName: 'Hathor',
+      name: 'Хатор',
+    });
+    const field = (name: string) =>
+      JSON.parse(
+        source.suggestions.find((item) => item.field === name)?.value || '[]',
+      );
+    expect(field('profile.baseStats')).toContainEqual({
+      id: 'AtkBase',
+      label: 'АТК',
+      value: '81',
+    });
+    const abilities = field('profile.abilities') as Array<{
+      id: string;
+      type: string;
+      iconUrl: string;
+      attributes: Array<{ value: string }>;
+    }>;
+    expect(
+      abilities.filter((item) => item.type === 'Городской пассивный навык'),
+    ).toHaveLength(2);
+    expect(new Set(abilities.map((item) => item.id)).size).toBe(
+      abilities.length,
+    );
+    const melee = abilities.find((item) => item.id === 'GA_Hathor_Melee');
+    expect(melee?.iconUrl).toMatch(/game-assets/);
+    expect(
+      melee?.attributes.some((item) => /24\.3\s*%/.test(item.value)),
+    ).toBeTruthy();
+    const awakenings = field('profile.awakenings') as Array<{
+      kind: string;
+      level: number;
+      iconUrl: string;
+    }>;
+    expect(awakenings.filter((item) => item.kind === 'awakening')).toHaveLength(
+      6,
+    );
+    expect(
+      awakenings
+        .filter((item) => item.kind === 'resonance')
+        .map((item) => item.level),
+    ).toEqual([3, 6]);
+    expect(
+      awakenings.every((item) => item.iconUrl.includes('game-assets')),
+    ).toBeTruthy();
+    expect(field('profile.voiceLines').length).toBeGreaterThan(0);
+    const friendship = field('profile.friendship') as Array<{
+      level: number;
+      rewards: Array<{ name: string; iconUrl: string }>;
+    }>;
+    expect(friendship).toHaveLength(10);
+    expect(friendship.every((row) => row.rewards.length > 0)).toBeTruthy();
+    expect(friendship[0].rewards[0].name).toMatch(/[А-Яа-я]/);
+    const profile = Object.fromEntries(
+      source.suggestions
+        .filter((s) => s.field.startsWith('profile.'))
+        .map((s) => {
+          let value;
+          try {
+            value = JSON.parse(s.value);
+          } catch {
+            value = s.value;
+          }
+          return [s.field.slice(8), value];
+        }),
+    );
+    const normalized = f.m.normalizeCharacterProfile(profile);
+    expect(normalized.awakenings).toHaveLength(8);
+    expect(normalized.abilities).toHaveLength(abilities.length);
+    expect(normalized.friendship).toHaveLength(10);
+    f.context.testUser = null;
+    const progression = await (await f.api('progression')).json();
+    expect(progression.data.costs).toContainEqual(
+      expect.objectContaining({ id: '1025', kind: 'character' }),
+    );
+    expect(progression.data.experienceItems).toHaveLength(6);
+  } finally {
+    f.db.close();
+  }
+});
+
+test('нативный профиль в браузере: резонансы, иконки, локальное EN/JP аудио и четыре ширины', async ({
+  page,
+  request,
+}, testInfo) => {
+  const records = JSON.parse(
+    await readFile('tests/fixtures/game-data-native-hathor.json', 'utf8'),
+  ) as SourceRecord[];
+  const f = await contract(records);
+  try {
+    const source = await f.m.buildLocalGameCharacterSource(f.env, {
+      originalName: 'Hathor',
+      name: 'Хатор',
+    });
+    const profile = Object.fromEntries(
+      source.suggestions
+        .filter((s) => s.field.startsWith('profile.'))
+        .map((s) => {
+          let value;
+          try {
+            value = JSON.parse(s.value);
+          } catch {
+            value = s.value;
+          }
+          return [s.field.slice(8), value];
+        }),
+    );
+    const characters = (
+      await (await request.get('http://127.0.0.1:8788/api/characters')).json()
+    ).data;
+    const hathor = characters.find((c: { id: string }) => c.id === 'hathor');
+    hathor.profile = { ...hathor.profile, ...profile };
+    await page.route('**/api/characters', (route) =>
+      route.fulfill({ json: { data: characters } }),
+    );
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto('/#/characters/hathor');
+    await expect(
+      page.getByText('Бонус за 3 пробуждений', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Бонус за 6 пробуждений', { exact: true }),
+    ).toBeVisible();
+    const basic = page.locator('.ability-card').filter({
+      has: page
+        .locator('summary strong')
+        .filter({ hasText: 'Быстрая доставка' }),
+    });
+    if ((await basic.getAttribute('open')) === null)
+      await basic.locator('summary').click();
+    await basic.getByRole('tab', { name: /^Атрибуты/ }).click();
+    await basic
+      .getByRole('combobox', { name: /^Уровень навыка/ })
+      .selectOption('13');
+    await expect(
+      basic.locator('.ability-attribute-grid dd').first(),
+    ).toContainText('61.2');
+    for (const language of ['Японский', 'Английский']) {
+      await page.getByRole('tab', { name: new RegExp('^' + language) }).click();
+      const player = page.locator('.voice-library audio').first();
+      await expect(player).toBeAttached();
+      const audio = await player.evaluate(async (element: HTMLAudioElement) => {
+        element.load();
+        await new Promise<void>((resolve, reject) => {
+          element.addEventListener('loadedmetadata', () => resolve(), {
+            once: true,
+          });
+          element.addEventListener(
+            'error',
+            () => reject(new Error('Audio failed')),
+            { once: true },
+          );
+        });
+        const context = new AudioContext();
+        const buffer = await context.decodeAudioData(
+          await (await fetch(element.currentSrc)).arrayBuffer(),
+        );
+        const samples = buffer.getChannelData(0);
+        let peak = 0;
+        for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
+        await context.close();
+        return { duration: element.duration, peak };
+      });
+      expect(audio.duration).toBeGreaterThan(0);
+      expect(audio.peak).toBeGreaterThan(0.001);
+    }
+    const { default: AxeBuilder } = await import('@axe-core/playwright');
+    for (const width of [360, 768, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth + 1,
+        ),
+        String(width),
+      ).toBeTruthy();
+      if (width === 360 || width === 1440) {
+        if (width === 360) {
+          const widths = await page
+            .locator('.awakening-card .character-detail-card-copy')
+            .evaluateAll((elements) =>
+              elements.map((element) => element.getBoundingClientRect().width),
+            );
+          expect(widths.every((width) => width >= 160)).toBeTruthy();
+        }
+        await page
+          .locator('#character-awakenings')
+          .evaluate((element) =>
+            element.scrollIntoView({ block: 'start', behavior: 'instant' }),
+          );
+        await page.screenshot({
+          path: testInfo.outputPath(`native-profile-${width}.png`),
+        });
+        expect(
+          (
+            await new AxeBuilder({ page })
+              .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+              .analyze()
+          ).violations,
+        ).toEqual([]);
+      }
+    }
+    expect(errors).toEqual([]);
   } finally {
     f.db.close();
   }

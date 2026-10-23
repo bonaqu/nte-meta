@@ -1,6 +1,54 @@
 @layer reset, tokens, base, layout, components, pages, responsive, polish;
 
 @layer polish {
+  .progression-calculator {
+    border: 1px solid var(--border);
+    padding: 16px;
+    margin-block: 16px;
+    background: var(--panel);
+    min-inline-size: 0;
+  }
+  .progression-calculator > summary {
+    cursor: pointer;
+    min-block-size: 44px;
+    font-weight: 700;
+  }
+  .progression-calculator .form-grid {
+    margin-block: 16px;
+  }
+  .progression-calculator__materials {
+    display: grid;
+    gap: 8px;
+  }
+  .progression-calculator__materials > article {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) minmax(100px, 180px);
+    align-items: center;
+    gap: 12px;
+    border-block-end: 1px solid var(--border);
+    padding: 12px 0;
+  }
+  .progression-calculator__materials > article > output {
+    grid-column: 2/-1;
+    color: var(--cyan);
+    font-weight: 700;
+  }
+  .progression-calculator__materials label {
+    display: grid;
+    gap: 6px;
+    min-inline-size: 0;
+  }
+  .progression-calculator__materials input {
+    inline-size: 100%;
+  }
+  @media (max-width: 600px) {
+    .progression-calculator__materials > article {
+      grid-template-columns: 48px minmax(0, 1fr);
+    }
+    .progression-calculator__materials label {
+      grid-column: 2/-1;
+    }
+  }
   .guide-visual {
     list-style: none;
     margin: 0;
@@ -122,6 +170,91 @@
     display: grid;
     gap: 6px;
     min-inline-size: 0;
+    border: 1px dashed var(--border);
+    padding: 10px;
+    border-radius: 8px;
+    background: var(--panel);
+  }
+  .image-upload--dragging {
+    border-color: var(--cyan);
+    background: color-mix(in srgb, var(--cyan) 12%, var(--panel));
+  }
+  .image-upload > button {
+    min-block-size: 44px;
+    white-space: normal;
+  }
+  .image-upload small {
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+  .image-upload__success {
+    color: var(--cyan);
+    font-size: 0.85rem;
+    overflow-wrap: anywhere;
+  }
+  .file-upload-field {
+    min-inline-size: 0;
+  }
+  .discovery-translation-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-block: 12px;
+  }
+  .discovery-translation-controls label {
+    min-block-size: 44px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .visual-section-editor__summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border-block: 1px solid var(--border);
+  }
+  .visual-section-editor__summary a {
+    color: var(--cyan);
+    min-block-size: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .guide-visual__equipment {
+    padding: 16px !important;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .guide-visual__equipment--signature {
+    border-inline-start: 3px solid var(--orange);
+  }
+  .guide-visual__equipment--replacement {
+    border-inline-start: 3px solid var(--cyan);
+  }
+  .guide-visual--skills {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  }
+  .guide-visual--skills > li {
+    grid-template-columns: 32px minmax(0, 1fr);
+    padding: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+  }
+  .guide-visual--skills > li:has(> img) {
+    grid-template-columns: 32px 48px minmax(0, 1fr);
+  }
+  .guide-visual--skills > li > img {
+    inline-size: 48px;
+  }
+  .guide-visual--skills .guide-visual__body {
+    grid-column: 2 / -1;
+  }
+  .guide-visual--skills .guide-visual__heading > h3 {
+    font-size: 1rem;
   }
   .image-upload > label {
     cursor: pointer;
@@ -5966,6 +6099,34 @@
 
   .awakening-card__icon svg {
     padding: 10px;
+  }
+
+  .ability-level-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-block-end: 12px;
+  }
+  .ability-level-control select {
+    min-inline-size: 80px;
+    min-block-size: 44px;
+  }
+  @media (max-width: 760px) {
+    .awakening-path,
+    .ability-attribute-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .awakening-path::before {
+      inset-block: 24px;
+      inset-inline: 34px auto;
+      inline-size: 2px;
+      block-size: auto;
+      background: linear-gradient(180deg, var(--cyan), var(--pink));
+    }
+    .awakening-path .awakening-card {
+      min-block-size: 0;
+    }
   }
 
   .ability-list p {

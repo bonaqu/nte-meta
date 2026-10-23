@@ -1,5 +1,5 @@
 """Normalize local game exports. Requires the shared Python/Pillow runtime, no network."""
-import argparse, csv, gzip, hashlib, io, json, re, struct
+import argparse, csv, gzip, hashlib, io, json, re, struct, subprocess
 from collections import Counter
 from pathlib import Path
 from PIL import Image
@@ -8,6 +8,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--source', type=Path, required=True)
 parser.add_argument('--repository', type=Path, required=True)
 parser.add_argument('--reuse-images', action='store_true')
+parser.add_argument('--vgmstream', default=r'D:\CODEX\Programs\vgmstream\vgmstream-cli.exe')
+parser.add_argument('--ffmpeg', default='ffmpeg')
 args = parser.parse_args()
 export = args.source / 'export'
 manifest = json.loads((export / 'extraction.json').read_text(encoding='utf-8-sig'))
@@ -72,9 +74,21 @@ for key,values in translations.items():
 for path in (export/'virtual-paths.txt').read_text(encoding='utf-8-sig').splitlines():
     match=re.search(r'/Ability_(\d{3})_([^/]+)/',path)
     if match: aliases[re.sub(r'[^a-z0-9]','',match[2].lower())]=str(1000+int(match[1]))
+for table in manifest['tables']:
+    if table['path'].endswith('/DT_DefaultAppearanceData.uasset'):
+        for obj in json.loads((export/table['file']).read_text(encoding='utf-8-sig')):
+            for game_id, details in obj.get('Rows',{}).items():
+                match=re.search(r'/Player/(\d{3})_([^/_]+)',details.get('PlayerAppearanceAsset',{}).get('AssetPathName',''),re.I)
+                if match:aliases[match[2].lower()]=game_id
 def alias_owner(key):
-    alias=re.sub(r'[^a-z0-9]','',key.split('_',1)[0].lower())
-    return aliases.get(alias,'')
+    tokens=re.sub(r'[^a-z0-9]+','_',key.lower()).split('_')
+    numeric={str(1000+int(match[2])) for token in tokens if (match:=re.fullmatch(r'([a-z]+)(\d{3})',token)) and str(1000+int(match[2])) in aliases.values()}
+    if len(numeric)==1:return next(iter(numeric))
+    matches={aliases[t] for t in tokens if t in aliases}
+    for token in tokens:
+        match=re.fullmatch(r'([a-z]+)(\d{3})',token)
+        if match and aliases.get(match[1])==str(1000+int(match[2])):matches.add(aliases[match[1]])
+    return next(iter(matches)) if len(matches)==1 else ''
 
 def text(value):
     if not isinstance(value,dict): return {}
@@ -130,6 +144,89 @@ for table in manifest['tables']:
 for path,image in images.items():
     records.append({'id':'asset:'+path,'kind':'image','namespace':path.rsplit('/',2)[-2],'gameId':Path(path).stem,'ownerId':owner(Path(path).stem) or alias_owner(Path(path).stem),'values':{},'details':{'virtualPath':path},'assets':[{'path':path,**image}],'term':False})
 
+audio_errors=[]
+audio_dir=args.repository/'public/game-audio'
+audio_dir.mkdir(parents=True,exist_ok=True)
+audio_locales={'English':'en','Japanese':'ja','Korean':'ko','Chinese':'zh'}
+for index,voice in enumerate(manifest.get('voices',[])):
+    name=digest(voice['path'].lower())[:20]+'.ogg'
+    target=audio_dir/name
+    try:
+        if not target.exists():
+            wave=export/'audio'/(Path(name).stem+'.wav')
+            try:
+                subprocess.run([args.vgmstream,'-o',str(wave),str(export/voice['file'])],check=True,capture_output=True,timeout=40)
+                subprocess.run([args.ffmpeg,'-nostdin','-v','error','-y','-i',str(wave),'-c:a','libopus','-b:a','32k','-vbr','on',str(target)],check=True,capture_output=True,timeout=40)
+            finally:
+                if wave.exists():wave.unlink()
+        locale=audio_locales[voice['locale']]
+        records.append({'id':'voice:'+voice['ownerId']+':'+locale+':'+voice['eventName'],'kind':'audio','namespace':'NTE_ProfileVoice','gameId':voice['eventName'],'ownerId':voice['ownerId'],'values':{},'details':{'locale':locale,'eventName':voice['eventName'],'virtualPath':voice['path']},'assets':[{'path':voice['path'],'url':'/nte-meta/game-audio/'+name}],'term':False})
+    except Exception as error:
+        audio_errors.append({'event':voice['eventName'],'locale':voice['locale'],'error':str(error)})
+    if index and index%500==0:print(f'Audio {index}/{len(manifest.get("voices",[]))}',flush=True)
+
+# Optional external completion stays distinguishable from native archive rows.
+supplement_path=args.source/'supplement.json'
+supplement=json.loads(supplement_path.read_text(encoding='utf-8-sig')) if supplement_path.exists() else None
+if supplement:
+    def plain_name(value):return re.sub(r'<[^>]*>','',value or '').strip()
+    by_english={};item_names={key.split('::',1)[1][:-5].lower():value for key,value in translations.items() if key.startswith('ST_Item::') and key.endswith('_name')}
+    for key,value in sorted(translations.items(),key=lambda pair:not(pair[0].startswith('ST_Item::') and pair[0].endswith('_name'))):
+        if value.get('ru'):
+            for name in value.values():
+                if name:by_english.setdefault(plain_name(name).lower(),[]).append(value)
+    def official_values(name,game_id=''):
+        if item_names.get(game_id.lower(),{}).get('ru'):return item_names[game_id.lower()]
+        if not name:return {}
+        candidates=by_english.get(plain_name(name).lower(),[])
+        rus={plain_name(value['ru']) for value in candidates}
+        return candidates[0] if len(rus)==1 else {'en':name}
+    item_by_icon={str(item.get('original_icon') or item.get('icon','')).replace('/Game/','HT/Content/').lower():item for item in supplement['items'].values()}
+    def external_icon(url):
+        if '/img/nte/' in url:
+            virtual='HT/Content/'+url.split('/img/nte/',1)[1].rsplit('.',1)[0]+'.uasset'
+            if virtual.lower() in images:return images[virtual.lower()]['url']
+        return url
+    def external_record(kind, namespace, game_id, data, url, owner_id='',provider='Nanoka'):
+        icon=data.get('original_icon') or data.get('icon','')
+        virtual='HT/Content/'+icon[6:]+'.uasset' if icon.startswith('/Game/') else ''
+        assets=[{'path':virtual,**images[virtual.lower()]}] if virtual.lower() in images else ([{'path':virtual,'url':'https://static.nanoka.cc/assets/nte'+icon+'.webp'}] if virtual else [])
+        values=official_values(data.get('name',''),game_id)
+        if kind=='character' and data.get('name'):
+            identities=[value for key,value in translations.items() if key.startswith('ST_Player::Role_Name_') and any(plain_name(name).lower()==plain_name(data['name']).lower() for name in value.values())]
+            if len({value.get('ru') for value in identities})==1 and identities:values=identities[0]
+        return {'id':'reference:'+namespace+':'+game_id,'kind':kind,'namespace':namespace,'gameId':game_id,'ownerId':owner_id,'values':values,'details':{**data,'reference':{'provider':provider,'version':supplement['version'] if provider=='Nanoka' else None,'url':url}},'assets':assets,'term':bool(data.get('name'))}
+    for item in supplement['items'].values():
+        records.append(external_record('item','NTE_ReferenceItem',item['id'],item,f"https://static.nanoka.cc/nte/{supplement['version']}/en/item.json"))
+    for item in supplement['characters']:
+        data=item['data']
+        selected={k:data[k] for k in ['id','name','breakthrough','gift_reward','preferrable_gifts','stats'] if k in data}
+        records.append(external_record('character','NTE_ReferenceCharacter',data['id'],selected,item['url'],data['id']))
+    for item in supplement['weapons']:
+        records.append(external_record('arc','NTE_ReferenceWeapon',item['data']['id'],item['data'],item['url']))
+    for gift in supplement.get('giftCatalog',{}).values():
+        record=external_record('item','NTE_ReferenceGift',gift['itemId'],gift,gift['sourceUrl'],provider='Neverness.app')
+        if not record['values'].get('ru') and gift.get('nameRu'):record['values']['ru']=gift['nameRu']
+        if gift.get('icon'):record['assets']=[{'url':'https://www.neverness.app'+gift['icon']}]
+        records.append(record)
+    for row in supplement.get('affinity',[]):
+        levels=[];assets=[]
+        for level in row['levels']:
+            rewards=[]
+            for reward in level['rewards']:
+                icon_path='HT/Content/'+reward['icon'].split('/img/nte/',1)[1].rsplit('.',1)[0] if '/img/nte/' in reward['icon'] else ''
+                matched=item_by_icon.get(icon_path.lower(),{})
+                translated=official_values(reward['name'],matched.get('id',''))
+                icon=external_icon(reward['icon'])
+                rewards.append({**reward,'originalName':reward['name'],'name':translated.get('ru',reward['name']),'iconUrl':icon})
+                if icon:assets.append({'url':icon})
+            levels.append({**level,'rewards':rewards})
+        record=external_record('affinity','NTE_ReferenceAffinity',row['ownerId'],{'levels':levels},row['url'],row['ownerId'],provider='Kaiden')
+        record['assets']=list({a['url']:a for a in assets}.values())
+        records.append(record)
+    for row in supplement.get('communityProfiles',[]):
+        records.append(external_record('character','NTE_ReferenceCommunityProfile',row['ownerId'],{'levels':row['levels'],'gifts':row['gifts']},row['url'],row['ownerId'],provider='Neverness.app'))
+
 # Keep the StringTable key, its owning character and the exact referring field.
 # Shared headings remain shared; unique biography/wardrobe lines gain an owner.
 references={}
@@ -173,8 +270,10 @@ with (content/'chunks.jsonl.gz').open('wb') as raw, gzip.GzipFile(filename='',mo
         payload=compact(rows)
         if len(payload.encode())>1700000: raise ValueError('Chunk exceeds D1 value limit: '+chunk_id)
         stream.write(compact({'id':chunk_id,'kind':rows[0]['kind'],'records':rows,'search':' '.join(r['search'] for r in rows),'hash':digest(payload),'count':len(rows)})+'\n')
-report={'formatVersion':1,'locales':['ru','en','ja','zh'],'localizationKeys':len(translations),'records':len(records),'kinds':dict(Counter(r['kind'] for r in records)),'textures':len(images),'extractionErrors':manifest['failures'],'imageErrors':image_errors,'emptyTables':sorted(set(empty)),'source':'Local installed game archives including PatchPaks; original strings preserved','datasetSha256':dataset_hash.hexdigest()}
+report={'formatVersion':2,'locales':['ru','en','ja','zh'],'localizationKeys':len(translations),'records':len(records),'kinds':dict(Counter(r['kind'] for r in records)),'textures':len(images),'extractionErrors':manifest['failures'],'imageErrors':image_errors,'audioErrors':audio_errors,'emptyTables':sorted(set(empty)),'source':'Local installed game archives including PatchPaks; original strings preserved','datasetSha256':dataset_hash.hexdigest()}
 report['chunks']=len(chunks)
+if supplement:report['supplement']={'providers':['Nanoka','Kaiden','Neverness.app'],'version':supplement['version'],'checkedAt':supplement['checkedAt'],'characters':len(supplement['characters']),'items':len(supplement['items']),'weapons':len(supplement['weapons']),'affinity':len(supplement.get('affinity',[])),'gifts':len(supplement.get('giftCatalog',{})),'failures':supplement['failures']}
 report['chunksSha256']=hashlib.sha256((content/'chunks.jsonl.gz').read_bytes()).hexdigest()
 (content/'manifest.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 print(compact({k:report[k] for k in ['localizationKeys','records','kinds','textures']}))
+if image_errors or audio_errors:raise SystemExit('Некоторые медиа не обработаны. Подробности сохранены в manifest.json; исправьте ошибки перед публикацией.')

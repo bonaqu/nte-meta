@@ -2,6 +2,11 @@ import { expect, test } from '@playwright/test';
 import { readFile, readdir } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import vm from 'node:vm';
+import {
+  translationParts,
+  translateInBrowser,
+  type BrowserTranslationPlan,
+} from '../src/lib/translation';
 async function contracts(fetcher: typeof fetch) {
   const context = vm.createContext({
     URL,
@@ -19,7 +24,7 @@ async function contracts(fetcher: typeof fetch) {
       'export default {',
       'const worker={',
     ) +
-      '\nglobalThis.contracts={ classifyDiscoveryContent,mergeDiscoverySources,validateDiscoveryUrl,translateCandidate,resolveNanokaCharacter,parseNanokaCharacter,discoveryFetch,isCleanImportedAbilityName,parseHtmlJsonAttribute,cleanImportedAbility };',
+      '\nglobalThis.contracts={ classifyDiscoveryContent,mergeDiscoverySources,validateDiscoveryUrl,translateCandidate,prepareBrowserTranslation,resolveNanokaCharacter,parseNanokaCharacter,discoveryFetch,isCleanImportedAbilityName,parseHtmlJsonAttribute,cleanImportedAbility };',
   ).runInContext(context);
   return context.contracts as {
     classifyDiscoveryContent: (source: object, text: string) => string;
@@ -31,6 +36,10 @@ async function contracts(fetcher: typeof fetch) {
       candidate: object,
       env: object,
     ) => Promise<{ title: string; excerpt: string }>;
+    prepareBrowserTranslation: (
+      candidate: object,
+      env: object,
+    ) => Promise<BrowserTranslationPlan>;
     resolveNanokaCharacter: (
       source: object,
       character: object,
@@ -214,6 +223,93 @@ test('перевод остаётся предложением, имена ло�
     ),
   ).toContain('Переводчик временно недоступен');
 });
+test('план перевода защищает игровые имена без сетевого запроса с сервера', async () => {
+  const m = await contracts(async () => {
+    throw new Error('Server must not call a translator');
+  });
+  const candidate = {
+    language: 'en',
+    title: 'Akane Rin buff',
+    excerpt: 'Mint and peppermint',
+  };
+  const env = {
+    DB: {
+      prepare: (sql: string) => ({
+        bind() {
+          return this;
+        },
+        all: async () => ({
+          results: sql.includes('game_source_chunks')
+            ? []
+            : [
+                { name: 'Аканэ Рин', original_name: 'Akane Rin' },
+                { name: 'Минт', original_name: 'Mint' },
+              ],
+        }),
+      }),
+    },
+  };
+  const plan = await m.prepareBrowserTranslation(candidate, env);
+  expect(plan).toMatchObject({
+    kind: 'browser-translation',
+    sourceLanguage: 'en',
+    title: '__NTE_TERM_0__ buff',
+    excerpt: '__NTE_TERM_1__ and peppermint',
+  });
+  expect(plan.terms.map((term) => term.to)).toEqual(['Аканэ Рин', 'Минт']);
+  expect(candidate.title).toBe('Akane Rin buff');
+});
+
+test('перевод из браузера сохраняет Unicode, термины и отдельный запрос без токена сайта', async () => {
+  const text = 'я'.repeat(1395) + '__NTE_TERM_0__' + '🙂'.repeat(10);
+  const parts = translationParts(text);
+  expect(parts.join('')).toBe(text);
+  expect(parts.every((part) => part.length <= 1400)).toBeTruthy();
+  for (const part of parts)
+    expect(() => encodeURIComponent(part)).not.toThrow();
+  expect(parts.filter((part) => part.includes('__NTE_TERM_0__'))).toHaveLength(
+    1,
+  );
+  const originalFetch = globalThis.fetch;
+  const plan: BrowserTranslationPlan = {
+    kind: 'browser-translation',
+    sourceLanguage: 'en',
+    title: '__NTE_TERM_0__ buff',
+    excerpt: 'peppermint',
+    terms: [{ token: '__NTE_TERM_0__', from: 'Akane Rin', to: 'Аканэ Рин' }],
+    names: [{ name: 'Минт', original_name: 'Mint' }],
+  };
+  try {
+    globalThis.fetch = async (input, init) => {
+      expect(String(input)).toBe(
+        'https://translate.googleapis.com/translate_a/single',
+      );
+      expect(init).toMatchObject({
+        method: 'POST',
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+      });
+      expect(new Headers(init?.headers).has('Authorization')).toBe(false);
+      const q = new URLSearchParams(String(init?.body)).get('q')!;
+      return new Response(
+        JSON.stringify([
+          [[q.includes('__NTE') ? '__NTE_TERM_0__ получает усиление.' : q]],
+        ]),
+      );
+    };
+    expect(await translateInBrowser(plan)).toMatchObject({
+      title: 'Аканэ Рин получает усиление.',
+      excerpt: 'peppermint',
+      requiresReview: true,
+    });
+    globalThis.fetch = async () => new Response('', { status: 429 });
+    await expect(translateInBrowser(plan)).rejects.toThrow('частоту');
+    expect(plan.title).toBe('__NTE_TERM_0__ buff');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('Nanoka выбирает опубликованную версию и изображения именно выбранного персонажа', async () => {
   const calls: string[] = [];
   const m = await contracts(async (input) => {

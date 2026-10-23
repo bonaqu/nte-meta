@@ -55,7 +55,6 @@ export function mergeNativeCollection(field, current, incoming) {
         old.description || '',
       ) ||
         (field === 'friendship' &&
-          row.rewards?.length &&
           /Награда за уровень[^.]*не указана/i.test(old.description || '')))
     )
       merged.description = row.description;

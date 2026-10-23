@@ -60,6 +60,7 @@ const decode = (value) =>
     .replace(/&gt;/g, '>');
 const affinity = [];
 const communityProfiles = [];
+const experienceCosts = [];
 const giftCatalog = {};
 const characterIndex = await (
   await get('https://www.kaiden.gg/nte/characters/')
@@ -124,7 +125,38 @@ for (const character of characters) {
         url,
         levels: context.helpers.parseHtmlJsonAttribute(page, 'data-levels'),
         gifts: context.helpers.parseHtmlJsonAttribute(page, 'data-gifts'),
+        phases: context.helpers.parseHtmlJsonAttribute(page, 'data-phases'),
       });
+      if (!experienceCosts.length) {
+        const calculator = [...page.matchAll(/<script[^>]*src="([^"]+)"/g)]
+          .map((match) => match[1])
+          .find((path) => path.includes('WandererAscensionCalculator.'));
+        if (calculator) {
+          const calculatorUrl = new URL(calculator, url);
+          if (calculatorUrl.origin !== 'https://www.neverness.app')
+            throw new Error('Unexpected calculator origin');
+          const script = await (await get(calculatorUrl)).text();
+          const modulePath = script.match(
+            /from["']([^"']*wanderer-ascension-math[^"']+)["']/,
+          )?.[1];
+          if (modulePath) {
+            const mathUrl = new URL(modulePath, calculatorUrl);
+            if (mathUrl.origin !== 'https://www.neverness.app')
+              throw new Error('Unexpected math origin');
+            const math = await (await get(mathUrl)).text();
+            for (const match of math.matchAll(
+              /itemId:"(CharacterUpMaterial_lv[1-3])"[^{}]*?xp:([\deE.+-]+)[^{}]*?beetleCoinCost:([\deE.+-]+)/g,
+            ))
+              experienceCosts.push({
+                itemId: match[1],
+                experience: Number(match[2]),
+                currencyCost: Number(match[3]),
+                currencyId: 'gold',
+                url: mathUrl.href,
+              });
+          }
+        }
+      }
       for (const gift of context.helpers.parseHtmlJsonAttribute(
         page,
         'data-gifts',
@@ -149,6 +181,7 @@ const report = {
   weapons,
   affinity,
   communityProfiles,
+  experienceCosts,
   giftCatalog,
   failures,
 };

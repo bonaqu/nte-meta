@@ -6,15 +6,15 @@
     "ja",
     "zh"
   ],
-  "localizationKeys": 113016,
-  "records": 202364,
+  "localizationKeys": 113100,
+  "records": 202471,
   "kinds": {
+    "localization": 142689,
     "skill": 3622,
-    "localization": 142605,
     "awakening": 210,
-    "wardrobe": 733,
+    "wardrobe": 754,
     "affinity": 14705,
-    "item": 7415,
+    "item": 7417,
     "arc": 5497,
     "stat": 8457,
     "cartridge": 2340,
@@ -89,8 +89,14 @@
     "HT/Content/DataTable/Skill/GlobalCharacterData/DT_GlobalValueLinkoData.uasset"
   ],
   "source": "Local installed game archives including PatchPaks; original strings preserved",
-  "datasetSha256": "c6e2588be7276bdbf4af10aee2a2a0825c166b45e3339020be8720dbe8989330",
+  "datasetSha256": "e55340946c3ff34b225654a6cbb83bbb176ea0d72207a82007e932a1a87288f0",
   "chunks": 1088,
+  "repairedCsvRows": {
+    "ru": 425,
+    "en": 598,
+    "ja": 213,
+    "zh": 237
+  },
   "supplement": {
     "providers": [
       "Nanoka",
@@ -98,7 +104,7 @@
       "Neverness.app"
     ],
     "version": "1.4.13",
-    "checkedAt": "2026-10-22T19:38:57.389Z",
+    "checkedAt": "2026-10-23T04:19:41.391Z",
     "characters": 25,
     "items": 2071,
     "weapons": 51,
@@ -106,5 +112,5 @@
     "gifts": 138,
     "failures": []
   },
-  "chunksSha256": "853186f5299c8fcd096c17baa0a566deb4b2f23bef6a623e986fd816544a92e5"
+  "chunksSha256": "400b4c7512f4d3b0311ee989869e831dab0c1fc49f8798a43b83a4549c647847"
 }

@@ -41,36 +41,51 @@ export function ProgressionCalculator({
       validation = reason instanceof Error ? reason.message : '';
     }
   }
+  async function load() {
+    if (data || pending) return;
+    setPending(true);
+    setError('');
+    const response = await loadProgressionData();
+    setPending(false);
+    if (response.ok) {
+      setData(response.data);
+      const key = (text: string) =>
+        text
+          .replace(/[^\p{L}\p{N}]/gu, '')
+          .toLowerCase()
+          .replace(/^esperzero$/, 'zero');
+      const option = response.data.costs.find(
+        (row) =>
+          row.kind === 'character' &&
+          [name, originalName].some((n) =>
+            [row.name, row.originalName].some((v) => key(v) === key(n)),
+          ),
+      );
+      setId(option?.id || '');
+    } else setError(response.error);
+  }
   return (
     <details
       className="progression-calculator"
-      onToggle={async (event) => {
-        if (!event.currentTarget.open || data || pending) return;
-        setPending(true);
-        setError('');
-        const response = await loadProgressionData();
-        setPending(false);
-        if (response.ok) {
-          setData(response.data);
-          const key = (text: string) =>
-            text
-              .replace(/[^\p{L}\p{N}]/gu, '')
-              .toLowerCase()
-              .replace(/^esperzero$/, 'zero');
-          const option = response.data.costs.find(
-            (row) =>
-              row.kind === 'character' &&
-              [name, originalName].some((n) =>
-                [row.name, row.originalName].some((v) => key(v) === key(n)),
-              ),
-          );
-          setId(option?.id || '');
-        } else setError(response.error);
+      onToggle={(event) => {
+        if (event.currentTarget.open) void load();
       }}
     >
       <summary>Калькулятор прокачки персонажа и дуги</summary>
       {pending ? <p role="status">Загружаем таблицы прокачки…</p> : null}
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? (
+        <div>
+          <p role="alert">{error}</p>
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => void load()}
+            disabled={pending}
+          >
+            Повторить загрузку
+          </button>
+        </div>
+      ) : null}
       {data ? (
         <>
           <div className="form-grid">
@@ -171,6 +186,12 @@ export function ProgressionCalculator({
                   {result.missingLevels.join(', ')}. Итог опыта неполный.
                 </p>
               ) : null}
+              {result.missingAscension ? (
+                <p role="status">
+                  Для выбранного персонажа или дуги не найдены материалы
+                  возвышений. Сумма ниже неполная.
+                </p>
+              ) : null}
               <div className="progression-calculator__materials">
                 {[
                   ...(result.experienceMaterial
@@ -190,8 +211,12 @@ export function ProgressionCalculator({
                     <div>
                       <strong>{item.name}</strong>
                       <p>
-                        {'excess' in item ? 'Для опыта' : 'На возвышения'}:{' '}
-                        {item.amount.toLocaleString('ru-RU')}
+                        {'excess' in item
+                          ? 'Для опыта'
+                          : item.id === 'gold'
+                            ? 'На прокачку'
+                            : 'На возвышения'}
+                        : {item.amount.toLocaleString('ru-RU')}
                         {'excess' in item &&
                         typeof item.excess === 'number' &&
                         item.excess > 0
@@ -222,9 +247,13 @@ export function ProgressionCalculator({
               </div>
               <p>
                 Предметы опыта рассчитаны для выбранного вида, без смешивания.
-                Фонсы выше относятся к возвышениям; стоимость применения
-                предметов опыта пока не включена в справочник.
               </p>
+              {!result.experienceCurrencyKnown ? (
+                <p role="status">
+                  Стоимость применения выбранных предметов опыта в жук-монетах
+                  пока неизвестна и не включена в итог.
+                </p>
+              ) : null}
             </>
           ) : null}
         </>

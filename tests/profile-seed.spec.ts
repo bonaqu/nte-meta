@@ -2,6 +2,47 @@ import { expect, test } from '@playwright/test';
 import { readFile, readdir } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import { mergeNativeCollection } from '../scripts/game-data/seed-profiles.mjs';
+
+test('русские названия экипировки сохраняют порядок, характеристики и ручные тексты', async () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec('CREATE TABLE guide_sections(id TEXT,meta_json TEXT)');
+    const items = [
+      {
+        name: 'Far Side of the Moon',
+        description: 'Ручное описание',
+        stats: [{ label: 'АТК', value: '570' }],
+      },
+      { name: 'Мой вариант дуги', description: 'Не менять' },
+    ];
+    db.prepare('INSERT INTO guide_sections VALUES(?,?)').run(
+      'manual',
+      JSON.stringify({
+        visual: { kind: 'arcs', items },
+        note: 'Ручная заметка',
+      }),
+    );
+    const migration = await readFile(
+      'migrations/0040_official_guide_equipment_names.sql',
+      'utf8',
+    );
+    db.exec(migration);
+    db.exec(migration);
+    const meta = JSON.parse(
+      db.prepare('SELECT meta_json FROM guide_sections').get()!
+        .meta_json as string,
+    );
+    expect(meta).toEqual({
+      visual: {
+        kind: 'arcs',
+        items: [{ ...items[0], name: 'Обратная сторона Луны' }, items[1]],
+      },
+      note: 'Ручная заметка',
+    });
+  } finally {
+    db.close();
+  }
+});
 test('обогащение сохраняет ручной текст и удаляет старые эвристические дубли', () => {
   const native = [
     {
@@ -96,9 +137,7 @@ test('реальная миграция дополняет профиль Хат
       .get()!;
     expect(after.biography_markdown).toBe('Ручная биография');
     expect(JSON.parse(after.awakenings_json as string)).toHaveLength(8);
-    expect(
-      JSON.parse(after.abilities_json as string).length,
-    ).toBeGreaterThanOrEqual(10);
+    expect(JSON.parse(after.abilities_json as string)).toHaveLength(8);
     expect(
       JSON.parse(after.voice_lines_json as string).filter(
         (r: { audioUrl: string }) => r.audioUrl,

@@ -1,5 +1,6 @@
 export interface ProgressionStage {
   level: string;
+  fromLevel?: number;
   items_id: string[];
   amount: number[];
   cost_gold?: number;
@@ -21,6 +22,7 @@ export interface ProgressionData {
     id: string;
     kind: 'character' | 'arc';
     experience: number;
+    currencyCost?: number;
   }>;
 }
 export function calculateProgression(
@@ -45,8 +47,12 @@ export function calculateProgression(
   const totals = new Map<string, number>();
   const sum = (id: string, amount: number) =>
     totals.set(id, (totals.get(id) || 0) + amount);
-  for (const stage of option.stages) {
-    const level = Number(stage.level);
+  const stages = [...option.stages].sort(
+    (a, b) => Number(a.level) - Number(b.level),
+  );
+  for (const [index, stage] of stages.entries()) {
+    const level =
+      stage.fromLevel ?? (index ? Number(stages[index - 1].level) : 20);
     if (level < from || level >= to || (level === from && ascended)) continue;
     for (let i = 0; i < stage.items_id.length; i++)
       sum(stage.items_id[i], Number(stage.amount[i]) || 0);
@@ -85,10 +91,24 @@ export function calculateProgression(
           experience,
       }
     : undefined;
+  const experienceCurrencyKnown =
+    experience === 0 ||
+    !!(experienceItem && Number.isFinite(experienceItem.currencyCost));
+  if (
+    experienceMaterial &&
+    experienceCurrencyKnown &&
+    experienceItem?.currencyCost
+  )
+    sum('gold', experienceMaterial.amount * experienceItem.currencyCost);
   return {
     experience,
     experienceMaterial,
     missingLevels,
+    experienceCurrencyKnown,
+    missingAscension:
+      !stages.length &&
+      from < to &&
+      [20, 30, 40, 50, 60, 70].some((level) => from <= level && to > level),
     materials: [...totals].map(([id, amount]) => ({
       id,
       name: data.items[id]?.name || id,

@@ -1,8 +1,9 @@
 """Normalize local game exports. Requires the shared Python/Pillow runtime, no network."""
-import argparse, csv, gzip, hashlib, io, json, re, struct, subprocess
+import argparse, gzip, hashlib, io, json, re, struct, subprocess
 from collections import Counter
 from pathlib import Path
 from PIL import Image
+from localization_csv import localized_rows
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--source', type=Path, required=True)
@@ -56,15 +57,15 @@ for image in manifest['images']:
     except Exception as error:
         image_errors.append({'path':image['path'],'error':str(error)})
 
-translations={}
+translations={};csv_repairs=Counter()
 for locale, folder in [('ru','ru'),('en','en'),('ja','ja'),('zh','zh-Hans')]:
     files=sorted((args.source/'localization'/folder).glob('*.csv'),key=lambda p:'_0_P' in p.name)
     for file in files:
         if '_skipped_lines' in file.name: continue
         with file.open(encoding='utf-8-sig',newline='') as stream:
-            for row in csv.DictReader(stream):
-                key=row.get('key','')
-                if '::' in key: translations.setdefault(key,{})[locale]=row.get('source','')
+            for key,value,repaired in localized_rows(stream):
+                if repaired:csv_repairs[locale]+=1
+                if key: translations.setdefault(key if '::' in key else '::'+key,{})[locale]=value
 
 aliases={}
 for key,values in translations.items():
@@ -197,17 +198,42 @@ if supplement:
             if len({value.get('ru') for value in identities})==1 and identities:values=identities[0]
         return {'id':'reference:'+namespace+':'+game_id,'kind':kind,'namespace':namespace,'gameId':game_id,'ownerId':owner_id,'values':values,'details':{**data,'reference':{'provider':provider,'version':supplement['version'] if provider=='Nanoka' else None,'url':url}},'assets':assets,'term':bool(data.get('name'))}
     for item in supplement['items'].values():
-        records.append(external_record('item','NTE_ReferenceItem',item['id'],item,f"https://static.nanoka.cc/nte/{supplement['version']}/en/item.json"))
+        record=external_record('item','NTE_ReferenceItem',item['id'],item,f"https://static.nanoka.cc/nte/{supplement['version']}/en/item.json")
+        usage=next((row for row in supplement.get('experienceCosts',[]) if row['itemId']==item['id']),None)
+        if usage:record['details']['upgradeUsage']={**usage,'reference':{'provider':'Neverness.app','url':usage['url']}}
+        records.append(record)
+    for currency,bundle_id in [('gold','gold_100'),('fons','fons_100')]:
+        bundle=next((item for item in supplement['items'].values() if item['id']==bundle_id),None)
+        if not bundle:continue
+        record=external_record('item','NTE_ReferenceCurrency',currency,bundle,f"https://static.nanoka.cc/nte/{supplement['version']}/en/item.json")
+        record['values']={locale:re.sub(r'\s*[×x]\s*[\d, .]+$','',value).strip() for locale,value in official_values(bundle.get('name',''),bundle_id).items()}
+        record['details']={'id':currency,'name':record['values'].get('en',''),'derivedFrom':bundle_id,'reference':record['details']['reference']}
+        records.append(record)
     for item in supplement['characters']:
         data=item['data']
         selected={k:data[k] for k in ['id','name','breakthrough','gift_reward','preferrable_gifts','stats'] if k in data}
+        selected['abilityMenu']=[{k:ability[k] for k in ['id','type','ability_type'] if k in ability} for ability in data.get('abilities',[])]
         records.append(external_record('character','NTE_ReferenceCharacter',data['id'],selected,item['url'],data['id']))
+        native_fashions={row['gameId'].lower() for row in records if row['kind']=='wardrobe' and row['id'].startswith('row:')}
+        for fashion in data.get('fashion',[]):
+            fashion_id=fashion['fashion_id']
+            if fashion_id.lower() in native_fashions:continue
+            record=external_record('wardrobe','NTE_ReferenceFashion',fashion_id,fashion,item['url'],data['id'])
+            record['details']['localizedDescription']=official_values(fashion.get('desc',''))
+            record['assets']=[]
+            for field in ['portrait_img','display_icon','head_icon_big','icon']:
+                path=fashion.get(field,'')
+                virtual='HT/Content/'+path[6:]+'.uasset' if path.startswith('/Game/') else ''
+                if virtual.lower() in images:record['assets'].append({'path':virtual,**images[virtual.lower()]})
+            records.append(record)
     for item in supplement['weapons']:
         records.append(external_record('arc','NTE_ReferenceWeapon',item['data']['id'],item['data'],item['url']))
     for gift in supplement.get('giftCatalog',{}).values():
         record=external_record('item','NTE_ReferenceGift',gift['itemId'],gift,gift['sourceUrl'],provider='Neverness.app')
         if not record['values'].get('ru') and gift.get('nameRu'):record['values']['ru']=gift['nameRu']
-        if gift.get('icon'):record['assets']=[{'url':'https://www.neverness.app'+gift['icon']}]
+        native_item=next((row for row in records if row['namespace']=='NTE_ReferenceItem' and row['gameId']==gift['itemId']),None)
+        if native_item and any(asset['url'].startswith('/nte-meta/game-assets/') for asset in native_item['assets']):record['assets']=native_item['assets']
+        elif gift.get('icon'):record['assets']=[{'url':'https://www.neverness.app'+gift['icon']}]
         records.append(record)
     for row in supplement.get('affinity',[]):
         levels=[];assets=[]
@@ -225,7 +251,7 @@ if supplement:
         record['assets']=list({a['url']:a for a in assets}.values())
         records.append(record)
     for row in supplement.get('communityProfiles',[]):
-        records.append(external_record('character','NTE_ReferenceCommunityProfile',row['ownerId'],{'levels':row['levels'],'gifts':row['gifts']},row['url'],row['ownerId'],provider='Neverness.app'))
+        records.append(external_record('character','NTE_ReferenceCommunityProfile',row['ownerId'],{'levels':row['levels'],'gifts':row['gifts'],'phases':row.get('phases',[])},row['url'],row['ownerId'],provider='Neverness.app'))
 
 # Keep the StringTable key, its owning character and the exact referring field.
 # Shared headings remain shared; unique biography/wardrobe lines gain an owner.
@@ -233,7 +259,7 @@ references={}
 def collect_references(value, record, field=''):
     if isinstance(value,dict):
         namespace=value.get('Namespace') or value.get('TableId','').split('.')[-1]
-        if namespace and value.get('Key'):
+        if value.get('Key') and ('Namespace' in value or value.get('TableId')):
             key=namespace+'::'+value['Key']
             entry=references.setdefault(key,{'owners':set(),'fields':[],'count':0})
             if record['ownerId']:entry['owners'].add(record['ownerId'])
@@ -272,6 +298,7 @@ with (content/'chunks.jsonl.gz').open('wb') as raw, gzip.GzipFile(filename='',mo
         stream.write(compact({'id':chunk_id,'kind':rows[0]['kind'],'records':rows,'search':' '.join(r['search'] for r in rows),'hash':digest(payload),'count':len(rows)})+'\n')
 report={'formatVersion':2,'locales':['ru','en','ja','zh'],'localizationKeys':len(translations),'records':len(records),'kinds':dict(Counter(r['kind'] for r in records)),'textures':len(images),'extractionErrors':manifest['failures'],'imageErrors':image_errors,'audioErrors':audio_errors,'emptyTables':sorted(set(empty)),'source':'Local installed game archives including PatchPaks; original strings preserved','datasetSha256':dataset_hash.hexdigest()}
 report['chunks']=len(chunks)
+report['repairedCsvRows']=dict(csv_repairs)
 if supplement:report['supplement']={'providers':['Nanoka','Kaiden','Neverness.app'],'version':supplement['version'],'checkedAt':supplement['checkedAt'],'characters':len(supplement['characters']),'items':len(supplement['items']),'weapons':len(supplement['weapons']),'affinity':len(supplement.get('affinity',[])),'gifts':len(supplement.get('giftCatalog',{})),'failures':supplement['failures']}
 report['chunksSha256']=hashlib.sha256((content/'chunks.jsonl.gz').read_bytes()).hexdigest()
 (content/'manifest.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')

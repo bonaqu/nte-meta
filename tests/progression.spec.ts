@@ -11,7 +11,14 @@ const data: ProgressionData = {
       kind: 'character',
       name: 'Хатор',
       originalName: 'Hathor',
-      stages: [{ level: '30', items_id: ['mat', 'gold'], amount: [5, 25000] }],
+      stages: [
+        {
+          level: '30',
+          fromLevel: 20,
+          items_id: ['mat', 'gold'],
+          amount: [5, 25000],
+        },
+      ],
     },
     {
       id: 'arc',
@@ -24,17 +31,17 @@ const data: ProgressionData = {
   ],
   items: {
     mat: { name: 'Материал', iconUrl: '' },
-    gold: { name: 'Фонсы', iconUrl: '' },
+    gold: { name: 'Жук-монета', iconUrl: '' },
     exp: { name: 'Опыт персонажа', iconUrl: '' },
     dye: { name: 'Краска', iconUrl: '' },
   },
   characterExp: [
-    { level: 30, exp: 2500 },
-    { level: 31, exp: 3000 },
+    { level: 20, exp: 2500 },
+    { level: 21, exp: 3000 },
   ],
-  arcExp: [{ key: 'upgrade_pack_Fork_rank5_1_31', exp: 1200 }],
+  arcExp: [{ key: 'upgrade_pack_Fork_rank5_1_21', exp: 1200 }],
   experienceItems: [
-    { id: 'exp', kind: 'character', experience: 1000 },
+    { id: 'exp', kind: 'character', experience: 1000, currencyCost: 250 },
     { id: 'dye', kind: 'arc', experience: 500 },
   ],
 };
@@ -42,8 +49,8 @@ test('границы возвышения, опыт персонажа/дуги,
   const r = calculateProgression(
     data,
     data.costs[0],
-    30,
-    32,
+    20,
+    22,
     false,
     { mat: 2, exp: 4 },
     'exp',
@@ -58,19 +65,23 @@ test('границы возвышения, опыт персонажа/дуги,
     needed: 2,
     excess: 500,
   });
+  expect(r.materials).toContainEqual(
+    expect.objectContaining({ id: 'gold', amount: 26500 }),
+  );
+  expect(r.experienceCurrencyKnown).toBe(true);
   expect(
-    calculateProgression(data, data.costs[0], 30, 31, true).materials,
+    calculateProgression(data, data.costs[0], 20, 21, true).materials,
   ).toEqual([]);
   expect(
     calculateProgression(data, data.costs[0], 30, 30, false).experience,
   ).toBe(0);
   expect(
-    calculateProgression(data, data.costs[1], 30, 31, false, {}, 'dye')
+    calculateProgression(data, data.costs[1], 20, 21, false, {}, 'dye')
       .experienceMaterial,
   ).toMatchObject({ amount: 3, excess: 300 });
   expect(
-    calculateProgression(data, data.costs[1], 30, 32, false).missingLevels,
-  ).toEqual([31]);
+    calculateProgression(data, data.costs[1], 20, 22, false).missingLevels,
+  ).toEqual([21]);
   expect(() =>
     calculateProgression(data, data.costs[0], 32, 30, false),
   ).toThrow('целевой');
@@ -86,8 +97,8 @@ test('калькулятор в профиле: выбор диапазона, �
   await calculator
     .getByText('Калькулятор прокачки персонажа и дуги', { exact: true })
     .click();
-  await calculator.getByLabel('С уровня', { exact: true }).fill('30');
-  await calculator.getByLabel('До уровня', { exact: true }).fill('32');
+  await calculator.getByLabel('С уровня', { exact: true }).fill('20');
+  await calculator.getByLabel('До уровня', { exact: true }).fill('22');
   await expect(calculator.getByLabel('Персонаж или дуга')).toHaveValue('1025');
   await expect(
     calculator.locator('.progression-calculator__experience'),
@@ -115,7 +126,7 @@ test('калькулятор в профиле: выбор диапазона, �
     }
   }
   await calculator.getByLabel('Что прокачиваем').selectOption('arc');
-  await calculator.getByLabel('До уровня', { exact: true }).fill('31');
+  await calculator.getByLabel('До уровня', { exact: true }).fill('21');
   await expect(calculator.getByLabel('Предмет опыта')).toContainText('Краска');
   await expect(
     calculator.locator('.progression-calculator__experience'),

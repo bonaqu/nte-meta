@@ -7,13 +7,28 @@ const apiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 // their resolution here covers cards, heroes, teams and editorial previews.
 const bundledPortraits: Record<string, string> = {
   Адлер: 'Adler.webp',
+  'Аканэ Рин': 'akane.webp',
   Аурелия: 'Aurelia.png',
+  Байканг: 'Baicang.webp',
+  Блэкбёрд: 'blackbird.webp',
   Даффодил: 'Daffodill.webp',
+  Занку: 'zankou.webp',
+  Ирой: 'iroi.webp',
+  Лакримоза: 'Lacrimosa.webp',
+  Линко: 'linko.webp',
   Минт: 'Mint.webp',
   Наналли: 'Nanally.webp',
   Сакири: 'Sakiri.webp',
+  Ския: 'Skia.webp',
+  Фадия: 'Fadia.webp',
+  Ханиэль: 'Haniel.webp',
+  Хаос: 'Chaos.png',
+  Хатор: 'Hathor.png',
   Хотори: 'Hotori.webp',
+  Цзююань: 'Jiuyuan.webp',
+  Чиз: 'Chiz.webp',
   Шинку: 'Shinku.webp',
+  Эдгар: 'Edgar.webp',
 };
 
 const currentPortraits: Record<string, string> = {
@@ -44,14 +59,18 @@ function resolveBundledPortrait(value: string) {
       url.hostname === 'static.wikia.nocookie.net' &&
       url.pathname.startsWith('/neverness-to-everness/images/')
     ) {
-      const file = decodeURIComponent(url.pathname.split('/')[5] || '');
+      const normalizeFile = (file: string) =>
+        file.replaceAll(' ', '_').toLowerCase();
+      const file = normalizeFile(
+        decodeURIComponent(url.pathname.split('/')[5] || ''),
+      );
       for (const [name, asset] of Object.entries(bundledPortraits)) {
         if (
           [
             `${name}_Иконка.png`,
             `СплэшАрт_${name}.webp`,
             `${name}_Представление.jpg`,
-          ].includes(file)
+          ].some((name) => normalizeFile(name) === file)
         ) {
           return `assets/characters/${asset}`;
         }

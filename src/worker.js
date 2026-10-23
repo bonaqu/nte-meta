@@ -11353,21 +11353,10 @@ async function handleCharacterImportLookup(request, env) {
       env,
       sourceResults.flatMap((source) => source.suggestions),
     );
-    const suggestions = dedupeImportSuggestions(
-      enrichCharacterImportSuggestions(
-        sourceResults.flatMap((source) => source.suggestions),
-        importCharacter,
-      ),
+    const { suggestions, fields } = prepareCharacterImportProposal(
+      sourceResults,
+      importCharacter,
     );
-    const fields = {};
-    for (const suggestion of suggestions) {
-      if (
-        !suggestion.field.startsWith('guide.') &&
-        fields[suggestion.field] === undefined
-      ) {
-        fields[suggestion.field] = suggestion.value;
-      }
-    }
     return json({
       data: {
         found: suggestions.length > 0,
@@ -11395,6 +11384,32 @@ async function handleCharacterImportLookup(request, env) {
       },
     });
   });
+}
+
+function prepareCharacterImportProposal(sources, character) {
+  const isVariant = (source) => /^local-installed-game-\d+$/.test(source.id);
+  const primary = dedupeImportSuggestions(
+    enrichCharacterImportSuggestions(
+      sources
+        .filter((source) => !isVariant(source))
+        .flatMap((source) => source.suggestions),
+      character,
+    ),
+  );
+  const fields = {};
+  for (const suggestion of primary)
+    if (
+      !suggestion.field.startsWith('guide.') &&
+      fields[suggestion.field] === undefined
+    )
+      fields[suggestion.field] = suggestion.value;
+  return {
+    suggestions: [
+      ...primary,
+      ...sources.filter(isVariant).flatMap((source) => source.suggestions),
+    ],
+    fields,
+  };
 }
 
 async function handleGuideImportLookup(request, env) {
@@ -14271,11 +14286,33 @@ async function buildLocalGameCharacterSource(env, character) {
     (r) => r.namespace === 'NTE_ReferenceCharacter',
   );
   const supplement = supplementRecord?.details;
+  const abilityMenu = Array.isArray(supplement?.abilityMenu)
+    ? supplement.abilityMenu
+    : [];
+  const menuIds = new Set(
+    abilityMenu.map((row) => String(row.id).toLowerCase()),
+  );
+  const missingIds = [...menuIds].filter(
+    (id) => !records.some((row) => row.gameId.toLowerCase() === id),
+  );
+  if (missingIds.length) {
+    const shared = await env.DB.prepare(
+      GAME_RECORD_SELECT +
+        " WHERE json_extract(e.value,'$.namespace') IN ('DT_GameplayAbilityTipsData','DT_CharacterAbilityCityGroupConfig') AND lower(json_extract(e.value,'$.gameId')) IN (SELECT value FROM json_each(?))",
+    )
+      .bind(JSON.stringify(missingIds))
+      .all();
+    records.push(...(shared.results || []).map((row) => gameRecordView(row)));
+  }
   const affinityRecord = records.find(
     (r) => r.namespace === 'NTE_ReferenceAffinity',
   );
   const communityRecord = records.find(
     (r) => r.namespace === 'NTE_ReferenceCommunityProfile',
+  );
+  const breakthrough = gameProgressionStages(
+    supplement?.breakthrough || [],
+    communityRecord?.details.phases || [],
   );
   const referenceSource = (record) => ({
     ...source,
@@ -14296,7 +14333,10 @@ async function buildLocalGameCharacterSource(env, character) {
       }));
   const materialIds = [
     ...new Set([
-      ...(supplement?.breakthrough || []).flatMap((row) => row.items_id || []),
+      ...breakthrough.flatMap((row) => [
+        ...(row.items_id || []),
+        ...(row.cost_gold ? ['gold'] : []),
+      ]),
       ...preferred.map((row) => row.item_id),
     ]),
   ];
@@ -14317,8 +14357,12 @@ async function buildLocalGameCharacterSource(env, character) {
   const refs = new Set();
   function collect(value) {
     if (!value || typeof value !== 'object') return;
-    if (value.TableId && value.Key)
-      refs.add(value.TableId.split('.').at(-1) + '::' + value.Key);
+    if (value.Key && (value.TableId || value.Namespace !== undefined))
+      refs.add(
+        (value.Namespace ?? value.TableId?.split('.').at(-1) ?? '') +
+          '::' +
+          value.Key,
+      );
     for (const child of Object.values(value)) collect(child);
   }
   for (const record of records) collect(record.details);
@@ -14347,7 +14391,11 @@ async function buildLocalGameCharacterSource(env, character) {
     if (value.CultureInvariantString)
       return plain(value.CultureInvariantString);
     return plain(
-      dictionary.get(value.TableId?.split('.').at(-1) + '::' + value.Key) || '',
+      dictionary.get(
+        (value.Namespace ?? value.TableId?.split('.').at(-1) ?? '') +
+          '::' +
+          value.Key,
+      ) || '',
     );
   }
   function add(field, label, value, provenance = source) {
@@ -14355,9 +14403,9 @@ async function buildLocalGameCharacterSource(env, character) {
     if (item) source.suggestions.push(item);
   }
   const itemName = (id) =>
-    id === 'gold'
-      ? 'Фонсы'
-      : itemMap.get(id)?.values.ru || itemMap.get(id)?.values.en || id;
+    itemMap.get(id)?.values.ru ||
+    itemMap.get(id)?.values.en ||
+    (id === 'gold' ? 'Жук-монета' : id);
   const itemIcon = (id) => itemMap.get(id)?.assets[0]?.url || '';
   if (preferred.length)
     add(
@@ -14377,14 +14425,16 @@ async function buildLocalGameCharacterSource(env, character) {
           : communityRecord,
       ),
     );
-  if (supplement?.breakthrough?.length) {
+  if (breakthrough.length) {
     const totals = new Map();
-    for (const stage of supplement.breakthrough)
-      for (let i = 0; i < (stage.items_id || []).length; i++) {
-        const id = stage.items_id[i];
+    for (const stage of breakthrough)
+      for (const [id, amount] of [
+        ...stage.items_id.map((id, index) => [id, stage.amount[index]]),
+        ...(stage.cost_gold ? [['gold', stage.cost_gold]] : []),
+      ]) {
         const current = totals.get(id) || { total: 0, levels: [] };
-        current.total += Number(stage.amount?.[i]) || 0;
-        current.levels.push(`${stage.level}: ${stage.amount?.[i]}`);
+        current.total += Number(amount) || 0;
+        current.levels.push(`${stage.fromLevel} → ${stage.level}: ${amount}`);
         totals.set(id, current);
       }
     add(
@@ -14397,7 +14447,11 @@ async function buildLocalGameCharacterSource(env, character) {
         amount: String(data.total),
         source: `Уровень возвышения → количество: ${data.levels.join(' · ')}`,
       })),
-      referenceSource(supplementRecord),
+      referenceSource(
+        communityRecord?.details.phases?.length
+          ? communityRecord
+          : supplementRecord,
+      ),
     );
   }
   if (friendshipLevels.length)
@@ -14596,6 +14650,7 @@ async function buildLocalGameCharacterSource(env, character) {
   const structuredSkills = records.filter(
     (r) =>
       r.namespace === 'DT_GameplayAbilityTipsData' &&
+      (!abilityMenu.length || menuIds.has(r.gameId.toLowerCase())) &&
       Array.isArray(r.details.AbilityDescription),
   );
   const numberText = (n) => String(Number(n.toFixed(4)));
@@ -14699,17 +14754,22 @@ async function buildLocalGameCharacterSource(env, character) {
       abilities.push({
         id: record.gameId,
         name: ru(data.Name),
-        type: /passive|pas\d/i.test(record.gameId)
-          ? 'Пассивный навык'
-          : /ultra|ultimate/i.test(record.gameId)
-            ? 'Сверхспособность'
-            : /qte/i.test(record.gameId)
-              ? 'Навык поддержки'
-              : /melee/i.test(record.gameId)
-                ? 'Базовая атака'
-                : /proskill/i.test(record.gameId)
-                  ? 'Особенность персонажа'
-                  : 'Навык перенаправления',
+        type:
+          abilityMenu.find(
+            (row) => row.id.toLowerCase() === record.gameId.toLowerCase(),
+          )?.type === 'peculiarity'
+            ? 'Особенность персонажа'
+            : /passive|pas\d/i.test(record.gameId)
+              ? 'Пассивный навык'
+              : /ultra|ultimate/i.test(record.gameId)
+                ? 'Сверхспособность'
+                : /qte/i.test(record.gameId)
+                  ? 'Навык поддержки'
+                  : /melee/i.test(record.gameId)
+                    ? 'Базовая атака'
+                    : /proskill/i.test(record.gameId)
+                      ? 'Особенность персонажа'
+                      : 'Навык перенаправления',
         iconUrl: assetUrl(record, data.icon),
         description: description.slice(0, 8000),
         attributes,
@@ -14717,7 +14777,10 @@ async function buildLocalGameCharacterSource(env, character) {
     }
   }
   for (const record of records.filter(
-    (r) => r.namespace === 'DT_CharacterAbilityCityGroupConfig',
+    (r) =>
+      r.namespace === 'DT_CharacterAbilityCityGroupConfig' &&
+      (!abilityMenu.some((row) => row.type === 'city') ||
+        menuIds.has(r.gameId.toLowerCase())),
   )) {
     const data = record.details;
     const attributes = (data.AbilityCityAttributeArray || [])
@@ -14821,12 +14884,19 @@ async function buildLocalGameCharacterSource(env, character) {
     .filter(
       (r) =>
         r.kind === 'wardrobe' &&
-        r.details?.AppearanceType === 'EAppearanceType::Fashion',
+        (r.details?.AppearanceType === 'EAppearanceType::Fashion' ||
+          r.namespace === 'NTE_ReferenceFashion'),
     )
     .map((r) => ({
       id: r.gameId,
-      name: ru(r.details.Name),
-      description: ru(r.details.Desc),
+      name:
+        r.namespace === 'NTE_ReferenceFashion'
+          ? r.values.ru || ''
+          : ru(r.details.Name),
+      description:
+        r.namespace === 'NTE_ReferenceFashion'
+          ? plain(r.details.localizedDescription?.ru || '')
+          : ru(r.details.Desc),
       imageUrl:
         assetUrl(r, r.details.PortraitImg) ||
         assetUrl(r, r.details.DisplayIcon) ||
@@ -14901,11 +14971,63 @@ async function getGameDataRow(env, id) {
     .bind(chunk, id)
     .first();
 }
+function gameProgressionStages(stages, phases = []) {
+  if (phases.length > 1) {
+    const sorted = [...phases].sort((a, b) => a.maxLevel - b.maxLevel);
+    return sorted.slice(1).map((phase, index) => ({
+      level: String(phase.maxLevel),
+      fromLevel: Number(sorted[index].maxLevel),
+      items_id: (phase.materials || []).map((item) => item.itemId),
+      amount: (phase.materials || []).map((item) => item.quantity),
+      cost_gold: Number(phase.goldCost) || 0,
+    }));
+  }
+  return [...stages]
+    .sort((a, b) => Number(a.level) - Number(b.level))
+    .map((stage, index, array) => ({
+      ...stage,
+      fromLevel: index ? Number(array[index - 1].level) : 20,
+    }));
+}
+
 async function handleGameData(request, env, parts) {
   if (parts[1] === 'progression' && request.method === 'GET') {
+    const cache = globalThis.caches?.default;
+    let cacheRequest;
+    if (cache) {
+      const latest = await env.DB.prepare(
+        'SELECT dataset_hash,status FROM game_import_runs ORDER BY updated_at DESC LIMIT 1',
+      ).first();
+      if (latest && latest.status !== 'complete')
+        throwHttp(
+          'Справочник прокачки обновляется. Повторите загрузку позже.',
+          503,
+        );
+      const edits = await env.DB.prepare(
+        'SELECT id,revision,updated_at FROM game_record_overrides ORDER BY id',
+      ).all();
+      const digest = await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(
+          JSON.stringify([latest?.dataset_hash, edits.results || []]),
+        ),
+      );
+      const version = Array.from(new Uint8Array(digest), (byte) =>
+        byte.toString(16).padStart(2, '0'),
+      ).join('');
+      const cacheUrl = new URL(request.url);
+      cacheUrl.searchParams.set('__reference', 'progression-v2-' + version);
+      cacheRequest = new globalThis.Request(cacheUrl.toString());
+      const hit = await cache.match(cacheRequest).catch(() => null);
+      if (hit) {
+        const response = new Response(hit.body, hit);
+        response.headers.set('Cache-Control', 'no-store');
+        return response;
+      }
+    }
     const rows = await env.DB.prepare(
       GAME_RECORD_SELECT +
-        " WHERE json_extract(e.value,'$.namespace') IN ('NTE_ReferenceCharacter','NTE_ReferenceWeapon','DT_CharacterUpgradeDataTable','DT_ForkUpgradeData','DT_DefaultAppearanceData')",
+        " WHERE json_extract(e.value,'$.namespace') IN ('NTE_ReferenceCharacter','NTE_ReferenceCommunityProfile','NTE_ReferenceWeapon','DT_CharacterUpgradeDataTable','DT_ForkUpgradeData','DT_DefaultAppearanceData')",
     ).all();
     const records = (rows.results || []).map((row) => gameRecordView(row));
     const variantLabel = (id) => {
@@ -14936,8 +15058,22 @@ async function handleGameData(request, env, parts) {
             : ''),
         originalName: row.values.en || '',
         rarity: row.details.rarity,
-        stages: row.details.breakthrough || row.details.materials || [],
+        stages: gameProgressionStages(
+          row.details.breakthrough || row.details.materials || [],
+          row.namespace === 'NTE_ReferenceCharacter'
+            ? records.find(
+                (record) =>
+                  record.namespace === 'NTE_ReferenceCommunityProfile' &&
+                  record.ownerId === row.ownerId,
+              )?.details.phases || []
+            : [],
+        ),
       }));
+    if (!costs.length)
+      throwHttp(
+        'Таблицы прокачки ещё не подготовлены. Повторите загрузку после импорта справочника.',
+        503,
+      );
     const experienceIds = [
       'CharacterUpMaterial_lv1',
       'CharacterUpMaterial_lv2',
@@ -14948,6 +15084,7 @@ async function handleGameData(request, env, parts) {
     ];
     const ids = [
       ...new Set([
+        'gold',
         ...experienceIds,
         ...costs.flatMap((row) =>
           row.stages.flatMap((stage) => stage.items_id || []),
@@ -14962,7 +15099,7 @@ async function handleGameData(request, env, parts) {
           .bind(JSON.stringify(ids))
           .all()
       : { results: [] };
-    const items = { gold: { name: 'Фонсы', iconUrl: '' } };
+    const items = { gold: { name: 'Жук-монета', iconUrl: '' } };
     const experienceItems = [];
     for (const raw of itemRows.results || []) {
       const row = gameRecordView(raw);
@@ -14983,6 +15120,7 @@ async function handleGameData(request, env, parts) {
             id: row.gameId,
             kind: row.gameId.startsWith('Character') ? 'character' : 'arc',
             experience: Number(match[1].replaceAll(',', '')),
+            currencyCost: row.details.upgradeUsage?.currencyCost,
           });
       }
     }
@@ -14995,9 +15133,20 @@ async function handleGameData(request, env, parts) {
     const arcExp = records
       .filter((row) => row.namespace === 'DT_ForkUpgradeData')
       .map((row) => ({ key: row.gameId, exp: row.details.NeedExp }));
-    return json({
+    const response = json({
       data: { costs, items, characterExp, arcExp, experienceItems },
     });
+    if (cache && cacheRequest) {
+      const copy = response.clone();
+      copy.headers.set('Cache-Control', 'public, max-age=86400');
+      try {
+        await cache.put(cacheRequest, copy);
+      } catch {
+        /* Cache availability must not block the calculator. */
+      }
+    }
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
   }
   if (parts[1] === 'localize' && request.method === 'POST') {
     await requireRole(request, env, CONTENT_ROLE);

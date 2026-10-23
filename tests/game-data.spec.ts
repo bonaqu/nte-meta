@@ -3,6 +3,10 @@ import { readFile } from 'node:fs/promises';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import vm from 'node:vm';
 import type { GameDataRecord } from '../src/lib/api';
+import {
+  calculateProgression,
+  type ProgressionData,
+} from '../src/lib/progression';
 
 type SourceRecord = GameDataRecord & {
   sourceHash: string;
@@ -15,6 +19,7 @@ async function fixture() {
   ) as SourceRecord[];
 }
 async function contract(records: SourceRecord[]) {
+  const stats = { heavyReads: 0 };
   const db = new DatabaseSync(':memory:');
   db.exec(await readFile('migrations/0036_local_game_reference.sql', 'utf8'));
   db.exec('CREATE TABLE characters(name TEXT,original_name TEXT)');
@@ -40,6 +45,7 @@ async function contract(records: SourceRecord[]) {
   const env = {
     DB: {
       prepare(sql: string) {
+        if (sql.includes('json_each(c.records_json)')) stats.heavyReads++;
         let args: SQLInputValue[] = [];
         return {
           bind(...values: SQLInputValue[]) {
@@ -82,7 +88,7 @@ async function contract(records: SourceRecord[]) {
       'export default {',
       'const worker={',
     ) +
-      '\ngetAuthUser=async()=>globalThis.testUser;logAudit=async()=>{};globalThis.contracts={handleGameData,gameTermReplacements,translateCandidate,buildLocalGameCharacterSource,localizeGameImportSuggestions,normalizeCharacterProfile};',
+      '\ngetAuthUser=async()=>globalThis.testUser;logAudit=async()=>{};globalThis.contracts={handleGameData,gameTermReplacements,translateCandidate,buildLocalGameCharacterSource,localizeGameImportSuggestions,normalizeCharacterProfile,prepareCharacterImportProposal};',
   ).runInContext(context);
   const m = context.contracts as {
     handleGameData: (r: Request, e: object, p: string[]) => Promise<Response>;
@@ -112,6 +118,13 @@ async function contract(records: SourceRecord[]) {
       abilities: unknown[];
       friendship: unknown[];
     };
+    prepareCharacterImportProposal: (
+      sources: object[],
+      character: object,
+    ) => {
+      suggestions: Array<{ sourceId: string; field: string; value: string }>;
+      fields: Record<string, string>;
+    };
   };
   context.testUser = { id: 'owner', role: 'owner' };
   async function api(path: string, body?: object) {
@@ -129,7 +142,7 @@ async function contract(records: SourceRecord[]) {
       ['game-data', path.split('?')[0]],
     );
   }
-  return { db, env, m, context, insert, api };
+  return { db, env, m, context, insert, api, stats };
 }
 
 test('локальные данные: четыре языка, сохранение, поиск, перевод, конфликт и повторный импорт', async () => {
@@ -349,6 +362,28 @@ test('варианты Зеро доступны отдельно; общие д
         ].includes(row.field),
       ),
     ).toBe(false);
+    const proposal = f.m.prepareCharacterImportProposal(
+      [
+        { ...source, id: 'local-installed-game' },
+        ...source.variants!.map((variant, index) => ({
+          ...variant,
+          id: `local-installed-game-${index === 0 ? '1046' : '1051'}`,
+        })),
+      ],
+      { originalName: 'Esper Zero' },
+    );
+    const commonAbilities = JSON.parse(
+      source.suggestions.find((row) => row.field === 'profile.abilities')!
+        .value,
+    );
+    expect(JSON.parse(proposal.fields['profile.abilities'])).toHaveLength(
+      commonAbilities.length,
+    );
+    expect(
+      proposal.suggestions.filter((row) => row.field === 'profile.abilities')
+        .length,
+    ).toBeGreaterThanOrEqual(3);
+    expect(proposal.fields['profile.skins']).toBeUndefined();
     const progression = (await (await f.api('progression')).json()).data;
     expect(
       progression.costs.find((row: { id: string }) => row.id === '1046').name,
@@ -388,7 +423,12 @@ test('нативный профиль Хатор: исходные статы, �
     }>;
     expect(
       abilities.filter((item) => item.type === 'Городской пассивный навык'),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
+    expect(abilities).toHaveLength(8);
+    expect(abilities.some((row) => row.id === 'GA_Hathor_Skill2')).toBe(false);
+    expect(
+      abilities.find((row) => row.id === 'GA_Hathor_Passive_3')?.type,
+    ).toBe('Черта персонажа');
     expect(new Set(abilities.map((item) => item.id)).size).toBe(
       abilities.length,
     );
@@ -444,6 +484,94 @@ test('нативный профиль Хатор: исходные статы, �
       expect.objectContaining({ id: '1025', kind: 'character' }),
     );
     expect(progression.data.experienceItems).toHaveLength(6);
+    const data = progression.data as ProgressionData;
+    const option = data.costs.find((row) => row.id === '1025')!;
+    expect(option.stages[0]).toMatchObject({ fromLevel: 20, level: '30' });
+    expect(option.stages.at(-1)).toMatchObject({ fromLevel: 70, level: '80' });
+    const full = calculateProgression(data, option, 1, 80, false);
+    expect(full.experience).toBe(6171460);
+    expect(full.missingLevels).toEqual([]);
+    expect(full.materials.find((row) => row.id === 'gold')).toMatchObject({
+      name: 'Жук-монета',
+      amount: 525000,
+    });
+    expect(
+      full.materials.find((row) => row.id === 'Worldboss_material_06')?.amount,
+    ).toBe(86);
+    const withBooks = calculateProgression(
+      data,
+      option,
+      1,
+      80,
+      false,
+      {},
+      'CharacterUpMaterial_lv1',
+    );
+    expect(withBooks.materials.find((row) => row.id === 'gold')?.amount).toBe(
+      2068000,
+    );
+    expect(
+      calculateProgression(data, option, 20, 21, false).materials.find(
+        (row) => row.id === 'gold',
+      )?.amount,
+    ).toBe(25000);
+    expect(
+      calculateProgression(data, option, 70, 71, false).materials.find(
+        (row) => row.id === 'gold',
+      )?.amount,
+    ).toBe(150000);
+  } finally {
+    f.db.close();
+  }
+});
+
+test('кэш калькулятора исключает повторное чтение корпуса и обновляется после ручной правки', async () => {
+  const records = JSON.parse(
+    await readFile('tests/fixtures/game-data-native-hathor.json', 'utf8'),
+  ) as SourceRecord[];
+  const f = await contract(records);
+  const cache = new Map<string, Response>();
+  f.context.caches = {
+    default: {
+      async match(request: Request) {
+        return cache.get(request.url)?.clone();
+      },
+      async put(request: Request, response: Response) {
+        cache.set(request.url, response.clone());
+      },
+    },
+  };
+  try {
+    const first = await f.api('progression');
+    expect(first.headers.get('Cache-Control')).toBe('no-store');
+    const reads = f.stats.heavyReads;
+    expect(reads).toBeGreaterThan(0);
+    await f.api('progression');
+    expect(f.stats.heavyReads).toBe(reads);
+    const gold = records.find(
+      (row) =>
+        row.namespace === 'NTE_ReferenceCurrency' && row.gameId === 'gold',
+    )!;
+    const row = (
+      await (await f.api('record?id=' + encodeURIComponent(gold.id))).json()
+    ).data;
+    await f.api('record', {
+      id: gold.id,
+      revision: row.revision,
+      overrides: { values: { ru: 'Жук-монета вручную' } },
+    });
+    const after = (await (await f.api('progression')).json()).data;
+    expect(after.items.gold.name).toBe('Жук-монета вручную');
+    const refreshed = f.stats.heavyReads;
+    await f.api('progression');
+    expect(f.stats.heavyReads).toBe(refreshed);
+    f.db
+      .prepare(
+        "INSERT INTO game_import_runs(dataset_hash,status) VALUES('new-dataset','complete')",
+      )
+      .run();
+    await f.api('progression');
+    expect(f.stats.heavyReads).toBeGreaterThan(refreshed);
   } finally {
     f.db.close();
   }

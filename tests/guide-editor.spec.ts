@@ -275,6 +275,12 @@ test('визуальная дуга: поиск, загрузка файла, с
   ).toHaveAttribute('src', /e7404c0c82eef53a2290\.webp$/);
   for (const width of [360, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
+    for (const name of ['Параметры', 'Секции', 'Отряды', 'Источники'])
+      await expect(
+        dialog
+          .getByRole('navigation', { name: 'Разделы редактора гайда' })
+          .getByRole('button', { name, exact: true }),
+      ).toBeInViewport();
     expect(
       await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth + 1),
       `editor at ${width}`,

@@ -259,7 +259,7 @@ export function GuideVisualEditor({
             ) : null}
           </summary>
           <fieldset>
-            <legend>
+            <legend className="sr-only">
               {value.kind === 'rotation' ? 'Шаг' : 'Позиция'} {index + 1}
               {item.name ? ` · ${item.name}` : ''}
             </legend>

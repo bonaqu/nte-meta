@@ -9622,3 +9622,28 @@
     content-visibility: visible;
   }
 }
+@layer pages {
+  .guide-editor-nav {
+    inset-block-start: -18px;
+  }
+  @media (max-width: 760px) {
+    .guide-editor-nav {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      overflow: visible;
+    }
+    .guide-editor-nav > button {
+      min-inline-size: 0;
+    }
+    .guide-editor-workspace
+      :is(
+        .guide-admin-meta,
+        .guide-import-panel,
+        .embedded-team-editor,
+        .guide-section-workspace,
+        .editor-panel
+      ) {
+      scroll-margin-block-start: 134px;
+    }
+  }
+}

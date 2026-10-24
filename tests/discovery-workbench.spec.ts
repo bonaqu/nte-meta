@@ -17,6 +17,7 @@ test('автоперевод найденного, переход в черно�
     approved: false,
   };
   let created = false;
+  let listLoads = 0;
   let published: Record<string, unknown> | undefined;
   await page.route('**/api/auth/me', (route) =>
     route.fulfill({
@@ -36,9 +37,12 @@ test('автоперевод найденного, переход в черно�
   await page.route('**/api/sources', (route) =>
     route.fulfill({ json: { data: [] } }),
   );
-  await page.route('**/api/leaks', (route) =>
-    route.fulfill({ json: { data: created ? [...leaks, draft] : leaks } }),
-  );
+  await page.route('**/api/leaks', (route) => {
+    listLoads++;
+    return route.fulfill({
+      json: { data: created ? [...leaks, draft] : leaks },
+    });
+  });
   await page.route('**/api/leaks/workbench-draft', (route) => {
     published = route.request().postDataJSON();
     return route.fulfill({
@@ -168,9 +172,20 @@ test('автоперевод найденного, переход в черно�
     .locator('[aria-label="Фильтр очереди"]')
     .getByRole('button', { name: 'Все', exact: true })
     .click();
+  const loadsBeforeReopen = listLoads;
   await row
     .getByRole('button', { name: 'Открыть черновик', exact: true })
     .click();
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
+  expect(
+    listLoads,
+    'Уже открытый черновик не требует повторной загрузки списка',
+  ).toBe(loadsBeforeReopen);
   await expect(
     dialog.getByLabel('Редактируемый заголовок', { exact: true }),
   ).toHaveValue(draft.title);

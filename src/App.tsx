@@ -1379,6 +1379,12 @@ function HomePage({
                 canCreateLeaks={canCreateLeak}
                 draftDirty={homeEditorDirty}
                 onPromoted={async (id, destination) => {
+                  if (homeEditorItemId === id && destination !== 'leaks') {
+                    document
+                      .querySelector('.editor-shell[open] .cms-workspace')
+                      ?.scrollIntoView({ block: 'start', behavior: 'instant' });
+                    return;
+                  }
                   await refreshContent();
                   setHomeEditorItemId(id);
                   if (destination === 'leaks') setHomeEditor('leak');
@@ -1427,6 +1433,12 @@ function HomePage({
               )}
               draftDirty={homeEditorDirty}
               onPromoted={async (leakId, destination) => {
+                if (homeEditorItemId === leakId && destination !== 'news') {
+                  document
+                    .querySelector('.editor-shell[open] .cms-workspace')
+                    ?.scrollIntoView({ block: 'start', behavior: 'instant' });
+                  return;
+                }
                 await refreshContent();
                 setHomeEditorItemId(leakId);
                 if (destination === 'news') setHomeEditor('news');

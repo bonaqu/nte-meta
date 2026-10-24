@@ -9620,6 +9620,9 @@
 }
 
 @layer polish {
+  html.profile-scroll-anchored {
+    overflow-anchor: none;
+  }
   .character-appearance-picker {
     display: flex;
     flex-wrap: wrap;

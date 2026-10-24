@@ -1,5 +1,11 @@
-import { useState } from 'react';
-import { ArrowRight, Orbit, UserRound } from 'lucide-react';
+import { lazy, Suspense, useState } from 'react';
+import {
+  ArrowRight,
+  Calculator,
+  ChevronDown,
+  Orbit,
+  UserRound,
+} from 'lucide-react';
 import { loadProgressionData } from '../lib/api';
 import {
   calculateProgression,
@@ -7,6 +13,10 @@ import {
   type ProgressionData,
 } from '../lib/progression';
 import { resolveAssetUrl } from '../lib/assets';
+import { QuantityControl } from './quantity-control';
+const ItemDetails = lazy(() =>
+  import('./item-details').then((module) => ({ default: module.ItemDetails })),
+);
 
 export function ProgressionCalculator({
   name,
@@ -59,7 +69,7 @@ export function ProgressionCalculator({
         from,
         to,
         ascended,
-        owned,
+        showOwned ? owned : {},
         experienceItem?.id,
       );
     } catch (reason) {
@@ -87,7 +97,11 @@ export function ProgressionCalculator({
         if (event.currentTarget.open) void load();
       }}
     >
-      <summary>Калькулятор прокачки персонажа и дуги</summary>
+      <summary>
+        <Calculator aria-hidden="true" />
+        <span>Калькулятор прокачки персонажа и дуги</span>
+        <ChevronDown aria-hidden="true" />
+      </summary>
       {pending ? <p role="status">Загружаем таблицы прокачки…</p> : null}
       {error ? (
         <div>
@@ -216,74 +230,98 @@ export function ProgressionCalculator({
           ) : null}
           {selected ? (
             <>
-              <div className="progression-levels">
-                <label>
-                  С уровня
-                  <input
-                    type="number"
+              <div className="progression-inputs">
+                <div className="progression-levels">
+                  <QuantityControl
+                    label="С уровня"
                     min={1}
                     max={80}
                     value={from}
-                    onChange={(e) => setFrom(Number(e.target.value))}
+                    onChange={setFrom}
                   />
-                </label>
-                <ArrowRight aria-hidden="true" />
-                <label>
-                  До уровня
-                  <input
-                    type="number"
+                  <ArrowRight aria-hidden="true" />
+                  <QuantityControl
+                    label="До уровня"
                     min={1}
                     max={80}
                     value={to}
-                    onChange={(e) => setTo(Number(e.target.value))}
+                    onChange={setTo}
                   />
-                </label>
-                <p className="progression-calculator__experience">
-                  Опыт уровней
-                  <strong>
-                    {result?.experience.toLocaleString('ru-RU') || '—'}
-                  </strong>
-                </p>
-              </div>
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={ascended}
-                  onChange={(e) => setAscended(e.target.checked)}
-                />
-                Возвышение на текущем уровне уже выполнено
-              </label>
-              <fieldset className="experience-picker">
-                <legend>Предмет опыта</legend>
-                <div>
-                  {experienceItems.map((item) => (
+                  <p className="progression-calculator__experience">
+                    Опыт уровней
+                    <strong>
+                      {result?.experience.toLocaleString('ru-RU') || '—'}
+                    </strong>
+                  </p>
+                </div>
+                <div
+                  className="progression-presets"
+                  role="group"
+                  aria-label="Диапазон уровней"
+                >
+                  {[
+                    [1, 20],
+                    [20, 40],
+                    [40, 60],
+                    [60, 80],
+                    [1, 80],
+                  ].map(([start, end]) => (
                     <button
                       type="button"
-                      key={item.id}
-                      aria-pressed={experienceItem?.id === item.id}
-                      onClick={() => setExperienceItemId(item.id)}
+                      key={`${start}-${end}`}
+                      aria-pressed={from === start && to === end}
+                      onClick={() => {
+                        setFrom(start);
+                        setTo(end);
+                      }}
                     >
-                      {data.items[item.id]?.iconUrl ? (
-                        <img
-                          src={resolveAssetUrl(data.items[item.id].iconUrl)}
-                          alt=""
-                          width="64"
-                          height="64"
-                        />
-                      ) : (
-                        <Orbit aria-hidden="true" />
-                      )}
-                      <span>{data.items[item.id]?.name || item.id}</span>
-                      <small>
-                        +{item.experience.toLocaleString('ru-RU')} опыта
-                      </small>
+                      {start} → {end}
                     </button>
                   ))}
                 </div>
-              </fieldset>
-              {validation ? <p role="alert">{validation}</p> : null}
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={ascended}
+                    onChange={(e) => setAscended(e.target.checked)}
+                  />
+                  Возвышение на текущем уровне уже выполнено
+                </label>
+                <fieldset className="experience-picker">
+                  <legend>Предмет опыта</legend>
+                  <div>
+                    {experienceItems.map((item) => (
+                      <button
+                        type="button"
+                        key={item.id}
+                        aria-pressed={experienceItem?.id === item.id}
+                        onClick={() => setExperienceItemId(item.id)}
+                      >
+                        {data.items[item.id]?.iconUrl ? (
+                          <img
+                            src={resolveAssetUrl(data.items[item.id].iconUrl)}
+                            alt=""
+                            width="64"
+                            height="64"
+                          />
+                        ) : (
+                          <Orbit aria-hidden="true" />
+                        )}
+                        <span>{data.items[item.id]?.name || item.id}</span>
+                        <small>
+                          +{item.experience.toLocaleString('ru-RU')} опыта
+                        </small>
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+                {validation ? <p role="alert">{validation}</p> : null}
+              </div>
               {result ? (
-                <>
+                <section
+                  className="progression-total"
+                  aria-label="Результат расчёта"
+                >
                   {result.missingLevels.length ? (
                     <p role="status">
                       Не хватает строк опыта для уровней:{' '}
@@ -316,6 +354,16 @@ export function ProgressionCalculator({
                       ...result.materials,
                     ].map((item) => (
                       <article key={item.id}>
+                        <Suspense fallback={null}>
+                          <ItemDetails
+                            id={item.id}
+                            name={item.name}
+                            iconUrl={item.iconUrl}
+                            context="Материал развития"
+                            quantity={item.amount.toLocaleString('ru-RU')}
+                            iconOnly
+                          />
+                        </Suspense>
                         {item.iconUrl ? (
                           <img
                             src={resolveAssetUrl(item.iconUrl)}
@@ -334,7 +382,9 @@ export function ProgressionCalculator({
                               : item.id === 'gold'
                                 ? 'Жук-монеты'
                                 : 'Возвышение'}{' '}
-                            · ×{item.amount.toLocaleString('ru-RU')}
+                            {showOwned
+                              ? ` · Всего ×${item.amount.toLocaleString('ru-RU')}`
+                              : ''}
                           </p>
                           {'excess' in item &&
                           typeof item.excess === 'number' &&
@@ -346,27 +396,15 @@ export function ProgressionCalculator({
                           ) : null}
                         </div>
                         {showOwned ? (
-                          <label>
-                            <span>
-                              Уже есть
-                              <span className="sr-only">: {item.name}</span>
-                            </span>
-                            <input
-                              type="number"
-                              min={0}
-                              max={999999999}
-                              value={owned[item.id] || 0}
-                              onChange={(e) =>
-                                setOwned({
-                                  ...owned,
-                                  [item.id]: Math.max(
-                                    0,
-                                    Number(e.target.value),
-                                  ),
-                                })
-                              }
-                            />
-                          </label>
+                          <QuantityControl
+                            label={`Уже есть: ${item.name}`}
+                            min={0}
+                            sliderMax={item.amount}
+                            value={owned[item.id] || 0}
+                            onChange={(amount) =>
+                              setOwned({ ...owned, [item.id]: amount })
+                            }
+                          />
                         ) : null}
                         <output aria-label={`Нужно ещё: ${item.name}`}>
                           ×{item.needed.toLocaleString('ru-RU')}
@@ -380,7 +418,7 @@ export function ProgressionCalculator({
                       жук-монетах пока неизвестна и не включена в итог.
                     </p>
                   ) : null}
-                </>
+                </section>
               ) : null}
             </>
           ) : null}

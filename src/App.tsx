@@ -15,6 +15,7 @@ import { ProgressionCalculator } from './components/progression-calculator';
 import { ImageUploadButton } from './components/image-field';
 import { PageStepper } from './components/page-stepper';
 import { CharacterWardrobe } from './components/character-wardrobe';
+import { CharacterSectionNav } from './components/character-section-nav';
 import { CharacterAppearanceSelector } from './components/character-appearance-selector';
 import { resolveStatIcon } from './lib/native-icons';
 import {
@@ -156,6 +157,7 @@ import type {
   Character,
   CharacterAbility,
   CharacterAbilityAttribute,
+  CharacterAwakening,
   CharacterImportLookupResult,
   CharacterImportSuggestion,
   CharacterRoleIcon,
@@ -509,6 +511,7 @@ function App() {
     }
 
     init().catch((loadError: unknown) => {
+      if (!mounted) return;
       setError(formatPortalLoadError(loadError));
       setLoading(false);
     });
@@ -3049,6 +3052,173 @@ const CharacterFriendship = lazy(() =>
   })),
 );
 
+function CharacterAbilityBrowser({
+  abilities,
+}: {
+  abilities: CharacterAbility[];
+}) {
+  const primary =
+    abilities.find((ability) => /базов.*атак/i.test(ability.type)) ||
+    abilities[0];
+  const [selected, setSelected] = useState(primary?.id || '');
+  const active =
+    abilities.find((ability) => ability.id === selected) || primary;
+  const groups = [
+    'Боевые навыки',
+    'Навыки поддержки',
+    'Черты персонажа',
+    'Повседневные навыки',
+  ];
+  const category = (ability: CharacterAbility) =>
+    /город|повседнев/i.test(ability.type)
+      ? groups[3]
+      : /поддерж/i.test(ability.type)
+        ? groups[1]
+        : /черт|пассив/i.test(ability.type)
+          ? groups[2]
+          : groups[0];
+  return (
+    <div className="skill-library">
+      <div
+        className="skill-library__choices"
+        role="group"
+        aria-label="Выбор навыка"
+      >
+        {groups.map((group) => {
+          const skills = abilities.filter(
+            (ability) => category(ability) === group,
+          );
+          return skills.length ? (
+            <div className="skill-library__group" key={group}>
+              <h3>{group}</h3>
+              <div>
+                {skills.map((ability) => (
+                  <button
+                    type="button"
+                    key={ability.id}
+                    aria-pressed={active.id === ability.id}
+                    onClick={() => setSelected(ability.id)}
+                  >
+                    <span className="skill-library__icon">
+                      {ability.iconUrl ? (
+                        <img
+                          src={resolveAssetUrl(ability.iconUrl)}
+                          alt=""
+                          width="58"
+                          height="58"
+                        />
+                      ) : (
+                        <BookOpen aria-hidden="true" />
+                      )}
+                    </span>
+                    <small>{ability.type}</small>
+                    <strong>{ability.name}</strong>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null;
+        })}
+      </div>
+      <div
+        className="skill-library__detail"
+        role="region"
+        aria-label={`Навык: ${active.name}`}
+      >
+        <CharacterAbilityCard key={active.id} ability={active} defaultOpen />
+      </div>
+    </div>
+  );
+}
+
+function CharacterAwakeningBrowser({
+  awakenings,
+}: {
+  awakenings: CharacterAwakening[];
+}) {
+  const [selected, setSelected] = useState(0);
+  const effects = awakenings
+    .filter((row) => row.kind !== 'resonance')
+    .sort((a, b) => a.level - b.level);
+  const resonances = awakenings
+    .filter((row) => row.kind === 'resonance')
+    .sort((a, b) => a.level - b.level);
+  const active = effects[Math.min(selected, effects.length - 1)];
+  return (
+    <div className="awakening-browser awakening-path">
+      {effects.length ? (
+        <div
+          className="awakening-browser__choices"
+          role="group"
+          aria-label="Выбор пробуждения"
+        >
+          {effects.map((row, index) => (
+            <button
+              type="button"
+              key={`${row.level}-${row.name}`}
+              aria-label={`Пробуждение ${row.level}: ${row.name}`}
+              aria-pressed={active === row}
+              onClick={() => setSelected(index)}
+            >
+              <span>{row.level}</span>
+              {row.iconUrl ? (
+                <img
+                  src={resolveAssetUrl(row.iconUrl)}
+                  alt=""
+                  width="58"
+                  height="58"
+                  loading="lazy"
+                />
+              ) : (
+                <Star aria-hidden="true" />
+              )}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div className="awakening-browser__details">
+        {[...(active ? [active] : []), ...resonances].map((awakening) => (
+          <article
+            className={`awakening-card${awakening.kind === 'resonance' ? ' awakening-card--resonance' : ''}`}
+            key={`${awakening.level}-${awakening.name}`}
+          >
+            <span
+              className="awakening-card__level"
+              aria-label={`Уровень ${awakening.level}`}
+            >
+              {awakening.level}
+            </span>
+            <span className="awakening-card__icon" aria-hidden="true">
+              {awakening.iconUrl ? (
+                <img
+                  src={resolveAssetUrl(awakening.iconUrl)}
+                  alt=""
+                  width="58"
+                  height="58"
+                  loading="lazy"
+                />
+              ) : (
+                <Star />
+              )}
+            </span>
+            <div className="character-detail-card-copy">
+              <p className="eyebrow">
+                {awakening.kind === 'resonance'
+                  ? `Бонус за ${awakening.level} ${awakening.level === 3 ? 'пробуждения' : 'пробуждений'}`
+                  : awakening.level > 0
+                    ? `Пробуждение ${awakening.level}`
+                    : 'Без пробуждений'}
+              </p>
+              <h3>{awakening.name || `Пробуждение ${awakening.level}`}</h3>
+              <MarkdownPreview value={awakening.description} />
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CharacterBiography({ value }: { value: string }) {
   const [expanded, setExpanded] = useState(false);
   const id = useId();
@@ -3102,9 +3272,10 @@ function CharacterDetailPage({
   const [guideEditorOpen, setGuideEditorOpen] = useState(false);
   const [characterEditorDirty, setCharacterEditorDirty] = useState(false);
   const [guideEditorDirty, setGuideEditorDirty] = useState(false);
-  const [activeCharacterSection, setActiveCharacterSection] = useState(
-    'character-biography',
-  );
+  const releaseCharacterScrollAnchor = useCallback(() => {
+    characterScrollAnchor.current = null;
+    document.documentElement.classList.remove('profile-scroll-anchored');
+  }, []);
 
   const alignCharacterScrollAnchor = useCallback(() => {
     const target = characterScrollAnchor.current;
@@ -3124,64 +3295,6 @@ function CharacterDetailPage({
     },
     [],
   );
-
-  useEffect(() => {
-    const sectionIds = [
-      'character-biography',
-      'character-abilities',
-      'character-awakenings',
-      'character-progression',
-      'character-friendship',
-      'character-wardrobe',
-      'character-voice',
-    ];
-    const sections = sectionIds
-      .map((id) => document.getElementById(id))
-      .filter((section): section is HTMLElement => Boolean(section));
-    if (!sections.length) return;
-    if (!characterScrollAnchor.current?.isConnected)
-      characterScrollAnchor.current = null;
-    let frame = 0;
-    const update = () => {
-      frame = 0;
-      const navigation = document.querySelector('.character-section-nav');
-      const anchor = (navigation?.getBoundingClientRect().bottom || 120) + 100;
-      const current = sections
-        .filter((section) => section.getBoundingClientRect().top <= anchor)
-        .at(-1);
-      setActiveCharacterSection(current?.id || sectionIds[0]);
-    };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
-    const observer = new ResizeObserver(() => {
-      // Lazy sections above the selected heading can change height after a jump.
-      // Keep the heading in place until the user starts another interaction.
-      alignCharacterScrollAnchor();
-      schedule();
-    });
-    sections.forEach((section) => observer.observe(section));
-    const profilePage = document.querySelector('.character-profile-page');
-    if (profilePage) observer.observe(profilePage);
-    const releaseAnchor = () => {
-      characterScrollAnchor.current = null;
-      document.documentElement.classList.remove('profile-scroll-anchored');
-    };
-    for (const event of ['wheel', 'touchstart', 'pointerdown', 'keydown'])
-      window.addEventListener(event, releaseAnchor, { passive: true });
-    window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule);
-    schedule();
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-      releaseAnchor();
-      for (const event of ['wheel', 'touchstart', 'pointerdown', 'keydown'])
-        window.removeEventListener(event, releaseAnchor);
-      window.removeEventListener('scroll', schedule);
-      window.removeEventListener('resize', schedule);
-    };
-  }, [slug, hasWardrobe, alignCharacterScrollAnchor]);
 
   if (!character) {
     return (
@@ -3340,32 +3453,13 @@ function CharacterDetailPage({
         </div>
       </section>
 
-      <nav className="character-section-nav" aria-label="Разделы персонажа">
-        {[
-          ['character-biography', 'Биография'],
-          ['character-abilities', 'Способности'],
-          ['character-awakenings', 'Пробуждения'],
-          ['character-progression', 'Прокачка'],
-          ['character-friendship', 'Дружба'],
-          ...(hasWardrobe ? [['character-wardrobe', 'Гардероб']] : []),
-          ['character-voice', 'Озвучка'],
-        ].map(([id, label]) => (
-          <button
-            type="button"
-            key={id}
-            className={activeCharacterSection === id ? 'active' : ''}
-            aria-current={
-              activeCharacterSection === id ? 'location' : undefined
-            }
-            onClick={() => {
-              setActiveCharacterSection(id);
-              scrollToCharacterSection(id);
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+      <CharacterSectionNav
+        slug={slug}
+        hasWardrobe={hasWardrobe}
+        onSelect={scrollToCharacterSection}
+        onLayout={alignCharacterScrollAnchor}
+        onRelease={releaseCharacterScrollAnchor}
+      />
 
       <section className="character-detail-section" id="character-biography">
         <SectionHeader title="Биография" text="История персонажа" />
@@ -3407,15 +3501,7 @@ function CharacterDetailPage({
           </dl>
         ) : null}
         {abilities.length ? (
-          <div className="ability-list ability-list--profile">
-            {abilities.map((ability, index) => (
-              <CharacterAbilityCard
-                key={ability.id}
-                ability={ability}
-                defaultOpen={index === 0}
-              />
-            ))}
-          </div>
+          <CharacterAbilityBrowser key={character.id} abilities={abilities} />
         ) : (
           <EmptyState
             title="Способности уточняются"
@@ -3430,54 +3516,10 @@ function CharacterDetailPage({
           text="Эффекты пробуждений и дополнительные бонусы за 3 и 6 пробуждений."
         />
         {profile.awakenings.length ? (
-          <div className="awakening-grid awakening-path">
-            {[...profile.awakenings]
-              .sort(
-                (a, b) =>
-                  Number(a.kind === 'resonance') -
-                    Number(b.kind === 'resonance') || a.level - b.level,
-              )
-              .map((awakening) => (
-                <article
-                  className={`awakening-card${awakening.kind === 'resonance' ? ' awakening-card--resonance' : ''}`}
-                  key={`${awakening.level}-${awakening.name}`}
-                >
-                  <span
-                    className="awakening-card__level"
-                    aria-label={`Уровень ${awakening.level}`}
-                  >
-                    {awakening.level}
-                  </span>
-                  <span className="awakening-card__icon" aria-hidden="true">
-                    {awakening.iconUrl ? (
-                      <img
-                        src={resolveAssetUrl(awakening.iconUrl)}
-                        alt=""
-                        width="58"
-                        height="58"
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <Star />
-                    )}
-                  </span>
-                  <div className="character-detail-card-copy">
-                    <p className="eyebrow">
-                      {awakening.kind === 'resonance'
-                        ? `Бонус за ${awakening.level} ${awakening.level === 3 ? 'пробуждения' : 'пробуждений'}`
-                        : awakening.level > 0
-                          ? `Пробуждение ${awakening.level}`
-                          : 'Без пробуждений'}
-                    </p>
-                    <h3>
-                      {awakening.name || `Пробуждение ${awakening.level}`}
-                    </h3>
-                    <MarkdownPreview value={awakening.description} />
-                  </div>
-                </article>
-              ))}
-          </div>
+          <CharacterAwakeningBrowser
+            key={character.id}
+            awakenings={profile.awakenings}
+          />
         ) : (
           <EmptyState
             title="Пробуждения не добавлены"

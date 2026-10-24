@@ -108,8 +108,12 @@ test('калькулятор в профиле: выбор диапазона, �
   await calculator
     .getByText('Калькулятор прокачки персонажа и дуги', { exact: true })
     .click();
+  await calculator.getByLabel('С уровня', { exact: true }).dblclick();
   await calculator.getByLabel('С уровня', { exact: true }).fill('20');
+  await calculator.getByLabel('С уровня', { exact: true }).press('Enter');
+  await calculator.getByLabel('До уровня', { exact: true }).dblclick();
   await calculator.getByLabel('До уровня', { exact: true }).fill('22');
+  await calculator.getByLabel('До уровня', { exact: true }).press('Enter');
   await expect(
     calculator.getByRole('button', { name: 'Персонаж Хатор', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
@@ -118,7 +122,27 @@ test('калькулятор в профиле: выбор диапазона, �
   await expect(
     calculator.locator('.progression-calculator__experience'),
   ).toContainText('5');
+  await calculator.getByLabel('Уже есть: Материал', { exact: true }).dblclick();
   await calculator.getByLabel('Уже есть: Материал', { exact: true }).fill('2');
+  await calculator
+    .getByLabel('Уже есть: Материал', { exact: true })
+    .press('Enter');
+  await expect(
+    calculator
+      .locator('article')
+      .filter({ has: page.getByText('Материал', { exact: true }) })
+      .getByRole('status'),
+  ).toContainText('3');
+  await calculator
+    .getByLabel('Учесть мой инвентарь', { exact: true })
+    .uncheck();
+  await expect(
+    calculator
+      .locator('article')
+      .filter({ has: page.getByText('Материал', { exact: true }) })
+      .getByRole('status'),
+  ).toContainText('5');
+  await calculator.getByLabel('Учесть мой инвентарь', { exact: true }).check();
   await expect(
     calculator
       .locator('article')
@@ -143,9 +167,13 @@ test('калькулятор в профиле: выбор диапазона, �
   await calculator
     .getByRole('button', { name: 'Дуга · Плазменный Дуга', exact: true })
     .click();
+  await calculator.getByLabel('До уровня', { exact: true }).dblclick();
   await calculator.getByLabel('До уровня', { exact: true }).fill('21');
+  await calculator.getByLabel('До уровня', { exact: true }).press('Enter');
   await expect(
-    calculator.getByRole('button', { name: /Краска/ }),
+    calculator
+      .locator('.experience-picker')
+      .getByRole('button', { name: /^Краска/ }),
   ).toHaveAttribute('aria-pressed', 'true');
   await expect(
     calculator.locator('.progression-calculator__experience'),
@@ -202,7 +230,7 @@ test('профиль: совместимые дуги, настоящие пре
     .getByRole('button', { name: /Руководство восходящего охотника/ })
     .click();
   await expect(
-    calculator.getByRole('button', {
+    calculator.locator('.experience-picker').getByRole('button', {
       name: /Руководство восходящего охотника/,
     }),
   ).toHaveAttribute('aria-pressed', 'true');
@@ -258,10 +286,8 @@ test('профиль: совместимые дуги, настоящие пре
   ).toBeVisible();
   await expect(
     friendship.getByRole('button', { name: 'Награды дружбы: вперёд' }),
-  ).toBeDisabled();
-  await friendship
-    .getByRole('button', { name: 'Награды дружбы: назад' })
-    .click();
+  ).toHaveCount(0);
+  await friendship.getByRole('button', { name: /^Ур\.\s*9$/ }).click();
   await expect(
     friendship.getByRole('heading', { name: 'Уровень симпатии 9' }),
   ).toBeVisible();

@@ -107,9 +107,9 @@ test('Адлер: старые навыки, пробуждения и мате�
   for (const width of [360, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`${origin}/#/characters/adler`);
-    await expect(page.locator('.ability-card__icon img')).toHaveCount(7);
+    await expect(page.locator('.skill-library__icon img')).toHaveCount(7);
     const icons = page.locator(
-      '.ability-card__icon img, #character-awakenings img, #character-progression img, #character-friendship img',
+      '.skill-library__icon img, #character-awakenings img, #character-progression img, #character-friendship img',
     );
     await expect.poll(() => icons.count()).toBeGreaterThan(30);
     for (const image of await icons.all()) {

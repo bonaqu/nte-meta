@@ -1,4 +1,5 @@
 import { AbilityAttributesField } from '../../components/ability-attributes-field';
+import { QuantityControl } from '../../components/quantity-control';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ImageUploadButton } from '../../components/image-field';
 import {
@@ -2278,18 +2279,13 @@ export function AdminCharacterEditor({
                 update(withFriendshipRewards(item, nextRewards));
               return (
                 <>
-                  <label>
-                    Уровень
-                    <input
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={item.level}
-                      onChange={(event) =>
-                        update({ ...item, level: Number(event.target.value) })
-                      }
-                    />
-                  </label>
+                  <QuantityControl
+                    label="Уровень"
+                    min={1}
+                    max={10}
+                    value={item.level}
+                    onChange={(level) => update({ ...item, level })}
+                  />
                   <label className="wide-field">
                     Описание
                     <textarea

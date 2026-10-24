@@ -3,6 +3,12 @@ import AxeBuilder from '@axe-core/playwright';
 import { readFile, writeFile } from 'node:fs/promises';
 import type { Character, CharacterAppearanceVariant } from '../src/types';
 
+// Chromium root scrolling rounds to device pixels. A fractional section edge
+// can land exactly half a CSS pixel from the requested 150px margin.
+function expectHeadingAligned(top: number) {
+  expect(Math.abs(top - 150)).toBeLessThanOrEqual(0.5);
+}
+
 async function owner(page: Page) {
   await page.route('**/api/auth/me', (route) =>
     route.fulfill({
@@ -86,9 +92,9 @@ test('варианты гардероба и озвучки переключаю
           requestAnimationFrame(() => requestAnimationFrame(resolve)),
         ),
     );
-    expect(
+    expectHeadingAligned(
       (await page.locator('#character-abilities').boundingBox())!.y,
-    ).toBeCloseTo(150, 0);
+    );
     const skills = page.locator('#character-abilities');
     const skillVariant = skills.getByRole('group', {
       name: 'Вариант способностей',
@@ -98,6 +104,10 @@ test('варианты гардероба и озвучки переключаю
       ['Мужской вариант', '23 %'],
     ]) {
       await skillVariant.getByRole('button', { name, exact: true }).click();
+      await skills
+        .getByRole('group', { name: 'Выбор навыка' })
+        .getByRole('button', { name: 'Базовая атака Оценка', exact: true })
+        .click();
       const melee = skills.locator('.ability-card').filter({
         has: page.getByText('Оценка', { exact: true }),
       });
@@ -119,7 +129,7 @@ test('варианты гардероба и озвучки переключаю
           requestAnimationFrame(() => requestAnimationFrame(resolve)),
         ),
     );
-    expect((await wardrobe.boundingBox())!.y).toBeCloseTo(150, 0);
+    expectHeadingAligned((await wardrobe.boundingBox())!.y);
     const picker = wardrobe.getByRole('group', { name: 'Вариант гардероба' });
     await expect(
       picker.getByRole('button', { name: 'Мужской вариант', exact: true }),
@@ -419,11 +429,13 @@ test('опубликованные профили: калькулятор, бы�
       networkErrors.push(`${response.status()} ${response.url()}`);
   });
   const positions: Array<{ width: number; section: string; top: number }> = [];
+  const review = process.env.NTE_FOLLOWUP_REVIEW_DIR;
   for (const width of [360, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto(base + '#/characters/adler');
     for (const [name, id] of [
       ['Способности', 'character-abilities'],
+      ['Дружба', 'character-friendship'],
       ['Гардероб', 'character-wardrobe'],
     ]) {
       await page
@@ -438,11 +450,15 @@ test('опубликованные профили: калькулятор, бы�
       );
       const top = (await page.locator('#' + id).boundingBox())!.y;
       positions.push({ width, section: id, top });
-      expect(top).toBeCloseTo(150, 0);
+      expectHeadingAligned(top);
     }
     expect(
       (await page.locator('.skin-media').boundingBox())!.height,
     ).toBeGreaterThanOrEqual(350);
+    if (review && (width === 360 || width === 1440))
+      await page
+        .locator('.wardrobe-gallery')
+        .screenshot({ path: `${review}/wardrobe-live-${width}.png` });
     await page.locator('.skin-media').click();
     await expect(page.locator('.skin-lightbox[open]')).toBeVisible({
       timeout: 1000,
@@ -460,7 +476,18 @@ test('опубликованные профили: калькулятор, бы�
       calculator.getByRole('button', { name: /^Дуга · Гибридный/ }),
     ).toBeEnabled();
     await expect(calculator.locator('.experience-picker img')).toHaveCount(3);
-    const review = process.env.NTE_FOLLOWUP_REVIEW_DIR;
+    const targetLevel = calculator.getByRole('spinbutton', {
+      name: 'До уровня',
+      exact: true,
+    });
+    await calculator
+      .getByRole('button', { name: 'Уменьшить: До уровня', exact: true })
+      .click();
+    await expect(targetLevel).toHaveValue('79');
+    await calculator
+      .getByRole('button', { name: 'Максимум: До уровня', exact: true })
+      .click();
+    await expect(targetLevel).toHaveValue('80');
     if (review && (width === 360 || width === 1440))
       await page.screenshot({ path: `${review}/calculator-live-${width}.png` });
     await calculator.locator('summary').first().click();
@@ -471,8 +498,25 @@ test('опубликованные профили: калькулятор, бы�
     await expect(
       rewards.getByRole('heading', { name: 'Уровень симпатии 10' }),
     ).toBeVisible();
+    await expect(rewards.locator('.page-stepper')).toHaveCount(0);
     if (review && width === 1440)
       await rewards.screenshot({ path: `${review}/friendship-live.png` });
+    await rewards
+      .getByRole('button', {
+        name: 'Подробнее: Проигрыватель «Лотус C198»',
+        exact: true,
+      })
+      .hover();
+    const lotus = page.getByRole('dialog', {
+      name: 'Проигрыватель «Лотус C198»',
+      exact: true,
+    });
+    await expect(lotus).toContainText('повысить уровень комфорта');
+    if (review && (width === 360 || width === 1440))
+      await page.screenshot({ path: `${review}/lotus-live-${width}.png` });
+    await lotus
+      .getByRole('button', { name: 'Закрыть описание предмета' })
+      .click();
     const voice = page.locator('#character-voice');
     for (const name of [/Английский/, /Японский/]) {
       await voice.getByRole('tab', { name }).click();
@@ -509,6 +553,10 @@ test('опубликованные профили: калькулятор, бы�
     await skills
       .getByRole('group', { name: 'Вариант способностей' })
       .getByRole('button', { name, exact: true })
+      .click();
+    await skills
+      .getByRole('group', { name: 'Выбор навыка' })
+      .getByRole('button', { name: 'Базовая атака Оценка', exact: true })
       .click();
     const melee = skills
       .locator('.ability-card')
@@ -653,7 +701,7 @@ test('переход к гардеробу держит заголовок пр�
           requestAnimationFrame(() => requestAnimationFrame(resolve)),
         ),
     );
-    expect((await wardrobe.boundingBox())!.y).toBeCloseTo(150, 0);
+    expectHeadingAligned((await wardrobe.boundingBox())!.y);
     await expect.poll(() => requested).toBe(true);
     release();
     await expect(
@@ -665,7 +713,7 @@ test('переход к гардеробу держит заголовок пр�
           requestAnimationFrame(() => requestAnimationFrame(resolve)),
         ),
     );
-    expect((await wardrobe.boundingBox())!.y).toBeCloseTo(150, 0);
+    expectHeadingAligned((await wardrobe.boundingBox())!.y);
     await page.mouse.wheel(0, 200);
     await expect
       .poll(async () => Math.abs((await wardrobe.boundingBox())!.y - 150))

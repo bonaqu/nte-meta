@@ -86,3 +86,5 @@ process.stdout.write(
     attributes: Object.keys(attributes).length,
   }) + '\n',
 );
+const { buildItemDescriptions } = await import('./build-item-descriptions.mjs');
+await buildItemDescriptions(rows);

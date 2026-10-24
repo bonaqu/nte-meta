@@ -24,6 +24,38 @@ export function CharacterWardrobe({ skins }: { skins: CharacterSkin[] }) {
           onOpen={() => setOpened(true)}
         />
         <div className="wardrobe-gallery__copy">
+          {skins.length > 1 ? (
+            <div
+              className="wardrobe-thumbnails"
+              role="group"
+              aria-label="Выбор наряда"
+            >
+              {skins.map((item, i) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  aria-label={item.name}
+                  aria-pressed={i === activeIndex}
+                  onClick={() => setIndex(i)}
+                >
+                  {item.imageUrl ? (
+                    <img
+                      src={resolveAssetUrl(item.imageUrl)}
+                      alt=""
+                      width="80"
+                      height="96"
+                      loading="lazy"
+                      decoding="async"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <ImageIcon aria-hidden="true" />
+                  )}
+                  <span>{item.name}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
           <p className="eyebrow">Наряд</p>
           <h3>{skin.name}</h3>
           <p>{skin.description}</p>
@@ -36,38 +68,6 @@ export function CharacterWardrobe({ skins }: { skins: CharacterSkin[] }) {
           />
         </div>
       </div>
-      {skins.length > 1 ? (
-        <div
-          className="wardrobe-thumbnails"
-          role="group"
-          aria-label="Выбор наряда"
-        >
-          {skins.map((item, i) => (
-            <button
-              type="button"
-              key={item.id}
-              aria-label={item.name}
-              aria-pressed={i === activeIndex}
-              onClick={() => setIndex(i)}
-            >
-              {item.imageUrl ? (
-                <img
-                  src={resolveAssetUrl(item.imageUrl)}
-                  alt=""
-                  width="80"
-                  height="96"
-                  loading="lazy"
-                  decoding="async"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <ImageIcon aria-hidden="true" />
-              )}
-              <span>{item.name}</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
       <dialog
         ref={dialog}
         className="skin-lightbox"

@@ -166,7 +166,7 @@ test.describe('Публичный портал NTE Meta', () => {
     await page.route('**/api/characters', async (route) => {
       characterRequests += 1;
       await new Promise((resolve) => setTimeout(resolve, 250));
-      if (characterRequests > 1) {
+      if (characterRequests > 2) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -200,7 +200,7 @@ test.describe('Публичный портал NTE Meta', () => {
       page.getByRole('heading', { name: 'Персонажи Neverness to Everness' }),
     ).toBeVisible();
     await expect(page.getByText('Персонажи не найдены')).toBeVisible();
-    expect(characterRequests).toBe(2);
+    expect(characterRequests).toBe(3);
   });
 
   test('поиск персонажей ведёт в lore-профиль, а мета остаётся в гайдах', async ({

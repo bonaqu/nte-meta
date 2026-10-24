@@ -60,6 +60,37 @@ async function request<T>(
   init: RequestInit = {},
   options: { timeoutMs?: number } = {},
 ): Promise<ApiResult<T>> {
+  const timeoutMs = options.timeoutMs ?? API_REQUEST_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
+  const result = await requestOnce<T>(path, init, { timeoutMs });
+  // Retry a safe read once, within the original time budget. Never repeat a
+  // login, upload or editorial mutation after an uncertain network response.
+  const safeRead =
+    !init.method || ['GET', 'HEAD'].includes(init.method.toUpperCase());
+  if (
+    !result.ok &&
+    API_BASE &&
+    safeRead &&
+    !result.aborted &&
+    !init.signal?.aborted &&
+    [0, 408, 502, 503, 504].includes(result.status) &&
+    deadline - Date.now() > 350
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const remaining = deadline - Date.now();
+    if (init.signal?.aborted || remaining <= 0) return result;
+    return requestOnce<T>(path, init, {
+      timeoutMs: remaining,
+    });
+  }
+  return result;
+}
+
+async function requestOnce<T>(
+  path: string,
+  init: RequestInit,
+  options: { timeoutMs: number },
+): Promise<ApiResult<T>> {
   if (!API_BASE) {
     return {
       ok: false,
@@ -125,9 +156,11 @@ async function request<T>(
         ? 'Запрос отменён.'
         : timedOut
           ? 'Сервер слишком долго отвечает. Проверьте соединение и повторите попытку.'
-          : error instanceof Error
-            ? error.message
-            : 'Не удалось выполнить запрос',
+          : error instanceof TypeError
+            ? 'Не удалось связаться с сервером. Проверьте соединение и повторите попытку.'
+            : error instanceof Error
+              ? error.message
+              : 'Не удалось выполнить запрос',
       status: 0,
       aborted: abortedByCaller,
     };

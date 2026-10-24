@@ -1,4 +1,5 @@
 import { ImageField } from '../../components/image-field';
+import { QuantityControl } from '../../components/quantity-control';
 import {
   useEffect,
   useId,
@@ -363,6 +364,23 @@ function FieldControl({
       />
     );
   }
+  if (field.kind === 'number') {
+    return (
+      <div className={fieldClassName}>
+        <QuantityControl
+          id={id}
+          name={field.name}
+          label={field.label}
+          value={numberValue(values, field.name)}
+          min={field.min}
+          max={field.max}
+          disabled={disabled}
+          onChange={(value) => setValue(field.name, value)}
+        />
+        {field.help ? <small>{field.help}</small> : null}
+      </div>
+    );
+  }
   return (
     <label className={fieldClassName} htmlFor={id}>
       {field.label}
@@ -397,26 +415,15 @@ function FieldControl({
         <input
           id={id}
           name={field.name}
-          type={field.kind === 'number' ? 'number' : 'text'}
+          type="text"
           inputMode={field.kind === 'url' ? 'url' : undefined}
-          value={
-            field.kind === 'number'
-              ? numberValue(values, field.name)
-              : textValue(values, field.name)
-          }
+          value={textValue(values, field.name)}
           min={field.min}
           max={field.max}
           required={field.required}
           disabled={disabled}
           aria-describedby={describedBy}
-          onChange={(event) =>
-            setValue(
-              field.name,
-              field.kind === 'number'
-                ? Number(event.target.value)
-                : event.target.value,
-            )
-          }
+          onChange={(event) => setValue(field.name, event.target.value)}
         />
       )}
       {field.help ? <small id={describedBy}>{field.help}</small> : null}

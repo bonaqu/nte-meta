@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ImageIcon } from 'lucide-react';
+import { ArrowLeftRight, ImageIcon, Swords, TrendingUp } from 'lucide-react';
 import type { CharacterMaterial } from '../types';
 import { loadProgressionData } from '../lib/api';
 import {
@@ -8,6 +8,7 @@ import {
   type ProgressionOption,
 } from '../lib/progression';
 import { displayItemName, resolveItemIcon } from '../lib/item-icons';
+import { ItemDetails } from './item-details';
 
 export function CharacterMaterials({
   materials,
@@ -129,7 +130,18 @@ export function CharacterMaterials({
       ) : null}
       {groups.map(({ title, rows }) => (
         <section className="profile-subsection" key={title} aria-label={title}>
-          <h3>{title}</h3>
+          <h3 className="profile-subsection__title">
+            <span aria-hidden="true">
+              {title === 'Возвышение персонажа' ? (
+                <TrendingUp />
+              ) : title === 'Навыки поддержки' ? (
+                <ArrowLeftRight />
+              ) : (
+                <Swords />
+              )}
+            </span>
+            {title}
+          </h3>
           {title === 'Возвышение персонажа' && stages.length ? (
             <div
               className="ascension-stages"
@@ -158,6 +170,12 @@ export function CharacterMaterials({
           <div className="material-grid inventory-tiles">
             {rows.map((row) => (
               <article className="game-item" key={row.id}>
+                <ItemDetails
+                  id={row.id}
+                  name={displayItemName(row.name)}
+                  iconUrl={row.iconUrl}
+                  context={title}
+                />
                 {resolveItemIcon(row.name, row.iconUrl) ? (
                   <img
                     src={resolveItemIcon(row.name, row.iconUrl)}
@@ -173,8 +191,27 @@ export function CharacterMaterials({
                 )}
                 <div className="character-detail-card-copy">
                   <h4>{displayItemName(row.name)}</h4>
-                  <strong>{row.amount}</strong>
-                  {row.source ? <p>{row.source}</p> : null}
+                  <div className="material-costs">
+                    {row.amount
+                      .split(';')
+                      .filter(Boolean)
+                      .map((cost, index) => (
+                        <strong key={index}>
+                          {cost
+                            .trim()
+                            .replace(
+                              /^Материалы навыков(?: поддержки)?:\s*/i,
+                              '',
+                            )}
+                        </strong>
+                      ))}
+                  </div>
+                  {row.source &&
+                  !/^Материалы (?:навыков|поддержки|прорыва)/i.test(
+                    row.source,
+                  ) ? (
+                    <p>{row.source}</p>
+                  ) : null}
                 </div>
               </article>
             ))}

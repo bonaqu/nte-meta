@@ -1,6 +1,6 @@
 import { stripEditorialText } from '../lib/guide-visual';
 import { useLayoutEffect, useState } from 'react';
-import { PageStepper } from './page-stepper';
+import { ItemDetails } from './item-details';
 import { Star } from 'lucide-react';
 import type { CharacterProfile } from '../types';
 import { resolveItemIcon } from '../lib/item-icons';
@@ -34,6 +34,12 @@ export function CharacterFriendship({
             )
             .map((gift) => (
               <article className="game-item" key={gift.id}>
+                <ItemDetails
+                  id={gift.id}
+                  name={gift.name}
+                  iconUrl={gift.iconUrl}
+                  context={gift.effect || 'Любимый подарок'}
+                />
                 {resolveItemIcon(gift.name, gift.iconUrl) ? (
                   <img
                     src={resolveItemIcon(gift.name, gift.iconUrl)}
@@ -111,6 +117,13 @@ export function CharacterFriendship({
                       >
                         {rewards.map((reward) => (
                           <li className="game-item" key={reward.id}>
+                            <ItemDetails
+                              id={reward.id}
+                              name={reward.name || 'Награда'}
+                              iconUrl={reward.iconUrl}
+                              context="Награда за дружбу"
+                              quantity={reward.quantity}
+                            />
                             {resolveItemIcon(reward.name, reward.iconUrl) ? (
                               <img
                                 src={resolveItemIcon(
@@ -137,13 +150,6 @@ export function CharacterFriendship({
               );
             })}
           </div>
-          <PageStepper
-            label={hasRewards ? 'Награды дружбы' : 'Уровни дружбы'}
-            unit="Уровень"
-            value={activeIndex + 1}
-            total={levels.length}
-            onChange={(value) => setSelectedLevel(value - 1)}
-          />
         </div>
       ) : null}
     </>

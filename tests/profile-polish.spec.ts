@@ -114,6 +114,13 @@ test('биография, уровни навыка, гардероб и стр�
       short.length + 500,
     );
     await biography.getByRole('button', { name: 'Свернуть историю' }).click();
+    await page
+      .getByRole('group', { name: 'Выбор навыка' })
+      .getByRole('button')
+      .filter({
+        has: page.getByText(legacy.abilities[0].name, { exact: true }),
+      })
+      .click();
     const skill = page.locator('.ability-card').first();
     await skill.getByRole('tab', { name: /Атрибуты/ }).click();
     const level = skill.getByRole('group', { name: /Уровень навыка/ });

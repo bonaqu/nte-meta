@@ -11,7 +11,37 @@ export interface ProgressionOption {
   name: string;
   originalName: string;
   rarity?: number;
+  arcTypeId?: number;
+  arcType?: string;
+  iconUrl?: string;
   stages: ProgressionStage[];
+}
+export function findProfileProgression(
+  data: ProgressionData,
+  name: string,
+  originalName: string,
+  appearanceId = '',
+) {
+  const key = (text: string) =>
+    text
+      .replace(/\([^)]*\)/g, '')
+      .replace(/[^\p{L}\p{N}]/gu, '')
+      .toLowerCase()
+      .replace(/^esperzero$/, 'zero');
+  return (
+    data.costs.find(
+      (row) => row.kind === 'character' && row.id === appearanceId,
+    ) ||
+    data.costs.find(
+      (row) =>
+        row.kind === 'character' &&
+        [name, originalName].some(
+          (n) =>
+            Boolean(key(n)) &&
+            [row.name, row.originalName].some((v) => key(v) === key(n)),
+        ),
+    )
+  );
 }
 export interface ProgressionData {
   costs: ProgressionOption[];

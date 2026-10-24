@@ -17,11 +17,13 @@ import {
   saveEntity,
 } from '../../lib/api';
 import { RichTextEditor } from '../../components/rich-text-editor';
+import { AppearanceVariantsEditor } from './appearance-variants-editor';
 import { ImportSourceLinks } from '../../components/import-source-links';
 import { ImportSourceReport } from '../../components/import-source-report';
 import { normalizeExternalAssetUrl, resolveAssetUrl } from '../../lib/assets';
 import type {
   Character,
+  CharacterAppearanceVariant,
   CharacterAbility,
   CharacterAbilityAttribute,
   CharacterAwakening,
@@ -672,6 +674,7 @@ function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {
     'profile.friendship': 'Симпатия',
     'profile.gifts': 'Любимые подарки',
     'profile.skins': 'Гардероб',
+    'profile.appearanceVariants': 'Гардероб и реплики по вариантам',
   };
   return labels[suggestion.field] || suggestion.label;
 }
@@ -1305,6 +1308,15 @@ export function AdminCharacterEditor({
         next.profile.skins = mergeNamedRows(
           next.profile.skins,
           parsed as CharacterSkin[],
+        );
+      } else if (
+        suggestion.field === 'profile.appearanceVariants' &&
+        Array.isArray(parsed)
+      ) {
+        next.profile.appearanceVariants = mergeRowsByKey(
+          next.profile.appearanceVariants || [],
+          parsed as CharacterAppearanceVariant[],
+          (item) => item.id,
         );
       } else if (
         suggestion.field === 'profile.baseStats' &&
@@ -2579,6 +2591,17 @@ export function AdminCharacterEditor({
         </details>
 
         <details className="editor-section">
+          <summary>Варианты внешности и озвучки</summary>
+          <AppearanceVariantsEditor
+            value={profile.appearanceVariants || []}
+            context={`characters/${draft.slug || 'draft'}`}
+            onChange={(appearanceVariants) =>
+              patchProfile({ appearanceVariants })
+            }
+          />
+        </details>
+
+        <details className="editor-section">
           <summary>Озвучка персонажа</summary>
           <p className="editor-section-intro">
             Актёры дубляжа и реплики собраны вместе. Для каждого языка можно
@@ -2668,7 +2691,7 @@ export function AdminCharacterEditor({
                 <label className="wide-field">
                   URL аудио-файла
                   <input
-                    type="url"
+                    type="text"
                     inputMode="url"
                     placeholder="https://example.com/voice-line.mp3"
                     value={item.audioUrl}
@@ -2685,7 +2708,7 @@ export function AdminCharacterEditor({
                 <label className="wide-field">
                   Источник записи или видео
                   <input
-                    type="url"
+                    type="text"
                     inputMode="url"
                     placeholder="YouTube, Bilibili, wiki-страница или официальный источник"
                     value={item.sourceUrl || ''}

@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { ImageIcon } from 'lucide-react';
 import type { CharacterMaterial } from '../types';
 import { loadProgressionData } from '../lib/api';
+import {
+  findProfileProgression,
+  type ProgressionData,
+  type ProgressionOption,
+} from '../lib/progression';
 import { displayItemName, resolveItemIcon } from '../lib/item-icons';
 
 export function CharacterMaterials({
@@ -14,7 +19,11 @@ export function CharacterMaterials({
   originalName: string;
 }) {
   const root = useRef<HTMLDivElement>(null);
-  const [ascension, setAscension] = useState<CharacterMaterial[] | null>(null);
+  const [native, setNative] = useState<{
+    data: ProgressionData;
+    option: ProgressionOption;
+  } | null>(null);
+  const [stageId, setStageId] = useState('all');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -29,45 +38,8 @@ export function CharacterMaterials({
         setError(response.error);
         return;
       }
-      const key = (value: string) =>
-        value
-          .toLowerCase()
-          .replace(/[^\p{L}\p{N}]/gu, '')
-          .replace(/^esperzero$/, 'zero');
-      const option = response.data.costs.find(
-        (row) =>
-          row.kind === 'character' &&
-          [name, originalName].some((value) =>
-            [row.name, row.originalName].some(
-              (other) => key(value) === key(other),
-            ),
-          ),
-      );
-      if (!option?.stages.length) return;
-      const totals = new Map<string, { total: number; levels: string[] }>();
-      for (const stage of option.stages) {
-        const entries: Array<[string, number]> = stage.items_id.map(
-          (id, index) => [id, stage.amount[index]],
-        );
-        if (stage.cost_gold) entries.push(['gold', stage.cost_gold]);
-        for (const [id, amount] of entries) {
-          const row = totals.get(id) || { total: 0, levels: [] };
-          row.total += Number(amount) || 0;
-          row.levels.push(
-            `${stage.fromLevel ?? Number(stage.level) - 10} → ${stage.level}: ${Number(amount).toLocaleString('ru-RU')}`,
-          );
-          totals.set(id, row);
-        }
-      }
-      setAscension(
-        [...totals].map(([id, row]) => ({
-          id,
-          name: response.data.items[id]?.name || id,
-          iconUrl: response.data.items[id]?.iconUrl || '',
-          amount: `×${row.total.toLocaleString('ru-RU')}`,
-          source: row.levels.join(' · '),
-        })),
-      );
+      const option = findProfileProgression(response.data, name, originalName);
+      if (option?.stages.length) setNative({ data: response.data, option });
       setError('');
     };
     const observer = new IntersectionObserver(
@@ -85,6 +57,28 @@ export function CharacterMaterials({
       observer.disconnect();
     };
   }, [name, originalName, attempt]);
+  const stages = native?.option.stages || [];
+  const selectedStage = stages.find((stage) => stage.level === stageId);
+  const totals = new Map<string, number>();
+  for (const stage of selectedStage ? [selectedStage] : stages) {
+    stage.items_id.forEach((id, index) =>
+      totals.set(
+        id,
+        (totals.get(id) || 0) + (Number(stage.amount[index]) || 0),
+      ),
+    );
+    if (stage.cost_gold)
+      totals.set('gold', (totals.get('gold') || 0) + stage.cost_gold);
+  }
+  const ascension = native
+    ? [...totals].map(([id, amount]) => ({
+        id,
+        name: native.data.items[id]?.name || id,
+        iconUrl: native.data.items[id]?.iconUrl || '',
+        amount: `×${amount.toLocaleString('ru-RU')}`,
+        source: '',
+      }))
+    : null;
   const groups: Array<{ title: string; rows: CharacterMaterial[] }> = [];
   if (ascension)
     groups.push({ title: 'Возвышение персонажа', rows: ascension });
@@ -107,7 +101,11 @@ export function CharacterMaterials({
             : 'Другие материалы прокачки';
     buckets.set(title, [...(buckets.get(title) || []), row]);
   }
-  for (const [title, rows] of buckets) groups.push({ title, rows });
+  for (const [title, rows] of buckets) {
+    const existing = groups.find((group) => group.title === title);
+    if (existing) existing.rows.push(...rows);
+    else groups.push({ title, rows });
+  }
   return (
     <div ref={root} className="character-material-groups">
       {pending ? <p role="status">Загружаем материалы возвышения…</p> : null}
@@ -126,9 +124,34 @@ export function CharacterMaterials({
       {groups.map(({ title, rows }) => (
         <section className="profile-subsection" key={title} aria-label={title}>
           <h3>{title}</h3>
-          <div className="material-grid">
+          {title === 'Возвышение персонажа' && stages.length ? (
+            <div
+              className="ascension-stages"
+              role="group"
+              aria-label="Этап возвышения"
+            >
+              <button
+                type="button"
+                aria-pressed={stageId === 'all'}
+                onClick={() => setStageId('all')}
+              >
+                Всего · 1–80
+              </button>
+              {stages.map((stage) => (
+                <button
+                  type="button"
+                  key={stage.level}
+                  aria-pressed={stageId === stage.level}
+                  onClick={() => setStageId(stage.level)}
+                >
+                  {stage.fromLevel ?? Number(stage.level) - 10} → {stage.level}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="material-grid inventory-tiles">
             {rows.map((row) => (
-              <article key={row.id}>
+              <article className="game-item" key={row.id}>
                 {resolveItemIcon(row.name, row.iconUrl) ? (
                   <img
                     src={resolveItemIcon(row.name, row.iconUrl)}
@@ -145,7 +168,7 @@ export function CharacterMaterials({
                 <div className="character-detail-card-copy">
                   <h4>{displayItemName(row.name)}</h4>
                   <strong>{row.amount}</strong>
-                  <p>{row.source}</p>
+                  {row.source ? <p>{row.source}</p> : null}
                 </div>
               </article>
             ))}

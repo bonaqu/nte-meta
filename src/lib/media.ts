@@ -5,7 +5,14 @@ export async function uploadImage(file: File, context = 'editor/images') {
     throw new Error('Выберите PNG, JPEG или WebP.');
   if (file.size > 12 * 1024 * 1024)
     throw new Error('Исходное изображение должно быть меньше 12 МБ.');
-  const bitmap = await createImageBitmap(file);
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error(
+      'Не удалось прочитать изображение. Выберите другой PNG, JPEG или WebP.',
+    );
+  }
   try {
     const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement('canvas');

@@ -1,28 +1,54 @@
 import { useState } from 'react';
+import { ArrowRight, Orbit, UserRound } from 'lucide-react';
 import { loadProgressionData } from '../lib/api';
-import { calculateProgression, type ProgressionData } from '../lib/progression';
+import {
+  calculateProgression,
+  findProfileProgression,
+  type ProgressionData,
+} from '../lib/progression';
 import { resolveAssetUrl } from '../lib/assets';
 
 export function ProgressionCalculator({
   name,
   originalName,
+  portraitUrl = '',
+  appearanceId = '',
 }: {
   name: string;
   originalName: string;
+  portraitUrl?: string;
+  appearanceId?: string;
 }) {
   const [data, setData] = useState<ProgressionData | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
-  const [id, setId] = useState('');
+  const [arcId, setArcId] = useState('');
   const [kind, setKind] = useState<'character' | 'arc'>('character');
+  const [query, setQuery] = useState('');
   const [from, setFrom] = useState(1);
   const [to, setTo] = useState(80);
   const [ascended, setAscended] = useState(false);
   const [owned, setOwned] = useState<Record<string, number>>({});
+  const [showOwned, setShowOwned] = useState(false);
   const [experienceItemId, setExperienceItemId] = useState('');
-  const selected = data?.costs.find(
-    (row) => row.kind === kind && row.id === id,
-  );
+  const character =
+    data && findProfileProgression(data, name, originalName, appearanceId);
+  const arcs =
+    data?.costs.filter(
+      (row) =>
+        row.kind === 'arc' &&
+        !!character?.arcTypeId &&
+        row.arcTypeId === character.arcTypeId,
+    ) || [];
+  const arc = arcs.find((row) => row.id === arcId) || arcs[0];
+  const selected = kind === 'character' ? character : arc;
+  const experienceItems =
+    data?.experienceItems
+      .filter((item) => item.kind === kind)
+      .sort((a, b) => a.experience - b.experience) || [];
+  const experienceItem =
+    experienceItems.find((item) => item.id === experienceItemId) ||
+    experienceItems.at(-1);
   let result;
   let validation = '';
   if (data && selected) {
@@ -34,8 +60,7 @@ export function ProgressionCalculator({
         to,
         ascended,
         owned,
-        experienceItemId ||
-          data.experienceItems.find((item) => item.kind === kind)?.id,
+        experienceItem?.id,
       );
     } catch (reason) {
       validation = reason instanceof Error ? reason.message : '';
@@ -47,23 +72,14 @@ export function ProgressionCalculator({
     setError('');
     const response = await loadProgressionData();
     setPending(false);
-    if (response.ok) {
-      setData(response.data);
-      const key = (text: string) =>
-        text
-          .replace(/[^\p{L}\p{N}]/gu, '')
-          .toLowerCase()
-          .replace(/^esperzero$/, 'zero');
-      const option = response.data.costs.find(
-        (row) =>
-          row.kind === 'character' &&
-          [name, originalName].some((n) =>
-            [row.name, row.originalName].some((v) => key(v) === key(n)),
-          ),
-      );
-      setId(option?.id || '');
-    } else setError(response.error);
+    if (response.ok) setData(response.data);
+    else setError(response.error);
   }
+  const changeKind = (next: 'character' | 'arc') => {
+    setKind(next);
+    setOwned({});
+    setExperienceItemId('');
+  };
   return (
     <details
       className="progression-calculator"
@@ -87,176 +103,288 @@ export function ProgressionCalculator({
         </div>
       ) : null}
       {data ? (
-        <>
-          <div className="form-grid">
-            <label>
-              Что прокачиваем
-              <select
-                value={kind}
-                onChange={(event) => {
-                  const kind = event.target.value as 'character' | 'arc';
-                  setKind(kind);
-                  setId(data.costs.find((row) => row.kind === kind)?.id || '');
-                  setOwned({});
-                  setExperienceItemId('');
-                }}
-              >
-                <option value="character">Персонаж</option>
-                <option value="arc">Дуга</option>
-              </select>
-            </label>
-            <label>
-              Предмет опыта
-              <select
-                value={
-                  experienceItemId ||
-                  data.experienceItems.find((item) => item.kind === kind)?.id ||
-                  ''
-                }
-                onChange={(event) => setExperienceItemId(event.target.value)}
-              >
-                {data.experienceItems
-                  .filter((item) => item.kind === kind)
-                  .map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {data.items[item.id]?.name || item.id} ·{' '}
-                      {item.experience.toLocaleString('ru-RU')} опыта
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label>
-              Персонаж или дуга
-              <select
-                value={id}
-                onChange={(event) => {
-                  setId(event.target.value);
-                  setOwned({});
-                }}
-              >
-                <option value="">Выберите из справочника</option>
-                {data.costs
-                  .filter((row) => row.kind === kind)
-                  .map((row) => (
-                    <option key={row.id} value={row.id}>
-                      {row.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label>
-              С уровня
-              <input
-                type="number"
-                min={1}
-                max={80}
-                value={from}
-                onChange={(event) => setFrom(Number(event.target.value))}
-              />
-            </label>
-            <label>
-              До уровня
-              <input
-                type="number"
-                min={from}
-                max={80}
-                value={to}
-                onChange={(event) => setTo(Number(event.target.value))}
-              />
-            </label>
+        <div className="progression-workbench">
+          <div
+            className="progression-mode"
+            role="group"
+            aria-label="Что прокачиваем"
+          >
+            <button
+              type="button"
+              aria-pressed={kind === 'character'}
+              onClick={() => changeKind('character')}
+            >
+              {portraitUrl ? (
+                <img
+                  src={resolveAssetUrl(portraitUrl)}
+                  alt=""
+                  width="52"
+                  height="52"
+                />
+              ) : (
+                <UserRound aria-hidden="true" />
+              )}
+              <span>
+                <small>Персонаж</small>
+                <strong>{name}</strong>
+              </span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={kind === 'arc'}
+              disabled={!arcs.length}
+              onClick={() => changeKind('arc')}
+            >
+              {arc?.iconUrl ? (
+                <img
+                  src={resolveAssetUrl(arc.iconUrl)}
+                  alt=""
+                  width="52"
+                  height="52"
+                />
+              ) : (
+                <Orbit aria-hidden="true" />
+              )}
+              <span>
+                <small>Дуга · {character?.arcType || 'тип не определён'}</small>
+                <strong>{arc?.name || 'Нет совместимых дуг'}</strong>
+              </span>
+            </button>
           </div>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={ascended}
-              onChange={(event) => setAscended(event.target.checked)}
-            />{' '}
-            Возвышение на текущем уровне уже выполнено
-          </label>
-          {validation ? <p role="alert">{validation}</p> : null}
-          {result ? (
-            <>
-              <p className="progression-calculator__experience">
-                Опыт уровней:{' '}
-                <strong>{result.experience.toLocaleString('ru-RU')}</strong>
-              </p>
-              {result.missingLevels.length ? (
-                <p role="status">
-                  Не хватает строк опыта для уровней:{' '}
-                  {result.missingLevels.join(', ')}. Итог опыта неполный.
-                </p>
-              ) : null}
-              {result.missingAscension ? (
-                <p role="status">
-                  Для выбранного персонажа или дуги не найдены материалы
-                  возвышений. Сумма ниже неполная.
-                </p>
-              ) : null}
-              <div className="progression-calculator__materials">
-                {[
-                  ...(result.experienceMaterial
-                    ? [result.experienceMaterial]
-                    : []),
-                  ...result.materials,
-                ].map((item) => (
-                  <article key={item.id}>
-                    {item.iconUrl ? (
-                      <img
-                        src={resolveAssetUrl(item.iconUrl)}
-                        width={48}
-                        height={48}
-                        alt=""
-                      />
-                    ) : null}
-                    <div>
-                      <strong>{item.name}</strong>
-                      <p>
-                        {'excess' in item
-                          ? 'Для опыта'
-                          : item.id === 'gold'
-                            ? 'На прокачку'
-                            : 'На возвышения'}
-                        : {item.amount.toLocaleString('ru-RU')}
-                        {'excess' in item &&
-                        typeof item.excess === 'number' &&
-                        item.excess > 0
-                          ? ` · запас опыта ${item.excess.toLocaleString('ru-RU')}`
-                          : ''}
-                      </p>
-                    </div>
-                    <label>
-                      Уже есть: {item.name}
-                      <input
-                        type="number"
-                        min={0}
-                        max={999999999}
-                        value={owned[item.id] || 0}
-                        onChange={(event) =>
-                          setOwned({
-                            ...owned,
-                            [item.id]: Math.max(0, Number(event.target.value)),
-                          })
-                        }
-                      />
-                    </label>
-                    <output>
-                      Нужно ещё: {item.needed.toLocaleString('ru-RU')}
-                    </output>
-                  </article>
-                ))}
+          {!character ? (
+            <p role="status">Для {name} таблица прокачки пока недоступна.</p>
+          ) : !arcs.length ? (
+            <p role="status">
+              Совместимость дуг для {name} пока не определена.
+            </p>
+          ) : null}
+          {kind === 'arc' && arcs.length ? (
+            <details className="arc-picker" key={appearanceId}>
+              <summary>Выбрать дугу · {arc?.name}</summary>
+              <label>
+                Поиск совместимой дуги
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </label>
+              <div
+                className="arc-picker__options"
+                role="group"
+                aria-label={`Дуги типа ${character?.arcType}`}
+              >
+                {arcs
+                  .filter((row) =>
+                    `${row.name} ${row.originalName}`
+                      .toLowerCase()
+                      .includes(query.trim().toLowerCase()),
+                  )
+                  .map((row) => (
+                    <button
+                      type="button"
+                      key={row.id}
+                      aria-pressed={arc?.id === row.id}
+                      onClick={() => {
+                        setArcId(row.id);
+                        setOwned({});
+                      }}
+                    >
+                      {row.iconUrl ? (
+                        <img
+                          src={resolveAssetUrl(row.iconUrl)}
+                          alt=""
+                          width="64"
+                          height="64"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <Orbit aria-hidden="true" />
+                      )}
+                      <span>{row.name}</span>
+                    </button>
+                  ))}
               </div>
-              <p>
-                Предметы опыта рассчитаны для выбранного вида, без смешивания.
-              </p>
-              {!result.experienceCurrencyKnown ? (
-                <p role="status">
-                  Стоимость применения выбранных предметов опыта в жук-монетах
-                  пока неизвестна и не включена в итог.
+              {!arcs.some((row) =>
+                `${row.name} ${row.originalName}`
+                  .toLowerCase()
+                  .includes(query.trim().toLowerCase()),
+              ) ? (
+                <p role="status">Дуга с таким названием не найдена.</p>
+              ) : null}
+            </details>
+          ) : null}
+          {selected ? (
+            <>
+              <div className="progression-levels">
+                <label>
+                  С уровня
+                  <input
+                    type="number"
+                    min={1}
+                    max={80}
+                    value={from}
+                    onChange={(e) => setFrom(Number(e.target.value))}
+                  />
+                </label>
+                <ArrowRight aria-hidden="true" />
+                <label>
+                  До уровня
+                  <input
+                    type="number"
+                    min={1}
+                    max={80}
+                    value={to}
+                    onChange={(e) => setTo(Number(e.target.value))}
+                  />
+                </label>
+                <p className="progression-calculator__experience">
+                  Опыт уровней
+                  <strong>
+                    {result?.experience.toLocaleString('ru-RU') || '—'}
+                  </strong>
                 </p>
+              </div>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={ascended}
+                  onChange={(e) => setAscended(e.target.checked)}
+                />
+                Возвышение на текущем уровне уже выполнено
+              </label>
+              <fieldset className="experience-picker">
+                <legend>Предмет опыта</legend>
+                <div>
+                  {experienceItems.map((item) => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      aria-pressed={experienceItem?.id === item.id}
+                      onClick={() => setExperienceItemId(item.id)}
+                    >
+                      {data.items[item.id]?.iconUrl ? (
+                        <img
+                          src={resolveAssetUrl(data.items[item.id].iconUrl)}
+                          alt=""
+                          width="64"
+                          height="64"
+                        />
+                      ) : (
+                        <Orbit aria-hidden="true" />
+                      )}
+                      <span>{data.items[item.id]?.name || item.id}</span>
+                      <small>
+                        +{item.experience.toLocaleString('ru-RU')} опыта
+                      </small>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              {validation ? <p role="alert">{validation}</p> : null}
+              {result ? (
+                <>
+                  {result.missingLevels.length ? (
+                    <p role="status">
+                      Не хватает строк опыта для уровней:{' '}
+                      {result.missingLevels.join(', ')}. Итог опыта неполный.
+                    </p>
+                  ) : null}
+                  {result.missingAscension ? (
+                    <p role="status">
+                      Материалы возвышений не найдены. Сумма ниже неполная.
+                    </p>
+                  ) : null}
+                  <div className="progression-result-heading">
+                    <h3>Нужно для прокачки</h3>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={showOwned}
+                        onChange={(e) => setShowOwned(e.target.checked)}
+                      />
+                      Учесть мой инвентарь
+                    </label>
+                  </div>
+                  <div
+                    className={`progression-calculator__materials${showOwned ? ' has-inventory' : ''}`}
+                  >
+                    {[
+                      ...(result.experienceMaterial
+                        ? [result.experienceMaterial]
+                        : []),
+                      ...result.materials,
+                    ].map((item) => (
+                      <article key={item.id}>
+                        {item.iconUrl ? (
+                          <img
+                            src={resolveAssetUrl(item.iconUrl)}
+                            width={52}
+                            height={52}
+                            alt=""
+                          />
+                        ) : (
+                          <Orbit aria-hidden="true" />
+                        )}
+                        <div>
+                          <strong>{item.name}</strong>
+                          <p>
+                            {'excess' in item
+                              ? 'Опыт'
+                              : item.id === 'gold'
+                                ? 'Жук-монеты'
+                                : 'Возвышение'}{' '}
+                            · ×{item.amount.toLocaleString('ru-RU')}
+                          </p>
+                          {'excess' in item &&
+                          typeof item.excess === 'number' &&
+                          item.excess > 0 ? (
+                            <small>
+                              Остаток опыта:{' '}
+                              {item.excess.toLocaleString('ru-RU')}
+                            </small>
+                          ) : null}
+                        </div>
+                        {showOwned ? (
+                          <label>
+                            <span>
+                              Уже есть
+                              <span className="sr-only">: {item.name}</span>
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={999999999}
+                              value={owned[item.id] || 0}
+                              onChange={(e) =>
+                                setOwned({
+                                  ...owned,
+                                  [item.id]: Math.max(
+                                    0,
+                                    Number(e.target.value),
+                                  ),
+                                })
+                              }
+                            />
+                          </label>
+                        ) : null}
+                        <output aria-label={`Нужно ещё: ${item.name}`}>
+                          ×{item.needed.toLocaleString('ru-RU')}
+                        </output>
+                      </article>
+                    ))}
+                  </div>
+                  {!result.experienceCurrencyKnown ? (
+                    <p role="status">
+                      Стоимость применения выбранных предметов опыта в
+                      жук-монетах пока неизвестна и не включена в итог.
+                    </p>
+                  ) : null}
+                </>
               ) : null}
             </>
           ) : null}
-        </>
+        </div>
       ) : null}
     </details>
   );

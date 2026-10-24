@@ -107,6 +107,13 @@ export interface CharacterRoleIcon {
   iconUrl: string;
 }
 
+export interface CharacterAppearanceVariant {
+  id: string;
+  name: string;
+  skins: CharacterSkin[];
+  voiceLines: CharacterVoiceLine[];
+}
+
 export interface CharacterAwakening {
   level: number;
   kind?: 'awakening' | 'resonance';
@@ -135,6 +142,7 @@ export interface CharacterProfile {
   gifts: CharacterGift[];
   voiceLines: CharacterVoiceLine[];
   awakenings: CharacterAwakening[];
+  appearanceVariants?: CharacterAppearanceVariant[];
 }
 
 export interface Character {

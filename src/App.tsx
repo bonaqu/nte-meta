@@ -15,6 +15,7 @@ import { ProgressionCalculator } from './components/progression-calculator';
 import { ImageUploadButton } from './components/image-field';
 import { PageStepper } from './components/page-stepper';
 import { CharacterWardrobe } from './components/character-wardrobe';
+import { CharacterAppearanceSelector } from './components/character-appearance-selector';
 import { resolveStatIcon } from './lib/native-icons';
 import {
   isPrivateGuideSection,
@@ -565,7 +566,7 @@ function App() {
 
   useLayoutEffect(() => {
     setMobileOpen(false);
-    const resetScroll = () => window.scrollTo({ top: 0, behavior: 'auto' });
+    const resetScroll = () => window.scrollTo({ top: 0, behavior: 'instant' });
     resetScroll();
     const frame = window.requestAnimationFrame(resetScroll);
     return () => window.cancelAnimationFrame(frame);
@@ -2859,11 +2860,12 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
   const languageLines = lines.filter(
     (line) => line.language === activeLanguage,
   );
-  const pageCount = Math.max(1, Math.ceil(languageLines.length / 8));
+  const pageSize = 6;
+  const pageCount = Math.max(1, Math.ceil(languageLines.length / pageSize));
   const currentPage = Math.min(voicePage, pageCount);
   const visibleLines = languageLines.slice(
-    (currentPage - 1) * 8,
-    currentPage * 8,
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
   );
 
   return (
@@ -3089,6 +3091,17 @@ function CharacterDetailPage({
   setData: SiteDataSetter;
 }) {
   const character = getCharacter(data, slug);
+  const [appearanceSelection, setAppearanceSelection] = useState<{
+    characterId: string;
+    variantId: string;
+  } | null>(null);
+  const characterScrollAnchor = useRef<HTMLElement | null>(null);
+  const hasWardrobe = Boolean(
+    character?.profile?.skins.length ||
+    character?.profile?.appearanceVariants?.some(
+      (variant) => variant.skins.length,
+    ),
+  );
   const [characterEditorOpen, setCharacterEditorOpen] = useState(false);
   const [guideEditorOpen, setGuideEditorOpen] = useState(false);
   const [characterEditorDirty, setCharacterEditorDirty] = useState(false);
@@ -3098,9 +3111,10 @@ function CharacterDetailPage({
   );
 
   const scrollToCharacterSection = useCallback(
-    (id: string, behavior: ScrollBehavior = 'smooth') => {
+    (id: string, behavior: ScrollBehavior = 'instant') => {
       const target = document.getElementById(id);
       if (!target) return;
+      characterScrollAnchor.current = target;
       target.scrollIntoView({ behavior, block: 'start' });
     },
     [],
@@ -3120,6 +3134,8 @@ function CharacterDetailPage({
       .map((id) => document.getElementById(id))
       .filter((section): section is HTMLElement => Boolean(section));
     if (!sections.length) return;
+    if (!characterScrollAnchor.current?.isConnected)
+      characterScrollAnchor.current = null;
     let frame = 0;
     const update = () => {
       frame = 0;
@@ -3133,18 +3149,34 @@ function CharacterDetailPage({
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(update);
     };
-    const observer = new ResizeObserver(schedule);
+    const observer = new ResizeObserver(() => {
+      // Lazy sections above the selected heading can change height after a jump.
+      // Keep the heading in place until the user starts another interaction.
+      const target = characterScrollAnchor.current;
+      if (target?.isConnected)
+        target.scrollIntoView({ behavior: 'instant', block: 'start' });
+      schedule();
+    });
     sections.forEach((section) => observer.observe(section));
+    const profilePage = document.querySelector('.character-profile-page');
+    if (profilePage) observer.observe(profilePage);
+    const releaseAnchor = () => {
+      characterScrollAnchor.current = null;
+    };
+    for (const event of ['wheel', 'touchstart', 'pointerdown', 'keydown'])
+      window.addEventListener(event, releaseAnchor, { passive: true });
     window.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', schedule);
     schedule();
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      for (const event of ['wheel', 'touchstart', 'pointerdown', 'keydown'])
+        window.removeEventListener(event, releaseAnchor);
       window.removeEventListener('scroll', schedule);
       window.removeEventListener('resize', schedule);
     };
-  }, [slug]);
+  }, [slug, hasWardrobe]);
 
   if (!character) {
     return (
@@ -3175,6 +3207,30 @@ function CharacterDetailPage({
   };
   const guide = getGuideForCharacter(data, character);
   const tierPlacement = getCharacterTierPlacement(data, character.id);
+  const appearanceVariants = character.profile?.appearanceVariants || [];
+  const appearances = [
+    ...(profile.skins.length || profile.voiceLines.length
+      ? [
+          {
+            id: 'published',
+            name: 'Основной вариант',
+            skins: profile.skins,
+            voiceLines: profile.voiceLines,
+          },
+        ]
+      : []),
+    ...appearanceVariants,
+  ];
+  const activeAppearance =
+    appearances.find(
+      (variant) =>
+        appearanceSelection?.characterId === character.id &&
+        appearanceSelection.variantId === variant.id,
+    ) || appearances[0];
+  const skins = activeAppearance?.skins || profile.skins;
+  const voiceLines = activeAppearance?.voiceLines || profile.voiceLines;
+  const selectAppearance = (variantId: string) =>
+    setAppearanceSelection({ characterId: character.id, variantId });
 
   async function refreshContent() {
     setData(
@@ -3283,7 +3339,7 @@ function CharacterDetailPage({
           ['character-awakenings', 'Пробуждения'],
           ['character-progression', 'Прокачка'],
           ['character-friendship', 'Дружба'],
-          ...(profile.skins.length ? [['character-wardrobe', 'Гардероб']] : []),
+          ...(hasWardrobe ? [['character-wardrobe', 'Гардероб']] : []),
           ['character-voice', 'Озвучка'],
         ].map(([id, label]) => (
           <button
@@ -3419,6 +3475,9 @@ function CharacterDetailPage({
       <section className="character-detail-section" id="character-progression">
         <SectionHeader title="Прокачка персонажа" />
         <ProgressionCalculator
+          key={`${character.id}-${activeAppearance?.id || 'default'}`}
+          portraitUrl={character.imageUrl}
+          appearanceId={activeAppearance?.id}
           name={character.name}
           originalName={character.originalName}
         />
@@ -3438,16 +3497,32 @@ function CharacterDetailPage({
         <SectionHeader title="Дружба и симпатия" />
         <Suspense fallback={<p role="status">Загрузка подарков и наград…</p>}>
           <CharacterFriendship
+            key={character.id}
             gifts={profile.gifts}
             friendship={profile.friendship}
           />
         </Suspense>
       </section>
 
-      {profile.skins.length ? (
+      {hasWardrobe ? (
         <section className="character-detail-section" id="character-wardrobe">
           <SectionHeader title="Гардероб" />
-          <CharacterWardrobe key={character.id} skins={profile.skins} />
+          <CharacterAppearanceSelector
+            variants={appearances}
+            value={activeAppearance?.id || ''}
+            label="Вариант гардероба"
+            onChange={selectAppearance}
+          />
+          {skins.length ? (
+            <CharacterWardrobe
+              key={`${character.id}:${activeAppearance?.id}`}
+              skins={skins}
+            />
+          ) : (
+            <p className="empty-inline-copy">
+              Для этого варианта гардероб пока не добавлен.
+            </p>
+          )}
         </section>
       ) : null}
 
@@ -3489,18 +3564,24 @@ function CharacterDetailPage({
               <p className="eyebrow">Фонотека</p>
               <h3 id="voice-records-title">Реплики персонажа</h3>
             </div>
-            {profile.voiceLines.some((line) =>
-              canPlayDirectAudio(line.audioUrl),
-            ) ? (
+            <CharacterAppearanceSelector
+              variants={appearances}
+              value={activeAppearance?.id || ''}
+              label="Вариант озвучки"
+              onChange={selectAppearance}
+            />
+            {voiceLines.some((line) => canPlayDirectAudio(line.audioUrl)) ? (
               <CharacterVoiceLibrary
-                lines={profile.voiceLines.filter((line) =>
+                key={`${character.id}:${activeAppearance?.id}`}
+                lines={voiceLines.filter((line) =>
                   canPlayDirectAudio(line.audioUrl),
                 )}
               />
             ) : (
               <p className="empty-inline-copy">
-                Аудио пока не добавлено. Редакторы смогут разместить реплики для
-                каждого языка отдельно.
+                {appearanceVariants.length
+                  ? 'В текущем снимке нет привязанных реплик для этого варианта.'
+                  : 'Реплики пока недоступны.'}
               </p>
             )}
           </section>

@@ -1,6 +1,8 @@
+import { VariantAbilitiesEditor } from './variant-abilities-editor';
 import { useState } from 'react';
 import type {
   CharacterAppearanceVariant,
+  CharacterAbility,
   CharacterSkin,
   CharacterVoiceLine,
 } from '../../types';
@@ -11,10 +13,12 @@ import { PageStepper } from '../../components/page-stepper';
 export function AppearanceVariantsEditor({
   value,
   context,
+  commonAbilities,
   onChange,
 }: {
   value: CharacterAppearanceVariant[];
   context: string;
+  commonAbilities: CharacterAbility[];
   onChange: (value: CharacterAppearanceVariant[]) => void;
 }) {
   const [selected, setSelected] = useState('');
@@ -56,10 +60,10 @@ export function AppearanceVariantsEditor({
   return (
     <section
       className="character-collection character-variants-editor"
-      aria-label="Варианты внешности и озвучки"
+      aria-label="Варианты персонажа"
     >
       <div className="panel-title-row">
-        <h3>Варианты внешности и озвучки</h3>
+        <h3>Варианты персонажа</h3>
         <button
           className="ghost-button"
           type="button"
@@ -109,6 +113,13 @@ export function AppearanceVariantsEditor({
               Удалить вариант
             </button>
           </div>
+          <VariantAbilitiesEditor
+            key={active.id}
+            value={active.abilities || []}
+            common={commonAbilities}
+            context={`${context}/variants/${active.id}`}
+            onChange={(abilities) => patch({ abilities })}
+          />
           <section
             className="appearance-variant-editor-part"
             aria-label="Образы выбранного варианта"

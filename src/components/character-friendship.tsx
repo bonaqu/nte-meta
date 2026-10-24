@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { PageStepper } from './page-stepper';
 import { Star } from 'lucide-react';
 import type { CharacterProfile } from '../types';
@@ -6,7 +6,11 @@ import { resolveItemIcon } from '../lib/item-icons';
 export function CharacterFriendship({
   gifts,
   friendship,
-}: Pick<CharacterProfile, 'gifts' | 'friendship'>) {
+  onLayout,
+}: Pick<CharacterProfile, 'gifts' | 'friendship'> & { onLayout?: () => void }) {
+  useLayoutEffect(() => {
+    onLayout?.();
+  });
   const levels = [...friendship].sort((a, b) => a.level - b.level);
   const [selectedLevel, setSelectedLevel] = useState(0);
   const activeIndex = Math.min(selectedLevel, Math.max(0, levels.length - 1));

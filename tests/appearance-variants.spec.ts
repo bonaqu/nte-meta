@@ -103,6 +103,7 @@ test('варианты внешности читаются и сохраняют
         'utf8',
       ),
     );
+    db.exec(await readFile('migrations/0044_variant_abilities.sql', 'utf8'));
     const context = vm.createContext({
       crypto: webcrypto,
       TextEncoder,
@@ -167,6 +168,18 @@ test('варианты внешности читаются и сохраняют
       {
         id: '1046',
         name: 'Мужской вариант',
+        abilities: [
+          {
+            id: 'male-melee',
+            name: 'Оценка',
+            type: 'Базовая атака',
+            iconUrl: '',
+            description: 'Мужской вариант',
+            attributes: [
+              { id: 'hit', label: 'Множитель 1-го удара', value: '1: 23 %' },
+            ],
+          },
+        ],
         skins: [
           {
             id: 'male-skin',
@@ -189,6 +202,7 @@ test('варианты внешности читаются и сохраняют
       {
         id: '1051',
         name: 'Женский вариант',
+        abilities: [],
         skins: [
           {
             id: 'female-skin',
@@ -212,6 +226,15 @@ test('варианты внешности читаются и сохраняют
       api.normalizeCharacterProfile(JSON.parse(JSON.stringify(normalized)))
         .appearanceVariants,
     ).toEqual(variants);
+    save('zero', {
+      appearanceVariants: variants.map((variant) => ({
+        id: variant.id,
+        name: variant.name,
+        skins: variant.skins,
+        voiceLines: variant.voiceLines,
+      })),
+    });
+    expect(read('zero')).toEqual(variants);
     save('zero', { biography: 'Правка из предыдущей версии редактора' });
     expect(read('zero')).toEqual(variants);
     expect(
@@ -247,6 +270,80 @@ test('варианты внешности читаются и сохраняют
         .prepare('SELECT COUNT(*) AS n FROM character_appearance_variants')
         .get()!.n,
     ).toBe(0);
+  } finally {
+    db.close();
+  }
+});
+
+test('коэффициенты вариантов Зеро добавляются раздельно и не перезаписывают ручные правки', async () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec(
+      "CREATE TABLE characters(id TEXT PRIMARY KEY, updated_at TEXT);INSERT INTO characters VALUES ('esper-zero','2026-07-28 14:58:37')",
+    );
+    for (const name of [
+      '0042_character_appearance_variants',
+      '0043_zero_appearance_variants',
+      '0044_variant_abilities',
+    ])
+      db.exec(await readFile(`migrations/${name}.sql`, 'utf8'));
+    const before = db
+      .prepare(
+        'SELECT variant_id,name,skins_json,voice_lines_json FROM character_appearance_variants ORDER BY variant_id',
+      )
+      .all();
+    const seed = await readFile(
+      'migrations/0045_zero_variant_abilities.sql',
+      'utf8',
+    );
+    db.exec(seed);
+    expect(
+      db
+        .prepare(
+          'SELECT variant_id,name,skins_json,voice_lines_json FROM character_appearance_variants ORDER BY variant_id',
+        )
+        .all(),
+    ).toEqual(before);
+    const read = (id: string) =>
+      JSON.parse(
+        String(
+          db
+            .prepare(
+              'SELECT abilities_json FROM character_appearance_variants WHERE variant_id=?',
+            )
+            .get(id)!.abilities_json,
+        ),
+      ) as CharacterProfile['abilities'];
+    for (const id of ['1046', '1051']) expect(read(id)).toHaveLength(7);
+    expect(
+      read('1046').find((row) => row.name === 'Оценка')!.attributes![0].value,
+    ).toContain('1: 23 %');
+    expect(
+      read('1051').find((row) => row.name === 'Оценка')!.attributes![0].value,
+    ).toContain('1: 19.2 %');
+    expect(
+      read('1046').find((row) => row.name === 'Цветение разлома')!
+        .attributes![0].value,
+    ).toContain('1: 75.3 %+124.7 %');
+    expect(
+      read('1051').find((row) => row.name === 'Цветение разлома')!
+        .attributes![0].value,
+    ).toContain('1: 83.7 %+116.3 %');
+    db.exec(
+      `UPDATE character_appearance_variants SET abilities_json='[{"id":"manual","name":"Ручной навык"}]' WHERE variant_id='1046'`,
+    );
+    db.exec(seed);
+    expect(read('1046')[0].name).toBe('Ручной навык');
+    db.exec(
+      "UPDATE character_appearance_variants SET abilities_json='[]' WHERE variant_id='1046';UPDATE characters SET updated_at='2030-01-01' WHERE id='esper-zero'",
+    );
+    db.exec(seed);
+    expect(read('1046')).toEqual([]);
+    db.exec(
+      "UPDATE characters SET updated_at='2026-07-28 14:58:37';UPDATE character_appearance_variants SET name='Моя подпись',abilities_json='[]' WHERE variant_id='1051'",
+    );
+    db.exec(seed);
+    expect(read('1051')).toEqual([]);
   } finally {
     db.close();
   }

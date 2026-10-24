@@ -68,6 +68,25 @@ test('варианты гардероба и озвучки переключаю
     expect(
       (await page.locator('#character-abilities').boundingBox())!.y,
     ).toBeCloseTo(150, 0);
+    const skills = page.locator('#character-abilities');
+    const skillVariant = skills.getByRole('group', {
+      name: 'Вариант способностей',
+    });
+    for (const [name, damage] of [
+      ['Женский вариант', '19.2 %'],
+      ['Мужской вариант', '23 %'],
+    ]) {
+      await skillVariant.getByRole('button', { name, exact: true }).click();
+      const melee = skills.locator('.ability-card').filter({
+        has: page.getByText('Оценка', { exact: true }),
+      });
+      if ((await melee.getAttribute('open')) === null)
+        await melee.locator('summary').click();
+      await melee.getByRole('tab', { name: /^Атрибуты/ }).click();
+      await expect(melee.locator('.ability-attribute-grid')).toContainText(
+        damage,
+      );
+    }
     await navigation
       .getByRole('button', { name: 'Гардероб', exact: true })
       .click();
@@ -115,6 +134,13 @@ test('варианты гардероба и озвучки переключаю
     await voices
       .getByRole('group', { name: 'Страницы реплик' })
       .getByRole('button', { name: /вперёд/ })
+      .click();
+    await expect(voices.locator('.voice-line-list article')).toHaveCount(1);
+    await navigation
+      .getByRole('button', { name: 'Способности', exact: true })
+      .click();
+    await navigation
+      .getByRole('button', { name: 'Озвучка', exact: true })
       .click();
     await expect(voices.locator('.voice-line-list article')).toHaveCount(1);
     await voices.getByRole('tab', { name: /Английский/ }).click();
@@ -210,10 +236,10 @@ test('редактор сохраняет вариант, изображение
   const dialog = page.locator('dialog[open]');
   await dialog
     .locator('summary')
-    .filter({ hasText: /^Варианты внешности и озвучки$/ })
+    .filter({ hasText: /^Варианты персонажа$/ })
     .click();
   const editor = dialog.getByRole('region', {
-    name: 'Варианты внешности и озвучки',
+    name: 'Варианты персонажа',
   });
   await editor
     .getByRole('group', { name: 'Редактируемый вариант' })
@@ -222,14 +248,25 @@ test('редактор сохраняет вариант, изображение
   await editor
     .getByLabel('Название варианта', { exact: true })
     .fill('Женский вариант — правка');
+  const attributes = editor.getByLabel('Атрибуты способности варианта', {
+    exact: true,
+  });
+  await attributes.fill('Параметр — 10');
+  await attributes.press('End');
+  await attributes.press('Enter');
+  await attributes.pressSequentially('Второй параметр — 20');
+  await expect(attributes).toHaveValue('Параметр — 10\nВторой параметр — 20');
   await editor
     .getByLabel('Название образа', { exact: true })
     .fill('Проверочный образ');
-  await editor.locator('input[type=file]').setInputFiles({
-    name: 'broken.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from('broken image'),
-  });
+  await editor
+    .getByRole('region', { name: 'Образы выбранного варианта' })
+    .locator('input[type=file]')
+    .setInputFiles({
+      name: 'broken.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('broken image'),
+    });
   await expect(
     editor.getByText(
       'Не удалось прочитать изображение. Выберите другой PNG, JPEG или WebP.',
@@ -237,11 +274,14 @@ test('редактор сохраняет вариант, изображение
     ),
   ).toBeVisible();
   expect(uploaded).toBeUndefined();
-  await editor.locator('input[type=file]').setInputFiles({
-    name: 'skin.webp',
-    mimeType: 'image/webp',
-    buffer: await readFile('public/assets/characters/akane.webp'),
-  });
+  await editor
+    .getByRole('region', { name: 'Образы выбранного варианта' })
+    .locator('input[type=file]')
+    .setInputFiles({
+      name: 'skin.webp',
+      mimeType: 'image/webp',
+      buffer: await readFile('public/assets/characters/akane.webp'),
+    });
   await expect
     .poll(() => uploaded?.context)
     .toContain('esper-zero/variants/1051/skins');
@@ -263,6 +303,14 @@ test('редактор сохраняет вариант, изображение
   await expect
     .poll(() => saved?.profile?.appearanceVariants?.[1].skins[0].name)
     .toBe('Проверочный образ');
+  expect(
+    saved!.profile!.appearanceVariants![1].abilities![0].attributes?.map(
+      (row) => [row.label, row.value],
+    ),
+  ).toEqual([
+    ['Параметр', '10'],
+    ['Второй параметр', '20'],
+  ]);
   expect(saved!.profile!.appearanceVariants![1].skins[0].imageUrl).toBe(
     imageUrl,
   );
@@ -275,12 +323,12 @@ test('редактор сохраняет вариант, изображение
     .click();
   const variantSummary = page
     .locator('dialog[open] summary')
-    .filter({ hasText: /^Варианты внешности и озвучки$/ });
+    .filter({ hasText: /^Варианты персонажа$/ });
   if ((await variantSummary.locator('..').getAttribute('open')) === null)
     await variantSummary.click();
   const reopened = page
     .locator('dialog[open]')
-    .getByRole('region', { name: 'Варианты внешности и озвучки' });
+    .getByRole('region', { name: 'Варианты персонажа' });
   await reopened
     .getByRole('group', { name: 'Редактируемый вариант' })
     .getByRole('button', { name: 'Женский вариант — правка', exact: true })
@@ -291,6 +339,9 @@ test('редактор сохраняет вариант, изображение
   await expect(
     reopened.getByLabel('Изображение образа', { exact: true }),
   ).toHaveValue(imageUrl);
+  await expect(
+    reopened.getByLabel('Атрибуты способности варианта', { exact: true }),
+  ).toHaveValue('Параметр — 10\nВторой параметр — 20');
   for (const width of [360, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await reopened.scrollIntoViewIfNeeded();
@@ -415,6 +466,26 @@ test('опубликованные профили: калькулятор, бы�
     ).toBe(true);
   }
   await page.goto(base + '#/characters/esper-zero');
+  await page.getByRole('button', { name: 'Способности', exact: true }).click();
+  const skills = page.locator('#character-abilities');
+  for (const [name, damage] of [
+    ['Мужской вариант', '23 %'],
+    ['Женский вариант', '19.2 %'],
+  ]) {
+    await skills
+      .getByRole('group', { name: 'Вариант способностей' })
+      .getByRole('button', { name, exact: true })
+      .click();
+    const melee = skills
+      .locator('.ability-card')
+      .filter({ has: page.getByText('Оценка', { exact: true }) });
+    if ((await melee.getAttribute('open')) === null)
+      await melee.locator('summary').click();
+    await melee.getByRole('tab', { name: /^Атрибуты/ }).click();
+    await expect(melee.locator('.ability-attribute-grid')).toContainText(
+      damage,
+    );
+  }
   await page.getByRole('button', { name: 'Гардероб', exact: true }).click();
   const wardrobe = page.locator('#character-wardrobe');
   let images = 0;

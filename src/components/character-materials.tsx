@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ImageIcon } from 'lucide-react';
 import type { CharacterMaterial } from '../types';
 import { loadProgressionData } from '../lib/api';
@@ -13,11 +13,17 @@ export function CharacterMaterials({
   materials,
   name,
   originalName,
+  onLayout,
 }: {
   materials: CharacterMaterial[];
   name: string;
   originalName: string;
+  onLayout?: () => void;
 }) {
+  // Align after React changes the loading/result block, before it is painted.
+  useLayoutEffect(() => {
+    onLayout?.();
+  });
   const root = useRef<HTMLDivElement>(null);
   const [native, setNative] = useState<{
     data: ProgressionData;

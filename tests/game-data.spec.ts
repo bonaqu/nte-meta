@@ -382,6 +382,23 @@ test('варианты Зеро доступны отдельно; общие д
         ].includes(row.field),
       ),
     ).toBe(false);
+    for (const [id, gender] of [
+      ['1046', /мужск/iu],
+      ['1051', /женск/iu],
+    ] as const) {
+      const original = source.variants!.find((variant) =>
+        gender.test(variant.name),
+      )!;
+      const expected = JSON.parse(
+        original.suggestions.find((row) => row.field === 'profile.abilities')!
+          .value,
+      );
+      expect(expected.length).toBeGreaterThan(4);
+      expect(
+        appearanceVariants.find((row: { id: string }) => row.id === id)
+          .abilities,
+      ).toEqual(expected);
+    }
     const proposal = f.m.prepareCharacterImportProposal(
       [
         { ...source, id: 'local-installed-game' },

@@ -112,6 +112,7 @@ export interface CharacterAppearanceVariant {
   name: string;
   skins: CharacterSkin[];
   voiceLines: CharacterVoiceLine[];
+  abilities?: CharacterAbility[];
 }
 
 export interface CharacterAwakening {

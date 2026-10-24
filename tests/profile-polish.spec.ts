@@ -209,6 +209,33 @@ test('биография, уровни навыка, гардероб и стр�
   expect(errors).toEqual([]);
 });
 
+test('переход к основным статам не перескакивает к отрядам', async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  const origin = (process.env.NTE_REVIEW_ORIGIN || '').replace(/\/$/, '');
+  for (const width of [360, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({
+      reducedMotion: width === 360 ? 'reduce' : 'no-preference',
+    });
+    await page.goto(`${origin}/#/guides/akane-build-guide`);
+    await page.reload();
+    const target = page.locator('.guide-section-card').filter({
+      has: page.getByRole('heading', { name: 'Основные статы', exact: true }),
+    });
+    await page.getByRole('button', { name: /^Основные статы/ }).click();
+    await page.waitForLoadState('networkidle');
+    await expect
+      .poll(async () => Math.round((await target.boundingBox())!.y))
+      .toBe(96);
+    const header = await page.locator('.site-header').boundingBox();
+    expect((await target.boundingBox())!.y).toBeGreaterThan(
+      header!.y + header!.height,
+    );
+  }
+});
+
 test('все шаги ротации выровнены, статы показывают иконки, публичный тир-лист скрывает логи', async ({
   page,
   request,

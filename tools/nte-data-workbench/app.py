@@ -175,6 +175,7 @@ class Workbench(tk.Tk):
             if database.exists():database=Path(source)/('verified-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite')
             self.command([sys.executable,str(REPOSITORY/'scripts/game-data/validate.py'),'--database',str(database)])
             self.command(['node',str(REPOSITORY/'scripts/game-data/build-asset-aliases.mjs'),'--output',str(REPOSITORY/'src/data/native-media-aliases.json')])
+            self.command(['node',str(REPOSITORY/'scripts/game-data/build-ui-icons.mjs')])
         self.run(operation,'Снимок подготовлен. Нажмите 4, чтобы получить читаемый каталог, Excel, PNG и MP3.')
 
     def supplement(self):

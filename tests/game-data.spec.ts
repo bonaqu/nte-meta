@@ -616,7 +616,7 @@ test('нативный профиль в браузере: резонансы, �
     await page.clock.install();
     await page.goto('/#/characters/hathor');
     await expect(
-      page.getByText('Бонус за 3 пробуждений', { exact: true }),
+      page.getByText('Бонус за 3 пробуждения', { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByText('Бонус за 6 пробуждений', { exact: true }),
@@ -644,9 +644,11 @@ test('нативный профиль в браузере: резонансы, �
     if ((await basic.getAttribute('open')) === null)
       await basic.locator('summary').click();
     await basic.getByRole('tab', { name: /^Атрибуты/ }).click();
-    await basic
-      .getByRole('combobox', { name: /^Уровень навыка/ })
-      .selectOption('13');
+    const levels = basic.getByRole('group', { name: /^Уровень навыка/ });
+    await expect(levels.getByRole('button', { name: /назад/ })).toBeDisabled();
+    for (let i = 1; i < 13; i++)
+      await levels.getByRole('button', { name: /вперёд/ }).click();
+    await expect(levels.getByRole('button', { name: /вперёд/ })).toBeDisabled();
     await expect(
       basic.locator('.ability-attribute-grid dd').first(),
     ).toContainText('61.2');

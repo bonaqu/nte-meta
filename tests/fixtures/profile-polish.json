@@ -1,0 +1,227 @@
+{
+  "biography": "Адлер, полное имя Алоис фон Адлер, хотя никто и никогда не называл этого респектабельного дворецкого полным именем. Быть дворецким в антикварном магазине Эйбон — невероятно сложная работа. Вот далеко не полный список его каждодневных обязанностей: приготовление семи совершенно разных завтраков и приучение привередливых детей к овощам; учёт и пополнение запасов алкоголя и средств от похмелья; составление планов по ликвидации ущерба при неизбежных потерях во время выполнения поручений; сохранение позитивного настроя при проверке баланса счёта магазина… В общем, иметь такого дворецкого — настоящее счастье. Это мечник с золотой медалью, сертифицированный виртуозный стрелок из лука, продвинутый инструктор по чайной церемонии и чемпион конкурса бумажных самолетиков Района мостов. Это истинный мастер сертификации Этеро, и «идеально» для него — это не просто слова. Однажды Наналли устроила конкурс под названием «Чего не делал удивительный Адлер?», и победитель должен был получить от семьи Колуччи титул «почётного члена на всю жизнь». В итоге в конкурсе победила сама Наналли с ответом: «Мистер Адлер совершенно точно никогда не создавал проблем!» Хотя ей, как Ити-дайме из Колуччи, наверное, и не нужна была эта награда? Что же касается того, действительно ли Адлер никогда не создавал проблем… легко подумать, что нет, верно? «Прости, старик! В следующий раз я обязательно буду следить за тем, куда ставлю цветочные горшки, и уж точно не разобью шестьдесят восьмой!» «Вы говорили то же самое, когда разбился шестьдесят седьмой». «Тайгедо. (мастер по уничтожению цветочных горшков Эйбона)». «Всё в порядке, это всего лишь цветочный горшок. Корни растения не пострадали, мы просто купим новый». «Тогда я куплю новый цветочный горшок на свои деньги!» В тот тёмный период, когда он впервые погрузился во тьму, Адлер однажды тоже случайно разбил цветочный горшок, который стоил ему один год, четыре месяца и тринадцать дней жалования. Конечно, после такого опыта мистер Адлер больше никогда ничего случайно не разбивал.",
+  "skins": [
+    {
+      "id": "skin-3zho7k",
+      "name": "Пустая лакшана с пятью агрегациями",
+      "description": "Наряд, в котором удобство боя сочетается с элегантностью. Дворецкий должен безупречно выполнять все обязанности: от безопасности до приготовления завтрака.",
+      "imageUrl": "https://interactivemap.app/neverness-to-everness/database/assets/illustrations/YH_UI_shizhuang_big_adele.png"
+    },
+    {
+      "id": "test-second-outfit",
+      "name": "Второй наряд",
+      "description": "Наряд, в котором удобство боя сочетается с элегантностью. Дворецкий должен безупречно выполнять все обязанности: от безопасности до приготовления завтрака.",
+      "imageUrl": "https://interactivemap.app/neverness-to-everness/database/assets/illustrations/YH_UI_shizhuang_big_adele.png"
+    }
+  ],
+  "voiceLines": [
+    {
+      "id": "ja-Play_Vo_Char_NPC010_deploy_002",
+      "title": "Отправка I",
+      "description": "Полезно немного потренироваться.",
+      "language": "Японский",
+      "audioUrl": "/nte-meta/game-audio/339541739f878ec225b2.ogg"
+    },
+    {
+      "id": "ja-Play_Vo_Char_NPC010_weather_002",
+      "title": "Дождливо",
+      "description": "Кажется, прогнозы погоды не всегда надежны. Давай найдем, где переждать дождь.",
+      "language": "Японский",
+      "audioUrl": "/nte-meta/game-audio/73a6b8eacba6bcfd12bc.ogg"
+    },
+    {
+      "id": "ja-Play_Vo_Char_NPC010_dead_003",
+      "title": "Потеря сознания III",
+      "description": "Прости, что разочаровал.",
+      "language": "Японский",
+      "audioUrl": "/nte-meta/game-audio/feba75d0a2ad1e4916f0.ogg"
+    },
+    {
+      "id": "ja-Play_Vo_Char_NPC010_gift_003",
+      "title": "Подарок получен III",
+      "description": "Оценщик, я всегда знал, что у вас превосходный вкус.Оценщица, я всегда знал, что у вас превосходный вкус.",
+      "language": "Японский",
+      "audioUrl": "/nte-meta/game-audio/ebc484e48a433ddcf861.ogg"
+    },
+    {
+      "id": "ja-Play_Vo_Char_NPC010_talk_002",
+      "title": "Тема: этикет",
+      "description": "Опрятный внешний вид производит хорошее впечатление, но истинный этикет заключается в том, чтобы учитывать чувства других, а не насаждать свои привычки. Принуждение других следовать нашим принципам — грубейшее нарушение этикета.",
+      "language": "Японский",
+      "audioUrl": "/nte-meta/game-audio/6ae5e8c7a573472df8e4.ogg"
+    },
+    {
+      "id": "ja-Play_Vo_Char_NPC010_anomaly_003",
+      "title": "Нуллификация I",
+      "description": "Нужно что-нибудь, чтобы восстановить силы?",
+      "language": "Японский",
+      "audioUrl": "/nte-meta/game-audio/f774e0d376d6b6a8649f.ogg"
+    },
+    {
+      "id": "ja-Play_Vo_Char_NPC010_meet_001",
+      "title": "Первая встреча",
+      "description": "Добро пожаловать в «Эйбон». Я Алоис фон Адлер, дворецкий. Пожалуйста, зови меня Адлер. Если что-то понадобится, дай знать. Я к твоим услугам.",
+      "language": "Японский",
+      "audioUrl": "/nte-meta/game-audio/2dc6dd20bcbce84fc460.ogg"
+    },
+    {
+      "id": "ja-Play_Vo_Char_NPC010_windfall_005",
+      "title": "Неожиданная добыча V",
+      "description": "Как насчет устроить сегодня особенный ужин?",
+      "language": "Японский",
+      "audioUrl": "/nte-meta/game-audio/bc81716445a486a0dab2.ogg"
+    },
+    {
+      "id": "ja-Play_Vo_Char_NPC010_kill_001",
+      "title": "Убийство I",
+      "description": "Ты в порядке?",
+      "language": "Японский",
+      "audioUrl": "/nte-meta/game-audio/db88daa2b1aeabd94674.ogg"
+    },
+    {
+      "id": "en-Play_Vo_Char_NPC010_hobby_001",
+      "title": "Хобби",
+      "description": "Кулинария требует дисциплины… от выбора ингредиентов до получения отзыва, каждое блюдо — уникальное путешествие. Мне нравится готовить для всех в «Эйбоне», хотя лучше бы Сакири не была такой привередой.",
+      "language": "Английский",
+      "audioUrl": "/nte-meta/game-audio/121299d8b5a20b9ddd08.ogg"
+    },
+    {
+      "id": "voice-6dwxfr",
+      "title": "О Сакири",
+      "description": "Прямая запись английской озвучки. Расшифровку и соответствие реплики проверьте в источнике перед публикацией.",
+      "language": "Английский",
+      "audioUrl": "https://static.wikia.nocookie.net/neverness-to-everness/images/2/2d/VO_Adler_About_Sakiri.ogg/revision/latest",
+      "sourceUrl": "https://neverness-to-everness.fandom.com/api.php?action=query&generator=images&gimlimit=max&prop=imageinfo&iiprop=url|mime|size&format=json&formatversion=2&titles=Adler%2FVoice-Overs&origin=*"
+    },
+    {
+      "id": "en-Play_Vo_Char_NPC010_DodgeCombo_001",
+      "title": "Серия критических уклонений I",
+      "description": "Я кое-чему научился.",
+      "language": "Английский",
+      "audioUrl": "/nte-meta/game-audio/dad96d895ababa181ed4.ogg"
+    },
+    {
+      "id": "en-Play_Vo_Char_NPC010_ug_001",
+      "title": "Вознесение персонажа I",
+      "description": "Учение не знает границ.",
+      "language": "Английский",
+      "audioUrl": "/nte-meta/game-audio/ec180b37d89ffe5eded9.ogg"
+    },
+    {
+      "id": "en-Play_Vo_Char_NPC010_skill_003",
+      "title": "Навык перенаправления III",
+      "description": "Осмысли.",
+      "language": "Английский",
+      "audioUrl": "/nte-meta/game-audio/4ae643482c0863a402bb.ogg"
+    },
+    {
+      "id": "en-Play_Vo_Char_NPC010_TeammateDown_002",
+      "title": "Поражен товарищ по команде – Наналли",
+      "description": "Наналли, не нагружай себя так!",
+      "language": "Английский",
+      "audioUrl": "/nte-meta/game-audio/8369a82675b8392a2efe.ogg"
+    },
+    {
+      "id": "voice-iekw4p",
+      "title": "О Тайгедо",
+      "description": "Прямая запись английской озвучки. Расшифровку и соответствие реплики проверьте в источнике перед публикацией.",
+      "language": "Английский",
+      "audioUrl": "https://static.wikia.nocookie.net/neverness-to-everness/images/d/de/VO_Adler_About_Taygedo.ogg/revision/latest",
+      "sourceUrl": "https://neverness-to-everness.fandom.com/api.php?action=query&generator=images&gimlimit=max&prop=imageinfo&iiprop=url|mime|size&format=json&formatversion=2&titles=Adler%2FVoice-Overs&origin=*"
+    },
+    {
+      "id": "en-Play_Vo_Char_NPC010_chat_002",
+      "title": "Чат: списки",
+      "description": "Выпивка, конфеты, манга, игровые картриджи, антикоррозийное масло… да, это все.",
+      "language": "Английский",
+      "audioUrl": "/nte-meta/game-audio/e1926235014ce7b85443.ogg"
+    },
+    {
+      "id": "en-Play_Vo_Char_NPC010_skill_001",
+      "title": "Навык перенаправления I",
+      "description": "Озари.",
+      "language": "Английский",
+      "audioUrl": "/nte-meta/game-audio/1b3764d86386acf8c6b3.ogg"
+    }
+  ],
+  "rotation": {
+    "id": "guide-akane-0031-rotations",
+    "title": "Базовая ротация",
+    "type": "rotations",
+    "content": "",
+    "position": 5,
+    "visual": {
+      "kind": "rotation",
+      "items": [
+        {
+          "id": "akane-rotation-1",
+          "name": "Шаг 1",
+          "description": "Подготовьте усиления и лечение союзников перед выходом Аканэ.",
+          "imageUrl": "",
+          "stats": []
+        },
+        {
+          "id": "akane-rotation-2",
+          "name": "Шаг 2",
+          "description": "Коротким нажатием Rhythm Wave поставьте Overtone на одну цель; удержанием создайте Reverb Field для группы.",
+          "imageUrl": "",
+          "stats": []
+        },
+        {
+          "id": "akane-rotation-3",
+          "name": "Шаг 3",
+          "description": "Базовыми атаками накопите 30 String Energy и используйте Synced Resonance, пока действует выбранная форма.",
+          "imageUrl": "",
+          "stats": []
+        },
+        {
+          "id": "akane-rotation-4",
+          "name": "Шаг 4",
+          "description": "Примените Sonic Boom; во второй половине Solo Cadenza повторно нажмите сверхспособность вручную.",
+          "imageUrl": "",
+          "stats": []
+        },
+        {
+          "id": "akane-rotation-5",
+          "name": "Шаг 5",
+          "description": "После окончания усилений обновите действия союзников и повторите цикл.",
+          "imageUrl": "",
+          "stats": []
+        }
+      ]
+    }
+  },
+  "stats": {
+    "id": "akane-stats-0035",
+    "title": "Основные статы",
+    "type": "main-stats",
+    "content": "",
+    "position": 6,
+    "visual": {
+      "kind": "stats",
+      "items": [
+        {
+          "id": "akane-stats-0",
+          "name": "Критический шанс / урон",
+          "imageUrl": "",
+          "description": "Учитывайте бонусы дуги, консоли и отряда; итоговый шанс не должен превышать 100%.",
+          "stats": []
+        },
+        {
+          "id": "akane-stats-1",
+          "name": "Атака %",
+          "imageUrl": "",
+          "description": "",
+          "stats": []
+        },
+        {
+          "id": "akane-stats-2",
+          "name": "Бонус урона Лакшаны",
+          "imageUrl": "",
+          "description": "",
+          "stats": []
+        }
+      ]
+    }
+  }
+}

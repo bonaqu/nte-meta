@@ -6,6 +6,8 @@ test.describe('Публичный портал NTE Meta', () => {
   }) => {
     const consoleErrors: string[] = [];
     const failedResponses: string[] = [];
+    const itemDictionaryRequests: string[] = [];
+    page.on('request', request => { if (/native-item-icons|\/item-icons-[^/]+\.js/.test(request.url())) itemDictionaryRequests.push(request.url()); });
     page.on('console', (message) => {
       if (message.type() === 'error') consoleErrors.push(message.text());
     });
@@ -30,6 +32,17 @@ test.describe('Публичный портал NTE Meta', () => {
       page.getByRole('heading', { name: 'Треды и обсуждения игроков' }),
     ).toBeVisible();
     await expect(page.locator('main')).toHaveAttribute('id', 'main-content');
+    const shortcuts = page.getByRole('region', { name: 'Быстрый доступ' });
+    await expect(
+      shortcuts.getByRole('link', { name: /Каталог персонажей/ }),
+    ).toHaveAttribute('href', '#/characters');
+    await expect(
+      shortcuts.getByRole('link', { name: /^Тир-лист/ }),
+    ).toHaveAttribute('href', '#/tierlists');
+    await expect(
+      page.getByText('Ручная проверка', { exact: true }),
+    ).toHaveCount(0);
+    expect(itemDictionaryRequests).toEqual([]);
     expect(
       consoleErrors,
       `HTTP failures: ${failedResponses.join(', ')}`,
@@ -230,7 +243,7 @@ test.describe('Публичный портал NTE Meta', () => {
       page.getByRole('region', { name: 'Актёры озвучки' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Прокачка и симпатия' }),
+      page.getByRole('heading', { name: 'Прокачка персонажа' }),
     ).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Озвучка' })).toBeVisible();
     await expect(
@@ -335,7 +348,8 @@ test.describe('Публичный портал NTE Meta', () => {
     await expect(
       page.getByRole('heading', { name: 'Тир-листы', exact: true }),
     ).toBeVisible();
-    await expect(page.getByText('Единый редакционный список')).toBeVisible();
+    await expect(page.locator('.tier-preview')).toBeVisible();
+    await expect(page.getByText(/Патч .*обновлено/)).toBeVisible();
     await expect(page.getByText('S+', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Premium C6' })).toHaveCount(
       0,

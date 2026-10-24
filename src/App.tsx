@@ -13,6 +13,9 @@ import React, {
 import { GuideVisualEditor, GuideVisualView } from './components/guide-visual';
 import { ProgressionCalculator } from './components/progression-calculator';
 import { ImageUploadButton } from './components/image-field';
+import { PageStepper } from './components/page-stepper';
+import { CharacterWardrobe } from './components/character-wardrobe';
+import { resolveStatIcon } from './lib/native-icons';
 import {
   isPrivateGuideSection,
   stripEditorialText,
@@ -44,7 +47,6 @@ import {
   LockKeyhole,
   LogOut,
   Menu,
-  Maximize2,
   MessageCircle,
   MessageSquare,
   Newspaper,
@@ -155,7 +157,6 @@ import type {
   CharacterAbilityAttribute,
   CharacterImportLookupResult,
   CharacterImportSuggestion,
-  CharacterProfile,
   CharacterRoleIcon,
   CharacterVoiceLine,
   Comment,
@@ -896,10 +897,6 @@ function RouteLoadingState({ route }: { route: string }) {
     <section className="route-loading-panel" aria-busy="true">
       <p className="eyebrow">NTE Meta API</p>
       <h1>Синхронизируем данные {label}</h1>
-      <p>
-        Показываем страницу только после ответа Worker/D1, чтобы не мигали
-        устаревшие демо-карточки.
-      </p>
       <SkeletonGrid label={`Загрузка ${label}`} />
     </section>
   );
@@ -1091,7 +1088,7 @@ function HomePage({
       </section>
 
       <MetricsStrip data={data} />
-      <HomeFocusPanel data={data} user={user} />
+      <HomeFocusPanel data={data} />
 
       {loading && latestGuides.length === 0 ? <SkeletonGrid /> : null}
 
@@ -1255,10 +1252,7 @@ function HomePage({
       </section>
 
       <section className="content-band">
-        <SectionHeader
-          eyebrow="Что смотрят чаще"
-          title="Популярные персонажи"
-        />
+        <SectionHeader eyebrow="Каталог" title="Персонажи NTE" />
         <div className="character-grid">
           {popularCharacters.map((character) => (
             <CharacterCard
@@ -1274,8 +1268,7 @@ function HomePage({
         <div className="community-band__intro">
           <h2>Треды и обсуждения игроков</h2>
           <p>
-            Создавайте треды с вопросами по отрядам, ротациям, ресурсам и
-            патчам. Комментарии под материалами остаются там же, где контекст.
+            Вопросы об отрядах, ротациях и ресурсах. Делитесь своими находками.
           </p>
           <div className="button-row">
             {canCreateThread ? (
@@ -1331,7 +1324,6 @@ function HomePage({
           homeEditorItemId === 'new' ? 'Добавить гайд' : 'Редактировать гайд'
         }
         eyebrow="Редактор"
-        description="Персонажный гайд создаётся прямо из главной и сразу попадёт в раздел гайдов после публикации."
         dirty={homeEditorDirty}
         onClose={() => {
           setHomeEditorDirty(false);
@@ -2216,18 +2208,12 @@ function MetricsStrip({ data }: { data: SiteData }) {
   );
 }
 
-function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
+function HomeFocusPanel({ data }: { data: SiteData }) {
   const updatedGuide = data.guides[0];
   const focusCharacter = updatedGuide
     ? getGuideCharacter(data, updatedGuide)
     : undefined;
-  const pendingLeaks = data.leaks.filter((leak) => !leak.approved).length;
-  const sourceCount = data.sources.length;
-  const sourceMetric = sourceCount
-    ? `${sourceCount} источников`
-    : canAccessAdmin(user)
-      ? 'Нет активных'
-      : 'Ручная проверка';
+  const tierlist = data.tierlists[0];
   const recentThread = data.threads[0];
   const leadHref = updatedGuide ? `#/guides/${updatedGuide.slug}` : '#/guides';
   const leadTitle = updatedGuide
@@ -2239,16 +2225,18 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
 
   const focusItems = [
     {
-      title: 'Проверка источников',
-      value: sourceMetric,
-      href: canAccessAdmin(user) ? '#/admin/sources' : '#/guides',
-      icon: Search,
+      title: 'Тир-лист',
+      value: tierlist
+        ? `Патч ${tierlist.patch} · ${formatDate(tierlist.updatedAt)}`
+        : 'Открыть тир-лист',
+      href: '#/tierlists',
+      icon: Star,
     },
     {
-      title: 'Сливы на модерации',
-      value: `${pendingLeaks}`,
-      href: '#/',
-      icon: CircleAlert,
+      title: 'Каталог персонажей',
+      value: `${data.characters.length} персонажей`,
+      href: '#/characters',
+      icon: Users,
     },
     {
       title: 'Свежий тред',
@@ -2271,7 +2259,7 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
   }
 
   return (
-    <section className="home-focus-panel" aria-label="Редакционный пульс">
+    <section className="home-focus-panel" aria-label="Быстрый доступ">
       <a
         className="home-focus-lead spotlight-surface"
         href={leadHref}
@@ -2296,7 +2284,7 @@ function HomeFocusPanel({ data, user }: { data: SiteData; user: User | null }) {
           <span className="home-focus-lead__icon">
             <BookOpen aria-hidden="true" />
           </span>
-          <small>Приоритет редакции</small>
+          <small>Свежий гайд</small>
           <strong>{leadTitle}</strong>
           <em>{leadText}</em>
         </span>
@@ -2407,7 +2395,9 @@ function GuideCard({
       <div className="guide-card__body">
         <p className="eyebrow">{character?.name || 'Гайд'}</p>
         <h3>{guide.title}</h3>
-        <p className="guide-card__summary">{guide.summary}</p>
+        <p className="guide-card__summary">
+          {stripEditorialText(guide.summary)}
+        </p>
         <dl className="meta-row">
           <div>
             <dt>Автор</dt>
@@ -2737,7 +2727,6 @@ function CharactersPage({
         open={editorOpen}
         title="Добавить персонажа"
         eyebrow="База персонажей"
-        description="Карточка персонажа хранит лор, профиль, способности, материалы, озвучку и косметику. Билды остаются в гайдах."
         dirty={editorDirty}
         onClose={() => {
           setEditorDirty(false);
@@ -2844,7 +2833,7 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
   const [activeLanguage, setActiveLanguage] = useState<
     CharacterVoiceLine['language']
   >(languages[0] || 'Японский');
-  const [visibleCount, setVisibleCount] = useState(8);
+  const [voicePage, setVoicePage] = useState(1);
   const panelId = `${useId().replace(/:/g, '')}-voice-lines`;
 
   useEffect(() => {
@@ -2853,12 +2842,17 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
     }
   }, [activeLanguage, languages]);
 
-  useEffect(() => setVisibleCount(8), [activeLanguage]);
+  useEffect(() => setVoicePage(1), [activeLanguage, lines]);
 
   const languageLines = lines.filter(
     (line) => line.language === activeLanguage,
   );
-  const visibleLines = languageLines.slice(0, visibleCount);
+  const pageCount = Math.max(1, Math.ceil(languageLines.length / 8));
+  const currentPage = Math.min(voicePage, pageCount);
+  const visibleLines = languageLines.slice(
+    (currentPage - 1) * 8,
+    currentPage * 8,
+  );
 
   return (
     <div className="voice-library">
@@ -2906,20 +2900,15 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
             </div>
           </article>
         ))}
-        {visibleLines.length < languageLines.length ? (
-          <button
-            className="ghost-button voice-library__more"
-            type="button"
-            onClick={() => setVisibleCount((count) => count + 8)}
-          >
-            Показать ещё
-            <span>
-              {Math.min(8, languageLines.length - visibleLines.length)} из{' '}
-              {languageLines.length - visibleLines.length}
-            </span>
-          </button>
-        ) : null}
       </div>
+      {pageCount > 1 ? (
+        <PageStepper
+          label="Страницы реплик"
+          value={currentPage}
+          total={pageCount}
+          onChange={setVoicePage}
+        />
+      ) : null}
     </div>
   );
 }
@@ -2952,6 +2941,7 @@ function CharacterAbilityCard({
     0,
     ...levelAttributes.map((attribute) => attribute.levels.length),
   );
+  const currentSkillLevel = Math.min(skillLevel, Math.max(1, maxSkillLevel));
 
   return (
     <details className="ability-card" open={defaultOpen || undefined}>
@@ -3007,28 +2997,21 @@ function CharacterAbilityCard({
         {activePane === 'attributes' && attributes.length ? (
           <>
             {maxSkillLevel > 1 ? (
-              <label className="ability-level-control">
-                Уровень навыка
-                <select
-                  aria-label={`Уровень навыка «${ability.name}»`}
-                  value={skillLevel}
-                  onChange={(event) =>
-                    setSkillLevel(Number(event.target.value))
-                  }
-                >
-                  {Array.from({ length: maxSkillLevel }, (_, index) => (
-                    <option key={index + 1} value={index + 1}>
-                      {index + 1}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <PageStepper
+                label={`Уровень навыка «${ability.name}»`}
+                unit="Уровень"
+                value={currentSkillLevel}
+                total={maxSkillLevel}
+                onChange={setSkillLevel}
+              />
             ) : null}
             <dl className="ability-attribute-grid">
               {levelAttributes.map((attribute) => (
                 <div key={attribute.id}>
                   <dt>{attribute.label}</dt>
-                  <dd>{attribute.levels[skillLevel - 1] || attribute.value}</dd>
+                  <dd>
+                    {attribute.levels[currentSkillLevel - 1] || attribute.value}
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -3045,66 +3028,40 @@ function CharacterAbilityCard({
   );
 }
 
-function CharacterSkinMedia({
-  skin,
-  onOpen,
-}: {
-  skin: CharacterProfile['skins'][number];
-  onOpen: () => void;
-}) {
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'failed'>(
-    'loading',
-  );
+const CharacterMaterials = lazy(() =>
+  import('./components/character-materials').then((module) => ({
+    default: module.CharacterMaterials,
+  })),
+);
+const CharacterFriendship = lazy(() =>
+  import('./components/character-friendship').then((module) => ({
+    default: module.CharacterFriendship,
+  })),
+);
 
-  useEffect(() => {
-    setLoadState('loading');
-  }, [skin.id, skin.imageUrl]);
-
-  if (loadState === 'failed') {
-    return (
-      <div className="skin-media-fallback" role="status">
-        <ImageIcon aria-hidden="true" />
-        <span>Изображение пока недоступно.</span>
+function CharacterBiography({ value }: { value: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const id = useId();
+  const long = value.length > 850;
+  const preview = value.slice(0, 600).replace(/\s+\S*$/, '') + '…';
+  return (
+    <div className="character-biography-copy">
+      <div id={id}>
+        <MarkdownPreview value={long && !expanded ? preview : value} />
+      </div>
+      {long ? (
         <button
           type="button"
-          className="button secondary"
-          onClick={() => setLoadState('loading')}
+          className="ghost-button biography-toggle"
+          aria-expanded={expanded}
+          aria-controls={id}
+          onClick={() => setExpanded(!expanded)}
         >
-          Повторить загрузку
+          {expanded ? 'Свернуть историю' : 'Развернуть историю'}
+          <ChevronDown aria-hidden="true" />
         </button>
-      </div>
-    );
-  }
-
-  return (
-    <button
-      className="skin-media"
-      type="button"
-      aria-label={`Открыть изображение «${skin.name}» целиком`}
-      aria-busy={loadState === 'loading'}
-      disabled={loadState === 'loading'}
-      onClick={onOpen}
-    >
-      <img
-        src={resolveAssetUrl(skin.imageUrl)}
-        alt={skin.name}
-        width="640"
-        height="720"
-        loading="lazy"
-        referrerPolicy="no-referrer"
-        onLoad={() => setLoadState('ready')}
-        onError={() => setLoadState('failed')}
-      />
-      <span className="skin-media-action">
-        {loadState === 'loading' ? (
-          'Загружаем изображение…'
-        ) : (
-          <>
-            <Maximize2 aria-hidden="true" /> Посмотреть целиком
-          </>
-        )}
-      </span>
-    </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -3127,12 +3084,6 @@ function CharacterDetailPage({
   const [activeCharacterSection, setActiveCharacterSection] = useState(
     'character-biography',
   );
-  const [activeSkin, setActiveSkin] = useState<{
-    name: string;
-    imageUrl: string;
-    description: string;
-  } | null>(null);
-  const skinDialogRef = useRef<HTMLDialogElement>(null);
 
   const scrollToCharacterSection = useCallback(
     (id: string, behavior: ScrollBehavior = 'smooth') => {
@@ -3149,42 +3100,45 @@ function CharacterDetailPage({
       'character-abilities',
       'character-awakenings',
       'character-progression',
+      'character-friendship',
       'character-wardrobe',
       'character-voice',
     ];
     const sections = sectionIds
       .map((id) => document.getElementById(id))
       .filter((section): section is HTMLElement => Boolean(section));
-    if (!sections.length || !('IntersectionObserver' in window)) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort(
-            (left, right) =>
-              left.boundingClientRect.top - right.boundingClientRect.top,
-          );
-        if (visible[0]?.target.id)
-          setActiveCharacterSection(visible[0].target.id);
-      },
-      { rootMargin: '-150px 0px -58% 0px', threshold: [0, 0.12, 0.4] },
-    );
+    if (!sections.length) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const navigation = document.querySelector('.character-section-nav');
+      const anchor = (navigation?.getBoundingClientRect().bottom || 120) + 100;
+      const current = sections
+        .filter((section) => section.getBoundingClientRect().top <= anchor)
+        .at(-1);
+      setActiveCharacterSection(current?.id || sectionIds[0]);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    const observer = new ResizeObserver(schedule);
     sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    schedule();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+    };
   }, [slug]);
-
-  useEffect(() => {
-    const dialog = skinDialogRef.current;
-    if (!dialog) return;
-    if (activeSkin && !dialog.open) dialog.showModal();
-    if (!activeSkin && dialog.open) dialog.close();
-  }, [activeSkin]);
 
   if (!character) {
     return (
       <EmptyState
         title="Персонаж не найден"
-        text="Проверьте slug или создайте карточку прямо в разделе персонажей."
+        text="Проверьте адрес или выберите персонажа в каталоге."
       />
     );
   }
@@ -3316,6 +3270,7 @@ function CharacterDetailPage({
           ['character-abilities', 'Способности'],
           ['character-awakenings', 'Пробуждения'],
           ['character-progression', 'Прокачка'],
+          ['character-friendship', 'Дружба'],
           ...(profile.skins.length ? [['character-wardrobe', 'Гардероб']] : []),
           ['character-voice', 'Озвучка'],
         ].map(([id, label]) => (
@@ -3337,11 +3292,9 @@ function CharacterDetailPage({
       </nav>
 
       <section className="character-detail-section" id="character-biography">
-        <SectionHeader
-          title="Биография"
-          text="История персонажа без мета-билдов и боевых ротаций."
-        />
-        <MarkdownPreview
+        <SectionHeader title="Биография" text="История персонажа" />
+        <CharacterBiography
+          key={character.id}
           value={stripEditorialText(profile.biography || character.summary)}
         />
       </section>
@@ -3355,7 +3308,17 @@ function CharacterDetailPage({
           <dl className="character-stat-grid">
             {profile.baseStats.map((stat) => (
               <div key={stat.id}>
-                <dt>{stat.label}</dt>
+                <dt>
+                  <img
+                    className="native-stat-icon"
+                    src={resolveStatIcon(stat.label)}
+                    alt=""
+                    width="24"
+                    height="24"
+                    loading="lazy"
+                  />
+                  {stat.label}
+                </dt>
                 <dd>{stat.value}</dd>
               </div>
             ))}
@@ -3387,10 +3350,14 @@ function CharacterDetailPage({
         {profile.awakenings.length ? (
           <div className="awakening-grid awakening-path">
             {[...profile.awakenings]
-              .sort((a, b) => a.level - b.level)
+              .sort(
+                (a, b) =>
+                  Number(a.kind === 'resonance') -
+                    Number(b.kind === 'resonance') || a.level - b.level,
+              )
               .map((awakening) => (
                 <article
-                  className="awakening-card"
+                  className={`awakening-card${awakening.kind === 'resonance' ? ' awakening-card--resonance' : ''}`}
                   key={`${awakening.level}-${awakening.name}`}
                 >
                   <span
@@ -3416,7 +3383,7 @@ function CharacterDetailPage({
                   <div className="character-detail-card-copy">
                     <p className="eyebrow">
                       {awakening.kind === 'resonance'
-                        ? `Бонус за ${awakening.level} пробуждений`
+                        ? `Бонус за ${awakening.level} ${awakening.level === 3 ? 'пробуждения' : 'пробуждений'}`
                         : awakening.level > 0
                           ? `Пробуждение ${awakening.level}`
                           : 'Без пробуждений'}
@@ -3438,152 +3405,37 @@ function CharacterDetailPage({
       </section>
 
       <section className="character-detail-section" id="character-progression">
-        <SectionHeader
-          title="Прокачка и симпатия"
-          text="Материалы, источники, награды дружбы и любимые подарки."
-        />
+        <SectionHeader title="Прокачка персонажа" />
         <ProgressionCalculator
           name={character.name}
           originalName={character.originalName}
         />
-        {profile.materials.length ? (
-          <div className="material-grid">
-            {profile.materials.map((material) => (
-              <article key={material.id}>
-                {material.iconUrl ? (
-                  <img
-                    src={resolveAssetUrl(material.iconUrl)}
-                    alt=""
-                    width="54"
-                    height="54"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <span
-                    className="character-detail-fallback-icon"
-                    aria-hidden="true"
-                  >
-                    <ImageIcon />
-                  </span>
-                )}
-                <div className="character-detail-card-copy">
-                  <h3>{material.name}</h3>
-                  <strong>{material.amount}</strong>
-                  <p>{material.source}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : null}
-        {profile.friendship.length ? (
-          <div className="friendship-track">
-            {[...profile.friendship]
-              .sort((a, b) => a.level - b.level)
-              .map((level) => {
-                const rewards = level.rewards?.length
-                  ? level.rewards
-                  : level.rewardName || level.rewardIconUrl
-                    ? [
-                        {
-                          id: `legacy-reward-${level.level}`,
-                          name: level.rewardName,
-                          quantity: '',
-                          iconUrl: level.rewardIconUrl,
-                        },
-                      ]
-                    : [];
-                return (
-                  <article key={level.level}>
-                    <strong>{level.level}</strong>
-                    <div className="friendship-level-content">
-                      <h3>{`Уровень симпатии ${level.level}`}</h3>
-                      <p>{level.description}</p>
-                      {rewards.length ? (
-                        <ul
-                          className="friendship-reward-list"
-                          aria-label={`Награды уровня ${level.level}`}
-                        >
-                          {rewards.map((reward) => (
-                            <li key={reward.id}>
-                              {reward.iconUrl ? (
-                                <img
-                                  src={resolveAssetUrl(reward.iconUrl)}
-                                  alt=""
-                                  width="44"
-                                  height="44"
-                                  loading="lazy"
-                                  referrerPolicy="no-referrer"
-                                />
-                              ) : null}
-                              <span>{reward.name || 'Награда'}</span>
-                              {reward.quantity ? (
-                                <strong>×{reward.quantity}</strong>
-                              ) : null}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </div>
-                  </article>
-                );
-              })}
-          </div>
-        ) : null}
-        {profile.gifts.length ? (
-          <div className="gift-grid">
-            {profile.gifts.map((gift) => (
-              <article key={gift.id}>
-                {gift.iconUrl ? (
-                  <img
-                    src={resolveAssetUrl(gift.iconUrl)}
-                    alt=""
-                    width="54"
-                    height="54"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <span
-                    className="character-detail-fallback-icon"
-                    aria-hidden="true"
-                  >
-                    <Star />
-                  </span>
-                )}
-                <div className="character-detail-card-copy">
-                  <h3>{gift.name}</h3>
-                  <p>{gift.effect}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : null}
+        <Suspense fallback={<p role="status">Загрузка материалов…</p>}>
+          <CharacterMaterials
+            key={character.id}
+            name={character.name}
+            originalName={character.originalName}
+            materials={profile.materials}
+          />
+        </Suspense>
+      </section>
+      <section
+        className="character-detail-section character-friendship-section"
+        id="character-friendship"
+      >
+        <SectionHeader title="Дружба и симпатия" />
+        <Suspense fallback={<p role="status">Загрузка подарков и наград…</p>}>
+          <CharacterFriendship
+            gifts={profile.gifts}
+            friendship={profile.friendship}
+          />
+        </Suspense>
       </section>
 
       {profile.skins.length ? (
         <section className="character-detail-section" id="character-wardrobe">
           <SectionHeader title="Гардероб" />
-          <div className="skin-grid">
-            {profile.skins.map((skin) => (
-              <article key={skin.id}>
-                {skin.imageUrl ? (
-                  <CharacterSkinMedia
-                    skin={skin}
-                    onOpen={() =>
-                      setActiveSkin({
-                        name: skin.name,
-                        imageUrl: skin.imageUrl,
-                        description: skin.description,
-                      })
-                    }
-                  />
-                ) : null}
-                <h3>{skin.name}</h3>
-                <p>{skin.description}</p>
-              </article>
-            ))}
-          </div>
+          <CharacterWardrobe key={character.id} skins={profile.skins} />
         </section>
       ) : null}
 
@@ -3649,36 +3501,6 @@ function CharacterDetailPage({
           <MarkdownPreview value={profile.trivia} />
         </section>
       ) : null}
-      <dialog
-        className="skin-lightbox"
-        ref={skinDialogRef}
-        onClose={() => setActiveSkin(null)}
-        aria-label={activeSkin ? `Гардероб: ${activeSkin.name}` : 'Гардероб'}
-      >
-        {activeSkin ? (
-          <div className="skin-lightbox-layout">
-            <button
-              className="icon-button game-close-button skin-lightbox-close"
-              type="button"
-              aria-label="Закрыть полноразмерное изображение"
-              onClick={() => setActiveSkin(null)}
-            >
-              <X aria-hidden="true" />
-            </button>
-            <img
-              src={resolveAssetUrl(activeSkin.imageUrl)}
-              alt={activeSkin.name}
-              loading="eager"
-              referrerPolicy="no-referrer"
-            />
-            <div>
-              <p className="eyebrow">Гардероб</p>
-              <h2>{activeSkin.name}</h2>
-              {activeSkin.description ? <p>{activeSkin.description}</p> : null}
-            </div>
-          </div>
-        ) : null}
-      </dialog>
       <CommentsBlock
         targetType="character"
         targetId={character.id}
@@ -3689,7 +3511,6 @@ function CharacterDetailPage({
         open={characterEditorOpen}
         title={`Редактировать: ${character.name}`}
         eyebrow="Карточка персонажа"
-        description="Лор, профиль, способности, материалы, озвучка, симпатия и косметика. Команды и ротации редактируются в гайде."
         dirty={characterEditorDirty}
         onClose={() => {
           setCharacterEditorDirty(false);
@@ -3722,7 +3543,6 @@ function CharacterDetailPage({
         open={guideEditorOpen}
         title={`Создать гайд: ${character.name}`}
         eyebrow="Гайд персонажа"
-        description="Создайте персонажный meta-гайд. Отряды, ротации, видео и билды будут редактироваться внутри гайда."
         dirty={guideEditorDirty}
         onClose={() => {
           setGuideEditorDirty(false);
@@ -3812,7 +3632,9 @@ function GuideHero({
       <div>
         <p className="eyebrow">Гайд на {character.name}</p>
         <h1>{guide.title}</h1>
-        <p className="guide-hero-summary">{guide.summary}</p>
+        <p className="guide-hero-summary">
+          {stripEditorialText(guide.summary)}
+        </p>
         <dl className="guide-facts">
           <div>
             <dt>Роль</dt>
@@ -3995,7 +3817,7 @@ function GuideDetail({
               ) : (
                 <EmptyState
                   title="Отряды пока не добавлены"
-                  text="Редактор сможет собрать состав и расписать его ротацию прямо в этом гайде."
+                  text="Для этого персонажа пока нет опубликованных отрядов."
                 />
               )}
             </div>
@@ -4019,7 +3841,6 @@ function GuideDetail({
         open={editorOpen}
         title={`Редактировать гайд: ${character.name}`}
         eyebrow="Meta-гайд"
-        description="Секции гайда, команды, ротации и видео редактируются здесь, без отдельного публичного раздела команд."
         dirty={editorDirty}
         onClose={() => {
           setEditorDirty(false);
@@ -5201,7 +5022,6 @@ function GuidesPage({
         open={Boolean(editorGuideId)}
         title={editorGuideId === 'new' ? 'Добавить гайд' : 'Редактировать гайд'}
         eyebrow="Meta-гайды"
-        description="Секции, команды, ротации и видео редактируются внутри одного персонажного гайда."
         dirty={editorDirty}
         onClose={() => {
           setEditorDirty(false);
@@ -5254,11 +5074,6 @@ function TierListsPage({
       <section className="page-hero compact">
         <p className="eyebrow">S · A · B · C · D</p>
         <h1>Тир-листы</h1>
-        <p>
-          Единый редакционный список S, A, B, C и D. Тиры отражают практическую
-          ценность персонажей для большинства игроков, а внутри одного тира все
-          персонажи считаются равноценными.
-        </p>
         {canManageContent(user, 'tierlists', 'edit') ? (
           <button
             className="primary-button"
@@ -5276,13 +5091,11 @@ function TierListsPage({
         <SectionHeader
           eyebrow={`Патч ${tierlist?.patch || '1.0'} · обновлено ${tierlist ? formatDate(tierlist.updatedAt) : ''}`}
           title={tierlist?.title || 'Тир-лист'}
-          text="Комментарии и история обновлений хранятся отдельно, чтобы редакция могла объяснять каждое изменение."
         />
         <TierPreview grouped={grouped} />
         {unratedCharacters.length ? (
           <div className="change-log">
-            <h3>Оценка уточняется</h3>
-            <p>Эти персонажи ещё не получили позицию в едином списке.</p>
+            <h3>Без оценки</h3>
             <div className="button-row">
               {unratedCharacters.map((character) => (
                 <a
@@ -5296,13 +5109,6 @@ function TierListsPage({
             </div>
           </div>
         ) : null}
-        <div className="change-log">
-          {(tierlist?.changelog || []).map((item) => (
-            <p key={item}>
-              <ClipboardList aria-hidden="true" /> {item}
-            </p>
-          ))}
-        </div>
       </section>
       <EditorShell
         open={editorOpen}
@@ -6757,6 +6563,7 @@ function AdminGuides({
   const guideImportControllerRef = useRef<AbortController | null>(null);
   const guideImportRequestIdRef = useRef(0);
   const guideImportButtonRef = useRef<HTMLButtonElement>(null);
+  const guideWorkspaceRef = useRef<HTMLDivElement>(null);
   const restoreGuideImportFocusRef = useRef(false);
   const canCreate = canManageContent(user, 'guides', 'create');
   const canPublish = canManageContent(user, 'guides', 'publish');
@@ -7682,7 +7489,39 @@ function AdminGuides({
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack guide-editor-workspace" ref={guideWorkspaceRef}>
+      <nav className="guide-editor-nav" aria-label="Разделы редактора гайда">
+        {(
+          [
+            ['.guide-admin-meta', 'Параметры', Settings],
+            ['.guide-section-workspace', 'Секции', BookOpen],
+            ['.embedded-team-editor', 'Отряды', Users],
+            ['.guide-import-panel', 'Источники', Search],
+          ] as const
+        ).map(([selector, label, Icon]) => (
+          <button
+            className="ghost-button"
+            type="button"
+            key={String(selector)}
+            onClick={() => {
+              const target = guideWorkspaceRef.current?.querySelector(
+                String(selector),
+              );
+              if (target instanceof HTMLDetailsElement) target.open = true;
+              target?.scrollIntoView({
+                block: 'start',
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)')
+                  .matches
+                  ? 'auto'
+                  : 'smooth',
+              });
+            }}
+          >
+            <Icon aria-hidden="true" />
+            {String(label)}
+          </button>
+        ))}
+      </nav>
       <section className="admin-panel guide-admin-meta">
         <div className="panel-title-row">
           <div>
@@ -7756,10 +7595,6 @@ function AdminGuides({
                 <dd>{activeGuideTier?.tier || 'Не задан'}</dd>
               </div>
             </dl>
-            <p>
-              Эти данные берутся из страницы персонажа и единого тир-листа.
-              Здесь они показаны для проверки и не дублируются в форме гайда.
-            </p>
           </div>
         ) : null}
         <div className="guide-meta-fields">
@@ -7870,11 +7705,10 @@ function AdminGuides({
       >
         <div>
           <p className="eyebrow">Источники гайда</p>
-          <h3>Подсказки именно для гайда</h3>
+          <h3>Найти рекомендации</h3>
           <p>
-            Поиск проверяет билд-гайды: плюсы и минусы, дуги, модули, статы,
-            команды, ротации, советы и видео. Данные профиля персонажа сюда не
-            переносятся. Каждая строка добавляется только после подтверждения.
+            Дуги, картриджи, навыки, статы и ротации. Выберите нужные
+            предложения перед добавлением в гайд.
           </p>
         </div>
         <button
@@ -8147,7 +7981,7 @@ function AdminGuides({
         canDelete={canDelete}
       />
 
-      <div className="admin-grid two-columns">
+      <div className="admin-grid two-columns guide-section-workspace">
         <div className="admin-panel">
           <div className="panel-title-row">
             <h2>Секции гайда</h2>
@@ -8199,7 +8033,15 @@ function AdminGuides({
                   reorder(index, getSectionDropPlacement(event));
                 }}
                 onDragEnd={clearSectionDragState}
-                onClick={() => selectSection(section)}
+                onClick={() => {
+                  selectSection(section);
+                  if (window.matchMedia('(max-width: 760px)').matches)
+                    requestAnimationFrame(() =>
+                      guideWorkspaceRef.current
+                        ?.querySelector('.editor-panel')
+                        ?.scrollIntoView({ block: 'start', behavior: 'auto' }),
+                    );
+                }}
                 aria-pressed={section.id === selectedSectionId}
                 className={[
                   section.id === selectedSectionId ? 'active' : '',
@@ -10607,15 +10449,16 @@ function Footer() {
       <div>
         <strong>NTE Meta</strong>
         <p>
-          Русскоязычный meta-hub по Neverness to Everness. Новости, сливы и
-          комьюнити живут на главной, а контент редактируется прямо в разделах.
+          Neverness to Everness на русском: персонажи, сборки и городские
+          истории.
         </p>
       </div>
-      <div>
+      <nav aria-label="Навигация внизу страницы">
+        <a href="#/">Новости и сообщество</a>
         <a href="#/characters">Персонажи</a>
         <a href="#/guides">Гайды</a>
         <a href="#/tierlists">Тир-листы</a>
-      </div>
+      </nav>
     </footer>
   );
 }

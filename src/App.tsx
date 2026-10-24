@@ -3729,14 +3729,11 @@ function GuideDetail({
     if (!sections.length || !('IntersectionObserver' in window)) return;
     setActiveGuideSection((current) => current || sections[0].id);
     const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort(
-            (left, right) =>
-              left.boundingClientRect.top - right.boundingClientRect.top,
-          );
-        if (visible[0]?.target.id) setActiveGuideSection(visible[0].target.id);
+      () => {
+        const current = [...sections]
+          .reverse()
+          .find((section) => section.getBoundingClientRect().top <= 160);
+        setActiveGuideSection((current || sections[0]).id);
       },
       { rootMargin: '-120px 0px -62% 0px', threshold: [0, 0.15, 0.5] },
     );

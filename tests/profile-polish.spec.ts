@@ -233,6 +233,25 @@ test('переход к основным статам не перескакив�
     expect((await target.boundingBox())!.y).toBeGreaterThan(
       header!.y + header!.height,
     );
+    await expect(
+      page.getByRole('button', { name: /^Основные статы/ }),
+    ).toHaveAttribute('aria-current', 'location');
+    const iconGaps = await target
+      .locator('.guide-visual--stats > li')
+      .evaluateAll((rows) =>
+        rows.map((row) => {
+          const title = row.querySelector('h3')!.getBoundingClientRect();
+          const icons = Array.from(
+            row.querySelectorAll('.guide-stat-icons img'),
+          );
+          return (
+            title.left -
+            Math.max(...icons.map((icon) => icon.getBoundingClientRect().right))
+          );
+        }),
+      );
+    expect(iconGaps.length).toBeGreaterThan(0);
+    iconGaps.forEach((gap) => expect(gap).toBeGreaterThanOrEqual(8));
   }
 });
 

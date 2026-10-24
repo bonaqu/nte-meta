@@ -74,6 +74,10 @@ test('редактор сохраняет несохранённую часть 
   await page.goto('/#/guides/hotori-burst-guide');
   await page.getByRole('button', { name: 'Редактировать гайд' }).click();
   const dialog = page.locator('dialog[open]');
+  await dialog
+    .getByRole('navigation', { name: 'Разделы редактора гайда' })
+    .getByRole('button', { name: 'Секции', exact: true })
+    .click();
   const summary = dialog.locator('.guide-admin-meta textarea').first();
   await summary.fill('Несохранённый вывод редактора');
   await dialog
@@ -198,14 +202,18 @@ test('визуальная дуга: поиск, загрузка файла, с
   });
   await page.route(`**/api/guides/${guide.id}/sections`, (route) => {
     const body = route.request().postDataJSON();
+    const id =
+      body.visual?.kind === 'stats'
+        ? 'visual-stats-persisted'
+        : 'visual-arc-persisted';
     guide.sections.push({
       ...body,
-      id: 'visual-arc-persisted',
+      id,
       position: guide.sections.length + 1,
     });
     return route.fulfill({
       status: 201,
-      json: { data: { id: 'visual-arc-persisted' } },
+      json: { data: { id } },
     });
   });
   await page.route(`**/api/guides/${guide.id}/sections/reorder`, (route) =>
@@ -239,24 +247,44 @@ test('визуальная дуга: поиск, загрузка файла, с
   await expect(item.getByLabel('Название', { exact: true })).toHaveValue(
     'Проверочная дуга',
   );
-  await item
-    .locator('input[type=file]')
-    .setInputFiles({
-      name: 'guide.webp',
-      mimeType: 'image/webp',
-      buffer: await readFile('public/assets/characters/akane.webp'),
-    });
+  await item.locator('input[type=file]').setInputFiles({
+    name: 'guide.webp',
+    mimeType: 'image/webp',
+    buffer: await readFile('public/assets/characters/akane.webp'),
+  });
   await expect(item.getByLabel('Изображение', { exact: true })).toHaveValue(
     imageUrl,
   );
   expect(uploaded?.context).toMatch(/^guides\/akane-build-guide\//);
   expect(uploaded?.dataUrl).toMatch(/^data:image\/webp;base64,/);
+  await dialog
+    .getByRole('button', { name: 'Основные статы', exact: true })
+    .click();
+  await dialog
+    .getByRole('button', { name: 'Добавить элемент', exact: true })
+    .click();
+  const statItem = dialog.locator('.visual-item-editor').first();
+  await statItem
+    .getByLabel('Характеристика из игры')
+    .selectOption('Бонус урона Лакшаны');
+  await statItem
+    .getByLabel('Краткое описание', { exact: true })
+    .fill('Приоритет основного стата');
+  await expect(
+    dialog.locator('.visual-section-preview .guide-visual--stats > li > img'),
+  ).toHaveAttribute('src', /e7404c0c82eef53a2290\.webp$/);
   for (const width of [360, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     expect(
       await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth + 1),
       `editor at ${width}`,
     ).toBeTruthy();
+    if (width === 360 || width === 1440) {
+      await statItem.locator('summary').scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: testInfo.outputPath(`visual-editor-${width}.png`),
+      });
+    }
   }
   const a11y = await new AxeBuilder({ page })
     .include('dialog[open]')
@@ -276,6 +304,14 @@ test('визуальная дуга: поиск, загрузка файла, с
     name: 'Проверочная дуга',
     imageUrl,
     stats: [{ label: 'Атака (ур. 80)', value: '570' }],
+  });
+  expect(
+    guide.sections.find((s) => s.id === 'visual-stats-persisted')?.visual
+      ?.items[0],
+  ).toMatchObject({
+    name: 'Бонус урона Лакшаны',
+    description: 'Приоритет основного стата',
+    imageUrl: '',
   });
   await dialog.getByRole('button', { name: 'Закрыть редактор' }).click();
   await page.reload();

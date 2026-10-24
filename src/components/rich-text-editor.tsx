@@ -247,6 +247,7 @@ export function RichTextEditor({
         aria-label="Форматирование"
       >
         <ImageUploadButton
+          compact
           context={imageContext}
           disabled={disabled}
           onUploaded={(url) =>

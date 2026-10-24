@@ -8,13 +8,16 @@ export function ImageUploadButton({
   context,
   disabled = false,
   label = 'Выбрать с компьютера',
+  compact = false,
 }: {
   onUploaded: (url: string) => void;
   context?: string;
   disabled?: boolean;
   label?: string;
+  compact?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const helpId = useId();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [uploaded, setUploaded] = useState('');
@@ -39,7 +42,7 @@ export function ImageUploadButton({
   }
   return (
     <div
-      className={`image-upload${dragging ? ' image-upload--dragging' : ''}`}
+      className={`image-upload${compact ? ' image-upload--compact' : ''}${dragging ? ' image-upload--dragging' : ''}`}
       aria-busy={pending}
       onDragOver={(event) => {
         event.preventDefault();
@@ -63,7 +66,9 @@ export function ImageUploadButton({
     >
       <button
         type="button"
-        className="ghost-button"
+        className="ghost-button image-upload__button"
+        aria-describedby={helpId}
+        title="PNG, JPEG, WebP до 12 МБ. Перетащите изображение или вставьте из буфера."
         disabled={pending || disabled}
         onClick={() => input.current?.click()}
       >
@@ -83,7 +88,7 @@ export function ImageUploadButton({
           void upload(file);
         }}
       />
-      <small>
+      <small id={helpId} className={compact ? 'sr-only' : undefined}>
         PNG, JPEG, WebP · до 12 МБ. Можно перетащить файл или вставить из
         буфера.
       </small>

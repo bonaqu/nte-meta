@@ -109,9 +109,9 @@ test('Адлер: старые навыки, пробуждения и мате�
     await page.goto(`${origin}/#/characters/adler`);
     await expect(page.locator('.ability-card__icon img')).toHaveCount(7);
     const icons = page.locator(
-      '.ability-card__icon img, #character-awakenings img, #character-progression img',
+      '.ability-card__icon img, #character-awakenings img, #character-progression img, #character-friendship img',
     );
-    expect(await icons.count()).toBeGreaterThan(30);
+    await expect.poll(() => icons.count()).toBeGreaterThan(30);
     for (const image of await icons.all()) {
       await expect(image).toHaveAttribute('src', /\/game-assets\/[^/]+\.webp$/);
       await image.scrollIntoViewIfNeeded();
@@ -195,9 +195,17 @@ test('опубликованный сайт: все изображения пр�
         level: 1,
       }),
     ).toBeVisible();
+    // Character materials/friendship are lazy chunks; load their real content
+    // and current progression response before inventorying image URLs.
+    await page.locator('#character-progression').scrollIntoViewIfNeeded();
+    await page.waitForLoadState('networkidle');
+    if (await page.locator('#character-friendship').count()) {
+      await page.locator('#character-friendship').scrollIntoViewIfNeeded();
+      await page.waitForLoadState('networkidle');
+    }
     const images = await page
       .locator(
-        '.character-lore-hero img, #character-abilities img, #character-awakenings img, #character-progression img, #character-wardrobe img',
+        '.character-lore-hero img, #character-abilities img, #character-awakenings img, #character-progression img, #character-friendship img, #character-wardrobe img',
       )
       .evaluateAll((images) =>
         Array.from(

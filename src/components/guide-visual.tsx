@@ -5,6 +5,7 @@ import { newVisualItem } from '../lib/guide-visual';
 import { ImageField } from './image-field';
 import { useState } from 'react';
 import { findEquipment } from '../lib/api';
+import { resolveStatIcon } from '../lib/native-icons';
 
 function EquipmentLookup({
   kind,
@@ -125,15 +126,21 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
               : undefined
           }
         >
-          <span
-            className="guide-visual__position"
-            aria-label={`Позиция ${index + 1}`}
-          >
-            {index + 1}
-          </span>
-          {item.imageUrl ? (
+          {value.kind !== 'stats' ? (
+            <span
+              className="guide-visual__position"
+              aria-label={`Позиция ${index + 1}`}
+            >
+              {index + 1}
+            </span>
+          ) : null}
+          {item.imageUrl || value.kind === 'stats' ? (
             <img
-              src={resolveAssetUrl(item.imageUrl)}
+              src={
+                item.imageUrl
+                  ? resolveAssetUrl(item.imageUrl)
+                  : resolveStatIcon(item.name)
+              }
               width={equipment ? 128 : 64}
               height={equipment ? 128 : 64}
               alt={item.name}
@@ -155,7 +162,17 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
               <dl className="guide-visual__stats">
                 {item.stats.map((stat, i) => (
                   <div key={i}>
-                    <dt>{stat.label}</dt>
+                    <dt>
+                      <img
+                        className="native-stat-icon"
+                        src={resolveStatIcon(stat.label)}
+                        alt=""
+                        width="20"
+                        height="20"
+                        loading="lazy"
+                      />
+                      {stat.label}
+                    </dt>
                     <dd>{stat.value}</dd>
                   </div>
                 ))}
@@ -209,195 +226,268 @@ export function GuideVisualEditor({
         <span>
           {value.items.length} {value.kind === 'rotation' ? 'шагов' : 'позиций'}
         </span>
-        <a href="#visual-section-preview">К предпросмотру</a>
       </div>
       {value.items.map((item, index) => (
-        <fieldset key={item.id} className="visual-item-editor">
-          <legend>
-            {value.kind === 'rotation' ? 'Шаг' : 'Позиция'} {index + 1}
-            {item.name ? ` · ${item.name}` : ''}
-          </legend>
-          <div className="button-row">
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => {
-                const items = [...value.items];
-                items.splice(index + 1, 0, {
-                  ...item,
-                  id: newVisualItem().id,
-                  stats: item.stats.map((stat) => ({ ...stat })),
-                });
-                onChange({ ...value, items });
-              }}
-            >
-              <Copy aria-hidden="true" />
-              Дублировать
-            </button>
-            <button
-              className="icon-button"
-              type="button"
-              disabled={index === 0}
-              aria-label={`Поднять элемент ${index + 1}`}
-              onClick={() => move(index, -1)}
-            >
-              <ArrowUp aria-hidden="true" />
-            </button>
-            <button
-              className="icon-button"
-              type="button"
-              disabled={index === value.items.length - 1}
-              aria-label={`Опустить элемент ${index + 1}`}
-              onClick={() => move(index, 1)}
-            >
-              <ArrowDown aria-hidden="true" />
-            </button>
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() =>
-                onChange({
-                  ...value,
-                  items: value.items.filter((row) => row.id !== item.id),
-                })
-              }
-            >
-              <Trash2 aria-hidden="true" /> Удалить элемент
-            </button>
-          </div>
-          {equipment ? (
-            <label>
-              Рекомендация
-              <select
-                value={item.category || 'replacement'}
-                onChange={(e) =>
-                  patch(item.id, {
-                    category: e.target.value as GuideVisualItem['category'],
-                  })
+        <details
+          key={item.id}
+          className="visual-item-editor"
+          open={!item.name || value.items.length === 1 || undefined}
+        >
+          <summary>
+            <span className="visual-item-editor__index">{index + 1}</span>
+            {item.imageUrl || value.kind === 'stats' ? (
+              <img
+                src={
+                  item.imageUrl
+                    ? resolveAssetUrl(item.imageUrl)
+                    : resolveStatIcon(item.name)
                 }
-              >
-                <option value="signature">
-                  Основной / сигнатурный вариант
-                </option>
-                <option value="replacement">Замена</option>
-                <option value="budget">Бюджетная альтернатива</option>
-              </select>
-            </label>
-          ) : null}
-          {equipment ? (
-            <EquipmentLookup
-              kind={value.kind as 'arcs' | 'cartridges'}
-              item={item}
-              onSelect={(fields) => patch(item.id, fields)}
-            />
-          ) : null}
-          {value.kind === 'skills' && character?.profile?.abilities?.length ? (
-            <label>
-              Навык персонажа
-              <select
-                value=""
-                onChange={(e) => {
-                  const ability = character.profile!.abilities!.find(
-                    (row) => row.id === e.target.value,
-                  );
-                  if (ability)
-                    patch(item.id, {
-                      name: ability.name,
-                      imageUrl: ability.iconUrl,
-                    });
-                }}
-              >
-                <option value="">Выбрать навык и иконку</option>
-                {character.profile.abilities.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} — {a.type}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          <label>
-            {value.kind === 'rotation' ? 'Действие' : 'Название'}
-            <input
-              value={item.name}
-              maxLength={600}
-              onChange={(e) => patch(item.id, { name: e.target.value })}
-            />
-          </label>
-          <label>
-            Краткое описание
-            <textarea
-              value={item.description}
-              maxLength={6000}
-              rows={3}
-              onChange={(e) => patch(item.id, { description: e.target.value })}
-            />
-          </label>
-          {value.kind !== 'stats' ? (
-            <ImageField
-              label={value.kind === 'skills' ? 'Иконка навыка' : 'Изображение'}
-              value={item.imageUrl}
-              onChange={(imageUrl) => patch(item.id, { imageUrl })}
-              context={`${context}/${item.id}`}
-            />
-          ) : null}
-          {equipment || value.kind === 'stats' ? (
-            <div className="visual-stat-editor">
-              {item.stats.map((stat, i) => (
-                <div key={i} className="form-grid">
-                  <label>
-                    Характеристика
-                    <input
-                      value={stat.label}
-                      onChange={(e) =>
-                        patch(item.id, {
-                          stats: item.stats.map((row, j) =>
-                            j === i ? { ...row, label: e.target.value } : row,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Значение
-                    <input
-                      value={stat.value}
-                      onChange={(e) =>
-                        patch(item.id, {
-                          stats: item.stats.map((row, j) =>
-                            j === i ? { ...row, value: e.target.value } : row,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={() =>
-                      patch(item.id, {
-                        stats: item.stats.filter((_, j) => j !== i),
-                      })
-                    }
-                  >
-                    Убрать характеристику
-                  </button>
-                </div>
-              ))}
+                alt=""
+                width="40"
+                height="40"
+                loading="lazy"
+              />
+            ) : null}
+            <span>
+              {item.name ||
+                (value.kind === 'rotation'
+                  ? 'Новое действие'
+                  : 'Новая позиция')}
+            </span>
+            {equipment ? (
+              <small>{categoryLabels[item.category || 'replacement']}</small>
+            ) : null}
+          </summary>
+          <fieldset>
+            <legend>
+              {value.kind === 'rotation' ? 'Шаг' : 'Позиция'} {index + 1}
+              {item.name ? ` · ${item.name}` : ''}
+            </legend>
+            <div className="button-row">
               <button
                 type="button"
                 className="ghost-button"
+                onClick={() => {
+                  const items = [...value.items];
+                  items.splice(index + 1, 0, {
+                    ...item,
+                    id: newVisualItem().id,
+                    stats: item.stats.map((stat) => ({ ...stat })),
+                  });
+                  onChange({ ...value, items });
+                }}
+              >
+                <Copy aria-hidden="true" />
+                Дублировать
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                disabled={index === 0}
+                aria-label={`Поднять элемент ${index + 1}`}
+                onClick={() => move(index, -1)}
+              >
+                <ArrowUp aria-hidden="true" />
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                disabled={index === value.items.length - 1}
+                aria-label={`Опустить элемент ${index + 1}`}
+                onClick={() => move(index, 1)}
+              >
+                <ArrowDown aria-hidden="true" />
+              </button>
+              <button
+                className="ghost-button"
+                type="button"
                 onClick={() =>
-                  patch(item.id, {
-                    stats: [...item.stats, { label: '', value: '' }],
+                  onChange({
+                    ...value,
+                    items: value.items.filter((row) => row.id !== item.id),
                   })
                 }
               >
-                Добавить характеристику
+                <Trash2 aria-hidden="true" /> Удалить элемент
               </button>
             </div>
-          ) : null}
-        </fieldset>
+            {equipment ? (
+              <label>
+                Рекомендация
+                <select
+                  value={item.category || 'replacement'}
+                  onChange={(e) =>
+                    patch(item.id, {
+                      category: e.target.value as GuideVisualItem['category'],
+                    })
+                  }
+                >
+                  <option value="signature">
+                    Основной / сигнатурный вариант
+                  </option>
+                  <option value="replacement">Замена</option>
+                  <option value="budget">Бюджетная альтернатива</option>
+                </select>
+              </label>
+            ) : null}
+            {equipment ? (
+              <EquipmentLookup
+                kind={value.kind as 'arcs' | 'cartridges'}
+                item={item}
+                onSelect={(fields) => patch(item.id, fields)}
+              />
+            ) : null}
+            {(value.kind === 'skills' || value.kind === 'rotation') &&
+            character?.profile?.abilities?.length ? (
+              <label>
+                Навык персонажа
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const ability = character.profile!.abilities!.find(
+                      (row) => row.id === e.target.value,
+                    );
+                    if (ability)
+                      patch(item.id, {
+                        name: ability.name,
+                        imageUrl: ability.iconUrl,
+                      });
+                  }}
+                >
+                  <option value="">Выбрать навык и иконку</option>
+                  {character.profile.abilities.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} — {a.type}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <label>
+              {value.kind === 'rotation' ? 'Действие' : 'Название'}
+              <input
+                value={item.name}
+                maxLength={600}
+                onChange={(e) => patch(item.id, { name: e.target.value })}
+              />
+            </label>
+            <label>
+              Краткое описание
+              <textarea
+                value={item.description}
+                maxLength={6000}
+                rows={3}
+                onChange={(e) =>
+                  patch(item.id, { description: e.target.value })
+                }
+              />
+            </label>
+            {value.kind === 'stats' ? (
+              <label>
+                Характеристика из игры
+                <select
+                  value=""
+                  onChange={(event) => {
+                    if (event.target.value)
+                      patch(item.id, {
+                        name: event.target.value,
+                        imageUrl: '',
+                      });
+                  }}
+                >
+                  <option value="">Выбрать характеристику и иконку</option>
+                  {[
+                    'Атака',
+                    'ОЗ',
+                    'Защита',
+                    'Шанс критического попадания',
+                    'Критический урон',
+                    'Восстановление энергии',
+                    'Бонус лечения',
+                    'Бонус урона Лакшаны',
+                    'Бонус урона Анимы',
+                    'Бонус урона Космоса',
+                    'Бонус урона Психики',
+                    'Бонус урона Хаоса',
+                    'Бонус урона Чар',
+                  ].map((name) => (
+                    <option key={name}>{name}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {
+              <ImageField
+                label={
+                  value.kind === 'skills'
+                    ? 'Иконка навыка'
+                    : value.kind === 'stats'
+                      ? 'Своя иконка (необязательно)'
+                      : 'Изображение'
+                }
+                value={item.imageUrl}
+                onChange={(imageUrl) => patch(item.id, { imageUrl })}
+                context={`${context}/${item.id}`}
+              />
+            }
+            {equipment || value.kind === 'stats' ? (
+              <div className="visual-stat-editor">
+                {item.stats.map((stat, i) => (
+                  <div key={i} className="form-grid">
+                    <label>
+                      Характеристика
+                      <input
+                        value={stat.label}
+                        onChange={(e) =>
+                          patch(item.id, {
+                            stats: item.stats.map((row, j) =>
+                              j === i ? { ...row, label: e.target.value } : row,
+                            ),
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Значение
+                      <input
+                        value={stat.value}
+                        onChange={(e) =>
+                          patch(item.id, {
+                            stats: item.stats.map((row, j) =>
+                              j === i ? { ...row, value: e.target.value } : row,
+                            ),
+                          })
+                        }
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() =>
+                        patch(item.id, {
+                          stats: item.stats.filter((_, j) => j !== i),
+                        })
+                      }
+                    >
+                      Убрать характеристику
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() =>
+                    patch(item.id, {
+                      stats: [...item.stats, { label: '', value: '' }],
+                    })
+                  }
+                >
+                  Добавить характеристику
+                </button>
+              </div>
+            ) : null}
+          </fieldset>
+        </details>
       ))}
       <button
         type="button"
@@ -425,11 +515,7 @@ export function GuideVisualEditor({
         <Plus aria-hidden="true" />{' '}
         {value.kind === 'rotation' ? 'Добавить шаг' : 'Добавить элемент'}
       </button>
-      <details
-        id="visual-section-preview"
-        className="visual-section-preview"
-        open
-      >
+      <details className="visual-section-preview" open>
         <summary>Предпросмотр секции</summary>
         <GuideVisualView value={value} />
       </details>

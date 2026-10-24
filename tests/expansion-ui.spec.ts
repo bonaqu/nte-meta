@@ -73,9 +73,7 @@ test('новые персонажи имеют читаемые гайды, би
     )
     .toBeTruthy();
   await page.goto('/#/tierlists');
-  await expect(
-    page.getByRole('heading', { name: 'Оценка уточняется' }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Без оценки' })).toBeVisible();
   await expect(
     page.getByRole('link', { name: 'Аканэ Рин', exact: true }).first(),
   ).toBeVisible();

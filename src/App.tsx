@@ -2843,19 +2843,15 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
       ),
     [lines],
   );
-  const [activeLanguage, setActiveLanguage] = useState<
-    CharacterVoiceLine['language']
-  >(languages[0] || 'Японский');
-  const [voicePage, setVoicePage] = useState(1);
+  const [selection, setSelection] = useState<{
+    language: CharacterVoiceLine['language'];
+    page: number;
+  }>({ language: languages[0] || 'Японский', page: 1 });
+  const activeLanguage = languages.includes(selection.language)
+    ? selection.language
+    : languages[0] || 'Японский';
+  const voicePage = selection.language === activeLanguage ? selection.page : 1;
   const panelId = `${useId().replace(/:/g, '')}-voice-lines`;
-
-  useEffect(() => {
-    if (!languages.includes(activeLanguage) && languages[0]) {
-      setActiveLanguage(languages[0]);
-    }
-  }, [activeLanguage, languages]);
-
-  useEffect(() => setVoicePage(1), [activeLanguage, lines]);
 
   const languageLines = lines.filter(
     (line) => line.language === activeLanguage,
@@ -2888,7 +2884,7 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
               aria-selected={selected}
               className={selected ? 'active' : ''}
               key={language}
-              onClick={() => setActiveLanguage(language)}
+              onClick={() => setSelection({ language, page: 1 })}
             >
               {language}
               <span>{count}</span>
@@ -2920,7 +2916,7 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
           label="Страницы реплик"
           value={currentPage}
           total={pageCount}
-          onChange={setVoicePage}
+          onChange={(page) => setSelection({ language: activeLanguage, page })}
         />
       ) : null}
     </div>
@@ -3110,6 +3106,12 @@ function CharacterDetailPage({
     'character-biography',
   );
 
+  const alignCharacterScrollAnchor = useCallback(() => {
+    const target = characterScrollAnchor.current;
+    if (target?.isConnected)
+      target.scrollIntoView({ behavior: 'instant', block: 'start' });
+  }, []);
+
   const scrollToCharacterSection = useCallback(
     (id: string, behavior: ScrollBehavior = 'instant') => {
       const target = document.getElementById(id);
@@ -3155,9 +3157,7 @@ function CharacterDetailPage({
     const observer = new ResizeObserver(() => {
       // Lazy sections above the selected heading can change height after a jump.
       // Keep the heading in place until the user starts another interaction.
-      const target = characterScrollAnchor.current;
-      if (target?.isConnected)
-        target.scrollIntoView({ behavior: 'instant', block: 'start' });
+      alignCharacterScrollAnchor();
       schedule();
     });
     sections.forEach((section) => observer.observe(section));
@@ -3181,7 +3181,7 @@ function CharacterDetailPage({
       window.removeEventListener('scroll', schedule);
       window.removeEventListener('resize', schedule);
     };
-  }, [slug, hasWardrobe]);
+  }, [slug, hasWardrobe, alignCharacterScrollAnchor]);
 
   if (!character) {
     return (
@@ -3232,6 +3232,9 @@ function CharacterDetailPage({
         appearanceSelection?.characterId === character.id &&
         appearanceSelection.variantId === variant.id,
     ) || appearances[0];
+  const abilities = activeAppearance?.abilities?.length
+    ? activeAppearance.abilities
+    : profile.abilities;
   const skins = activeAppearance?.skins || profile.skins;
   const voiceLines = activeAppearance?.voiceLines || profile.voiceLines;
   const selectAppearance = (variantId: string) =>
@@ -3377,6 +3380,12 @@ function CharacterDetailPage({
           title="Способности"
           text="Точные игровые навыки и начальные показатели."
         />
+        <CharacterAppearanceSelector
+          variants={appearances}
+          value={activeAppearance?.id || ''}
+          label="Вариант способностей"
+          onChange={selectAppearance}
+        />
         {profile.baseStats.length ? (
           <dl className="character-stat-grid">
             {profile.baseStats.map((stat) => (
@@ -3397,9 +3406,9 @@ function CharacterDetailPage({
             ))}
           </dl>
         ) : null}
-        {profile.abilities.length ? (
+        {abilities.length ? (
           <div className="ability-list ability-list--profile">
-            {profile.abilities.map((ability, index) => (
+            {abilities.map((ability, index) => (
               <CharacterAbilityCard
                 key={ability.id}
                 ability={ability}
@@ -3488,6 +3497,7 @@ function CharacterDetailPage({
         />
         <Suspense fallback={<p role="status">Загрузка материалов…</p>}>
           <CharacterMaterials
+            onLayout={alignCharacterScrollAnchor}
             key={character.id}
             name={character.name}
             originalName={character.originalName}
@@ -3502,6 +3512,7 @@ function CharacterDetailPage({
         <SectionHeader title="Дружба и симпатия" />
         <Suspense fallback={<p role="status">Загрузка подарков и наград…</p>}>
           <CharacterFriendship
+            onLayout={alignCharacterScrollAnchor}
             key={character.id}
             gifts={profile.gifts}
             friendship={profile.friendship}

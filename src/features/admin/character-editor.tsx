@@ -1,3 +1,4 @@
+import { AbilityAttributesField } from '../../components/ability-attributes-field';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ImageUploadButton } from '../../components/image-field';
 import {
@@ -25,7 +26,6 @@ import type {
   Character,
   CharacterAppearanceVariant,
   CharacterAbility,
-  CharacterAbilityAttribute,
   CharacterAwakening,
   CharacterFriendshipLevel,
   CharacterFriendshipReward,
@@ -89,35 +89,6 @@ function readCharacterDraft(key: string) {
 
 function rowId() {
   return crypto.randomUUID();
-}
-
-function formatAbilityAttributes(
-  attributes: CharacterAbilityAttribute[] | undefined,
-) {
-  return (attributes || [])
-    .map((attribute) =>
-      [attribute.label.trim(), attribute.value.trim()]
-        .filter(Boolean)
-        .join(' — '),
-    )
-    .filter(Boolean)
-    .join('\n');
-}
-
-function parseAbilityAttributes(value: string): CharacterAbilityAttribute[] {
-  return value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, 80)
-    .map((line) => {
-      const separator = line.match(/^(.{1,160}?)(?:\s+[—–-]\s+|:\s*)(.+)$/);
-      return {
-        id: rowId(),
-        label: (separator?.[1] || line).trim(),
-        value: (separator?.[2] || '').trim(),
-      };
-    });
 }
 
 function friendshipRewards(item: CharacterFriendshipLevel) {
@@ -674,7 +645,8 @@ function getSuggestionFieldLabel(suggestion: CharacterImportSuggestion) {
     'profile.friendship': 'Симпатия',
     'profile.gifts': 'Любимые подарки',
     'profile.skins': 'Гардероб',
-    'profile.appearanceVariants': 'Гардероб и реплики по вариантам',
+    'profile.appearanceVariants':
+      'Способности, гардероб и реплики по вариантам',
   };
   return labels[suggestion.field] || suggestion.label;
 }
@@ -2017,8 +1989,20 @@ export function AdminCharacterEditor({
             )}
           />
           <Collection<CharacterAbility>
-            title="Способности"
-            description="Точные названия, типы, иконки и полное описание навыков."
+            title={
+              profile.appearanceVariants?.some(
+                (variant) => variant.abilities?.length,
+              )
+                ? 'Общие способности'
+                : 'Способности'
+            }
+            description={
+              profile.appearanceVariants?.some(
+                (variant) => variant.abilities?.length,
+              )
+                ? 'Используются, если у варианта нет своего списка. Отдельные навыки находятся в разделе «Варианты персонажа».'
+                : 'Точные названия, типы, иконки и полное описание навыков.'
+            }
             items={profile.abilities}
             addLabel="Добавить способность"
             createItem={() => ({
@@ -2104,25 +2088,10 @@ export function AdminCharacterEditor({
                     }
                   />
                 </label>
-                <label className="wide-field">
-                  Атрибуты
-                  <textarea
-                    rows={6}
-                    placeholder={
-                      'Коэфф. урона 1-го удара — 16,7 %\nЭнергия циклов — 33'
-                    }
-                    value={formatAbilityAttributes(item.attributes)}
-                    onChange={(event) =>
-                      update({
-                        ...item,
-                        attributes: parseAbilityAttributes(event.target.value),
-                      })
-                    }
-                  />
-                  <small>
-                    Один показатель на строку: название, тире и значение.
-                  </small>
-                </label>
+                <AbilityAttributesField
+                  value={item.attributes || []}
+                  onChange={(attributes) => update({ ...item, attributes })}
+                />
               </>
             )}
           />
@@ -2591,9 +2560,10 @@ export function AdminCharacterEditor({
         </details>
 
         <details className="editor-section">
-          <summary>Варианты внешности и озвучки</summary>
+          <summary>Варианты персонажа</summary>
           <AppearanceVariantsEditor
             value={profile.appearanceVariants || []}
+            commonAbilities={profile.abilities}
             context={`characters/${draft.slug || 'draft'}`}
             onChange={(appearanceVariants) =>
               patchProfile({ appearanceVariants })

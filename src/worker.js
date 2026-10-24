@@ -1251,7 +1251,7 @@ function characterProfileSelect() {
       character_profiles.awakenings_json AS profile_awakenings_json,
       (SELECT json_group_array(json_object(
         'id', variant_id, 'name', name, 'skins', json(skins_json),
-        'voiceLines', json(voice_lines_json)
+        'voiceLines', json(voice_lines_json), 'abilities', json(abilities_json)
       )) FROM (
         SELECT * FROM character_appearance_variants
         WHERE character_id = characters.id ORDER BY position, variant_id
@@ -4390,7 +4390,8 @@ function makeImportSuggestion(
       'profile.arcType': 'Тип дуги',
       'profile.voiceActors': 'Озвучка: актёры',
       'profile.voiceLines': 'Реплики озвучки',
-      'profile.appearanceVariants': 'Гардероб и реплики по вариантам',
+      'profile.appearanceVariants':
+        'Способности, гардероб и реплики по вариантам',
       'profile.roleTags': 'Роли персонажа',
     }[canonicalField] || label;
   return {
@@ -8900,13 +8901,9 @@ function translateGameWithArcType(value) {
     ['凝縮', 'Гибридный'],
   ].find(([key]) => raw.includes(key));
   if (direct) return direct[1];
-  const ru = [
-    'Гибридный',
-    'Твёрдый',
-    'Жидкий',
-    'Газовый',
-    'Плазменный',
-  ].find((item) => normalized.includes(normalizeImportSearch(item)));
+  const ru = ['Гибридный', 'Твёрдый', 'Жидкий', 'Газовый', 'Плазменный'].find(
+    (item) => normalized.includes(normalizeImportSearch(item)),
+  );
   return ru || translateArcType(raw) || raw;
 }
 
@@ -12370,21 +12367,28 @@ function profileCollectionLabel(name) {
 
 function normalizeCharacterAppearanceVariants(value) {
   if (!Array.isArray(value) || value.length > 4)
-    throwHttp('Можно указать не больше 4 вариантов внешности', 400);
+    throwHttp('Можно указать не больше 4 вариантов персонажа', 400);
   const seen = new Set();
   return value.map((item) => {
     if (!item || typeof item !== 'object' || Array.isArray(item))
-      throwHttp('Вариант внешности должен быть объектом', 400);
+      throwHttp('Вариант персонажа должен быть объектом', 400);
     const id = cleanString(item.id, 1, 80);
     const name = cleanString(item.name, 1, 80);
     if (seen.has(id))
-      throwHttp('ID вариантов внешности должны различаться', 400);
+      throwHttp('ID вариантов персонажа должны различаться', 400);
     seen.add(id);
     const profile = normalizeCharacterProfile({
       skins: item.skins,
       voiceLines: item.voiceLines,
+      abilities: item.abilities,
     });
-    return { id, name, skins: profile.skins, voiceLines: profile.voiceLines };
+    return {
+      id,
+      name,
+      skins: profile.skins,
+      voiceLines: profile.voiceLines,
+      abilities: profile.abilities,
+    };
   });
 }
 
@@ -12660,15 +12664,25 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
     if (Object.hasOwn(body.profile, 'appearanceVariants')) {
       statements.push(
         env.DB.prepare(
-          'DELETE FROM character_appearance_variants WHERE character_id = ?',
-        ).bind(entityId),
+          'DELETE FROM character_appearance_variants WHERE character_id = ? AND variant_id NOT IN (SELECT value FROM json_each(?))',
+        ).bind(
+          entityId,
+          JSON.stringify(
+            profile.appearanceVariants.map((variant) => variant.id),
+          ),
+        ),
       );
       for (const [position, variant] of profile.appearanceVariants.entries())
         statements.push(
           env.DB.prepare(
             `INSERT INTO character_appearance_variants
-              (character_id, variant_id, name, skins_json, voice_lines_json, position)
-             VALUES (?, ?, ?, ?, ?, ?)`,
+              (character_id, variant_id, name, skins_json, voice_lines_json, position, abilities_json)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(character_id, variant_id) DO UPDATE SET
+               name=excluded.name, skins_json=excluded.skins_json, voice_lines_json=excluded.voice_lines_json,
+               position=excluded.position,
+               abilities_json=CASE WHEN ? THEN excluded.abilities_json ELSE character_appearance_variants.abilities_json END,
+               updated_at=CURRENT_TIMESTAMP`,
           ).bind(
             entityId,
             variant.id,
@@ -12676,6 +12690,13 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
             JSON.stringify(variant.skins),
             JSON.stringify(variant.voiceLines),
             position,
+            JSON.stringify(variant.abilities),
+            Object.hasOwn(
+              body.profile.appearanceVariants[position],
+              'abilities',
+            )
+              ? 1
+              : 0,
           ),
         );
     }
@@ -14367,7 +14388,7 @@ async function buildLocalGameCharacterSource(env, character) {
     source.suggestions.push(
       makeImportSuggestion(
         'profile.appearanceVariants',
-        'Гардероб и реплики по вариантам',
+        'Способности, гардероб и реплики по вариантам',
         variants
           .map((variant) => ({
             id: variant.id.replace('local-installed-game-', ''),
@@ -14378,6 +14399,11 @@ async function buildLocalGameCharacterSource(env, character) {
             skins: JSON.parse(
               variant.suggestions.find((row) => row.field === 'profile.skins')
                 ?.value || '[]',
+            ),
+            abilities: JSON.parse(
+              variant.suggestions.find(
+                (row) => row.field === 'profile.abilities',
+              )?.value || '[]',
             ),
             voiceLines: JSON.parse(
               variant.suggestions.find(
@@ -14395,7 +14421,7 @@ async function buildLocalGameCharacterSource(env, character) {
       status: source.suggestions.length ? 'ok' : 'reference',
       variants,
       message:
-        'Общие данные двух вариантов Зеро. Отдельные источники ниже позволяют выбрать мужской или женский вариант для внешности и озвучки.',
+        'Общие данные двух вариантов Зеро. Отдельные источники ниже позволяют выбрать мужской или женский вариант для способностей, внешности и озвучки.',
     };
   }
   let identity = character.gameDataOwnerId

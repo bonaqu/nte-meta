@@ -9644,20 +9644,21 @@
     }
   }
 }
-@layer pages {
+@layer polish {
   .guide-stat-icons {
     display: inline-flex;
     align-items: center;
     gap: 4px;
     flex: 0 0 auto;
+    inline-size: max-content;
   }
   .guide-stat-icons > img {
     inline-size: 32px;
     block-size: 32px;
     object-fit: contain;
   }
-  .guide-visual--stats > li:has(.guide-stat-icons > img:nth-child(2)) {
-    grid-template-columns: 72px minmax(0, 1fr);
+  .guide-visual--stats > li {
+    grid-template-columns: max-content minmax(0, 1fr);
   }
   .guide-visual__stats .guide-stat-icons > img {
     inline-size: 20px;

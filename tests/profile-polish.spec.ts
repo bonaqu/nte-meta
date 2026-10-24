@@ -222,6 +222,22 @@ test('все шаги ротации выровнены, статы показы
   const guide = guides.find(
     (row: { slug: string }) => row.slug === 'akane-build-guide',
   );
+  fixture.stats.visual.items.push(
+    {
+      id: 'psyche-alias',
+      name: 'Бонус урона Психеи',
+      description: '',
+      imageUrl: '',
+      stats: [],
+    },
+    {
+      id: 'incantation-alias',
+      name: 'Бонус урона Инкантации',
+      description: '',
+      imageUrl: '',
+      stats: [],
+    },
+  );
   guide.sections = [fixture.rotation, fixture.stats];
   await page.route('**/api/guides', (route) =>
     route.fulfill({ json: { data: guides } }),
@@ -235,9 +251,19 @@ test('все шаги ротации выровнены, статы показы
       nodes.map((node) => node.getBoundingClientRect().left),
     );
     expect(new Set(offsets).size).toBe(1);
-    await expect(page.locator('.guide-visual--stats > li > img')).toHaveCount(
-      fixture.stats.visual.items.length,
-    );
+    await expect(
+      page.locator('.guide-visual--stats .guide-stat-icons img'),
+    ).toHaveCount(6);
+    await expect(
+      page.locator(
+        '.guide-visual--stats .guide-stat-icons img[src*="75a01c3718f57e576b08"]',
+      ),
+    ).toHaveCount(1);
+    await expect(
+      page.locator(
+        '.guide-visual--stats .guide-stat-icons img[src*="b5507cb8cea8e48c0d5d"]',
+      ),
+    ).toHaveCount(1);
     await expect(
       page.locator('.guide-visual--stats .guide-visual__position'),
     ).toHaveCount(0);

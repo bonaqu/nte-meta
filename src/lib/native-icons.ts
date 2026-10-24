@@ -10,11 +10,11 @@ export function resolveStatIcon(label: string) {
       ? 'Cosmos'
       : /аним|anima/.test(value)
         ? 'Nature'
-        : /психик|psyche/.test(value)
+        : /псих|psyche/.test(value)
           ? 'Psyche'
           : /хаос|chaos/.test(value)
             ? 'Chaos'
-            : /чар|incantation/.test(value)
+            : /чар|инкантац|incantation/.test(value)
               ? 'Incantation'
               : '';
   const id = /крит.*урон|урон.*крит|crit.*(?:dmg|damage)/.test(value)
@@ -41,4 +41,12 @@ export function resolveStatIcon(label: string) {
                       ? 'icon_damageup_white'
                       : 'icon_attri_count_up';
   return resolveAssetUrl(stats[id]);
+}
+
+export function resolveStatIcons(label: string) {
+  return /крит.*шанс\s*\/\s*(?:крит[^/]*\s*)?урон|crit.*rate\s*\/.*(?:dmg|damage)/i.test(
+    label,
+  )
+    ? [resolveStatIcon('Критический шанс'), resolveStatIcon('Критический урон')]
+    : [resolveStatIcon(label)];
 }

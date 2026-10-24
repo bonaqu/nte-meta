@@ -271,7 +271,7 @@ test('визуальная дуга: поиск, загрузка файла, с
     .getByLabel('Краткое описание', { exact: true })
     .fill('Приоритет основного стата');
   await expect(
-    dialog.locator('.visual-section-preview .guide-visual--stats > li > img'),
+    dialog.locator('.visual-section-preview .guide-stat-icons img'),
   ).toHaveAttribute('src', /e7404c0c82eef53a2290\.webp$/);
   for (const width of [360, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });

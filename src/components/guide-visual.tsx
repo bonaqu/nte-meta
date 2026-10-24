@@ -5,7 +5,20 @@ import { newVisualItem } from '../lib/guide-visual';
 import { ImageField } from './image-field';
 import { useState } from 'react';
 import { findEquipment } from '../lib/api';
-import { resolveStatIcon } from '../lib/native-icons';
+import { resolveStatIcons } from '../lib/native-icons';
+
+function StatIcons({ label, imageUrl }: { label: string; imageUrl?: string }) {
+  const icons = imageUrl
+    ? [resolveAssetUrl(imageUrl)]
+    : resolveStatIcons(label);
+  return (
+    <span className="guide-stat-icons" aria-hidden="true">
+      {icons.map((url) => (
+        <img key={url} src={url} alt="" width="32" height="32" loading="lazy" />
+      ))}
+    </span>
+  );
+}
 
 function EquipmentLookup({
   kind,
@@ -134,13 +147,11 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
               {index + 1}
             </span>
           ) : null}
-          {item.imageUrl || value.kind === 'stats' ? (
+          {value.kind === 'stats' ? (
+            <StatIcons label={item.name} imageUrl={item.imageUrl} />
+          ) : item.imageUrl ? (
             <img
-              src={
-                item.imageUrl
-                  ? resolveAssetUrl(item.imageUrl)
-                  : resolveStatIcon(item.name)
-              }
+              src={resolveAssetUrl(item.imageUrl)}
               width={equipment ? 128 : 64}
               height={equipment ? 128 : 64}
               alt={item.name}
@@ -163,14 +174,7 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
                 {item.stats.map((stat, i) => (
                   <div key={i}>
                     <dt>
-                      <img
-                        className="native-stat-icon"
-                        src={resolveStatIcon(stat.label)}
-                        alt=""
-                        width="20"
-                        height="20"
-                        loading="lazy"
-                      />
+                      <StatIcons label={stat.label} />
                       {stat.label}
                     </dt>
                     <dd>{stat.value}</dd>
@@ -235,13 +239,11 @@ export function GuideVisualEditor({
         >
           <summary>
             <span className="visual-item-editor__index">{index + 1}</span>
-            {item.imageUrl || value.kind === 'stats' ? (
+            {value.kind === 'stats' ? (
+              <StatIcons label={item.name} imageUrl={item.imageUrl} />
+            ) : item.imageUrl ? (
               <img
-                src={
-                  item.imageUrl
-                    ? resolveAssetUrl(item.imageUrl)
-                    : resolveStatIcon(item.name)
-                }
+                src={resolveAssetUrl(item.imageUrl)}
                 alt=""
                 width="40"
                 height="40"

@@ -9407,7 +9407,7 @@
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }
-  .visual-item-editor > fieldset {
+  .visual-item-editor__fields {
     display: grid;
     gap: 12px;
     border: 0;
@@ -9415,11 +9415,6 @@
     padding: 16px;
     margin: 0;
     min-inline-size: 0;
-  }
-  .visual-item-editor > fieldset > legend {
-    padding-block: 6px;
-    color: var(--muted);
-    font-size: 0.8rem;
   }
   .image-upload {
     align-content: start;

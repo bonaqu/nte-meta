@@ -258,11 +258,11 @@ export function GuideVisualEditor({
               <small>{categoryLabels[item.category || 'replacement']}</small>
             ) : null}
           </summary>
-          <fieldset>
-            <legend className="sr-only">
-              {value.kind === 'rotation' ? 'Шаг' : 'Позиция'} {index + 1}
-              {item.name ? ` · ${item.name}` : ''}
-            </legend>
+          <div
+            className="visual-item-editor__fields"
+            role="group"
+            aria-label={`Позиция ${index + 1}: ${item.name || 'Новая позиция'}`}
+          >
             <div className="button-row">
               <button
                 type="button"
@@ -486,7 +486,7 @@ export function GuideVisualEditor({
                 </button>
               </div>
             ) : null}
-          </fieldset>
+          </div>
         </details>
       ))}
       <button

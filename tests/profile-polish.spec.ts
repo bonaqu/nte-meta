@@ -177,16 +177,15 @@ test('биография, уровни навыка, гардероб и стр�
     const voice = page.locator('#character-voice');
     await voice.getByRole('tab', { name: /Японский/ }).click();
     const pages = voice.getByRole('group', { name: 'Страницы реплик' });
-    await expect(voice.locator('.voice-line-list article')).toHaveCount(8);
+    await expect(voice.locator('.voice-line-list article')).toHaveCount(6);
     await pages.getByRole('button', { name: /вперёд/ }).click();
-    await expect(voice.locator('.voice-line-list article')).toHaveCount(1);
+    await expect(voice.locator('.voice-line-list article')).toHaveCount(3);
     await expect(pages.getByRole('button', { name: /вперёд/ })).toBeDisabled();
     await voice.getByRole('tab', { name: /Английский/ }).click();
-    await expect(voice.locator('.voice-line-list article')).toHaveCount(8);
+    await expect(voice.locator('.voice-line-list article')).toHaveCount(6);
     await expect(pages.getByRole('button', { name: /назад/ })).toBeDisabled();
-    const upload = page.locator('.comment-composer .image-upload__button');
-    if (await upload.count())
-      expect((await upload.boundingBox())!.height).toBeLessThanOrEqual(50);
+    const upload = page.locator('.comment-form .image-upload__button');
+    expect((await upload.boundingBox())!.height).toBe(44);
     expect(
       await page.evaluate(
         () =>

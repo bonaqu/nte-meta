@@ -1,3 +1,4 @@
+import { gunzipSync } from 'node:zlib';
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
@@ -338,6 +339,25 @@ test('варианты Зеро доступны отдельно; общие д
     expect(source.variants!.map((row) => row.name).join(' ')).toContain(
       'мужской вариант',
     );
+    const appearanceVariants = JSON.parse(
+      source.suggestions.find(
+        (row) => row.field === 'profile.appearanceVariants',
+      )!.value,
+    );
+    expect(
+      appearanceVariants.map((row: { id: string }) => row.id).sort(),
+    ).toEqual(['1046', '1051']);
+    expect(
+      appearanceVariants.find((row: { id: string }) => row.id === '1046').name,
+    ).toBe('Мужской вариант');
+    expect(
+      appearanceVariants.find((row: { id: string }) => row.id === '1051').name,
+    ).toBe('Женский вариант');
+    expect(
+      appearanceVariants.every(
+        (row: { skins: unknown[] }) => row.skins.length > 0,
+      ),
+    ).toBeTruthy();
     const stats = JSON.parse(
       source.suggestions.find((row) => row.field === 'profile.baseStats')!
         .value,
@@ -484,6 +504,11 @@ test('нативный профиль Хатор: исходные статы, �
       expect.objectContaining({ id: '1025', kind: 'character' }),
     );
     expect(progression.data.experienceItems).toHaveLength(6);
+    expect(
+      progression.data.experienceItems.every((item: { id: string }) =>
+        progression.data.items[item.id]?.iconUrl?.includes('game-assets/'),
+      ),
+    ).toBe(true);
     const data = progression.data as ProgressionData;
     const option = data.costs.find((row) => row.id === '1025')!;
     expect(option.stages[0]).toMatchObject({ fromLevel: 20, level: '30' });
@@ -844,4 +869,71 @@ test('админка справочника: фильтры, JSON-валидац
     .selectOption('skill');
   await expect(page.locator('.game-data-list li')).toHaveCount(rows.length - 1);
   expect(errors).toEqual([]);
+});
+
+test('игровой калькулятор: все 25 вариантов имеют один совместимый тип дуг и настоящие иконки опыта', async () => {
+  const namespaces = new Set([
+    'NTE_ReferenceCharacter',
+    'NTE_ReferenceWeapon',
+    'DT_CultivationGuideData',
+  ]);
+  const records = gunzipSync(
+    await readFile('scripts/content/game-data/chunks.jsonl.gz'),
+  )
+    .toString('utf8')
+    .trim()
+    .split('\n')
+    .flatMap((line) =>
+      (JSON.parse(line).records as SourceRecord[]).filter((row) =>
+        namespaces.has(row.namespace),
+      ),
+    );
+  const f = await contract(records);
+  try {
+    const data = (await (await f.api('progression')).json())
+      .data as ProgressionData;
+    const characters = data.costs.filter((row) => row.kind === 'character');
+    const arcs = data.costs.filter((row) => row.kind === 'arc');
+    expect(characters).toHaveLength(25);
+    expect(arcs).toHaveLength(51);
+    for (const character of characters) {
+      expect(character.arcTypeId, character.name).toBeGreaterThan(0);
+      expect(
+        arcs.some((arc) => arc.arcTypeId === character.arcTypeId),
+        character.name,
+      ).toBe(true);
+    }
+    expect(characters.find((row) => row.id === '1033')).toMatchObject({
+      arcTypeId: 5,
+      arcType: 'Гибридный',
+    });
+    expect(characters.find((row) => row.id === '1004')).toMatchObject({
+      arcTypeId: 2,
+      arcType: 'Жидкий',
+    });
+    expect(arcs.every((arc) => !!arc.iconUrl?.includes('game-assets/'))).toBe(
+      true,
+    );
+    const guide = records.find(
+      (row) =>
+        row.namespace === 'DT_CultivationGuideData' && row.gameId === '1033',
+    )!;
+    f.insert([
+      {
+        ...guide,
+        sourceHash: guide.sourceHash + '-unknown-fork',
+        details: {
+          ...guide.details,
+          RecommendForkList: [{ ForkItemId: 'does-not-exist' }],
+        },
+      },
+    ]);
+    const unknown = (await (await f.api('progression')).json())
+      .data as ProgressionData;
+    expect(
+      unknown.costs.find((row) => row.id === '1033')?.arcTypeId,
+    ).toBeUndefined();
+  } finally {
+    f.db.close();
+  }
 });

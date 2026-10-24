@@ -1248,7 +1248,14 @@ function characterProfileSelect() {
     character_profiles.friendship_json AS profile_friendship_json,
     character_profiles.gifts_json AS profile_gifts_json,
       character_profiles.voice_lines_json AS profile_voice_lines_json,
-      character_profiles.awakenings_json AS profile_awakenings_json
+      character_profiles.awakenings_json AS profile_awakenings_json,
+      (SELECT json_group_array(json_object(
+        'id', variant_id, 'name', name, 'skins', json(skins_json),
+        'voiceLines', json(voice_lines_json)
+      )) FROM (
+        SELECT * FROM character_appearance_variants
+        WHERE character_id = characters.id ORDER BY position, variant_id
+      )) AS profile_appearance_variants_json
   FROM characters
   LEFT JOIN character_profiles ON character_profiles.character_id = characters.id`;
 }
@@ -4108,9 +4115,9 @@ function normalizeImportArcType(value) {
     ['プラズマ', 'Плазменный'],
     ['плазм', 'Плазменный'],
     ['plasma', 'Плазменный'],
-    ['凝縮', 'Конденсат'],
-    ['конденсат', 'Конденсат'],
-    ['condensate', 'Конденсат'],
+    ['凝縮', 'Гибридный'],
+    ['конденсат', 'Гибридный'],
+    ['condensate', 'Гибридный'],
   ].find(([key]) => normalized.includes(key));
   return direct?.[1] || '';
 }
@@ -4292,6 +4299,8 @@ function normalizeProfileImportValue(field, value) {
     if (field === 'profile.voiceActors') return normalizeVoiceActorRows(value);
     if (field === 'profile.roleTags') return normalizeImportedStringList(value);
     if (field === 'profile.skins') return normalizeSkinRows(value);
+    if (field === 'profile.appearanceVariants')
+      return normalizeCharacterAppearanceVariants(value);
     if (
       [
         'profile.roleIcons',
@@ -4381,6 +4390,7 @@ function makeImportSuggestion(
       'profile.arcType': 'Тип дуги',
       'profile.voiceActors': 'Озвучка: актёры',
       'profile.voiceLines': 'Реплики озвучки',
+      'profile.appearanceVariants': 'Гардероб и реплики по вариантам',
       'profile.roleTags': 'Роли персонажа',
     }[canonicalField] || label;
   return {
@@ -8878,7 +8888,7 @@ function translateGameWithArcType(value) {
     ['liquid', 'Жидкий'],
     ['gas', 'Газовый'],
     ['plasma', 'Плазменный'],
-    ['condensate', 'Конденсат'],
+    ['condensate', 'Гибридный'],
   ].find(([key]) => normalized === key || normalized.includes(key));
   if (slug) return slug[1];
   const direct = [
@@ -8887,7 +8897,7 @@ function translateGameWithArcType(value) {
     ['液', 'Жидкий'],
     ['気', 'Газовый'],
     ['プラズマ', 'Плазменный'],
-    ['凝縮', 'Конденсат'],
+    ['凝縮', 'Гибридный'],
   ].find(([key]) => raw.includes(key));
   if (direct) return direct[1];
   const ru = [
@@ -8896,7 +8906,6 @@ function translateGameWithArcType(value) {
     'Жидкий',
     'Газовый',
     'Плазменный',
-    'Конденсат',
   ].find((item) => normalized.includes(normalizeImportSearch(item)));
   return ru || translateArcType(raw) || raw;
 }
@@ -9578,7 +9587,7 @@ function translateArcType(value) {
     ['liquid', 'Жидкий'],
     ['gas', 'Газовый'],
     ['plasma', 'Плазменный'],
-    ['condensate', 'Конденсат'],
+    ['condensate', 'Гибридный'],
     ['hybrid', 'Гибридный'],
     ['cluster', 'Гибридный'],
   ];
@@ -10723,6 +10732,7 @@ function dedupeImportSuggestions(items) {
     'profile.gifts',
     'profile.skins',
     'profile.voiceLines',
+    'profile.appearanceVariants',
   ]);
 
   const variantsByField = new Map();
@@ -11867,6 +11877,9 @@ function serializeCharacter(row) {
         'profile.voiceLines',
         parseJson(row.profile_voice_lines_json, []),
       ),
+      appearanceVariants: normalizeCharacterAppearanceVariants(
+        parseJson(row.profile_appearance_variants_json, []),
+      ),
       awakenings: normalizeProfileCollectionRows(
         'profile.awakenings',
         parseJson(row.profile_awakenings_json, []),
@@ -12350,8 +12363,29 @@ function profileCollectionLabel(name) {
       gifts: 'любимые подарки',
       voiceLines: 'реплики',
       awakenings: 'пробуждения',
+      appearanceVariants: 'варианты внешности и озвучки',
     }[name] || name
   );
+}
+
+function normalizeCharacterAppearanceVariants(value) {
+  if (!Array.isArray(value) || value.length > 4)
+    throwHttp('Можно указать не больше 4 вариантов внешности', 400);
+  const seen = new Set();
+  return value.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item))
+      throwHttp('Вариант внешности должен быть объектом', 400);
+    const id = cleanString(item.id, 1, 80);
+    const name = cleanString(item.name, 1, 80);
+    if (seen.has(id))
+      throwHttp('ID вариантов внешности должны различаться', 400);
+    seen.add(id);
+    const profile = normalizeCharacterProfile({
+      skins: item.skins,
+      voiceLines: item.voiceLines,
+    });
+    return { id, name, skins: profile.skins, voiceLines: profile.voiceLines };
+  });
 }
 
 function normalizeCharacterProfile(value) {
@@ -12511,6 +12545,9 @@ function normalizeCharacterProfile(value) {
       description: text(item.description, 1000, 'Реплика: описание'),
     })),
     awakenings,
+    appearanceVariants: normalizeCharacterAppearanceVariants(
+      value.appearanceVariants ?? [],
+    ),
   };
   if (
     new TextEncoder().encode(JSON.stringify(profile)).byteLength >
@@ -12619,6 +12656,29 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
         JSON.stringify(profile.awakenings),
       ),
     );
+    // Older clients omit this field; their unrelated edits must preserve variants.
+    if (Object.hasOwn(body.profile, 'appearanceVariants')) {
+      statements.push(
+        env.DB.prepare(
+          'DELETE FROM character_appearance_variants WHERE character_id = ?',
+        ).bind(entityId),
+      );
+      for (const [position, variant] of profile.appearanceVariants.entries())
+        statements.push(
+          env.DB.prepare(
+            `INSERT INTO character_appearance_variants
+              (character_id, variant_id, name, skins_json, voice_lines_json, position)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+          ).bind(
+            entityId,
+            variant.id,
+            variant.name,
+            JSON.stringify(variant.skins),
+            JSON.stringify(variant.voiceLines),
+            position,
+          ),
+        );
+    }
   }
 
   if (entity === 'teams' && Array.isArray(body.members)) {
@@ -14304,6 +14364,32 @@ async function buildLocalGameCharacterSource(env, character) {
           sourceId: source.id,
         });
     }
+    source.suggestions.push(
+      makeImportSuggestion(
+        'profile.appearanceVariants',
+        'Гардероб и реплики по вариантам',
+        variants
+          .map((variant) => ({
+            id: variant.id.replace('local-installed-game-', ''),
+            name: variant.name
+              .split(' · ')
+              .at(-1)
+              .replace(/^./u, (letter) => letter.toLocaleUpperCase('ru')),
+            skins: JSON.parse(
+              variant.suggestions.find((row) => row.field === 'profile.skins')
+                ?.value || '[]',
+            ),
+            voiceLines: JSON.parse(
+              variant.suggestions.find(
+                (row) => row.field === 'profile.voiceLines',
+              )?.value || '[]',
+            ),
+          }))
+          .sort((left, right) => left.id.localeCompare(right.id)),
+        source,
+        'high',
+      ),
+    );
     return {
       ...source,
       status: source.suggestions.length ? 'ok' : 'reference',
@@ -15090,7 +15176,7 @@ async function handleGameData(request, env, parts) {
         byte.toString(16).padStart(2, '0'),
       ).join('');
       const cacheUrl = new URL(request.url);
-      cacheUrl.searchParams.set('__reference', 'progression-v2-' + version);
+      cacheUrl.searchParams.set('__reference', 'progression-v3-' + version);
       cacheRequest = new globalThis.Request(cacheUrl.toString());
       const hit = await cache.match(cacheRequest).catch(() => null);
       if (hit) {
@@ -15101,7 +15187,7 @@ async function handleGameData(request, env, parts) {
     }
     const rows = await env.DB.prepare(
       GAME_RECORD_SELECT +
-        " WHERE json_extract(e.value,'$.namespace') IN ('NTE_ReferenceCharacter','NTE_ReferenceCommunityProfile','NTE_ReferenceWeapon','DT_CharacterUpgradeDataTable','DT_ForkUpgradeData','DT_DefaultAppearanceData')",
+        " WHERE json_extract(e.value,'$.namespace') IN ('NTE_ReferenceCharacter','NTE_ReferenceCommunityProfile','NTE_ReferenceWeapon','DT_CharacterUpgradeDataTable','DT_ForkUpgradeData','DT_DefaultAppearanceData','DT_CultivationGuideData')",
     ).all();
     const records = (rows.results || []).map((row) => gameRecordView(row));
     const variantLabel = (id) => {
@@ -15116,6 +15202,41 @@ async function handleGameData(request, env, parts) {
           ? ' (мужской вариант)'
           : '';
     };
+    // The client recommendations all use one Arc type per character. Never
+    // broaden the picker when recommendations are absent or disagree.
+    const weapons = new Map(
+      records
+        .filter((row) => row.namespace === 'NTE_ReferenceWeapon')
+        .map((row) => [row.gameId, row]),
+    );
+    const arcTypes = {
+      1: 'Твёрдый',
+      2: 'Жидкий',
+      3: 'Плазменный',
+      4: 'Газовый',
+      5: 'Гибридный',
+    };
+    const characterArcTypes = new Map(
+      records
+        .filter((row) => row.namespace === 'DT_CultivationGuideData')
+        .map((row) => {
+          const types = [
+            ...new Set(
+              (row.details.RecommendForkList || []).map((item) =>
+                Number(weapons.get(item.ForkItemId)?.details.type_id),
+              ),
+            ),
+          ];
+          return [
+            row.ownerId || row.gameId,
+            types.length === 1 && arcTypes[types[0]] ? types[0] : undefined,
+          ];
+        }),
+    );
+    const typeFor = (row) =>
+      row.namespace === 'NTE_ReferenceWeapon'
+        ? Number(row.details.type_id)
+        : characterArcTypes.get(row.ownerId || row.gameId);
     const costs = records
       .filter(
         (row) =>
@@ -15132,6 +15253,9 @@ async function handleGameData(request, env, parts) {
             : ''),
         originalName: row.values.en || '',
         rarity: row.details.rarity,
+        arcTypeId: typeFor(row),
+        arcType: arcTypes[typeFor(row)] || '',
+        iconUrl: row.assets[0]?.url || '',
         stages: gameProgressionStages(
           row.details.breakthrough || row.details.materials || [],
           row.namespace === 'NTE_ReferenceCharacter'

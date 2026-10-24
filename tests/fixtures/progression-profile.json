@@ -1,0 +1,356 @@
+{
+  "gifts": [
+    {
+      "id": "food_061",
+      "name": "Банджо странника",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/food_0061.png",
+      "effect": "+100 очков симпатии"
+    },
+    {
+      "id": "food_095",
+      "name": "Пастилки для защиты от воспаления",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/food_0095.png",
+      "effect": "+100 очков симпатии"
+    },
+    {
+      "id": "food_097",
+      "name": "Великий защитник!",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/food_0097.png",
+      "effect": "+100 очков симпатии"
+    },
+    {
+      "id": "Food_128",
+      "name": "Памятный кофе от «Пука»",
+      "iconUrl": "https://www.neverness.app/assets/codex/likeability/Food_128.webp",
+      "effect": "Симпатия +100"
+    },
+    {
+      "id": "flower0003",
+      "name": "Месяц священного богослужения",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Flower0003_256.png",
+      "effect": "+200 очков симпатии"
+    },
+    {
+      "id": "furniture_flowerpot_004",
+      "name": "Золотая заря",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Furniture_FlowerPot_004_256.png",
+      "effect": "+200 очков симпатии"
+    },
+    {
+      "id": "furniture_draw_006",
+      "name": "Обещание",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Furniture_draw_006_256.png",
+      "effect": "+400 очков симпатии"
+    },
+    {
+      "id": "specialgift_ticket",
+      "name": "Билет в кинотеатр «Флоу»",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/YH_UI_Item_Likeability_Gift_02.png",
+      "effect": "+400 очков симпатии"
+    },
+    {
+      "id": "SpecialGift_letter",
+      "name": "Рукописное письмо",
+      "iconUrl": "/nte-meta/game-assets/3deebe64fe65e4e200c3.webp",
+      "effect": "Симпатия +2000"
+    },
+    {
+      "id": "specialgift_letter",
+      "name": "Письмо, написанное от руки",
+      "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/YH_UI_Item_01_YiFengShouXieXin.png",
+      "effect": "+2 000 очков симпатии"
+    }
+  ],
+  "friendship": [
+    {
+      "level": 1,
+      "rewardName": "Аннулит ×10; Руководство старшего охотника ×3",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png",
+      "description": "Опыт симпатии для уровня: 100",
+      "rewards": [
+        {
+          "id": "annulith",
+          "name": "Аннулит",
+          "quantity": "10",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png"
+        },
+        {
+          "id": "characterupmaterial_lv2",
+          "name": "Руководство старшего охотника",
+          "quantity": "3",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/CharacterUpMaterial_lv2.png"
+        }
+      ]
+    },
+    {
+      "level": 2,
+      "rewardName": "Аннулит ×10; Хаотическая краска ×2; Знакомство: Адлер ×1",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png",
+      "description": "Опыт симпатии для уровня: 500",
+      "rewards": [
+        {
+          "id": "annulith",
+          "name": "Аннулит",
+          "quantity": "10",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png"
+        },
+        {
+          "id": "weaponupmaterial_lv3",
+          "name": "Хаотическая краска",
+          "quantity": "2",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/weaponexp_lv3_256x256.png"
+        },
+        {
+          "id": "friendship_1_1033",
+          "name": "Знакомство: Адлер",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/YH_lihui_Adl_01.png"
+        }
+      ]
+    },
+    {
+      "level": 3,
+      "rewardName": "Аннулит ×10; Руководство элитного охотника ×2",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png",
+      "description": "Опыт симпатии для уровня: 1000",
+      "rewards": [
+        {
+          "id": "annulith",
+          "name": "Аннулит",
+          "quantity": "10",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png"
+        },
+        {
+          "id": "characterupmaterial_lv3",
+          "name": "Руководство элитного охотника",
+          "quantity": "2",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/CharacterUpMaterial_lv3.png"
+        }
+      ]
+    },
+    {
+      "level": 4,
+      "rewardName": "Аннулит ×10; Руководство элитного охотника ×3",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png",
+      "description": "Опыт симпатии для уровня: 2000",
+      "rewards": [
+        {
+          "id": "annulith",
+          "name": "Аннулит",
+          "quantity": "10",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png"
+        },
+        {
+          "id": "characterupmaterial_lv3",
+          "name": "Руководство элитного охотника",
+          "quantity": "3",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/CharacterUpMaterial_lv3.png"
+        }
+      ]
+    },
+    {
+      "level": 5,
+      "rewardName": "Аннулит ×20; Семя без снов ×5; Манеры дворецкого ×1",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png",
+      "description": "Опыт симпатии для уровня: 3500",
+      "rewards": [
+        {
+          "id": "annulith",
+          "name": "Аннулит",
+          "quantity": "20",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png"
+        },
+        {
+          "id": "cityability_upmaterial",
+          "name": "Семя без снов",
+          "quantity": "5",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/CityAbility_UpMaterial.png"
+        },
+        {
+          "id": "furniture_draw_0030_kv_solo",
+          "name": "Манеры дворецкого",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/KVpicture014.png"
+        }
+      ]
+    },
+    {
+      "level": 6,
+      "rewardName": "Аннулит ×20; Жук-монета ×20 000",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png",
+      "description": "Опыт симпатии для уровня: 5000",
+      "rewards": [
+        {
+          "id": "annulith",
+          "name": "Аннулит",
+          "quantity": "20",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Icon_Ringstone.png"
+        },
+        {
+          "id": "gold",
+          "name": "Жук-монета",
+          "quantity": "20 000",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png"
+        }
+      ]
+    },
+    {
+      "level": 7,
+      "rewardName": "Жук-монета ×20 000; И это так ×1",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png",
+      "description": "Опыт симпатии для уровня: 7000",
+      "rewards": [
+        {
+          "id": "gold",
+          "name": "Жук-монета",
+          "quantity": "20 000",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png"
+        },
+        {
+          "id": "universal_stickers_1033",
+          "name": "И это так",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/Likeability_Medal_1033_256.png"
+        }
+      ]
+    },
+    {
+      "level": 8,
+      "rewardName": "Жук-монета ×30 000; релдА ×1",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png",
+      "description": "Опыт симпатии для уровня: 9000",
+      "rewards": [
+        {
+          "id": "gold",
+          "name": "Жук-монета",
+          "quantity": "30 000",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png"
+        },
+        {
+          "id": "universal_avatar1_1033",
+          "name": "релдА",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/player_042.png"
+        }
+      ]
+    },
+    {
+      "level": 9,
+      "rewardName": "Жук-монета ×40 000; Свобода осознания себя ×1",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png",
+      "description": "Опыт симпатии для уровня: 12000",
+      "rewards": [
+        {
+          "id": "gold",
+          "name": "Жук-монета",
+          "quantity": "40 000",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png"
+        },
+        {
+          "id": "universal_frame_1033",
+          "name": "Свобода осознания себя",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/UI_Icon_Frame_1033_256.png"
+        }
+      ]
+    },
+    {
+      "level": 10,
+      "rewardName": "Жук-монета ×50 000; Добро пожаловать ×1; Проигрыватель «Лотус C198» ×1",
+      "rewardIconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png",
+      "description": "Опыт симпатии для уровня: 16000",
+      "rewards": [
+        {
+          "id": "gold",
+          "name": "Жук-монета",
+          "quantity": "50 000",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/item_Coin_Beetle.png"
+        },
+        {
+          "id": "universal_businesscard_1033",
+          "name": "Добро пожаловать",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/YH_UI_bg_card_icon_11.png"
+        },
+        {
+          "id": "likeprice_1033_0",
+          "name": "Проигрыватель «Лотус C198»",
+          "quantity": "1",
+          "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/items/YH_UI_item_Jukebox_002.png"
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "id": "b850edef-73b9-4ac7-bf48-db222ec455c4",
+      "name": "Размытая цифра",
+      "iconUrl": "https://static.wikia.nocookie.net/neverness-to-everness/images/a/a6/%D0%A0%D0%B0%D0%B7%D0%BC%D1%8B%D1%82%D0%B0%D1%8F_%D1%86%D0%B8%D1%84%D1%80%D0%B0.png/revision/latest?path-prefix=ru",
+      "amount": "Ур. 2: ×2; Ур. 3: ×3",
+      "source": "Материалы навыков"
+    },
+    {
+      "id": "14b43717-458c-4bdb-ba9e-548f03ada844",
+      "name": "Жук-монета",
+      "iconUrl": "https://static.wikia.nocookie.net/neverness-to-everness/images/5/5d/%D0%96%D1%83%D0%BA-%D0%BC%D0%BE%D0%BD%D0%B5%D1%82%D0%B0.png/revision/latest?path-prefix=ru",
+      "amount": "Материалы навыков поддержки: ×30 000; Материалы навыков поддержки: ×60 000",
+      "source": "Материалы навыков поддержки"
+    },
+    {
+      "id": "Worldboss_material_04",
+      "name": "Медиатор водяной луны",
+      "iconUrl": "/nte-meta/game-assets/32caabafeb97c4c67ae7.webp",
+      "amount": "86",
+      "source": "Уровень возвышения → количество: 30 → 40: 2 · 40 → 50: 8 · 50 → 60: 16 · 60 → 70: 24 · 70 → 80: 36"
+    },
+    {
+      "id": "b9dc3dfe-3685-4a2f-833f-087e935f4cdc",
+      "name": "Неразгаданная цифра",
+      "iconUrl": "https://static.wikia.nocookie.net/neverness-to-everness/images/8/88/%D0%9D%D0%B5%D1%80%D0%B0%D0%B7%D0%B3%D0%B0%D0%B4%D0%B0%D0%BD%D0%BD%D0%B0%D1%8F_%D1%86%D0%B8%D1%84%D1%80%D0%B0.png/revision/latest?path-prefix=ru",
+      "amount": "Ур. 4: ×5; Ур. 5: ×2; Ур. 6: ×3; Ур. 7: ×5",
+      "source": "Материалы навыков"
+    },
+    {
+      "id": "3466f112-9721-4499-8ee9-f08996a327bb",
+      "name": "Искажённая цифра",
+      "iconUrl": "https://static.wikia.nocookie.net/neverness-to-everness/images/6/6f/%D0%98%D1%81%D0%BA%D0%B0%D0%B6%D1%91%D0%BD%D0%BD%D0%B0%D1%8F_%D1%86%D0%B8%D1%84%D1%80%D0%B0.png/revision/latest?path-prefix=ru",
+      "amount": "Ур. 8: ×3; Ур. 9: ×5; Ур. 10: ×8",
+      "source": "Материалы навыков"
+    },
+    {
+      "id": "a111ccb2-6604-4f66-a9b1-9aa35cfb2da4",
+      "name": "Пик Водяной Луны",
+      "iconUrl": "https://static.wikia.nocookie.net/neverness-to-everness/images/f/f9/%D0%9F%D0%B8%D0%BA_%D0%92%D0%BE%D0%B4%D1%8F%D0%BD%D0%BE%D0%B9_%D0%9B%D1%83%D0%BD%D1%8B.png/revision/latest?path-prefix=ru",
+      "amount": "Ур. 30: ×2; Ур. 40: ×8; Ур. 50: ×16; Ур. 60: ×24; Ур. 70: ×36",
+      "source": "Материалы прорыва"
+    },
+    {
+      "id": "6280b345-9191-4374-933d-579700caafa7",
+      "name": "Первые ожидания",
+      "iconUrl": "",
+      "amount": "Ур. 2: ×2; Ур. 3: ×3",
+      "source": "Материалы навыков"
+    },
+    {
+      "id": "82c81fa9-a3e2-4950-8cc9-025976b982f2",
+      "name": "Известная усталость",
+      "iconUrl": "",
+      "amount": "Материалы навыков поддержки: ×2",
+      "source": "Материалы навыков поддержки"
+    },
+    {
+      "id": "867092f1-a926-41e7-b78a-001ddbd81a0d",
+      "name": "Показушное платье с рукавами",
+      "iconUrl": "",
+      "amount": "Материалы навыков поддержки: ×1; Материалы навыков поддержки: ×2",
+      "source": "Материалы навыков поддержки"
+    },
+    {
+      "id": "873fe386-41fc-42b5-8f16-c6a58ff60e33",
+      "name": "Черная шляпа",
+      "iconUrl": "",
+      "amount": "Материалы навыков поддержки: ×1",
+      "source": "Материалы навыков поддержки"
+    }
+  ]
+}

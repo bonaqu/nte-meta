@@ -1,0 +1,153 @@
+[
+  {
+    "id": "1046",
+    "name": "Мужской вариант",
+    "skins": [
+      {
+        "id": "Fashion_1046_rpg_level1",
+        "name": "Неприметный воин",
+        "imageUrl": "/nte-meta/game-assets/b1a6ede18c2c4caca341.webp",
+        "description": "Застегни верхнюю пуговицу, расправь воротник.\n\nТе, кто впервые отправляется в путь, должны научиться этому в первую очередь."
+      },
+      {
+        "id": "Fashion_1046_0",
+        "name": "Начало истории",
+        "imageUrl": "/nte-meta/game-assets/d4e610bd9fce8d53dcd3.webp",
+        "description": "Чёткий, минималистичный силуэт, прекрасно подходящий для ежедневной работы."
+      }
+    ],
+    "voiceLines": [
+      {
+        "id": "ja-Play_Vo_Char_ZERO_M_TeammateDown_003",
+        "title": "Поражен товарищ по команде – Адлер",
+        "language": "Японский",
+        "audioUrl": "/nte-meta/game-audio/9221058ab3c16a2926f4.ogg",
+        "sourceUrl": "",
+        "description": "«Эйбон» никогда не сдаётся."
+      },
+      {
+        "id": "ja-Play_Vo_Char_ZERO_M_windfall_001",
+        "title": "Неожиданная добыча I",
+        "language": "Японский",
+        "audioUrl": "/nte-meta/game-audio/8f0d0124fd4cf4dbb4e4.ogg",
+        "sourceUrl": "",
+        "description": "Спрячь это как следует."
+      },
+      {
+        "id": "ja-Play_Vo_Char_ZERO_M_aoe_UI_001",
+        "title": "Сверхспособность I",
+        "language": "Японский",
+        "audioUrl": "/nte-meta/game-audio/b76db0a0e10e472c5e0b.ogg",
+        "sourceUrl": "",
+        "description": "Закончим это!"
+      },
+      {
+        "id": "ja-Play_Vo_Char_ZERO_M_TeammateDown_001",
+        "title": "Поражен товарищ по команде – Хотори",
+        "language": "Японский",
+        "audioUrl": "/nte-meta/game-audio/cdd1dfdc5f5e5589f545.ogg",
+        "sourceUrl": "",
+        "description": "Оставь это вино… потом выпьешь."
+      },
+      {
+        "id": "ja-Play_Vo_Char_ZERO_M_kill_002",
+        "title": "Убийство II",
+        "language": "Японский",
+        "audioUrl": "/nte-meta/game-audio/e97dc5e64bab38113530.ogg",
+        "sourceUrl": "",
+        "description": "Нексус, вот он."
+      },
+      {
+        "id": "ja-Play_Vo_Char_ZERO_M_Mh_001",
+        "title": "Исцеление I",
+        "language": "Японский",
+        "audioUrl": "/nte-meta/game-audio/272412696aaf9576c1dc.ogg",
+        "sourceUrl": "",
+        "description": "Спасибо за поддержку."
+      },
+      {
+        "id": "ja-Play_Vo_Char_ZERO_M_DodgeCombo_001",
+        "title": "Серия критических уклонений I",
+        "language": "Японский",
+        "audioUrl": "/nte-meta/game-audio/a583c294907c57dec30a.ogg",
+        "sourceUrl": "",
+        "description": "Чувствую себя хорошо."
+      },
+      {
+        "id": "en-Play_Vo_Char_ZERO_M_DodgeCombo_002",
+        "title": "Серия критических уклонений II",
+        "language": "Английский",
+        "audioUrl": "/nte-meta/game-audio/283d5428f7c1aca6c557.ogg",
+        "sourceUrl": "",
+        "description": "Хм-м, не так уж сложно."
+      },
+      {
+        "id": "en-Play_Vo_Char_ZERO_M_QTE_001",
+        "title": "Атака на входе I",
+        "language": "Английский",
+        "audioUrl": "/nte-meta/game-audio/b0fbb53ed55434893992.ogg",
+        "sourceUrl": "",
+        "description": "Оценить… и разбить!"
+      },
+      {
+        "id": "en-Play_Vo_Char_ZERO_M_deploy_002",
+        "title": "Отправка I",
+        "language": "Английский",
+        "audioUrl": "/nte-meta/game-audio/a85ad8fa0bf067dc7be9.ogg",
+        "sourceUrl": "",
+        "description": "Ясно, предоставь это мне."
+      },
+      {
+        "id": "en-Play_Vo_Char_ZERO_M_containment_001",
+        "title": "Сдерживание I",
+        "language": "Английский",
+        "audioUrl": "/nte-meta/game-audio/8951f96bd4e5e1f4e452.ogg",
+        "sourceUrl": "",
+        "description": "Все готово."
+      },
+      {
+        "id": "en-Play_Vo_Char_ZERO_M_aoe_UI_002",
+        "title": "Сверхспособность II",
+        "language": "Английский",
+        "audioUrl": "/nte-meta/game-audio/2b1e12dbfa121f343221.ogg",
+        "sourceUrl": "",
+        "description": "Все может сломаться."
+      },
+      {
+        "id": "en-Play_Vo_Char_ZERO_M_windfall_005",
+        "title": "Неожиданная добыча V",
+        "language": "Английский",
+        "audioUrl": "/nte-meta/game-audio/a0827ca285e0a7b6d0d6.ogg",
+        "sourceUrl": "",
+        "description": "Мне ведь не нужно сообщать об этом в Офис безопасности, верно?"
+      },
+      {
+        "id": "en-Play_Vo_Char_ZERO_M_hp_003",
+        "title": "Низкий уровень здоровья III",
+        "language": "Английский",
+        "audioUrl": "/nte-meta/game-audio/0ba50729096a5001d99b.ogg",
+        "sourceUrl": "",
+        "description": "Не отвлекаемся, это ещё не конец."
+      }
+    ]
+  },
+  {
+    "id": "1051",
+    "name": "Женский вариант",
+    "skins": [
+      {
+        "id": "Fashion_1051_4",
+        "name": "Нетрадиционная одежда",
+        "imageUrl": "/nte-meta/game-assets/aed60058c0f3eac6e350.webp",
+        "description": "Стандартная форма изолятора с хорошо сидящим кроем, комфортной тканью и яркими цветами. Вот бы можно было носить её как обычную одежду…"
+      },
+      {
+        "id": "Fashion_1051_7",
+        "name": "Идеальный дуэт",
+        "imageUrl": "/nte-meta/game-assets/1e563c795b6ac5ffe035.webp",
+        "description": "Безупречно сидящий гоночный костюм так же незаменим, как напарник рядом."
+      }
+    ],
+    "voiceLines": []
+  }
+]

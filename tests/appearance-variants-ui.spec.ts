@@ -47,6 +47,8 @@ test('варианты гардероба и озвучки переключаю
   );
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  const cpu = await page.context().newCDPSession(page);
+  await cpu.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   for (const width of [360, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/#/characters/esper-zero');
@@ -153,6 +155,7 @@ test('варианты гардероба и озвучки переключаю
       width === 360 ? 1 : width === 768 ? 2 : width === 1024 ? 3 : 4,
     );
   }
+  await cpu.detach();
   expect(errors).toEqual([]);
 });
 
@@ -488,4 +491,82 @@ test('опубликованные профили: калькулятор, бы�
   );
   expect(errors).toEqual([]);
   expect(networkErrors).toEqual([]);
+});
+
+test('переход к гардеробу держит заголовок при поздней загрузке материалов и отпускает прокрутку пользователю', async ({
+  page,
+  request,
+}) => {
+  const characters = (
+    await (await request.get('http://127.0.0.1:8788/api/characters')).json()
+  ).data as Character[];
+  const variants = JSON.parse(
+    await readFile('tests/fixtures/appearance-variants.json', 'utf8'),
+  ) as CharacterAppearanceVariant[];
+  const zero = characters.find((row) => row.id === 'esper-zero')!;
+  zero.profile = {
+    ...zero.profile!,
+    skins: [],
+    voiceLines: [],
+    appearanceVariants: variants,
+  };
+  await page.route('**/api/characters', (route) =>
+    route.fulfill({ json: { data: characters } }),
+  );
+  const native = JSON.parse(
+    await readFile('tests/fixtures/progression-native.json', 'utf8'),
+  );
+  native.costs.push({
+    ...native.costs.find((row: { id: string }) => row.id === '1033'),
+    id: '1046',
+    name: 'Зеро',
+    originalName: 'Zero',
+  });
+  let release = () => {};
+  let requested = false;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/game-data/progression', async (route) => {
+    requested = true;
+    await gate;
+    await route.fulfill({ json: { data: native } });
+  });
+  const cpu = await page.context().newCDPSession(page);
+  await cpu.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  try {
+    await page.setViewportSize({ width: 360, height: 900 });
+    await page.goto('/#/characters/esper-zero');
+    await page
+      .getByRole('navigation', { name: 'Разделы персонажа' })
+      .getByRole('button', { name: 'Гардероб', exact: true })
+      .click();
+    const wardrobe = page.locator('#character-wardrobe');
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    expect((await wardrobe.boundingBox())!.y).toBeCloseTo(150, 0);
+    await expect.poll(() => requested).toBe(true);
+    release();
+    await expect(
+      page.getByRole('button', { name: 'Всего · 1–80', exact: true }),
+    ).toBeAttached();
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    expect((await wardrobe.boundingBox())!.y).toBeCloseTo(150, 0);
+    await page.mouse.wheel(0, 200);
+    await expect
+      .poll(async () => Math.abs((await wardrobe.boundingBox())!.y - 150))
+      .toBeGreaterThan(10);
+  } finally {
+    release();
+    await cpu.detach();
+  }
 });

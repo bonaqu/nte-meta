@@ -3115,6 +3115,9 @@ function CharacterDetailPage({
       const target = document.getElementById(id);
       if (!target) return;
       characterScrollAnchor.current = target;
+      // Browser scroll anchoring can otherwise apply a second adjustment after
+      // our ResizeObserver has already kept the requested heading in place.
+      document.documentElement.classList.add('profile-scroll-anchored');
       target.scrollIntoView({ behavior, block: 'start' });
     },
     [],
@@ -3162,6 +3165,7 @@ function CharacterDetailPage({
     if (profilePage) observer.observe(profilePage);
     const releaseAnchor = () => {
       characterScrollAnchor.current = null;
+      document.documentElement.classList.remove('profile-scroll-anchored');
     };
     for (const event of ['wheel', 'touchstart', 'pointerdown', 'keydown'])
       window.addEventListener(event, releaseAnchor, { passive: true });
@@ -3171,6 +3175,7 @@ function CharacterDetailPage({
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      releaseAnchor();
       for (const event of ['wheel', 'touchstart', 'pointerdown', 'keydown'])
         window.removeEventListener(event, releaseAnchor);
       window.removeEventListener('scroll', schedule);

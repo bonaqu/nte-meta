@@ -1,3 +1,4 @@
+import { stripEditorialText } from '../lib/guide-visual';
 import { useLayoutEffect, useState } from 'react';
 import { PageStepper } from './page-stepper';
 import { Star } from 'lucide-react';
@@ -11,6 +12,9 @@ export function CharacterFriendship({
   useLayoutEffect(() => {
     onLayout?.();
   });
+  const hasRewards = friendship.some(
+    (level) => level.rewards?.length || level.rewardName || level.rewardIconUrl,
+  );
   const levels = [...friendship].sort((a, b) => a.level - b.level);
   const [selectedLevel, setSelectedLevel] = useState(0);
   const activeIndex = Math.min(selectedLevel, Math.max(0, levels.length - 1));
@@ -56,7 +60,9 @@ export function CharacterFriendship({
         </div>
       ) : null}
       {friendship.length ? (
-        <h3 className="profile-subheading">Награды за уровни дружбы</h3>
+        <h3 className="profile-subheading">
+          {hasRewards ? 'Награды за уровни дружбы' : 'Уровни дружбы'}
+        </h3>
       ) : null}
       {friendship.length ? (
         <div className="friendship-browser">
@@ -79,6 +85,7 @@ export function CharacterFriendship({
           </div>
           <div className="friendship-track">
             {levels.slice(activeIndex, activeIndex + 1).map((level) => {
+              const description = stripEditorialText(level.description);
               const rewards = level.rewards?.length
                 ? level.rewards
                 : level.rewardName || level.rewardIconUrl
@@ -96,7 +103,7 @@ export function CharacterFriendship({
                   <strong aria-hidden="true">{level.level}</strong>
                   <div className="friendship-level-content">
                     <h3>{`Уровень симпатии ${level.level}`}</h3>
-                    {level.description ? <p>{level.description}</p> : null}
+                    {description ? <p>{description}</p> : null}
                     {rewards.length ? (
                       <ul
                         className="friendship-reward-list inventory-tiles"
@@ -131,7 +138,7 @@ export function CharacterFriendship({
             })}
           </div>
           <PageStepper
-            label="Награды дружбы"
+            label={hasRewards ? 'Награды дружбы' : 'Уровни дружбы'}
             unit="Уровень"
             value={activeIndex + 1}
             total={levels.length}

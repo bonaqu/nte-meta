@@ -148,6 +148,10 @@ export function isPrivateGuideSection(section: GuideSection) {
 
 export function stripEditorialText(text: string) {
   return text
+    .replace(
+      /\s*Награда за уровень в проверенном источнике не указана\.?/giu,
+      '',
+    )
     .replace(/\s*Источники сверены[^\n]*?для версии \d+(?:\.\d+)*\.?/g, '')
     .replace(/\n\nСверено \d{4}-\d{2}-\d{2}[\s\S]*$/, '')
     .replace(

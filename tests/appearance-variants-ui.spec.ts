@@ -41,6 +41,16 @@ test('варианты гардероба и озвучки переключаю
     skins: [],
     voiceLines: [],
     appearanceVariants: variants,
+    friendship: [
+      {
+        level: 1,
+        rewardName: '',
+        rewardIconUrl: '',
+        rewards: [],
+        description:
+          'Для достижения уровня 1 требуется 100 очков симпатии. Награда за уровень в проверенном источнике не указана.',
+      },
+    ],
   };
   await page.route('**/api/characters', (route) =>
     route.fulfill({ json: { data: characters } }),
@@ -53,6 +63,17 @@ test('варианты гардероба и озвучки переключаю
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/#/characters/esper-zero');
     await page.reload();
+    await expect(
+      page
+        .locator('#character-friendship')
+        .getByRole('heading', { name: 'Уровни дружбы', exact: true }),
+    ).toBeAttached();
+    await expect(page.locator('#character-friendship')).toContainText(
+      '100 очков симпатии',
+    );
+    await expect(page.locator('#character-friendship')).not.toContainText(
+      'в проверенном источнике',
+    );
     const navigation = page.getByRole('navigation', {
       name: 'Разделы персонажа',
     });
@@ -466,6 +487,19 @@ test('опубликованные профили: калькулятор, бы�
     ).toBe(true);
   }
   await page.goto(base + '#/characters/esper-zero');
+  await expect(page.locator('#character-friendship')).not.toContainText(
+    'в проверенном источнике',
+  );
+  if (
+    zero.profile!.friendship.every(
+      (row) => !row.rewards?.length && !row.rewardName && !row.rewardIconUrl,
+    )
+  )
+    await expect(
+      page
+        .locator('#character-friendship')
+        .getByRole('heading', { name: 'Уровни дружбы', exact: true }),
+    ).toBeAttached();
   await page.getByRole('button', { name: 'Способности', exact: true }).click();
   const skills = page.locator('#character-abilities');
   for (const [name, damage] of [

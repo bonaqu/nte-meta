@@ -1462,7 +1462,6 @@
   }
 
   @supports (content-visibility: auto) {
-    .guide-section-card,
     .admin-panel {
       content-visibility: auto;
       /* These panels have predictable vertical bounds. Dynamic page bands can
@@ -2960,6 +2959,7 @@
 
   .guide-section-card {
     display: grid;
+    scroll-margin-block-start: 96px;
     gap: 12px;
     padding: clamp(18px, 3vw, 28px);
     border: 1px solid var(--border);

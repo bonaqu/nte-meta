@@ -3786,9 +3786,14 @@ function GuideDetail({
               }
               onClick={() => {
                 setActiveGuideSection(section.id);
-                document
-                  .getElementById(section.id)
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                document.getElementById(section.id)?.scrollIntoView({
+                  behavior: window.matchMedia(
+                    '(prefers-reduced-motion: reduce)',
+                  ).matches
+                    ? 'auto'
+                    : 'smooth',
+                  block: 'start',
+                });
               }}
             >
               {section.title}

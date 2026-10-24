@@ -1223,15 +1223,27 @@ export function LeakDiscoveryPanel({
                       }
                       const id =
                         candidate.createdNewsId || candidate.createdLeakId;
-                      if (id)
+                      if (!id) return;
+                      setActionId(candidate.id);
+                      try {
                         await onPromoted(
                           id,
                           candidate.createdNewsId ? 'news' : 'leaks',
                         );
+                      } catch {
+                        setTone('danger');
+                        setMessage(
+                          'Не удалось открыть черновик. Попробуйте ещё раз.',
+                        );
+                      } finally {
+                        setActionId('');
+                      }
                     }}
                   >
                     <FilePenLine aria-hidden="true" />
-                    Открыть черновик
+                    {actionId === candidate.id
+                      ? 'Открываем…'
+                      : 'Открыть черновик'}
                   </button>
                 ) : null}
                 {candidate.reviewStatus === 'pending' ? (

@@ -60,6 +60,14 @@
 
 ## Командная строка
 
+Владелец реплик определяется по игровому ID строки профиля. Имя файла может содержать старый ID: например, `1009FileDataTable` хранит женский вариант Зеро в строке `1051`. Для проверки этой связи без открытия архивов:
+
+```powershell
+dotnet run --project scripts/game-data/extractor -- --profile-voices ПутьКТаблице.json
+```
+
+Офлайн-проверка регрессии: задайте `NTE_EXTRACTOR_DLL` равным полному пути к собранному `extractor.dll` и запустите `python -m unittest discover -s tools/nte-data-workbench -p test_voice_bindings.py`.
+
 ```powershell
 D:\CODEX\Programs\Python312\python.exe -X utf8 tools/nte-data-workbench/exporter.py --repository D:\Projects\nte-hub --output D:\Exports\NTE-new
 ```

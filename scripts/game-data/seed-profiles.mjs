@@ -20,13 +20,15 @@ const identity = (field, row) =>
         ? key(row.language) +
           ':' +
           key(String(row.title || '').replace(/^(?:обо|об|о)\s+/i, ''))
-        : field === 'baseStats'
-          ? key(row.label).startsWith('шанскрит')
-            ? 'crit'
-            : key(row.label).includes('крит')
-              ? 'critDamage'
-              : key(row.label)
-          : key(row.name);
+        : field === 'voiceActors'
+          ? key(row.language)
+          : field === 'baseStats'
+            ? key(row.label).startsWith('шанскрит')
+              ? 'crit'
+              : key(row.label).includes('крит')
+                ? 'critDamage'
+                : key(row.label)
+            : key(row.name);
 const legacyVoicePlaceholder = (row) =>
   /^https:\/\/static\.wikia\.nocookie\.net\/neverness-to-everness\/images\/[^/]+\/[^/]+\/VO_/.test(
     row.audioUrl || '',

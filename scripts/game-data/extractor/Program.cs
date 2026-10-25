@@ -6,6 +6,10 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 
 // The game is only read. All exports go to a separate output directory.
+if (args.Length == 2 && args[0] == "--profile-voices") {
+ Console.WriteLine(JsonSerializer.Serialize(ProfileVoiceBindings.Read(File.ReadAllText(args[1]))));
+ return;
+}
 if (args.Length < 4) throw new ArgumentException("Usage: extractor <UEExtractor.dll> <archive mount named HT> <usmap> <output> [--probe <path-list>]");
 var output = Path.GetFullPath(args[3]);
 if (output.Equals(Path.GetFullPath(args[1]),StringComparison.OrdinalIgnoreCase) || output.StartsWith(Path.GetFullPath(args[1]) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Output must be outside the archive mount");
@@ -39,6 +43,11 @@ var profileOwners = new HashSet<string>();
 void AddVoice(string name, string owner) {
  if(!voiceEvents.ContainsKey(name))voiceEvents[name]=new(); voiceEvents[name].Add(owner);
 }
+void ReadProfile(string json) {
+ foreach(var binding in ProfileVoiceBindings.Read(json)) {
+  profileOwners.Add(binding.OwnerId); AddVoice(binding.EventName,binding.OwnerId);
+ }
+}
 void ReadVoiceMap(string json) {
  using var document=JsonDocument.Parse(json);
  void Walk(JsonElement node) {
@@ -64,9 +73,7 @@ if(voicesOnly) {
   var path=table.GetProperty("path").GetString()!;
   if(Regex.IsMatch(path,@"/\d{4}FileDataTable\d*\.uasset$")) {
    var json=File.ReadAllText(Path.Combine(output,table.GetProperty("file").GetString()!));
-   foreach(Match match in Regex.Matches(json,"\"AssetPathName\":\"(/Game/WwiseAudio/Events/Voice/[^\"]+)\"")) {
-    var owner=Path.GetFileName(path)[..4];profileOwners.Add(owner);AddVoice(Path.GetFileName(match.Groups[1].Value.Split('.')[0]),owner);
-   }
+   ReadProfile(json);
   }
   if(path.EndsWith("/DT_CharacterVoice.uasset"))ReadVoiceMap(File.ReadAllText(Path.Combine(output,table.GetProperty("file").GetString()!)));
  }
@@ -77,17 +84,13 @@ foreach (var path in paths.Where(x=>!voicesOnly && x.StartsWith("HT/Content/Data
   var objects=Objects(load.Invoke(provider,[path])!);
   var json=(string)serialize.Invoke(null,[objects])!;
   if(path.EndsWith("/DT_CharacterVoice.uasset"))ReadVoiceMap(json);
+  if(Regex.IsMatch(path,@"/\d{4}FileDataTable\d*\.uasset$"))ReadProfile(json);
   var name=Hash(path)+".json";
   File.WriteAllText(Path.Combine(output,"tables",name),json);
   tables.Add(new {path,file="tables/"+name});
   foreach(Match match in Regex.Matches(json,"\"AssetPathName\":\"(/Game/[^\"]+)\"")) {
    var asset=match.Groups[1].Value.Split('.')[0];
    if(asset.StartsWith("/Game/UI/")) referencedImages.Add("HT/Content/"+asset[6..]+".uasset");
-   if(Regex.IsMatch(path,@"/\d{4}FileDataTable\d*\.uasset$") && asset.StartsWith("/Game/WwiseAudio/Events/Voice/")) {
-    var owner=Path.GetFileName(path)[..4]; var key=Path.GetFileName(asset);
-    profileOwners.Add(owner);
-    if(!voiceEvents.ContainsKey(key)) voiceEvents[key]=new(); voiceEvents[key].Add(owner);
-   }
   }
  } catch(Exception ex) { failures.Add(new {path,error=ex.GetBaseException().Message}); }
 }

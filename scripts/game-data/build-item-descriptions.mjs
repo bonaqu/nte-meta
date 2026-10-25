@@ -95,6 +95,13 @@ export async function buildItemDescriptions(rows) {
     }
   }
   const aliases = {};
+  // Food IDs use three or four digits in different native tables.
+  for (const id of Object.keys(byId)) {
+    if (!/^food_\d+$/.test(id)) continue;
+    const number = String(Number(id.split('_')[1]));
+    for (const length of [0, 3, 4])
+      aliases[`food_${number.padStart(length, '0')}`] = id;
+  }
   for (const row of rows.filter((row) =>
     [
       'NTE_ReferenceItem',

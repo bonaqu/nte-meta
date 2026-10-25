@@ -76,7 +76,8 @@ test('Дружба открывается первым кадром после �
         ).friendshipFrame,
     );
     console.log(JSON.stringify({ width, ...result }));
-    expect(result.top).toBeCloseTo(150, 0);
+    // Root scroll rounds to device pixels, including the exact half-pixel edge.
+    expect(Math.abs(result.top - 150)).toBeLessThanOrEqual(0.5);
     expect(result.elapsed).toBeLessThan(750);
   }
   await cpu.detach();

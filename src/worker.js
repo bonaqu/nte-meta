@@ -13456,7 +13456,10 @@ function validateGuideVisual(value) {
     const imageUrl = cleanString(item.imageUrl || '', 0, 2048);
     if (
       imageUrl &&
-      !/^(?:https:\/\/|assets\/|\/api\/media\/uploads\/)/i.test(imageUrl)
+      !/^(?:https:\/\/|assets\/|\/api\/media\/uploads\/)/i.test(imageUrl) &&
+      !/^\/(?:nte-meta\/)?game-assets\/[a-f0-9]{20}\.(?:webp|png|jpe?g)$/i.test(
+        imageUrl,
+      )
     )
       throwHttp('Укажите безопасную ссылку на изображение', 400);
     if (!Array.isArray(item.stats) || item.stats.length > 24)
@@ -14526,19 +14529,65 @@ async function buildLocalGameCharacterSource(env, character) {
       ...preferred.map((row) => row.item_id),
     ]),
   ];
+  const nativeItemKey = (id) => {
+    const key = String(id)
+      .toLowerCase()
+      .replace(/_name$/, '');
+    return /^food_\d+$/.test(key) ? `food_${Number(key.split('_')[1])}` : key;
+  };
+  const itemLookupIds = [
+    ...new Set(
+      materialIds.flatMap((id) => {
+        const keys = [String(id).toLowerCase()];
+        if (/^food_\d+$/i.test(id)) {
+          const number = String(Number(id.split('_')[1]));
+          keys.push(
+            ...[0, 3, 4].map(
+              (length) => `food_${number.padStart(length, '0')}`,
+            ),
+          );
+        }
+        return [...keys, ...keys.map((key) => `${key}_name`)];
+      }),
+    ),
+  ];
   const itemRows = materialIds.length
     ? await env.DB.prepare(
         GAME_RECORD_SELECT +
-          " WHERE c.kind='item' AND json_extract(e.value,'$.gameId') IN (SELECT value FROM json_each(?))",
+          " WHERE c.kind IN ('item','image','localization') AND lower(json_extract(e.value,'$.gameId')) IN (SELECT value FROM json_each(?))",
       )
-        .bind(JSON.stringify(materialIds))
+        .bind(JSON.stringify(itemLookupIds))
         .all()
     : { results: [] };
   const itemMap = new Map();
   for (const raw of itemRows.results || []) {
     const row = gameRecordView(raw);
-    const previous = itemMap.get(row.gameId);
-    if (!previous || row.values.ru) itemMap.set(row.gameId, row);
+    const key = nativeItemKey(row.gameId);
+    const previous = itemMap.get(key);
+    const values = { ...previous?.values };
+    for (const [locale, text] of Object.entries(row.values || {}))
+      if (text && (!previous?.modified || row.modified)) values[locale] = text;
+    const assetsOverridden = Object.hasOwn(
+      JSON.parse(raw.overrides_json || '{}'),
+      'assets',
+    );
+    const assets = assetsOverridden
+      ? row.assets
+      : previous?.assetsOverridden
+        ? previous.assets
+        : [...(previous?.assets || []), ...row.assets].sort(
+            (a, b) =>
+              (b.width || 0) * (b.height || 0) -
+              (a.width || 0) * (a.height || 0),
+          );
+    itemMap.set(key, {
+      ...previous,
+      ...row,
+      values,
+      assets,
+      assetsOverridden: assetsOverridden || previous?.assetsOverridden,
+      modified: previous?.modified || row.modified,
+    });
   }
   const refs = new Set();
   function collect(value) {
@@ -14589,10 +14638,10 @@ async function buildLocalGameCharacterSource(env, character) {
     if (item) source.suggestions.push(item);
   }
   const itemName = (id) =>
-    itemMap.get(id)?.values.ru ||
-    itemMap.get(id)?.values.en ||
+    itemMap.get(nativeItemKey(id))?.values.ru ||
+    itemMap.get(nativeItemKey(id))?.values.en ||
     (id === 'gold' ? 'Жук-монета' : id);
-  const itemIcon = (id) => itemMap.get(id)?.assets[0]?.url || '';
+  const itemIcon = (id) => itemMap.get(nativeItemKey(id))?.assets[0]?.url || '';
   if (preferred.length)
     add(
       'profile.gifts',

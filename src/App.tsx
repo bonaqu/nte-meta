@@ -14,6 +14,7 @@ import { GuideVisualEditor, GuideVisualView } from './components/guide-visual';
 import { ProgressionCalculator } from './components/progression-calculator';
 import { ImageUploadButton } from './components/image-field';
 import { PageStepper } from './components/page-stepper';
+import { LevelSelector } from './components/level-selector';
 import { CharacterWardrobe } from './components/character-wardrobe';
 import { CharacterSectionNav } from './components/character-section-nav';
 import { CharacterAppearanceSelector } from './components/character-appearance-selector';
@@ -3010,9 +3011,8 @@ function CharacterAbilityCard({
         {activePane === 'attributes' && attributes.length ? (
           <>
             {maxSkillLevel > 1 ? (
-              <PageStepper
+              <LevelSelector
                 label={`Уровень навыка «${ability.name}»`}
-                unit="Уровень"
                 value={currentSkillLevel}
                 total={maxSkillLevel}
                 onChange={setSkillLevel}
@@ -3881,7 +3881,7 @@ function GuideDetail({
   }, [guideNavigation]);
 
   return (
-    <div className="page-stack">
+    <div className="page-stack guide-page">
       <GuideHero
         guide={guide}
         character={character}
@@ -3960,7 +3960,6 @@ function GuideDetail({
             <SectionHeader
               eyebrow="Внутри гайда"
               title={`Лучшие отряды и ротации для ${character.name}`}
-              text="Состав, роли и последовательность действий собраны в одном месте."
             />
             <div className="team-grid">
               {relatedTeams.length ? (
@@ -4678,7 +4677,7 @@ function CommentsBlock({
   }
 
   return (
-    <section className="content-band">
+    <section className="content-band comments-module">
       <div className="panel-title-row">
         <SectionHeader eyebrow="Комьюнити" title="Комментарии и обсуждения" />
         <label className="compact-select">
@@ -5223,7 +5222,7 @@ function TierListsPage({
   );
 
   return (
-    <div className="page-stack">
+    <div className="page-stack tierlists-page">
       <section className="page-hero compact">
         <p className="eyebrow">S · A · B · C · D</p>
         <h1>Тир-листы</h1>

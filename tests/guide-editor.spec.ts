@@ -138,6 +138,29 @@ test('визуальная дуга: поиск, загрузка файла, с
     await (await request.get('http://127.0.0.1:8788/api/guides')).json()
   ).data as Guide[];
   const guide = guides.find((g) => g.characterId === 'akane')!;
+  const characters = (
+    await (await request.get('http://127.0.0.1:8788/api/characters')).json()
+  ).data;
+  const character = characters.find(
+    (row: { id: string }) => row.id === guide.characterId,
+  );
+  character.profile = {
+    ...character.profile,
+    abilities: [
+      {
+        id: 'native-test-skill',
+        type: 'Навык',
+        name: 'Проверочный навык из игры',
+        iconUrl: '/nte-meta/game-assets/ad87d2a73478180243f0.webp',
+        description: 'Описание',
+        attributes: [],
+      },
+    ],
+  };
+  await page.route('**/api/characters', (route) =>
+    route.fulfill({ json: { data: characters } }),
+  );
+
   await page.route('**/api/auth/me', (route) =>
     route.fulfill({
       json: {
@@ -205,7 +228,9 @@ test('визуальная дуга: поиск, загрузка файла, с
     const id =
       body.visual?.kind === 'stats'
         ? 'visual-stats-persisted'
-        : 'visual-arc-persisted';
+        : body.visual?.kind === 'skills'
+          ? 'visual-skills-persisted'
+          : 'visual-arc-persisted';
     guide.sections.push({
       ...body,
       id,
@@ -257,6 +282,20 @@ test('визуальная дуга: поиск, загрузка файла, с
   );
   expect(uploaded?.context).toMatch(/^guides\/akane-build-guide\//);
   expect(uploaded?.dataUrl).toMatch(/^data:image\/webp;base64,/);
+  await dialog
+    .getByRole('button', { name: 'Приоритет прокачки навыков', exact: true })
+    .click();
+  await dialog
+    .getByRole('button', { name: 'Добавить элемент', exact: true })
+    .click();
+  const choice = dialog
+    .getByRole('group', { name: 'Навыки для секции гайда' })
+    .getByRole('button', { name: /Проверочный навык из игры/ });
+  await choice.click();
+  await expect(choice).toHaveAttribute('aria-pressed', 'true');
+  await expect(dialog.locator('.visual-section-preview')).toContainText(
+    'Проверочный навык из игры',
+  );
   await dialog
     .getByRole('button', { name: 'Основные статы', exact: true })
     .click();
@@ -310,6 +349,13 @@ test('визуальная дуга: поиск, загрузка файла, с
     name: 'Проверочная дуга',
     imageUrl,
     stats: [{ label: 'Атака (ур. 80)', value: '570' }],
+  });
+  expect(
+    guide.sections.find((s) => s.id === 'visual-skills-persisted')?.visual
+      ?.items[0],
+  ).toMatchObject({
+    name: 'Проверочный навык из игры',
+    imageUrl: '/nte-meta/game-assets/ad87d2a73478180243f0.webp',
   });
   expect(
     guide.sections.find((s) => s.id === 'visual-stats-persisted')?.visual

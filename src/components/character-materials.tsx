@@ -4,6 +4,7 @@ import type { CharacterMaterial } from '../types';
 import { loadProgressionData } from '../lib/api';
 import {
   findProfileProgression,
+  calculateProgression,
   type ProgressionData,
   type ProgressionOption,
 } from '../lib/progression';
@@ -77,15 +78,42 @@ export function CharacterMaterials({
     if (stage.cost_gold)
       totals.set('gold', (totals.get('gold') || 0) + stage.cost_gold);
   }
-  const ascension = native
-    ? [...totals].map(([id, amount]) => ({
-        id,
-        name: native.data.items[id]?.name || id,
-        iconUrl: native.data.items[id]?.iconUrl || '',
-        amount: `×${amount.toLocaleString('ru-RU')}`,
+  const initialLevels =
+    native && stageId === 'initial'
+      ? calculateProgression(
+          native.data,
+          native.option,
+          1,
+          20,
+          false,
+          {},
+          native.data.experienceItems
+            .filter((item) => item.kind === 'character')
+            .sort((a, b) => b.experience - a.experience)[0]?.id,
+        )
+      : null;
+  const ascension = initialLevels
+    ? [
+        ...(initialLevels.experienceMaterial
+          ? [initialLevels.experienceMaterial]
+          : []),
+        ...initialLevels.materials,
+      ].map((item) => ({
+        id: item.id,
+        name: item.name,
+        iconUrl: item.iconUrl,
+        amount: `×${item.amount.toLocaleString('ru-RU')}`,
         source: '',
       }))
-    : null;
+    : native
+      ? [...totals].map(([id, amount]) => ({
+          id,
+          name: native.data.items[id]?.name || id,
+          iconUrl: native.data.items[id]?.iconUrl || '',
+          amount: `×${amount.toLocaleString('ru-RU')}`,
+          source: '',
+        }))
+      : null;
   const groups: Array<{ title: string; rows: CharacterMaterial[] }> = [];
   if (ascension)
     groups.push({ title: 'Возвышение персонажа', rows: ascension });
@@ -150,6 +178,13 @@ export function CharacterMaterials({
             >
               <button
                 type="button"
+                aria-pressed={stageId === 'initial'}
+                onClick={() => setStageId('initial')}
+              >
+                1 → 20
+              </button>
+              <button
+                type="button"
                 aria-pressed={stageId === 'all'}
                 onClick={() => setStageId('all')}
               >
@@ -166,6 +201,17 @@ export function CharacterMaterials({
                 </button>
               ))}
             </div>
+          ) : null}
+          {title === 'Возвышение персонажа' && stageId === 'initial' ? (
+            <p className="profile-range-note">
+              Уровни 1–20: набор опыта. Первое возвышение — после 20-го уровня.
+            </p>
+          ) : null}
+          {initialLevels?.missingLevels.length &&
+          title === 'Возвышение персонажа' ? (
+            <p role="status">
+              В таблице не хватает данных опыта для этого диапазона.
+            </p>
           ) : null}
           <div className="material-grid inventory-tiles">
             {rows.map((row) => (

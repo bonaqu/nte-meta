@@ -181,7 +181,7 @@ test('варианты гардероба и озвучки переключаю
     expect((await upload.boundingBox())!.height).toBeLessThanOrEqual(46);
     expect(
       (await upload.locator('.image-upload__button').boundingBox())!.height,
-    ).toBe(44);
+    ).toBe(width >= 900 ? 34 : 44);
     if (width === 360 || width === 1440) {
       const a11y = await new AxeBuilder({ page })
         .include('#main-content')
@@ -523,7 +523,7 @@ test('опубликованные профили: калькулятор, бы�
       await expect(voice.locator('.voice-line-list article')).toHaveCount(6);
     }
     const upload = page.locator('.comment-form .image-upload__button');
-    expect((await upload.boundingBox())!.height).toBe(44);
+    expect((await upload.boundingBox())!.height).toBe(width >= 900 ? 34 : 44);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth + 1,

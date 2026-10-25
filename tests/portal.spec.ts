@@ -7,7 +7,10 @@ test.describe('Публичный портал NTE Meta', () => {
     const consoleErrors: string[] = [];
     const failedResponses: string[] = [];
     const itemDictionaryRequests: string[] = [];
-    page.on('request', request => { if (/native-item-icons|\/item-icons-[^/]+\.js/.test(request.url())) itemDictionaryRequests.push(request.url()); });
+    page.on('request', (request) => {
+      if (/native-item-icons|\/item-icons-[^/]+\.js/.test(request.url()))
+        itemDictionaryRequests.push(request.url());
+    });
     page.on('console', (message) => {
       if (message.type() === 'error') consoleErrors.push(message.text());
     });
@@ -321,7 +324,7 @@ test.describe('Публичный портал NTE Meta', () => {
       page.getByText(
         'Состав, роли и последовательность действий собраны в одном месте.',
       ),
-    ).toBeVisible();
+    ).toHaveCount(0);
     const teamRotations = page
       .locator('#guide-teams')
       .getByText('Командная ротация', { exact: true });

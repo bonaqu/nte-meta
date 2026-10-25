@@ -56,6 +56,11 @@ const items = Object.fromEntries(
 if (items[normalize('Подол платья тщеславия')])
   items[normalize('Показушное платье с рукавами')] =
     items[normalize('Подол платья тщеславия')];
+// The published legacy label is already bound to SpecialGift_letter in the
+// description registry. Use the same native texture without renaming content.
+if (items[normalize('Рукописное письмо')])
+  items[normalize('Письмо, написанное от руки')] =
+    items[normalize('Рукописное письмо')];
 const attributes = Object.fromEntries(
   images
     .filter((row) =>

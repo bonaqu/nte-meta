@@ -14,14 +14,16 @@ if($outputRoot.StartsWith($gameRoot+[IO.Path]::DirectorySeparatorChar,[StringCom
 $runDirectory=Join-Path $outputRoot (Get-Date -Format 'yyyyMMddTHHmmss')
 $mount=Join-Path $runDirectory 'mount\HT'
 New-Item -ItemType Directory -Path $mount -Force | Out-Null
+'{"status":"running"}' | Set-Content -LiteralPath (Join-Path $runDirectory 'extraction-status.json') -Encoding utf8
 $archives=@()
 foreach($folder in 'Paks','PatchPaks','TagPatchPaks'){
  $destination=Join-Path $mount "Content\$folder"
- New-Item -ItemType Directory -Path $destination -Force | Out-Null
- foreach($file in Get-ChildItem -LiteralPath (Join-Path $content $folder) -File | Where-Object Extension -in '.pak','.utoc','.ucas'){
-  $link=Join-Path $destination $file.Name
-  $linkType=if([IO.Path]::GetPathRoot($link) -eq [IO.Path]::GetPathRoot($file.FullName)){'HardLink'}else{'SymbolicLink'}
-  New-Item -ItemType $linkType -Path $link -Target $file.FullName | Out-Null
+ $sourceFolder=Join-Path $content $folder
+ New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+ # Directory junctions work across local volumes without copying game archives.
+ # Extractors only read Content; aes.txt and every output stay in the run folder.
+ New-Item -ItemType Junction -Path $destination -Target $sourceFolder | Out-Null
+ foreach($file in Get-ChildItem -LiteralPath $sourceFolder -File | Where-Object Extension -in '.pak','.utoc','.ucas'){
   $archives+=@{folder=$folder;name=$file.Name;bytes=$file.Length;modifiedUtc=$file.LastWriteTimeUtc.ToString('o')}
  }
 }
@@ -41,6 +43,14 @@ try {
  $project=Join-Path $PSScriptRoot 'extractor'
  & dotnet run --project $project -- ([IO.Path]::ChangeExtension($Tool,'.dll')) $mount $Mapping (Join-Path $runDirectory 'export') *> (Join-Path $runDirectory 'extraction.log')
  if($LASTEXITCODE -ne 0){throw 'Game table/texture extraction failed. See extraction.log'}
+ $after=@()
+ foreach($folder in 'Paks','PatchPaks','TagPatchPaks'){
+  foreach($file in Get-ChildItem -LiteralPath (Join-Path $content $folder) -File | Where-Object Extension -in '.pak','.utoc','.ucas'){
+   $after+=@{folder=$folder;name=$file.Name;bytes=$file.Length;modifiedUtc=$file.LastWriteTimeUtc.ToString('o')}
+  }
+ }
+ if(($after | ConvertTo-Json -Compress) -ne ($archives | ConvertTo-Json -Compress)){throw 'Game archives changed during extraction. Wait for the launcher to finish, then create a new snapshot. This run is not ready to publish.'}
+ '{"status":"complete"}' | Set-Content -LiteralPath (Join-Path $runDirectory 'extraction-status.json') -Encoding utf8
 } finally {Pop-Location}
 Write-Output "Local extraction: $runDirectory"
 Write-Output 'Run normalize.py with --source pointing to this directory, then validate.py before publishing.'

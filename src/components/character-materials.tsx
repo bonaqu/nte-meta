@@ -10,6 +10,7 @@ import {
 } from '../lib/progression';
 import { displayItemName, resolveItemIcon } from '../lib/item-icons';
 import { ItemDetails } from './item-details';
+import { sumMaterialRows } from '../lib/profile-presentation';
 
 export function CharacterMaterials({
   materials,
@@ -214,7 +215,7 @@ export function CharacterMaterials({
             </p>
           ) : null}
           <div className="material-grid inventory-tiles">
-            {rows.map((row) => (
+            {sumMaterialRows(rows).map((row) => (
               <article className="game-item" key={row.id}>
                 <ItemDetails
                   id={row.id}

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -9,10 +10,13 @@ import queue
 import subprocess
 import sys
 import threading
+import shutil
+import urllib.request
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from exporter import export
+from updates import check_update, snapshot_folder, profile_migration
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 SETTINGS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'NTEMetaWorkbench/settings.json'
@@ -21,7 +25,7 @@ DEFAULTS = {
     'tool': r'D:\CODEX\Programs\UEExtractor\1.0.8.7\UEExtractor.exe',
     'mapping': r'D:\CODEX\Tasks\nte-local-data\NTE_Latest.usmap',
     'key': r'D:\CODEX\Tasks\nte-local-data\mount\HT\aes.txt',
-    'output': r'D:\CODEX\Tasks\nte-local-data',
+    'output': r'E:\CODEX - IMPORT HERE TEMP FILES AND OTHER\nte-meta\extracts',
     'source': r'D:\CODEX\Tasks\nte-local-data',
     'last_export': '',
 }
@@ -41,6 +45,9 @@ HELP = {
     'working': 'Открыть техническую рабочую папку из строки «Рабочая выгрузка». Здесь исходные файлы чтения игры и журналы. WEM — внутренний формат звука; готовые MP3 и картинки PNG находятся в каталоге после шага 4.',
     'media': 'Если включено: экспорт включает PNG для обычных просмотрщиков и MP3 для проигрывателей, сгруппированные по персонажу, языку и назначению; HTML умеет их показывать и проигрывать. Если выключено: только тексты и таблицы, быстрее и меньше места. Первый экспорт с медиа может занять несколько минут.',
     'log': 'Здесь видно, какой этап выполняется: текущий персонаж, количество строк и число готовых MP3. Технические ошибки сохраняются в журнале. Во время обработки кнопки запуска временно выключены; дождитесь сообщения «Готово» или текста ошибки.',
+    'check': 'Сравнить размер и дату игровых архивов с выбранной рабочей выгрузкой. Проверяются Paks, PatchPaks и голосовые TagPatchPaks; игра и лаунчер не меняются. Если появились или изменились архивы, выполните шаг 1 и затем 3. Проверка также выполняется при запуске программы.',
+    'prepare': 'Подготовить новых персонажей для сайта из проверенного снимка шага 3. Программа сверит имена с сайтом, создаст файл «Персонажи для сайта.json» и обновление существующих профилей с сохранением ручных правок. После публикации файлов шага 7 откройте Админка → Данные игры → Новые персонажи из локальной программы, выберите JSON, проверьте сведения и создайте черновик.',
+    'publish': 'Создать GitHub Issue и pull request только с подготовленными игровыми данными, медиа и обновлением профилей. Нужна основная ветка проекта без посторонних изменений и действующий вход в GitHub CLI. Пароли на сайт не передаются. Проверьте PR и объедините его: Actions опубликует сайт и обновит D1. Кнопка не объединяет PR автоматически.',
 }
 
 
@@ -74,8 +81,8 @@ class Workbench(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title('NTE Meta — выгрузка данных игры')
-        self.geometry('1000x800')
-        self.minsize(760, 680)
+        self.geometry('1000x900')
+        self.minsize(760, 780)
         self.messages = queue.Queue()
         self.busy = False
         self.process = None
@@ -111,16 +118,16 @@ class Workbench(tk.Tk):
         actions.pack(fill='x',pady=16)
         self.buttons=[]
         for column in range(2):actions.columnconfigure(column,weight=1)
-        for index,(title,command,key) in enumerate([('1 · Извлечь обновление',self.extract,'extract'),('2 · Обновить дополнение',self.supplement,'supplement'),('3 · Подготовить снимок игры',self.normalize,'normalize'),('4 · Каталог игрока / Excel / MP3',self.export_data,'export')]):
+        for index,(title,command,key) in enumerate([('1 · Извлечь обновление',self.extract,'extract'),('2 · Обновить дополнение',self.supplement,'supplement'),('3 · Подготовить снимок игры',self.normalize,'normalize'),('4 · Каталог игрока / Excel / MP3',self.export_data,'export'),('5 · Проверить обновления игры',self.check_updates,'check'),('6 · Персонажи для сайта',self.prepare_characters,'prepare'),('7 · Создать PR данных',self.publish_data,'publish')]):
             button=ttk.Button(actions,text=title,command=command)
             button.grid(row=index//2,column=index%2,sticky='ew',padx=4,pady=4);self.buttons.append(button);explain(button,key)
-        result=ttk.Button(actions,text='Открыть каталог игрока',command=self.open_output); result.grid(row=2,column=0,sticky='ew',padx=4,pady=4); explain(result,'open')
-        working=ttk.Button(actions,text='Открыть рабочую папку',command=self.open_working); working.grid(row=2,column=1,sticky='ew',padx=4,pady=4); explain(working,'working')
+        result=ttk.Button(actions,text='Открыть каталог игрока',command=self.open_output); result.grid(row=3,column=1,sticky='ew',padx=4,pady=4); explain(result,'open')
+        working=ttk.Button(actions,text='Открыть рабочую папку',command=self.open_working); working.grid(row=4,column=0,columnspan=2,sticky='ew',padx=4,pady=4); explain(working,'working')
         self.media=tk.BooleanVar(value=True)
         media=ttk.Checkbutton(body,text='Добавить в каталог картинки PNG и озвучку MP3 с понятными названиями',variable=self.media); media.pack(anchor='w'); explain(media,'media')
         help_label=tk.Label(body,textvariable=self.help_text,wraplength=900,relief='groove',padx=8,pady=8,height=3,anchor='w',justify='left'); help_label.pack(fill='x',pady=8)
         body.bind('<Configure>', lambda event: help_label.configure(wraplength=max(300,event.width-52)))
-        ttk.Label(body,text='Порядок: извлечь обновление → подготовить данные сайта → экспорт. Публикация сайта выполняется отдельно через GitHub PR/Actions.',wraplength=900).pack(anchor='w',pady=10)
+        ttk.Label(body,text='После патча: 5 → 1 → 3. Для каталога игрока — 4. Для сайта — 6 → 7 → проверка PR на GitHub. Новые персонажи создаются черновиками в админке.',wraplength=900).pack(anchor='w',pady=10)
         self.status=tk.StringVar(value='Готов к работе. Можно экспортировать уже извлечённый снимок.')
         ttk.Label(body,textvariable=self.status,wraplength=900).pack(anchor='w',pady=4)
         self.progress=ttk.Progressbar(body,mode='indeterminate');self.progress.pack(fill='x',pady=5)
@@ -129,6 +136,7 @@ class Workbench(tk.Tk):
         explain(self.log,'log'); explain(self.progress,'log')
         self.protocol('WM_DELETE_WINDOW',self.close)
         self.after(100,self.poll)
+        self.after(500,lambda:self.check_updates(automatic=True))
 
     def browse(self,key,folder):
         value=filedialog.askdirectory() if folder else filedialog.askopenfilename()
@@ -151,7 +159,11 @@ class Workbench(tk.Tk):
     def command(self,args):
         # Logs from UEExtractor can contain archive keys. extract-local.ps1 redirects
         # them into local files; the GUI only displays its sanitized top-level output.
-        self.process=subprocess.Popen(args,cwd=REPOSITORY,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+        environment=os.environ.copy()
+        temporary=Path(self.values['output'].get()).parent/'temp'
+        temporary.mkdir(parents=True,exist_ok=True)
+        environment.update(TEMP=str(temporary),TMP=str(temporary))
+        self.process=subprocess.Popen(args,cwd=REPOSITORY,env=environment,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
             text=True,encoding='utf-8',errors='replace',creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
         for line in self.process.stdout:self.messages.put(('log',line.rstrip()))
         code=self.process.wait();self.process=None
@@ -159,28 +171,77 @@ class Workbench(tk.Tk):
 
     def extract(self):
         values={k:v.get() for k,v in self.values.items()}
+        try: prior_supplement=snapshot_folder(Path(values['source']))/'supplement.json'
+        except ValueError: prior_supplement=None
         def operation():
             self.command(['pwsh','-NoProfile','-File',str(REPOSITORY/'scripts/game-data/extract-local.ps1'),
                 '-GameDirectory',values['game'],'-Tool',values['tool'],'-Mapping',values['mapping'],
                 '-ArchiveKeyFile',values['key'],'-Output',values['output']])
             candidates=sorted(p for p in Path(values['output']).iterdir() if (p/'export/extraction.json').exists())
-            if candidates:self.messages.put(('source',str(candidates[-1])))
+            if candidates:
+                latest=candidates[-1]
+                prior_cache=prior_supplement.parent/'export/media-cache.json' if prior_supplement else None
+                if prior_cache and prior_cache.is_file():shutil.copy2(prior_cache,latest/'export/media-cache.json')
+                if prior_supplement and prior_supplement.is_file() and not (latest/'supplement.json').exists():
+                    shutil.copy2(prior_supplement,latest/'supplement.json')
+                    self.messages.put(('log','Справочное дополнение сохранено из прошлого снимка. Шаг 2 обновляет его через интернет.'))
+                self.messages.put(('source',str(latest)))
         self.run(operation,'Извлечение завершено. WEM — внутренний формат. Теперь нажмите 3, затем 4 для готового каталога; шаг 2 необязателен.')
 
     def normalize(self):
-        source=self.values['source'].get()
+        try:source=str(snapshot_folder(Path(self.values['source'].get())))
+        except ValueError as error:messagebox.showerror('Рабочая выгрузка',str(error));return
         def operation():
-            self.command([sys.executable,str(REPOSITORY/'scripts/game-data/normalize.py'),'--source',source,'--repository',str(REPOSITORY)])
+            self.command([sys.executable,str(REPOSITORY/'scripts/game-data/normalize.py'),'--source',source,'--repository',str(REPOSITORY),'--reuse-images'])
             database=Path(source)/'verified-reference.sqlite'
             if database.exists():database=Path(source)/('verified-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite')
             self.command([sys.executable,str(REPOSITORY/'scripts/game-data/validate.py'),'--database',str(database)])
             self.command(['node',str(REPOSITORY/'scripts/game-data/build-asset-aliases.mjs'),'--output',str(REPOSITORY/'src/data/native-media-aliases.json')])
             self.command(['node',str(REPOSITORY/'scripts/game-data/build-ui-icons.mjs')])
+            manifest=REPOSITORY/'scripts/content/game-data/manifest.json'
+            (Path(source)/'prepared-snapshot.json').write_text(json.dumps({'chunksSha256':json.loads(manifest.read_text('utf-8'))['chunksSha256'],'database':str(database)},ensure_ascii=False,indent=2),encoding='utf-8')
         self.run(operation,'Снимок подготовлен. Нажмите 4, чтобы получить читаемый каталог, Excel, PNG и MP3.')
 
     def supplement(self):
-        source=self.values['source'].get()
+        try:source=str(snapshot_folder(Path(self.values['source'].get())))
+        except ValueError as error:messagebox.showerror('Рабочая выгрузка',str(error));return
         self.run(lambda:self.command(['node',str(REPOSITORY/'scripts/game-data/fetch-supplement.mjs'),'--source',source]),'Дополнение загружено. Теперь нажмите 3, затем 4.')
+
+    def check_updates(self,automatic=False):
+        game,source=Path(self.values['game'].get()),Path(self.values['source'].get())
+        if automatic and (not game.is_dir() or not source.exists()):return
+        def operation():
+            try:result=check_update(game,source)
+            except ValueError as error:
+                if not automatic:raise
+                self.messages.put(('log',str(error)));return
+            changed=sum(len(result[k]) for k in ['added','changed','removed'])
+            self.messages.put(('log',f"Проверено {result['archiveCount']} архивов. "+(f'Изменений: {changed}. Выполните шаги 1 и 3.' if result['needsExtraction'] else 'Установленные архивы совпадают с рабочей выгрузкой.')))
+        self.run(operation,'Проверка обновлений завершена.')
+
+    def prepare_characters(self):
+        try:source=snapshot_folder(Path(self.values['source'].get()))
+        except ValueError as error:messagebox.showerror('Рабочая выгрузка',str(error));return
+        def operation():
+            prepared=source/'prepared-snapshot.json'
+            if not prepared.is_file():raise ValueError('Сначала выполните шаг 3 для выбранной выгрузки.')
+            metadata=json.loads(prepared.read_text('utf-8'))
+            corpus=REPOSITORY/'scripts/content/game-data/chunks.jsonl.gz'
+            with corpus.open('rb') as stream:actual=hashlib.file_digest(stream,'sha256').hexdigest()
+            if actual!=metadata['chunksSha256']:raise ValueError('Снимок изменился после проверки. Выполните шаг 3 заново.')
+            request=urllib.request.Request('https://nte-meta-api.bonaqu.workers.dev/api/characters',headers={'Origin':'https://bonaqu.github.io','User-Agent':'Mozilla/5.0 NTE-Meta-Workbench'})
+            with urllib.request.urlopen(request,timeout=30) as response:payload=json.load(response)
+            if not isinstance(payload.get('data'),list):raise ValueError('Сайт вернул неизвестный формат каталога. Файлы не отправлены.')
+            current=source/'site-characters.json';current.write_text(json.dumps(payload['data'],ensure_ascii=False),encoding='utf-8')
+            native=source/'native-profiles.json'
+            self.command(['node',str(REPOSITORY/'scripts/game-data/export-character-proposals.mjs'),'--database',metadata['database'],'--current',str(current),'--output',str(source/'Персонажи для сайта.json'),'--native',str(native)])
+            output=profile_migration(REPOSITORY,source)
+            self.command(['node',str(REPOSITORY/'scripts/game-data/seed-profiles.mjs'),'--native',str(native),'--current',str(current),'--output',str(output)])
+            self.messages.put(('open',str(source)))
+        self.run(operation,'Файл персонажей подготовлен. Шаг 7 отправляет данные в PR. Затем выберите JSON в Админка → Данные игры.')
+
+    def publish_data(self):
+        self.run(lambda:self.command(['node',str(REPOSITORY/'scripts/game-data/publish-update.mjs')]),'PR подготовлен. Откройте ссылку из журнала, дождитесь проверок и объедините PR на GitHub.')
 
     def export_data(self):
         parent=filedialog.askdirectory(title='Куда сохранить новую папку экспорта')
@@ -212,6 +273,7 @@ class Workbench(tk.Tk):
                     if kind=='error':messagebox.showerror('NTE Meta',message)
                 elif kind=='source':self.values['source'].set(message);self.save_settings()
                 elif kind=='export':self.last_output=message;self.values['last_export'].set(message);self.save_settings();self.status.set('Экспорт сохранён: '+message)
+                elif kind=='open':os.startfile(message)
                 self.log.configure(state='normal');self.log.insert('end',message+'\n');self.log.see('end');self.log.configure(state='disabled')
         except queue.Empty:pass
         self.after(100,self.poll)

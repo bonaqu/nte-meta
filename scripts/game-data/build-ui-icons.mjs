@@ -95,3 +95,5 @@ const { buildItemDescriptions } = await import('./build-item-descriptions.mjs');
 await buildItemDescriptions(rows);
 const { buildNativeItems } = await import('./build-native-items.mjs');
 await buildNativeItems(rows);
+const { buildProfileIndex } = await import('./build-profile-index.mjs');
+await buildProfileIndex(rows);

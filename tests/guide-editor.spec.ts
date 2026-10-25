@@ -249,6 +249,7 @@ test('визуальная дуга: поиск, загрузка файла, с
     .getByRole('button', { name: 'Редактировать гайд', exact: true })
     .click();
   const dialog = page.locator('dialog[open]');
+  await dialog.getByText('Добавить визуальный раздел', { exact: true }).click();
   await dialog
     .getByRole('button', { name: 'Лучшие дуги', exact: true })
     .click();

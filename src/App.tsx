@@ -19,9 +19,12 @@ import { CharacterWardrobe } from './components/character-wardrobe';
 import { CharacterSectionNav } from './components/character-section-nav';
 import { CharacterAppearanceSelector } from './components/character-appearance-selector';
 import { resolveStatIcon } from './lib/native-icons';
+import { orderedAbilities } from './lib/profile-presentation';
 import {
   isPrivateGuideSection,
   stripEditorialText,
+  cleanGuideText,
+  keepGuideImportMarkers,
   visualFromLegacy,
   visualFromImport,
   visualKind,
@@ -3345,9 +3348,13 @@ function CharacterDetailPage({
         appearanceSelection?.characterId === character.id &&
         appearanceSelection.variantId === variant.id,
     ) || appearances[0];
-  const abilities = activeAppearance?.abilities?.length
-    ? activeAppearance.abilities
-    : profile.abilities;
+  const abilities = orderedAbilities(
+    activeAppearance?.abilities?.length
+      ? activeAppearance.abilities
+      : profile.abilities,
+    character.name,
+    character.originalName,
+  );
   const skins = activeAppearance?.skins || profile.skins;
   const voiceLines = activeAppearance?.voiceLines || profile.voiceLines;
   const selectAppearance = (variantId: string) =>
@@ -3374,14 +3381,11 @@ function CharacterDetailPage({
           loading="eager"
           referrerPolicy="no-referrer"
         />
-        <div>
+        <div className="character-dossier">
           <p className="eyebrow">
             {character.originalName} · {profile.faction || 'Фракция уточняется'}
           </p>
           <h1>{character.name}</h1>
-          {character.shortDescription ? (
-            <p>{character.shortDescription}</p>
-          ) : null}
           <dl className="guide-facts character-profile-facts">
             <div>
               <dt>День рождения</dt>
@@ -3420,6 +3424,12 @@ function CharacterDetailPage({
               <dd>{profile.faction || 'Не указана'}</dd>
             </div>
           </dl>
+          {character.shortDescription ? (
+            <div className="character-dossier__summary">
+              <p>{character.shortDescription}</p>
+              <span aria-hidden="true">N.T.E · PERSONAL FILE</span>
+            </div>
+          ) : null}
           <Tags
             tags={profile.roleTags.length ? profile.roleTags : character.tags}
             icons={profile.roleIcons}
@@ -3472,7 +3482,7 @@ function CharacterDetailPage({
       <section className="character-detail-section" id="character-abilities">
         <SectionHeader
           title="Способности"
-          text="Точные игровые навыки и начальные показатели."
+          text="Игровые навыки и начальные показатели."
         />
         <CharacterAppearanceSelector
           variants={appearances}
@@ -3513,7 +3523,7 @@ function CharacterDetailPage({
       <section className="character-detail-section" id="character-awakenings">
         <SectionHeader
           title="Пробуждения и резонанс"
-          text="Эффекты пробуждений и дополнительные бонусы за 3 и 6 пробуждений."
+          text="Эффекты пробуждений и дополнительные бонусы."
         />
         {profile.awakenings.length ? (
           <CharacterAwakeningBrowser
@@ -3847,7 +3857,13 @@ function GuideDetail({
               ? section.visual.items.length > 0
               : section.content.trim().length > 0),
         )
-        .sort((a, b) => a.position - b.position),
+        .sort((a, b) => a.position - b.position)
+        .map((section) => ({
+          ...section,
+          title:
+            cleanGuideText(section.title) ||
+            guideSectionTypeLabel(section.type),
+        })),
     [guide.sections],
   );
   const guideNavigation = useMemo(
@@ -3949,7 +3965,7 @@ function GuideDetail({
                   value={visualFromLegacy(section, character)!}
                 />
               ) : (
-                <MarkdownPreview value={section.content} />
+                <MarkdownPreview value={cleanGuideText(section.content)} />
               )}
             </article>
           ))}
@@ -6777,7 +6793,9 @@ function AdminGuides({
 
       setSections(savedDraft.sections);
       setSelectedSectionId(selectedSection?.id || '');
-      setMarkdown(selectedSection?.content || savedDraft.markdown || '');
+      setMarkdown(
+        cleanGuideText(selectedSection?.content || savedDraft.markdown || ''),
+      );
       setGuideMeta(savedDraft.guideMeta);
       if (!refreshDraft) setMessage('Восстановлен локальный черновик гайда.');
       return;
@@ -6789,7 +6807,7 @@ function AdminGuides({
 
     setSections(nextSections);
     setSelectedSectionId(selectedSection?.id || '');
-    setMarkdown(selectedSection?.content || '');
+    setMarkdown(cleanGuideText(selectedSection?.content || ''));
     setGuideMeta({
       title: guide.title,
       summary: guide.summary,
@@ -6983,7 +7001,7 @@ function AdminGuides({
 
   function selectSection(section: GuideSection) {
     setSelectedSectionId(section.id);
-    setMarkdown(section.content);
+    setMarkdown(cleanGuideText(section.content));
   }
 
   function updateSelectedMarkdown(value: string) {
@@ -6992,7 +7010,10 @@ function AdminGuides({
     setSections((current) =>
       current.map((section) =>
         section.id === selectedSectionId
-          ? { ...section, content: value }
+          ? {
+              ...section,
+              content: keepGuideImportMarkers(section.content, value),
+            }
           : section,
       ),
     );
@@ -7017,7 +7038,7 @@ function AdminGuides({
     };
     setSections((value) => [...value, nextSection]);
     setSelectedSectionId(nextSection.id);
-    setMarkdown(nextSection.content);
+    setMarkdown(cleanGuideText(nextSection.content));
   }
 
   function addBuildSection() {
@@ -7036,7 +7057,7 @@ function AdminGuides({
     };
     setSections((value) => [...value, nextSection]);
     setSelectedSectionId(nextSection.id);
-    setMarkdown(nextSection.content);
+    setMarkdown(cleanGuideText(nextSection.content));
   }
 
   function insertSectionImage() {
@@ -7252,7 +7273,7 @@ function AdminGuides({
             : {}),
         };
         setSelectedSectionId(existing.id);
-        setMarkdown(next[existingIndex].content);
+        setMarkdown(cleanGuideText(next[existingIndex].content));
         return next;
       }
       const nextSection: GuideSection = {
@@ -7271,7 +7292,7 @@ function AdminGuides({
           : {}),
       };
       setSelectedSectionId(nextSection.id);
-      setMarkdown(nextSection.content);
+      setMarkdown(cleanGuideText(nextSection.content));
       return [...current, nextSection];
     });
     acceptGuideImportDecision(suggestion);
@@ -7477,7 +7498,7 @@ function AdminGuides({
       .map((section, position) => ({ ...section, position: position + 1 }));
     setSections(next);
     setSelectedSectionId(next[0]?.id || '');
-    setMarkdown(next[0]?.content || '');
+    setMarkdown(cleanGuideText(next[0]?.content || ''));
     setMessage('Секция удалена. Сохраните новый порядок.');
     setPending(false);
   }
@@ -8214,7 +8235,10 @@ function AdminGuides({
                 }
               >
                 <GripVertical aria-hidden="true" />
-                <span>{section.title}</span>
+                <span>
+                  {cleanGuideText(section.title) ||
+                    guideSectionTypeLabel(section.type)}
+                </span>
                 <small>{guideSectionTypeLabel(section.type)}</small>
               </button>
             ))}
@@ -8263,52 +8287,60 @@ function AdminGuides({
           </p>
         </div>
         <div className="admin-panel editor-panel">
-          <h2>Редактор секции</h2>
-          <div className="button-row" aria-label="Визуальные секции">
-            {visualKinds.map(([kind, title]) => (
-              <button
-                type="button"
-                className="ghost-button"
-                key={kind}
-                onClick={() => {
-                  const section: GuideSection = {
-                    id: `custom-${crypto.randomUUID()}`,
-                    title,
-                    type: {
-                      arcs: 'best-arcs',
-                      cartridges: 'cartridges',
-                      stats: 'main-stats',
-                      skills: 'skill-priority',
-                      rotation: 'rotation',
-                    }[kind],
-                    content: '',
-                    position: sections.length + 1,
-                    visual: { kind, items: [] },
-                  };
-                  setSections((current) => [...current, section]);
-                  setSelectedSectionId(section.id);
-                  setMarkdown('');
-                }}
-              >
-                {title}
-              </button>
-            ))}
-          </div>
+          <h2>
+            {cleanGuideText(
+              sections.find((section) => section.id === selectedSectionId)
+                ?.title || '',
+            ) || 'Редактор раздела'}
+          </h2>
+          <details className="guide-add-section">
+            <summary>Добавить визуальный раздел</summary>
+            <div className="button-row" aria-label="Визуальные секции">
+              {visualKinds.map(([kind, title]) => (
+                <button
+                  type="button"
+                  className="ghost-button"
+                  key={kind}
+                  onClick={() => {
+                    const section: GuideSection = {
+                      id: `custom-${crypto.randomUUID()}`,
+                      title,
+                      type: {
+                        arcs: 'best-arcs',
+                        cartridges: 'cartridges',
+                        stats: 'main-stats',
+                        skills: 'skill-priority',
+                        rotation: 'rotation',
+                      }[kind],
+                      content: '',
+                      position: sections.length + 1,
+                      visual: { kind, items: [] },
+                    };
+                    setSections((current) => [...current, section]);
+                    setSelectedSectionId(section.id);
+                    setMarkdown('');
+                  }}
+                >
+                  {title}
+                </button>
+              ))}
+            </div>
+          </details>
           <div className="guide-section-fields">
             <label>
               Название секции
               <input
-                value={
+                value={cleanGuideText(
                   sections.find((section) => section.id === selectedSectionId)
-                    ?.title || ''
-                }
+                    ?.title || '',
+                )}
                 onChange={(event) =>
                   updateSelectedSection({ title: event.target.value })
                 }
               />
             </label>
             <label>
-              Категория раздела
+              Содержимое раздела
               <select
                 value={
                   sections.find((section) => section.id === selectedSectionId)
@@ -8359,8 +8391,18 @@ function AdminGuides({
           })()}
           <details
             open={
-              !sections.find((section) => section.id === selectedSectionId)
-                ?.visual
+              !visualFromLegacy(
+                sections.find(
+                  (section) => section.id === selectedSectionId,
+                ) || {
+                  id: '',
+                  title: '',
+                  type: 'custom',
+                  position: 0,
+                  content: '',
+                },
+                activeGuideCharacter,
+              )
             }
           >
             <summary>Текст и дополнительные изображения</summary>
@@ -10598,19 +10640,21 @@ function AdminSettings() {
 function Footer() {
   return (
     <footer className="site-footer">
-      <div>
-        <strong>NTE Meta</strong>
-        <p>
-          Neverness to Everness на русском: персонажи, сборки и городские
-          истории.
-        </p>
+      <div className="site-footer__inner">
+        <div>
+          <strong>NTE Meta</strong>
+          <p>
+            Neverness to Everness на русском: персонажи, сборки и городские
+            истории.
+          </p>
+        </div>
+        <nav aria-label="Навигация внизу страницы">
+          <a href="#/">Новости и сообщество</a>
+          <a href="#/characters">Персонажи</a>
+          <a href="#/guides">Гайды</a>
+          <a href="#/tierlists">Тир-листы</a>
+        </nav>
       </div>
-      <nav aria-label="Навигация внизу страницы">
-        <a href="#/">Новости и сообщество</a>
-        <a href="#/characters">Персонажи</a>
-        <a href="#/guides">Гайды</a>
-        <a href="#/tierlists">Тир-листы</a>
-      </nav>
     </footer>
   );
 }

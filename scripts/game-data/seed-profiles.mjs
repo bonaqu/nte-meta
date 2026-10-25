@@ -17,7 +17,9 @@ const identity = (field, row) =>
     : field === 'friendship'
       ? String(row.level)
       : field === 'voiceLines'
-        ? key(row.language) + ':' + key(row.title)
+        ? key(row.language) +
+          ':' +
+          key(String(row.title || '').replace(/^(?:обо|об|о)\s+/i, ''))
         : field === 'baseStats'
           ? key(row.label).startsWith('шанскрит')
             ? 'crit'
@@ -25,6 +27,13 @@ const identity = (field, row) =>
               ? 'critDamage'
               : key(row.label)
           : key(row.name);
+const legacyVoicePlaceholder = (row) =>
+  /^https:\/\/static\.wikia\.nocookie\.net\/neverness-to-everness\/images\/[^/]+\/[^/]+\/VO_/.test(
+    row.audioUrl || '',
+  ) &&
+  /^Прямая запись .*Расшифровку и соответствие реплики проверьте в источнике перед публикацией\.$/.test(
+    row.description || '',
+  );
 export function mergeNativeCollection(field, current, incoming) {
   const used = new Set();
   const result = incoming.map((row) => {
@@ -38,6 +47,21 @@ export function mergeNativeCollection(field, current, incoming) {
     used.add(index);
     const old = current[index];
     const merged = { ...row, ...old };
+    if (
+      field === 'voiceLines' &&
+      legacyVoicePlaceholder(old) &&
+      row.description
+    )
+      merged.description = row.description;
+    // Refresh installed voice packs while retaining explicit administrator uploads.
+    if (
+      field === 'voiceLines' &&
+      /^(?:\/nte-meta\/game-audio\/[a-f0-9]{20}\.ogg$|https:\/\/static\.wikia\.nocookie\.net\/neverness-to-everness\/images\/[^/]+\/[^/]+\/VO_)/.test(
+        old.audioUrl || '',
+      ) &&
+      row.audioUrl
+    )
+      merged.audioUrl = row.audioUrl;
     for (const name of [
       'iconUrl',
       'imageUrl',
@@ -64,6 +88,17 @@ export function mergeNativeCollection(field, current, incoming) {
     if (
       !used.has(index) &&
       !(
+        field === 'voiceLines' &&
+        /^https:\/\/static\.wikia\.nocookie\.net\/neverness-to-everness\/images\/[^/]+\/[^/]+\/VO_/.test(
+          row.audioUrl || '',
+        ) &&
+        result.some(
+          (value) =>
+            identity(field, value) === identity(field, row) ||
+            (legacyVoicePlaceholder(row) && value.language === row.language),
+        )
+      ) &&
+      !(
         field === 'abilities' &&
         (/^GA_.+_name$/.test(row.id) || /^не введено$/i.test(row.name))
       )
@@ -89,6 +124,32 @@ export function mergeNativeCollection(field, current, incoming) {
   return result;
 }
 const quote = (value) => `'${String(value).replaceAll("'", "''")}'`;
+function collectionUpdates(table, column, rows, guard) {
+  const lines = [];
+  let batch = [],
+    size = 0,
+    first = true;
+  function flush() {
+    if (!batch.length) return;
+    const value = quote(JSON.stringify(batch));
+    lines.push(
+      `UPDATE ${table} SET ${column}=${first ? `json(${value})` : `(SELECT json_group_array(json(value)) FROM (SELECT value FROM json_each(${column}) UNION ALL SELECT value FROM json_each(${value})))`} WHERE ${guard};`,
+    );
+    first = false;
+    batch = [];
+    size = 0;
+  }
+  for (const row of rows) {
+    const length = Buffer.byteLength(JSON.stringify(row), 'utf8');
+    if (length > 65000)
+      throw Error('One profile row exceeds migration query budget');
+    if (size + length > 65000) flush();
+    batch.push(row);
+    size += length;
+  }
+  flush();
+  return lines;
+}
 if (
   process.argv[1] &&
   pathToFileURL(resolve(process.argv[1])).href === import.meta.url
@@ -142,6 +203,40 @@ if (
     let changed = 0;
     for (const suggestion of source.suggestions || []) {
       const field = suggestion.field.replace(/^profile\./, '');
+      if (field === 'appearanceVariants') {
+        for (const variant of JSON.parse(suggestion.value)) {
+          const before = (character.profile.appearanceVariants || []).find(
+            (v) => v.id === variant.id,
+          );
+          if (!before) continue;
+          for (const [name, column] of [
+            ['voiceLines', 'voice_lines_json'],
+            ['abilities', 'abilities_json'],
+            ['skins', 'skins_json'],
+          ]) {
+            const incoming = variant[name] || [];
+            if (!incoming.length) continue;
+            const merged = mergeNativeCollection(
+              name,
+              before[name] || [],
+              incoming,
+            );
+            if (JSON.stringify(merged) === JSON.stringify(before[name]))
+              continue;
+            const condition = `character_id=${quote(character.id)} AND variant_id=${quote(variant.id)} AND EXISTS(SELECT 1 FROM character_profiles WHERE ${guard})`;
+            lines.push(
+              ...collectionUpdates(
+                'character_appearance_variants',
+                column,
+                merged,
+                condition,
+              ),
+            );
+            changed++;
+          }
+        }
+        continue;
+      }
       const column = columns[field];
       if (!column) continue;
       const incoming = JSON.parse(suggestion.value);
@@ -151,28 +246,9 @@ if (
       if (JSON.stringify(before) === JSON.stringify(merged)) continue;
       // Keep every SQL statement below D1's 100 KB query limit. A rerun starts
       // each array again; interrupted generation/import cannot append duplicates.
-      let batch = [];
-      let size = 0;
-      let first = true;
-      function flush() {
-        if (!batch.length) return;
-        const value = JSON.stringify(batch);
-        lines.push(
-          `UPDATE character_profiles SET ${column}=${first ? `json(${quote(value)})` : `(SELECT json_group_array(json(value)) FROM (SELECT value FROM json_each(${column}) UNION ALL SELECT value FROM json_each(${quote(value)})))`} WHERE ${guard};`,
-        );
-        first = false;
-        batch = [];
-        size = 0;
-      }
-      for (const row of merged) {
-        const length = Buffer.byteLength(JSON.stringify(row), 'utf8');
-        if (length > 65000)
-          throw new Error('One profile row exceeds migration query budget');
-        if (size + length > 65000) flush();
-        batch.push(row);
-        size += length;
-      }
-      flush();
+      lines.push(
+        ...collectionUpdates('character_profiles', column, merged, guard),
+      );
       changed++;
     }
     if (changed)

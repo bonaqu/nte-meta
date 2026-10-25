@@ -7,9 +7,13 @@ db.executescript(Path('migrations/0036_local_game_reference.sql').read_text(enco
 for name in ['game_chunks_ai','game_chunks_ad','game_chunks_au']:db.execute('DROP TRIGGER IF EXISTS '+name)
 sql="""INSERT INTO game_source_chunks(id,kind,records_json,search_text,source_hash,record_count) VALUES(?,?,?,?,?,?)
 ON CONFLICT(id) DO UPDATE SET kind=excluded.kind,records_json=excluded.records_json,search_text=excluded.search_text,source_hash=excluded.source_hash,record_count=excluded.record_count WHERE game_source_chunks.source_hash<>excluded.source_hash"""
-count=0
+count=0; identifiers=set()
 for line in gzip.open('scripts/content/game-data/chunks.jsonl.gz','rt',encoding='utf8'):
- c=json.loads(line); db.execute(sql,(c['id'],c['kind'],json.dumps(c['records'],ensure_ascii=False,separators=(',',':')),c['search'],c['hash'],c['count']));count+=c['count']
+ c=json.loads(line)
+ for record in c['records']:
+  assert record['id'] not in identifiers, 'Duplicate game record: '+record['id']
+  identifiers.add(record['id'])
+ db.execute(sql,(c['id'],c['kind'],json.dumps(c['records'],ensure_ascii=False,separators=(',',':')),c['search'],c['hash'],c['count']));count+=c['count']
 db.commit()
 db.execute("INSERT INTO game_chunks_fts(game_chunks_fts) VALUES('rebuild')")
 schema=Path('migrations/0036_local_game_reference.sql').read_text(encoding='utf-8-sig')

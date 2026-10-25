@@ -33,25 +33,65 @@ if (args.Length == 6 && args[4] == "--probe") {
 var tables = new List<object>(); var images = new List<object>(); var failures = new List<object>();
 var referencedImages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 var voiceEvents = new Dictionary<string,HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+var voicesOnly = args.Length == 5 && args[4] == "--voices-only";
+var fallbackPrefixes = new Dictionary<string,HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+var profileOwners = new HashSet<string>();
+void AddVoice(string name, string owner) {
+ if(!voiceEvents.ContainsKey(name))voiceEvents[name]=new(); voiceEvents[name].Add(owner);
+}
+void ReadVoiceMap(string json) {
+ using var document=JsonDocument.Parse(json);
+ void Walk(JsonElement node) {
+  if(node.ValueKind==JsonValueKind.Object) {
+   if(node.TryGetProperty("AllCharacterVoiceInfo",out var entries) && entries.ValueKind==JsonValueKind.Array)
+    foreach(var entry in entries.EnumerateArray()) {
+     if(!entry.TryGetProperty("Key",out var key) || !entry.TryGetProperty("Value",out var value))continue;
+     var owner=key.ToString(); if(!Regex.IsMatch(owner,@"^\d{4}$"))continue;
+     foreach(Match match in Regex.Matches(value.GetRawText(),@"Play_Vo_(?:Char|Shouts)_[A-Za-z0-9]+_+[A-Za-z0-9_]+")) {
+      var name=match.Value;
+      var prefix=Regex.Match(name,@"^Play_Vo_(?:Char|Shouts)_[A-Za-z0-9]+(?:_[FMfm])?_").Value;
+      if(prefix.Length>0) { if(!fallbackPrefixes.ContainsKey(prefix))fallbackPrefixes[prefix]=new(); fallbackPrefixes[prefix].Add(owner); }
+     }
+    }
+   foreach(var property in node.EnumerateObject())Walk(property.Value);
+  } else if(node.ValueKind==JsonValueKind.Array)foreach(var child in node.EnumerateArray())Walk(child);
+ }
+ Walk(document.RootElement);
+}
+if(voicesOnly) {
+ using var prior=JsonDocument.Parse(File.ReadAllText(Path.Combine(output,"extraction.json")));
+ foreach(var table in prior.RootElement.GetProperty("tables").EnumerateArray()) {
+  var path=table.GetProperty("path").GetString()!;
+  if(Regex.IsMatch(path,@"/\d{4}FileDataTable\d*\.uasset$")) {
+   var json=File.ReadAllText(Path.Combine(output,table.GetProperty("file").GetString()!));
+   foreach(Match match in Regex.Matches(json,"\"AssetPathName\":\"(/Game/WwiseAudio/Events/Voice/[^\"]+)\"")) {
+    var owner=Path.GetFileName(path)[..4];profileOwners.Add(owner);AddVoice(Path.GetFileName(match.Groups[1].Value.Split('.')[0]),owner);
+   }
+  }
+  if(path.EndsWith("/DT_CharacterVoice.uasset"))ReadVoiceMap(File.ReadAllText(Path.Combine(output,table.GetProperty("file").GetString()!)));
+ }
+}
 Directory.CreateDirectory(Path.Combine(output,"tables")); Directory.CreateDirectory(Path.Combine(output,"textures"));
-foreach (var path in paths.Where(x=>x.StartsWith("HT/Content/DataTable/") && x.EndsWith(".uasset") && (IsRelevantTable(x) || x.EndsWith("/DT_CharacterVoice.uasset")))) {
+foreach (var path in paths.Where(x=>!voicesOnly && x.StartsWith("HT/Content/DataTable/") && x.EndsWith(".uasset") && (IsRelevantTable(x) || x.EndsWith("/DT_CharacterVoice.uasset")))) {
  try {
   var objects=Objects(load.Invoke(provider,[path])!);
   var json=(string)serialize.Invoke(null,[objects])!;
+  if(path.EndsWith("/DT_CharacterVoice.uasset"))ReadVoiceMap(json);
   var name=Hash(path)+".json";
   File.WriteAllText(Path.Combine(output,"tables",name),json);
   tables.Add(new {path,file="tables/"+name});
   foreach(Match match in Regex.Matches(json,"\"AssetPathName\":\"(/Game/[^\"]+)\"")) {
    var asset=match.Groups[1].Value.Split('.')[0];
    if(asset.StartsWith("/Game/UI/")) referencedImages.Add("HT/Content/"+asset[6..]+".uasset");
-   if(path.EndsWith("FileDataTable.uasset") && asset.StartsWith("/Game/WwiseAudio/Events/Voice/")) {
+   if(Regex.IsMatch(path,@"/\d{4}FileDataTable\d*\.uasset$") && asset.StartsWith("/Game/WwiseAudio/Events/Voice/")) {
     var owner=Path.GetFileName(path)[..4]; var key=Path.GetFileName(asset);
+    profileOwners.Add(owner);
     if(!voiceEvents.ContainsKey(key)) voiceEvents[key]=new(); voiceEvents[key].Add(owner);
    }
   }
  } catch(Exception ex) { failures.Add(new {path,error=ex.GetBaseException().Message}); }
 }
-foreach(var path in paths.Where(x=>x.EndsWith(".uasset") && (referencedImages.Contains(x) || x.StartsWith("HT/Content/UI/UI_Icon/") || x.StartsWith("HT/Content/UI/UI/Appearance/") || x.StartsWith("HT/Content/UI/UI/Awaken/") || x.StartsWith("HT/Content/UI/UI/likeability/") || x.StartsWith("HT/Content/UI/UI/Gacha/") || x.StartsWith("HT/Content/UI/UI/Equip/")))) {
+foreach(var path in paths.Where(x=>!voicesOnly && x.EndsWith(".uasset") && (referencedImages.Contains(x) || x.StartsWith("HT/Content/UI/UI_Icon/") || x.StartsWith("HT/Content/UI/UI/Appearance/") || x.StartsWith("HT/Content/UI/UI/Awaken/") || x.StartsWith("HT/Content/UI/UI/likeability/") || x.StartsWith("HT/Content/UI/UI/Gacha/") || x.StartsWith("HT/Content/UI/UI/Equip/")))) {
  try {
   var texture=Objects(load.Invoke(provider,[path])!).FirstOrDefault(x=>x?.GetType().Name=="UTexture2D");
   if(texture==null) continue;
@@ -66,6 +106,13 @@ foreach(var path in paths.Where(x=>x.EndsWith(".uasset") && (referencedImages.Co
  } catch(Exception ex) { failures.Add(new {path,error=ex.GetBaseException().Message}); }
 }
 var voices=new List<object>();
+// A missing FileDataTable must not hide a new character's installed voice pack.
+// Prefix ownership is accepted only when the game's explicit map is unique.
+foreach(var path in paths.Where(x=>x.EndsWith(".bnk"))) {
+ var name=Path.GetFileNameWithoutExtension(path);
+ foreach(var pair in fallbackPrefixes)
+  if(pair.Value.Count==1 && !profileOwners.Contains(pair.Value.Single()) && name.StartsWith(pair.Key,StringComparison.OrdinalIgnoreCase) && Regex.IsMatch(name,@"^Play_Vo_Char_.+_\d{3}$"))AddVoice(name,pair.Value.Single());
+}
 var saveAsset=provider.GetType().GetMethod("SaveAsset",[typeof(string)])!;
 var pathSet=paths.ToHashSet(StringComparer.OrdinalIgnoreCase);
 foreach(var path in paths.Where(x=>x.EndsWith(".bnk") && voiceEvents.ContainsKey(Path.GetFileNameWithoutExtension(x)))) {
@@ -78,11 +125,17 @@ foreach(var path in paths.Where(x=>x.EndsWith(".bnk") && voiceEvents.ContainsKey
    if(!pathSet.Contains(media)) { failures.Add(new {path,error="Profile voice media is missing: "+mediaId});continue; }
    var filename=$"audio/{locale}/{mediaId}.wem"; Directory.CreateDirectory(Path.Combine(output,"audio",locale!));
    if(!File.Exists(Path.Combine(output,filename)))File.WriteAllBytes(Path.Combine(output,filename),(byte[])saveAsset.Invoke(provider,[media])!);
-   foreach(var owner in voiceEvents[Path.GetFileNameWithoutExtension(path)]) voices.Add(new {ownerId=owner,locale,eventName=Path.GetFileNameWithoutExtension(path),mediaId,file=filename,path=media});
+   foreach(var owner in voiceEvents[Path.GetFileNameWithoutExtension(path)]) voices.Add(new {ownerId=owner,locale,eventName=Path.GetFileNameWithoutExtension(path),mediaId,file=filename,path=media,binding=profileOwners.Contains(owner)?"profile":"character-voice-map"});
   }
  } catch(Exception ex){failures.Add(new {path,error=ex.GetBaseException().Message});}
 }
-File.WriteAllText(Path.Combine(output,"extraction.json"),JsonSerializer.Serialize(new {formatVersion=2,tables,images,voices,failures}));
+if(voicesOnly) {
+ var manifest=System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(output,"extraction.json")))!.AsObject();
+ manifest["voices"]=System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(voices));
+ var retained=manifest["failures"]!.AsArray().Where(x=>!x!["path"]!.GetValue<string>().EndsWith(".bnk")).Select(x=>x!.ToJsonString());
+ manifest["failures"]=System.Text.Json.Nodes.JsonNode.Parse("["+string.Join(",",retained.Concat(failures.Select(x=>JsonSerializer.Serialize(x))).Distinct())+"]");
+ File.WriteAllText(Path.Combine(output,"extraction.json"),manifest.ToJsonString());
+} else File.WriteAllText(Path.Combine(output,"extraction.json"),JsonSerializer.Serialize(new {formatVersion=2,tables,images,voices,failures}));
 Console.WriteLine($"Exported {tables.Count} tables, {images.Count} textures; {failures.Count} errors (see extraction.json)");
 static object? Get(object obj,string name)=>obj.GetType().GetProperty(name)?.GetValue(obj)??obj.GetType().GetField(name)?.GetValue(obj);
 static object?[] Objects(object pkg)=>((IEnumerable)Get(pkg,"ExportsLazy")!).Cast<object>().Select(x=>Get(x,"Value")).ToArray();

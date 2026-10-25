@@ -3,6 +3,71 @@ import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
 import type { Character } from '../src/types';
 
+test('опубликованные пакеты: Аканэ и оба варианта Зеро воспроизводят четыре языка', async ({
+  page,
+}) => {
+  test.skip(
+    !process.env.NTE_PUBLIC_VOICES_URL,
+    'Опциональная проверка опубликованного аудио.',
+  );
+  test.setTimeout(120000);
+  if (process.env.NTE_VOICE_CHARACTER_FIXTURE) {
+    const characters = JSON.parse(
+      await readFile(process.env.NTE_VOICE_CHARACTER_FIXTURE, 'utf8'),
+    );
+    await page.route('**/api/characters', (route) =>
+      route.fulfill({ json: { data: characters } }),
+    );
+  }
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  for (const [slug, variants] of [
+    ['akane', []],
+    ['esper-zero', ['Мужской вариант', 'Женский вариант']],
+  ] as const) {
+    await page.goto(
+      process.env.NTE_PUBLIC_VOICES_URL! + '#/characters/' + slug,
+    );
+    const voices = page.locator('#character-voice');
+    await page
+      .getByRole('navigation', { name: 'Разделы персонажа' })
+      .getByRole('button', { name: 'Озвучка', exact: true })
+      .click();
+    for (const variant of variants.length ? variants : ['']) {
+      if (variant)
+        await voices
+          .getByRole('group', { name: 'Вариант озвучки' })
+          .getByRole('button', { name: variant, exact: true })
+          .click();
+      for (const language of [
+        'Японский',
+        'Английский',
+        'Китайский',
+        'Корейский',
+      ]) {
+        await voices.getByRole('tab', { name: new RegExp(language) }).click();
+        await expect(voices.locator('audio')).toHaveCount(6);
+        const audio = voices.locator('audio').first();
+        await audio.evaluate(async (element: HTMLAudioElement) => {
+          await element.play();
+        });
+        await expect
+          .poll(() =>
+            audio.evaluate((element: HTMLAudioElement) => element.currentTime),
+          )
+          .toBeGreaterThan(0);
+        expect(
+          await audio.evaluate((element: HTMLAudioElement) =>
+            Boolean(element.error),
+          ),
+        ).toBe(false);
+        await audio.evaluate((element: HTMLAudioElement) => element.pause());
+      }
+    }
+  }
+  expect(errors).toEqual([]);
+});
+
 test('готовая сборка: досье, стабильный гардероб, четыре языка и локальный черновик', async ({
   page,
 }, info) => {

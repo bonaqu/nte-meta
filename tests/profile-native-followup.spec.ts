@@ -13,6 +13,80 @@ import {
 import type { CharacterAbility, GuideSection } from '../src/types';
 import { mergeNativeCollection } from '../scripts/game-data/seed-profiles.mjs';
 import { validProposal } from '../src/lib/local-character-proposal';
+import { readFile } from 'node:fs/promises';
+import { DatabaseSync } from 'node:sqlite';
+
+test('озвучка женского Зеро: четыре пакета, повтор миграции и защита поздних правок', async () => {
+  const sql = await readFile(
+    'migrations/0048_native_voice_row_owners.sql',
+    'utf8',
+  );
+  const observed = sql.match(
+    /FROM characters WHERE id=character_id AND updated_at='([^']+)'/,
+  )![1];
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec(
+      'CREATE TABLE characters(id TEXT, updated_at TEXT); CREATE TABLE character_profiles(character_id TEXT, updated_at TEXT); CREATE TABLE character_appearance_variants(character_id TEXT, variant_id TEXT, voice_lines_json TEXT);',
+    );
+    db.prepare('INSERT INTO characters VALUES(?,?)').run(
+      'esper-zero',
+      observed,
+    );
+    db.exec(
+      "INSERT INTO character_profiles VALUES('esper-zero','2026-01-01'); INSERT INTO character_appearance_variants VALUES('esper-zero','1046','[]'),('esper-zero','1051','[]');",
+    );
+    db.exec(sql);
+    const get = () =>
+      db
+        .prepare(
+          "SELECT voice_lines_json FROM character_appearance_variants WHERE variant_id='1051'",
+        )
+        .get()!.voice_lines_json as string;
+    const first = get();
+    const voices = JSON.parse(first) as {
+      language: string;
+      audioUrl: string;
+      title: string;
+    }[];
+    expect(voices).toHaveLength(244);
+    for (const language of ['Японский', 'Английский', 'Китайский', 'Корейский'])
+      expect(voices.filter((v) => v.language === language)).toHaveLength(61);
+    expect(
+      voices.every(
+        (v) =>
+          v.title &&
+          /^\/nte-meta\/game-audio\/[a-f0-9]{20}\.ogg$/.test(v.audioUrl),
+      ),
+    ).toBe(true);
+    db.exec(sql);
+    expect(get()).toBe(first);
+    db.exec(
+      "UPDATE character_profiles SET updated_at='2099-01-01'; UPDATE character_appearance_variants SET voice_lines_json='[{\"title\":\"Ручная правка\"}]' WHERE variant_id='1051';",
+    );
+    db.exec(sql);
+    expect(JSON.parse(get())).toEqual([{ title: 'Ручная правка' }]);
+  } finally {
+    db.close();
+  }
+});
+
+test('повторный импорт актёра по языку сохраняет ручное полное имя без дубля', () => {
+  const current = [
+    { language: 'Японский', name: 'Toshiyuki Morikawa (森川 智之)' },
+  ];
+  const incoming = [{ language: 'Японский', name: '森川智之' }];
+  expect(mergeNativeCollection('voiceActors', current, incoming)).toEqual(
+    current,
+  );
+  expect(
+    mergeNativeCollection(
+      'voiceActors',
+      mergeNativeCollection('voiceActors', current, incoming),
+      incoming,
+    ),
+  ).toEqual(current);
+});
 
 test('обновление голосовых пакетов сохраняет ручную озвучку и убирает старую импортированную заглушку', () => {
   const incoming = [

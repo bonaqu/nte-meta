@@ -201,7 +201,7 @@ def _export_readable(repository, destination, owners, source_records, include_me
         if row['namespace'] in ('NTE_ReferenceItem', 'NTE_ReferenceCurrency'): item_rows.append(row)
         if row.get('kind') == 'image': image_rows.append(row)
         if row.get('kind') == 'audio': audio_rows.append(row)
-        if row['namespace'].endswith('FileDataTable'):
+        if re.search(r'FileDataTable\d*$', row['namespace']):
             voice_parts.extend(row['details'].get('DailyContent', [])); voice_parts.extend(row['details'].get('BattleContent', []))
     def native_text(value):
         if not isinstance(value, dict): return value or ''

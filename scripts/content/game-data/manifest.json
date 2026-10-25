@@ -7,7 +7,7 @@
     "zh"
   ],
   "localizationKeys": 113100,
-  "records": 207666,
+  "records": 207326,
   "kinds": {
     "localization": 142689,
     "skill": 3622,
@@ -21,7 +21,7 @@
     "biography": 3522,
     "character": 1269,
     "image": 7968,
-    "audio": 9216
+    "audio": 8876
   },
   "textures": 7968,
   "extractionErrors": [
@@ -737,7 +737,7 @@
     "HT/Content/DataTable/Skill/GlobalCharacterData/DT_GlobalValueLinkoData.uasset"
   ],
   "source": "Local installed game archives including PatchPaks; original strings preserved",
-  "datasetSha256": "89d3de8eeb7e2fc2345e843fe658db38c4160a61f88e8f55cc6db3aaa5db2df7",
+  "datasetSha256": "e0b084c9771c9ac22d90f3f737af35dcef0957dbbceb9650063701addef7e918",
   "chunks": 1088,
   "repairedCsvRows": {
     "ru": 425,
@@ -760,5 +760,5 @@
     "gifts": 138,
     "failures": []
   },
-  "chunksSha256": "eb5ee3170150d8679d5bfe2eee6bf389a869c6b46c6480250cecf1c2b03eea5c"
+  "chunksSha256": "51aed3f716636dc8a3db4717af847e431060b5bd7a128574d1fa5cd78e50cc4a"
 }

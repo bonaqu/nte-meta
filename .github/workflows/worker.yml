@@ -2,10 +2,10 @@ name: Deploy Cloudflare Worker
 
 on:
   workflow_dispatch:
-  push:
+  workflow_run:
+    workflows: [Deploy GitHub Pages]
+    types: [completed]
     branches: [bonaqu_projects]
-    paths:
-      - 'scripts/content/game-data/**'
 
 permissions:
   contents: read
@@ -16,10 +16,13 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'pull_request')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
       - name: Setup Node
         uses: actions/setup-node@v6
         with:

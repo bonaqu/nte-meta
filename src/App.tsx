@@ -3809,8 +3809,8 @@ function GuideHero({
             <dd>{character.role}</dd>
           </div>
           <div>
-            <dt>Тип</dt>
-            <dd>{character.type}</dd>
+            <dt>Атрибут</dt>
+            <dd>{character.attribute}</dd>
           </div>
           <div>
             <dt>Редкость</dt>
@@ -3821,7 +3821,16 @@ function GuideHero({
             <dd>{tierPlacement?.tier || 'Не задан'}</dd>
           </div>
         </dl>
-        <Tags tags={character.tags} />
+        <Tags
+          tags={character.tags.filter(
+            (tag) =>
+              ![character.role, character.type, character.attribute].some(
+                (value) =>
+                  value.toLocaleLowerCase('ru-RU') ===
+                  tag.toLocaleLowerCase('ru-RU'),
+              ),
+          )}
+        />
         <div className="guide-hero-byline">
           <span>Автор: {guide.author}</span>
           <span>Обновлено {formatDate(guide.updatedAt)}</span>

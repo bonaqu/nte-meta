@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useId, useRef, useState } from 'react';
 import {
   ArrowRight,
   Calculator,
@@ -35,6 +35,9 @@ export function ProgressionCalculator({
   const [arcId, setArcId] = useState('');
   const [kind, setKind] = useState<'character' | 'arc'>('character');
   const [query, setQuery] = useState('');
+  const [arcPickerOpen, setArcPickerOpen] = useState(false);
+  const pickerId = useId();
+  const arcToggle = useRef<HTMLButtonElement>(null);
   const [from, setFrom] = useState(1);
   const [to, setTo] = useState(80);
   const [ascended, setAscended] = useState(false);
@@ -87,6 +90,7 @@ export function ProgressionCalculator({
   }
   const changeKind = (next: 'character' | 'arc') => {
     setKind(next);
+    if (next === 'character') setArcPickerOpen(false);
     setOwned({});
     setExperienceItemId('');
   };
@@ -143,27 +147,48 @@ export function ProgressionCalculator({
                 <strong>{name}</strong>
               </span>
             </button>
-            <button
-              type="button"
-              aria-pressed={kind === 'arc'}
-              disabled={!arcs.length}
-              onClick={() => changeKind('arc')}
+            <div
+              className={`progression-arc-control${kind === 'arc' ? ' active' : ''}`}
             >
-              {arc?.iconUrl ? (
-                <img
-                  src={resolveAssetUrl(arc.iconUrl)}
-                  alt=""
-                  width="52"
-                  height="52"
-                />
-              ) : (
-                <Orbit aria-hidden="true" />
-              )}
-              <span>
-                <small>Дуга · {character?.arcType || 'тип не определён'}</small>
-                <strong>{arc?.name || 'Нет совместимых дуг'}</strong>
-              </span>
-            </button>
+              <button
+                type="button"
+                aria-pressed={kind === 'arc'}
+                disabled={!arcs.length}
+                onClick={() => changeKind('arc')}
+              >
+                {arc?.iconUrl ? (
+                  <img
+                    src={resolveAssetUrl(arc.iconUrl)}
+                    alt=""
+                    width="52"
+                    height="52"
+                  />
+                ) : (
+                  <Orbit aria-hidden="true" />
+                )}
+                <span>
+                  <small>
+                    Дуга · {character?.arcType || 'тип не определён'}
+                  </small>
+                  <strong>{arc?.name || 'Нет совместимых дуг'}</strong>
+                </span>
+              </button>
+              <button
+                ref={arcToggle}
+                type="button"
+                className="progression-arc-toggle"
+                aria-label="Выбрать дугу"
+                aria-expanded={arcPickerOpen}
+                aria-controls={arcPickerOpen ? pickerId : undefined}
+                disabled={!arcs.length}
+                onClick={() => {
+                  if (kind !== 'arc') changeKind('arc');
+                  setArcPickerOpen((value) => !value);
+                }}
+              >
+                <ChevronDown aria-hidden="true" />
+              </button>
+            </div>
           </div>
           {!character ? (
             <p role="status">Для {name} таблица прокачки пока недоступна.</p>
@@ -172,9 +197,19 @@ export function ProgressionCalculator({
               Совместимость дуг для {name} пока не определена.
             </p>
           ) : null}
-          {kind === 'arc' && arcs.length ? (
-            <details className="arc-picker" key={appearanceId}>
-              <summary>Выбрать дугу · {arc?.name}</summary>
+          {kind === 'arc' && arcs.length && arcPickerOpen ? (
+            <div
+              className="arc-picker"
+              id={pickerId}
+              role="region"
+              aria-label="Доступные дуги"
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  setArcPickerOpen(false);
+                  arcToggle.current?.focus();
+                }
+              }}
+            >
               <label>
                 Поиск совместимой дуги
                 <input
@@ -202,6 +237,8 @@ export function ProgressionCalculator({
                       onClick={() => {
                         setArcId(row.id);
                         setOwned({});
+                        setArcPickerOpen(false);
+                        arcToggle.current?.focus();
                       }}
                     >
                       {row.iconUrl ? (
@@ -226,7 +263,7 @@ export function ProgressionCalculator({
               ) ? (
                 <p role="status">Дуга с таким названием не найдена.</p>
               ) : null}
-            </details>
+            </div>
           ) : null}
           {selected ? (
             <>

@@ -269,6 +269,7 @@ export function GuideVisualEditor({
               <button
                 type="button"
                 className="ghost-button"
+                disabled={value.items.length >= 40}
                 onClick={() => {
                   const items = [...value.items];
                   items.splice(index + 1, 0, {
@@ -341,29 +342,41 @@ export function GuideVisualEditor({
             ) : null}
             {(value.kind === 'skills' || value.kind === 'rotation') &&
             character?.profile?.abilities?.length ? (
-              <label>
-                Навык персонажа
-                <select
-                  value=""
-                  onChange={(e) => {
-                    const ability = character.profile!.abilities!.find(
-                      (row) => row.id === e.target.value,
-                    );
-                    if (ability)
-                      patch(item.id, {
-                        name: ability.name,
-                        imageUrl: ability.iconUrl,
-                      });
-                  }}
-                >
-                  <option value="">Выбрать навык и иконку</option>
-                  {character.profile.abilities.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} — {a.type}
-                    </option>
+              <fieldset className="guide-ability-picker">
+                <legend>Навык персонажа</legend>
+                <div role="group" aria-label="Навыки для секции гайда">
+                  {character.profile.abilities.map((ability) => (
+                    <button
+                      key={ability.id}
+                      type="button"
+                      aria-pressed={
+                        item.name === ability.name &&
+                        item.imageUrl === ability.iconUrl
+                      }
+                      onClick={() =>
+                        patch(item.id, {
+                          name: ability.name,
+                          imageUrl: ability.iconUrl,
+                        })
+                      }
+                    >
+                      {ability.iconUrl ? (
+                        <img
+                          src={resolveAssetUrl(ability.iconUrl)}
+                          alt=""
+                          width="40"
+                          height="40"
+                          loading="lazy"
+                        />
+                      ) : null}
+                      <span>
+                        <strong>{ability.name}</strong>
+                        <small>{ability.type}</small>
+                      </span>
+                    </button>
                   ))}
-                </select>
-              </label>
+                </div>
+              </fieldset>
             ) : null}
             <label>
               {value.kind === 'rotation' ? 'Действие' : 'Название'}
@@ -440,6 +453,7 @@ export function GuideVisualEditor({
                       Характеристика
                       <input
                         value={stat.label}
+                        maxLength={120}
                         onChange={(e) =>
                           patch(item.id, {
                             stats: item.stats.map((row, j) =>
@@ -453,6 +467,7 @@ export function GuideVisualEditor({
                       Значение
                       <input
                         value={stat.value}
+                        maxLength={500}
                         onChange={(e) =>
                           patch(item.id, {
                             stats: item.stats.map((row, j) =>
@@ -478,6 +493,7 @@ export function GuideVisualEditor({
                 <button
                   type="button"
                   className="ghost-button"
+                  disabled={item.stats.length >= 24}
                   onClick={() =>
                     patch(item.id, {
                       stats: [...item.stats, { label: '', value: '' }],

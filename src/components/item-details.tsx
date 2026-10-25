@@ -75,6 +75,10 @@ export function ItemDetails({
     panel.current?.showPopover();
     position();
   };
+  const scheduleShow = () => {
+    cancel();
+    timer.current = setTimeout(show, 500);
+  };
   useEffect(() => {
     let mounted = true;
     loadRegistry()
@@ -135,7 +139,7 @@ export function ItemDetails({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={panelId}
-        onMouseEnter={show}
+        onMouseEnter={scheduleShow}
         onMouseLeave={leave}
         onFocus={(event) => {
           if (skipFocus.current) {

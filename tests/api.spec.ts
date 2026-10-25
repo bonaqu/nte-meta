@@ -1998,14 +1998,12 @@ ${'Проверенная редакционная биография остаё
       await page
         .getByRole('button', { name: 'Редактировать тир-лист', exact: true })
         .click();
-      const dialog = page
-        .getByRole('dialog')
-        .filter({
-          has: page.getByRole('heading', {
-            name: 'Редактор тир-листа',
-            exact: true,
-          }),
-        });
+      const dialog = page.getByRole('dialog').filter({
+        has: page.getByRole('heading', {
+          name: 'Редактор тир-листа',
+          exact: true,
+        }),
+      });
       await dialog
         .getByLabel('Добавить персонажа в тир-лист')
         .selectOption('akane');
@@ -2098,7 +2096,7 @@ ${'Проверенная редакционная биография остаё
         {
           id: 'test-arc',
           name: 'Дуга',
-          imageUrl: 'https://example.com/arc.webp',
+          imageUrl: '/nte-meta/game-assets/ad87d2a73478180243f0.webp',
           description: 'Практическое описание',
           category: 'signature',
           stats: [{ label: 'Атака', value: '100' }],
@@ -2138,6 +2136,7 @@ ${'Проверенная редакционная биография остаё
         (s: { id: string }) => s.id === id,
       );
       expect(section.visual.items[0].name).toBe('Исправленная дуга');
+      expect(section.visual.items[0].imageUrl).toBe(visual.items[0].imageUrl);
       expect(section.visual.items[0].sourceUrl).toBeUndefined();
       expect(
         publicGuide.sections.some(

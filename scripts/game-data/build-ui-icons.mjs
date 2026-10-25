@@ -88,3 +88,5 @@ process.stdout.write(
 );
 const { buildItemDescriptions } = await import('./build-item-descriptions.mjs');
 await buildItemDescriptions(rows);
+const { buildNativeItems } = await import('./build-native-items.mjs');
+await buildNativeItems(rows);

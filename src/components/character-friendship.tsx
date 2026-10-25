@@ -3,7 +3,7 @@ import { useLayoutEffect, useState } from 'react';
 import { ItemDetails } from './item-details';
 import { Star } from 'lucide-react';
 import type { CharacterProfile } from '../types';
-import { resolveItemIcon } from '../lib/item-icons';
+import { resolveItemIcon, resolveNativeItem } from '../lib/item-icons';
 export function CharacterFriendship({
   gifts,
   friendship,
@@ -26,6 +26,7 @@ export function CharacterFriendship({
       {gifts.length ? (
         <div className="gift-grid inventory-tiles">
           {gifts
+            .map(resolveNativeItem)
             .filter(
               (gift, index, all) =>
                 all.findIndex(

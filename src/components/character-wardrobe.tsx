@@ -1,11 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { ImageIcon, Maximize2, X } from 'lucide-react';
+import {
+  ImageIcon,
+  Maximize2,
+  X,
+  LayoutGrid,
+  GalleryHorizontalEnd,
+} from 'lucide-react';
 import type { CharacterSkin } from '../types';
 import { resolveAssetUrl } from '../lib/assets';
 import { PageStepper } from './page-stepper';
 
 export function CharacterWardrobe({ skins }: { skins: CharacterSkin[] }) {
   const [index, setIndex] = useState(0);
+  const [view, setView] = useState<'rail' | 'grid'>('rail');
+  const rail = useRef<HTMLDivElement>(null);
   const [opened, setOpened] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const activeIndex = Math.min(index, Math.max(0, skins.length - 1));
@@ -14,6 +22,21 @@ export function CharacterWardrobe({ skins }: { skins: CharacterSkin[] }) {
     if (opened && !dialog.current?.open) dialog.current?.showModal();
     if (!opened && dialog.current?.open) dialog.current.close();
   }, [opened]);
+  useEffect(() => {
+    if (view !== 'rail') return;
+    const container = rail.current;
+    const selected = container?.querySelector<HTMLButtonElement>(
+      '[aria-pressed="true"]',
+    );
+    if (container && selected)
+      container.scrollTo({
+        left:
+          selected.offsetLeft -
+          container.offsetLeft -
+          (container.clientWidth - selected.clientWidth) / 2,
+        behavior: 'instant',
+      });
+  }, [activeIndex, view]);
   if (!skin) return null;
   return (
     <div className="wardrobe-gallery">
@@ -26,7 +49,32 @@ export function CharacterWardrobe({ skins }: { skins: CharacterSkin[] }) {
         <div className="wardrobe-gallery__copy">
           {skins.length > 1 ? (
             <div
-              className="wardrobe-thumbnails"
+              className="wardrobe-view"
+              role="group"
+              aria-label="Вид гардероба"
+            >
+              <button
+                type="button"
+                aria-label="Лента костюмов"
+                aria-pressed={view === 'rail'}
+                onClick={() => setView('rail')}
+              >
+                <GalleryHorizontalEnd aria-hidden="true" /> Лента
+              </button>
+              <button
+                type="button"
+                aria-label="Плитки костюмов"
+                aria-pressed={view === 'grid'}
+                onClick={() => setView('grid')}
+              >
+                <LayoutGrid aria-hidden="true" /> Плитки
+              </button>
+            </div>
+          ) : null}
+          {skins.length > 1 ? (
+            <div
+              ref={rail}
+              className={`wardrobe-thumbnails wardrobe-thumbnails--${view}`}
               role="group"
               aria-label="Выбор наряда"
             >

@@ -687,10 +687,11 @@ test('нативный профиль в браузере: резонансы, �
       await basic.locator('summary').click();
     await basic.getByRole('tab', { name: /^Атрибуты/ }).click();
     const levels = basic.getByRole('group', { name: /^Уровень навыка/ });
-    await expect(levels.getByRole('button', { name: /назад/ })).toBeDisabled();
-    for (let i = 1; i < 13; i++)
-      await levels.getByRole('button', { name: /вперёд/ }).click();
-    await expect(levels.getByRole('button', { name: /вперёд/ })).toBeDisabled();
+    await expect(levels.getByRole('button')).toHaveCount(13);
+    await levels.getByRole('button', { name: 'Ур. 13', exact: true }).click();
+    await expect(
+      levels.getByRole('button', { name: 'Ур. 13', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
     await expect(
       basic.locator('.ability-attribute-grid dd').first(),
     ).toContainText('61.2');
@@ -950,6 +951,91 @@ test('игровой калькулятор: все 25 вариантов име
     expect(
       unknown.costs.find((row) => row.id === '1033')?.arcTypeId,
     ).toBeUndefined();
+  } finally {
+    f.db.close();
+  }
+});
+
+test('импорт подарков связывает Food_142, Food_0142_name и игровую текстуру', async () => {
+  const records = JSON.parse(
+    await readFile('tests/fixtures/game-data-native-hathor.json', 'utf8'),
+  ) as SourceRecord[];
+  const character = records.find(
+    (row) => row.namespace === 'NTE_ReferenceCharacter',
+  )!;
+  character.details.preferrable_gifts = [{ item_id: 'Food_142', amount: 100 }];
+  const base = records.find((row) => row.kind === 'item')!;
+  records.push({
+    ...base,
+    id: 'localization:food-test|ST_food:Food_0142_name',
+    kind: 'localization',
+    namespace: 'ST_food',
+    gameId: 'Food_0142_name',
+    values: {
+      ru: 'Рисовая лапша с жар-птицей и грудинкой',
+      en: 'Firebird noodles',
+      ja: '',
+      zh: '',
+    },
+    assets: [],
+    details: {},
+  });
+  records.push({
+    ...base,
+    id: 'image:food-test|Item:food_0142',
+    kind: 'image',
+    namespace: 'Item',
+    gameId: 'food_0142',
+    values: { ru: '', en: '', ja: '', zh: '' },
+    assets: [
+      {
+        url: '/nte-meta/game-assets/ad87d2a73478180243f0.webp',
+        width: 256,
+        height: 256,
+      },
+    ],
+    details: {},
+  });
+  const f = await contract(records);
+  try {
+    const source = await f.m.buildLocalGameCharacterSource(f.env, {
+      originalName: 'Hathor',
+      name: 'Хатор',
+    });
+    const gifts = JSON.parse(
+      source.suggestions.find((row) => row.field === 'profile.gifts')!.value,
+    );
+    expect(gifts).toContainEqual(
+      expect.objectContaining({
+        id: 'Food_142',
+        name: 'Рисовая лапша с жар-птицей и грудинкой',
+        iconUrl: '/nte-meta/game-assets/ad87d2a73478180243f0.webp',
+      }),
+    );
+    f.db
+      .prepare(
+        'INSERT INTO game_record_overrides(id,chunk_id,overrides_json,search_text,revision) VALUES(?,?,?,?,1)',
+      )
+      .run(
+        'localization:food-test|ST_food:Food_0142_name',
+        'localization:food-test',
+        JSON.stringify({ values: { ru: 'Название администратора' } }),
+        'override',
+      );
+    const edited = await f.m.buildLocalGameCharacterSource(f.env, {
+      originalName: 'Hathor',
+      name: 'Хатор',
+    });
+    const editedGifts = JSON.parse(
+      edited.suggestions.find((row) => row.field === 'profile.gifts')!.value,
+    );
+    expect(editedGifts).toContainEqual(
+      expect.objectContaining({
+        id: 'Food_142',
+        name: 'Название администратора',
+        iconUrl: '/nte-meta/game-assets/ad87d2a73478180243f0.webp',
+      }),
+    );
   } finally {
     f.db.close();
   }

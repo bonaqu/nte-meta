@@ -235,7 +235,9 @@ test('профиль: совместимые дуги, настоящие пре
     }),
   ).toHaveAttribute('aria-pressed', 'true');
   await calculator.getByRole('button', { name: /^Дуга · Гибридный/ }).click();
-  await calculator.locator('.arc-picker > summary').click();
+  await calculator
+    .getByRole('button', { name: 'Выбрать дугу', exact: true })
+    .click();
   const arcButtons = calculator.locator('.arc-picker__options button');
   const compatible = native.costs.filter(
     (row) => row.kind === 'arc' && row.arcTypeId === 5,
@@ -245,6 +247,10 @@ test('профиль: совместимые дуги, настоящие пре
     compatible.map((row) => row.name),
   );
   await arcButtons.last().click();
+  await expect(calculator.locator('.arc-picker')).toHaveCount(0);
+  await calculator
+    .getByRole('button', { name: 'Выбрать дугу', exact: true })
+    .click();
   await expect(arcButtons.last()).toHaveAttribute('aria-pressed', 'true');
   await calculator
     .getByLabel('Поиск совместимой дуги')

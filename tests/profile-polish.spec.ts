@@ -124,16 +124,19 @@ test('биография, уровни навыка, гардероб и стр�
     const skill = page.locator('.ability-card').first();
     await skill.getByRole('tab', { name: /Атрибуты/ }).click();
     const level = skill.getByRole('group', { name: /Уровень навыка/ });
-    await expect(level.getByRole('button', { name: /назад/ })).toBeDisabled();
+    await expect(level.getByRole('button')).toHaveCount(13);
+    await expect(
+      level.getByRole('button', { name: 'Ур. 1', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
     await expect(skill.locator('select')).toHaveCount(0);
-    for (let i = 1; i < 13; i++)
-      await level.getByRole('button', { name: /вперёд/ }).click();
-    await expect(level.getByRole('button', { name: /вперёд/ })).toBeDisabled();
-    await expect(level).toContainText('13');
+    await level.getByRole('button', { name: 'Ур. 13', exact: true }).click();
+    await expect(
+      level.getByRole('button', { name: 'Ур. 13', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
     await expect(skill.locator('.ability-attribute-grid')).toContainText(
       '176.3',
     );
-    await level.getByRole('button', { name: /назад/ }).click();
+    await level.getByRole('button', { name: 'Ур. 12', exact: true }).click();
     await expect(skill.locator('.ability-attribute-grid')).toContainText(
       '163.2',
     );
@@ -192,7 +195,7 @@ test('биография, уровни навыка, гардероб и стр�
     await expect(voice.locator('.voice-line-list article')).toHaveCount(6);
     await expect(pages.getByRole('button', { name: /назад/ })).toBeDisabled();
     const upload = page.locator('.comment-form .image-upload__button');
-    expect((await upload.boundingBox())!.height).toBe(44);
+    expect((await upload.boundingBox())!.height).toBe(width >= 900 ? 34 : 44);
     expect(
       await page.evaluate(
         () =>

@@ -33,19 +33,39 @@
   .character-profile-page .section-heading p {
     margin-block: 3px 0;
   }
+  .character-profile-page .character-profile-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
   .character-profile-page .character-profile-facts > div {
-    display: flex;
-    gap: 12px;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(74px, 0.8fr) minmax(0, 1.2fr);
+    gap: 10px;
     align-items: center;
+    min-inline-size: 0;
+    overflow: visible;
     border: 1px solid #46474b;
-    border-radius: 999px;
-    padding: 9px 14px;
+    border-radius: 14px;
+    padding: 10px 13px;
     background: #222327;
+  }
+  .character-profile-page .character-profile-facts > div:last-child {
+    grid-column: 1 / -1;
+  }
+  .character-profile-page .character-profile-facts :is(dt, dd) {
+    min-inline-size: 0;
+    overflow-wrap: normal;
+    word-break: normal;
   }
   .character-profile-page .character-profile-facts dd {
     margin: 0;
     text-align: end;
+    line-height: 1.4;
+  }
+  @media (max-width: 1100px) {
+    .character-profile-page .character-profile-facts {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
   .character-profile-page .character-biography-copy {
     max-inline-size: none;
@@ -1020,6 +1040,289 @@
     }
     .item-detail-popover > header {
       gap: 8px;
+    }
+  }
+}
+
+@layer nte {
+  .character-profile-page .progression-arc-control {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 48px;
+    border: 1px solid #45464b;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #121316;
+  }
+  .character-profile-page .progression-arc-control.active {
+    border-color: var(--pink);
+    background: #30232a;
+  }
+  .character-profile-page .progression-arc-control > button {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  .character-profile-page .progression-arc-control > .progression-arc-toggle {
+    display: grid;
+    place-content: center;
+    padding: 0;
+    min-inline-size: 44px;
+    align-self: stretch;
+    border-inline-start: 1px solid #45464b;
+  }
+  .character-profile-page .progression-arc-toggle[aria-expanded='true'] svg {
+    transform: rotate(180deg);
+  }
+  .arc-picker {
+    padding: 14px;
+    border: 1px solid #6b4a59;
+    border-radius: 14px;
+    background: #191a1e;
+  }
+  .character-profile-page .friendship-levels {
+    gap: 6px;
+  }
+  .character-profile-page .friendship-levels button {
+    min-inline-size: 46px;
+    min-block-size: 48px;
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 3px #141518;
+    background: #303136;
+    border-color: #74757b;
+    font-variant-numeric: tabular-nums;
+  }
+  .character-profile-page .friendship-levels button[aria-pressed='true'] {
+    box-shadow: inset 0 0 0 3px #77324f;
+  }
+  .friendship-levels button:active {
+    transform: translateY(1px);
+  }
+  .level-selector {
+    margin-block: 8px 16px;
+  }
+  .profile-range-note {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .character-profile-page .wardrobe-gallery__stage {
+    background: #1d1e22;
+    border: 3px solid #48494f;
+    box-shadow: inset 0 0 0 3px #111215;
+    padding: 20px;
+  }
+  .character-profile-page .skin-media {
+    border-radius: 16px;
+    border: 1px solid #55565c;
+    background: radial-gradient(ellipse at bottom, #34343a, #141518 75%);
+  }
+  .wardrobe-view {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid #55565b;
+    border-radius: 999px;
+    background: #101114;
+    width: fit-content;
+  }
+  .wardrobe-view button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    min-block-size: 44px;
+    border: 0;
+    border-radius: 999px;
+    color: #dadadd;
+    background: transparent;
+  }
+  .wardrobe-view button[aria-pressed='true'] {
+    color: #171117;
+    background: var(--pink);
+  }
+  .wardrobe-view svg {
+    width: 18px;
+    height: 18px;
+  }
+  .character-profile-page .wardrobe-thumbnails--rail {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-block-size: none;
+    scroll-snap-type: x mandatory;
+    padding: 8px 4px 12px;
+  }
+  .character-profile-page .wardrobe-thumbnails--rail button {
+    flex: 0 0 140px;
+    scroll-snap-align: center;
+  }
+  .character-profile-page .wardrobe-thumbnails--rail img {
+    block-size: 200px;
+  }
+  .character-profile-page .wardrobe-thumbnails button {
+    transition:
+      border-color 120ms,
+      transform 120ms;
+  }
+  .character-profile-page .wardrobe-thumbnails button:active {
+    transform: scale(0.98);
+  }
+  .character-profile-page .wardrobe-thumbnails span {
+    overflow-wrap: normal;
+  }
+  .page-stepper {
+    padding: 4px;
+    gap: 4px;
+    border: 2px solid #5c5d63;
+    border-radius: 999px;
+    background: #101114;
+    box-shadow: inset 0 0 0 2px #25262b;
+    min-block-size: 56px;
+  }
+  .page-stepper > span {
+    font-size: 0.85rem;
+    padding-inline: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .page-stepper button {
+    border-radius: 50%;
+    border: 1px solid #74757c;
+    color: #26272b;
+    background: #deddda;
+    transition:
+      transform 100ms,
+      background 100ms;
+  }
+  .page-stepper button:disabled {
+    color: #83848b;
+    background: #292a2f;
+    border-color: #4e4f56;
+    opacity: 1;
+  }
+  .page-stepper button:not(:disabled):active {
+    transform: scale(0.91);
+    background: var(--pink);
+  }
+  .page-stepper button:not(:disabled):hover {
+    background: #ffadd0;
+  }
+  .comments-module > .panel-title-row {
+    border-block-end: 1px solid #4b4c53;
+    padding-block-end: 14px;
+  }
+  .comments-module .comment-form {
+    border: 1px solid #505158;
+    border-radius: 16px;
+    background: #1d1e22;
+    padding: 14px;
+    gap: 10px;
+    box-shadow: inset 0 0 0 3px #111215;
+  }
+  .comments-module .reply-context {
+    padding-inline: 6px;
+  }
+  .comments-module .comment-card {
+    border: 1px solid #44454c;
+    border-radius: 12px;
+    background: #202125;
+    box-shadow: none;
+  }
+  .comments-module .comment-heading {
+    padding-block-end: 10px;
+    border-block-end: 1px solid #3b3c43;
+  }
+  .comments-module .comment-author-line > strong {
+    color: #fff;
+  }
+  .comments-module .comment-composer-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .comments-module .comment-composer-footer p:empty {
+    display: none;
+  }
+  .site-footer {
+    position: relative;
+    border: 1px solid #4b4c53;
+    border-radius: 18px 18px 0 0;
+    padding: 24px;
+    background: #1b1c20;
+    box-shadow: inset 0 4px 0 #34353b;
+    gap: 24px;
+  }
+  .site-footer strong {
+    font-style: italic;
+    letter-spacing: 0.03em;
+  }
+  .site-footer nav {
+    gap: 6px;
+    align-content: center;
+  }
+  .site-footer nav a {
+    display: flex;
+    align-items: center;
+    min-block-size: 44px;
+    padding: 8px 16px;
+    border: 1px solid #505158;
+    border-radius: 999px;
+    background: #111215;
+  }
+  .site-footer nav a:is(:hover, :focus-visible) {
+    background: #deddda;
+    color: #222328;
+  }
+  .tierlists-page .tier-preview {
+    padding: 8px;
+    border: 2px solid #505158;
+    border-radius: 18px;
+    background: #101114;
+    gap: 6px;
+  }
+  .tierlists-page .tier-row {
+    border-radius: 12px;
+    border-color: #505158;
+  }
+  .tierlists-page .tier-row > strong {
+    font-style: italic;
+    border: 4px solid #191a1e;
+    border-radius: 12px;
+    text-shadow: 1px 2px #ffffff70;
+  }
+  .tierlists-page .tier-row > div {
+    background: #242529;
+  }
+  @media (max-width: 600px) {
+    .character-profile-page .wardrobe-gallery__stage {
+      padding: 12px;
+    }
+    .character-profile-page .wardrobe-thumbnails--rail button {
+      flex-basis: 116px;
+    }
+    .character-profile-page .wardrobe-thumbnails--rail img {
+      block-size: 160px;
+    }
+    .site-footer {
+      padding: 18px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .page-stepper button,
+    .character-profile-page .wardrobe-thumbnails button {
+      transition: none;
+    }
+  }
+}
+@layer polish {
+  @media (min-width: 900px) and (hover: hover) and (pointer: fine) {
+    .image-upload > .image-upload__button,
+    .rich-text-editor__toolbar .image-upload > .image-upload__button {
+      block-size: 34px;
+      min-block-size: 34px;
+      padding-block: 4px;
+      border-radius: 999px;
     }
   }
 }

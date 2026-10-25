@@ -6,6 +6,10 @@ import { ImageField } from './image-field';
 import { useState } from 'react';
 import { findEquipment } from '../lib/api';
 import { resolveStatIcons } from '../lib/native-icons';
+import {
+  nativeEquipmentImage,
+  orderedAbilities,
+} from '../lib/profile-presentation';
 
 function StatIcons({ label, imageUrl }: { label: string; imageUrl?: string }) {
   const icons = imageUrl
@@ -149,9 +153,11 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
           ) : null}
           {value.kind === 'stats' ? (
             <StatIcons label={item.name} imageUrl={item.imageUrl} />
-          ) : item.imageUrl ? (
+          ) : nativeEquipmentImage(item.name, value.kind, item.imageUrl) ? (
             <img
-              src={resolveAssetUrl(item.imageUrl)}
+              src={resolveAssetUrl(
+                nativeEquipmentImage(item.name, value.kind, item.imageUrl),
+              )}
               width={equipment ? 128 : 64}
               height={equipment ? 128 : 64}
               alt={item.name}
@@ -241,9 +247,11 @@ export function GuideVisualEditor({
             <span className="visual-item-editor__index">{index + 1}</span>
             {value.kind === 'stats' ? (
               <StatIcons label={item.name} imageUrl={item.imageUrl} />
-            ) : item.imageUrl ? (
+            ) : nativeEquipmentImage(item.name, value.kind, item.imageUrl) ? (
               <img
-                src={resolveAssetUrl(item.imageUrl)}
+                src={resolveAssetUrl(
+                  nativeEquipmentImage(item.name, value.kind, item.imageUrl),
+                )}
                 alt=""
                 width="40"
                 height="40"
@@ -345,7 +353,11 @@ export function GuideVisualEditor({
               <fieldset className="guide-ability-picker">
                 <legend>Навык персонажа</legend>
                 <div role="group" aria-label="Навыки для секции гайда">
-                  {character.profile.abilities.map((ability) => (
+                  {orderedAbilities(
+                    character.profile.abilities,
+                    character.name,
+                    character.originalName,
+                  ).map((ability) => (
                     <button
                       key={ability.id}
                       type="button"

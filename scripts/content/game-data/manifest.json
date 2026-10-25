@@ -7,7 +7,7 @@
     "zh"
   ],
   "localizationKeys": 113100,
-  "records": 202471,
+  "records": 207666,
   "kinds": {
     "localization": 142689,
     "skill": 3622,
@@ -21,32 +21,680 @@
     "biography": 3522,
     "character": 1269,
     "image": 7968,
-    "audio": 4021
+    "audio": 9216
   },
   "textures": 7968,
   "extractionErrors": [
     {
-      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC028_QTE_001.bnk",
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_about_001.bnk",
       "error": "Profile voice media is missing: 0"
     },
     {
-      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC028_QTE_002.bnk",
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_about_002.bnk",
       "error": "Profile voice media is missing: 0"
     },
     {
-      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC028_QTE_003.bnk",
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_about_003.bnk",
       "error": "Profile voice media is missing: 0"
     },
     {
-      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC028_skill_001.bnk",
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_about_004.bnk",
       "error": "Profile voice media is missing: 0"
     },
     {
-      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC028_skill_002.bnk",
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_about_005.bnk",
       "error": "Profile voice media is missing: 0"
     },
     {
-      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC028_skill_003.bnk",
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_anomaly_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_aoe_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_aoe_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_aoe_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_chat_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_chat_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_chat_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_containment_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_dead_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_dead_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_dead_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_deploy_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_deploy_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_fh_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_fh_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_greet_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_greet_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_greet_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_greet_004.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_hobby_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_hp_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_hp_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_hstruck_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_hstruck_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_kill_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_kill_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_meet_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_meet_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_self_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_self_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_self_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_skill_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_skill_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_skill_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_struck_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_struck_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_talk_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_talk_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_talk_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_talk_004.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_ug_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_ug_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_ug_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_vexation_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_weather_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_weather_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_weather_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_weather_004.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_windfall_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_windfall_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_windfall_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_about_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_about_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_about_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_about_004.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_about_005.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_anomaly_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_aoe_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_aoe_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_aoe_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_chat_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_chat_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_chat_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_containment_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_dead_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_dead_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_dead_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_deploy_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_deploy_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_fh_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_fh_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_greet_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_greet_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_greet_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_greet_004.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_hobby_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_hp_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_hp_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_hstruck_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_hstruck_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_kill_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_kill_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_meet_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_meet_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_self_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_self_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_self_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_skill_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_skill_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_skill_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_struck_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_struck_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_talk_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_talk_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_talk_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_talk_004.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_ug_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_ug_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_ug_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_vexation_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_weather_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_weather_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_weather_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_weather_004.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_windfall_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_windfall_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Japanese/Play_Vo_Char_NPC020_windfall_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_about_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_about_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_about_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_about_004.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_about_005.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_anomaly_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_aoe_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_aoe_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_aoe_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_chat_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_chat_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_chat_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_containment_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_dead_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_dead_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_dead_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_deploy_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_deploy_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_fh_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_fh_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_greet_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_greet_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_greet_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_greet_004.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_hobby_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_hp_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_hp_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_hstruck_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_hstruck_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_kill_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_kill_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_meet_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_meet_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_self_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_self_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_self_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_skill_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_skill_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_skill_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_struck_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_struck_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_talk_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_talk_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_talk_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_talk_004.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_ug_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_ug_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_ug_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_vexation_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_weather_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_weather_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_weather_003.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_weather_004.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_windfall_001.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_windfall_002.bnk",
+      "error": "Profile voice media is missing: 0"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Korean/Play_Vo_Char_NPC020_windfall_003.bnk",
       "error": "Profile voice media is missing: 0"
     }
   ],
@@ -89,7 +737,7 @@
     "HT/Content/DataTable/Skill/GlobalCharacterData/DT_GlobalValueLinkoData.uasset"
   ],
   "source": "Local installed game archives including PatchPaks; original strings preserved",
-  "datasetSha256": "e55340946c3ff34b225654a6cbb83bbb176ea0d72207a82007e932a1a87288f0",
+  "datasetSha256": "89d3de8eeb7e2fc2345e843fe658db38c4160a61f88e8f55cc6db3aaa5db2df7",
   "chunks": 1088,
   "repairedCsvRows": {
     "ru": 425,
@@ -112,5 +760,5 @@
     "gifts": 138,
     "failures": []
   },
-  "chunksSha256": "400b4c7512f4d3b0311ee989869e831dab0c1fc49f8798a43b83a4549c647847"
+  "chunksSha256": "eb5ee3170150d8679d5bfe2eee6bf389a869c6b46c6480250cecf1c2b03eea5c"
 }

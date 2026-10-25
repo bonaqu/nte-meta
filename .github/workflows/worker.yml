@@ -2,6 +2,10 @@ name: Deploy Cloudflare Worker
 
 on:
   workflow_dispatch:
+  push:
+    branches: [bonaqu_projects]
+    paths:
+      - 'scripts/content/game-data/**'
 
 permissions:
   contents: read

@@ -13,7 +13,7 @@ class AppTests(unittest.TestCase):
             window = app.Workbench()
             try:
                 window.withdraw(); window.geometry('760x680'); window.update_idletasks()
-                self.assertEqual(len(window.tooltips), 27)
+                self.assertEqual(len(window.tooltips), 30)
                 self.assertTrue(all(len(t.text) > 80 for t in window.tooltips))
                 hint = window.tooltips[0]
                 hint.enter(); hint.hide(); hint.show(); window.update_idletasks()

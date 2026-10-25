@@ -46,7 +46,9 @@ export function CharacterWardrobe({ skins }: { skins: CharacterSkin[] }) {
           skin={skin}
           onOpen={() => setOpened(true)}
         />
-        <div className="wardrobe-gallery__copy">
+        <div
+          className={`wardrobe-gallery__copy${skins.length === 1 ? ' wardrobe-gallery__copy--single' : ''}`}
+        >
           {skins.length > 1 ? (
             <div
               className="wardrobe-view"
@@ -106,7 +108,13 @@ export function CharacterWardrobe({ skins }: { skins: CharacterSkin[] }) {
           ) : null}
           <p className="eyebrow">Наряд</p>
           <h3>{skin.name}</h3>
-          <p>{skin.description}</p>
+          <div
+            className="wardrobe-gallery__description"
+            tabIndex={0}
+            aria-label="Описание наряда"
+          >
+            <p>{skin.description}</p>
+          </div>
           <PageStepper
             label="Гардероб"
             unit="Наряд"

@@ -14806,7 +14806,7 @@ async function buildLocalGameCharacterSource(env, character) {
     if (splash) add('splashUrl', 'Полный арт из гардероба', splash);
   }
   const file = records.find(
-    (r) => r.namespace.endsWith('FileDataTable') && r.gameId === owner,
+    (r) => /FileDataTable\d*$/.test(r.namespace) && r.gameId === owner,
   )?.details;
   if (file) {
     add('profile.birthday', 'День рождения', ru(file.Birthday));
@@ -14887,7 +14887,13 @@ async function buildLocalGameCharacterSource(env, character) {
       r.namespace === 'DT_GameplayAbilityTipsData' &&
       (!abilityMenu.length || menuIds.has(r.gameId.toLowerCase())) &&
       Array.isArray(r.details.AbilityDescription),
-  );
+  ).sort((a,b) => {
+    const rank = (record) => {
+      const at=abilityMenu.findIndex((row)=>row.id.toLowerCase()===record.gameId.toLowerCase());
+      return at<0 ? 100 : at;
+    };
+    return rank(a)-rank(b);
+  });
   const numberText = (n) => String(Number(n.toFixed(4)));
   function curveValues(curve, percent) {
     const keys = [...(curve.Keys || [])].sort((a, b) => a.Time - b.Time);
@@ -15083,12 +15089,13 @@ async function buildLocalGameCharacterSource(env, character) {
       const line = lines.find(
         (l) => l.AudioEvent?.AssetPathName?.split('.').at(-1) === r.gameId,
       );
-      return line && r.assets[0]
+      const mapped = !line && r.details.binding === 'character-voice-map' && r.details.titleRu && r.details.contentRu;
+      return (line || mapped) && r.assets[0]
         ? [
             {
               id: `${r.details.locale}-${r.gameId}`.slice(0, 80),
-              title: ru(line.Title),
-              description: ru(line.Content).slice(0, 1000),
+              title: line ? ru(line.Title) : plain(r.details.titleRu),
+              description: (line ? ru(line.Content) : plain(r.details.contentRu)).slice(0, 1000),
               language: languageNames[r.details.locale],
               audioUrl: r.assets[0].url,
             },

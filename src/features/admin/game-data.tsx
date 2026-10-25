@@ -8,6 +8,7 @@ import {
 } from '../../lib/api';
 import { resolveAssetUrl } from '../../lib/assets';
 import { ImageField } from '../../components/image-field';
+import LocalCharacterImport from './local-character-import';
 
 const kinds: Record<string, string> = {
   character: 'Персонажи',
@@ -85,6 +86,7 @@ export default function AdminGameData() {
   }
   return (
     <div className="game-data-manager">
+      <LocalCharacterImport />
       <p>
         Данные локальной игры на четырёх языках. Изменения сохраняются в базе
         сразу после нажатия «Сохранить в базу».

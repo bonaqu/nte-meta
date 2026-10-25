@@ -5,6 +5,35 @@ import type {
   GuideVisualItem,
   GuideVisualKind,
 } from '../types';
+import { nativeEquipmentImage } from './profile-presentation';
+
+export function cleanGuideText(text: string) {
+  return text.replace(/<!--\s*import:[\s\S]*?-->/gi, '').trim();
+}
+export function keepGuideImportMarkers(previous: string, edited: string) {
+  const markers = previous.match(/<!--\s*import:[\s\S]*?-->/gi) || [];
+  return [...new Set(markers), cleanGuideText(edited)]
+    .filter(Boolean)
+    .join('\n\n');
+}
+function presentVisual(visual: GuideVisual): GuideVisual {
+  return {
+    ...visual,
+    items: visual.items
+      .filter(
+        (item) =>
+          !/<!--\s*import:/i.test(item.name) ||
+          cleanGuideText(item.name) ||
+          cleanGuideText(item.description),
+      )
+      .map((item) => ({
+        ...item,
+        name: cleanGuideText(item.name),
+        description: cleanGuideText(item.description),
+        imageUrl: nativeEquipmentImage(item.name, visual.kind, item.imageUrl),
+      })),
+  };
+}
 
 export const visualKinds: Array<[GuideVisualKind, string]> = [
   ['arcs', 'Лучшие дуги'],
@@ -42,10 +71,10 @@ export function visualFromLegacy(
   section: GuideSection,
   character?: Character,
 ): GuideVisual | undefined {
-  if (section.visual) return section.visual;
+  if (section.visual) return presentVisual(section.visual);
   const kind = visualKind(section.type);
   if (!kind) return;
-  const text = section.content
+  const text = cleanGuideText(section.content)
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/[*#]/g, '')
@@ -59,7 +88,7 @@ export function visualFromLegacy(
       .split(/→|>/)
       .map((x) => x.trim())
       .filter(Boolean);
-  return {
+  return presentVisual({
     kind,
     items: values.slice(0, 40).map((name, index) => {
       const ability =
@@ -77,15 +106,16 @@ export function visualFromLegacy(
         stats: [],
       };
     }),
-  };
+  });
 }
 export function visualFromImport(
   kind: GuideVisualKind,
   rows: unknown,
 ): GuideVisual {
   if (typeof rows === 'string') {
+    rows = cleanGuideText(rows);
     try {
-      rows = JSON.parse(rows);
+      rows = JSON.parse(rows as string);
     } catch {
       rows = [rows];
     }
@@ -104,7 +134,7 @@ export function visualFromImport(
             .filter((row) => row.name)
         : [row];
     });
-  return {
+  return presentVisual({
     kind,
     items: values.slice(0, 40).map((row, i) => {
       const item =
@@ -130,7 +160,7 @@ export function visualFromImport(
           typeof item.sourceUrl === 'string' ? item.sourceUrl : undefined,
       };
     }),
-  };
+  });
 }
 export function isPrivateGuideSection(section: GuideSection) {
   return [
@@ -147,7 +177,7 @@ export function isPrivateGuideSection(section: GuideSection) {
 }
 
 export function stripEditorialText(text: string) {
-  return text
+  return cleanGuideText(text)
     .replace(
       /\s*Награда за уровень в проверенном источнике не указана\.?/giu,
       '',

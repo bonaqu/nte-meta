@@ -4,6 +4,7 @@ from collections import Counter
 from pathlib import Path
 from PIL import Image
 from localization_csv import localized_rows
+from media_cache import media_name
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--source', type=Path, required=True)
@@ -14,6 +15,9 @@ parser.add_argument('--ffmpeg', default='ffmpeg')
 args = parser.parse_args()
 export = args.source / 'export'
 manifest = json.loads((export / 'extraction.json').read_text(encoding='utf-8-sig'))
+cache_path=export/'media-cache.json'
+media_cache=json.loads(cache_path.read_text('utf-8')) if cache_path.exists() else {}
+next_media_cache={}
 content = args.repository / 'scripts/content/game-data'
 assets_dir = args.repository / 'public/game-assets'
 content.mkdir(parents=True, exist_ok=True)
@@ -28,7 +32,10 @@ def digest(value):
 images, image_errors = {}, []
 for image in manifest['images']:
     try:
-        name=Path(image['file']).stem+'.webp'
+        raw = (export / image['file']).read_bytes()
+        fingerprint=hashlib.sha256(raw).hexdigest()
+        name=media_name(image['path'],fingerprint,media_cache,'webp')
+        next_media_cache[image['path'].lower()]={'sha256':fingerprint,'name':name}
         existing=assets_dir/name
         if args.reuse_images and existing.exists():
             decoded=Image.open(existing)
@@ -38,7 +45,6 @@ for image in manifest['images']:
                 decoded.save(existing,'WEBP',quality=84,method=3)
             images[image['path'].lower()]={'url':'/nte-meta/game-assets/'+name,'width':decoded.width,'height':decoded.height}
             continue
-        raw = (export / image['file']).read_bytes()
         width, height, fmt = image['width'], image['height'], image['format']
         if fmt == 'PF_B8G8R8A8':
             decoded = Image.frombytes('RGBA', (width, height), raw, 'raw', 'BGRA')
@@ -150,7 +156,9 @@ audio_dir=args.repository/'public/game-audio'
 audio_dir.mkdir(parents=True,exist_ok=True)
 audio_locales={'English':'en','Japanese':'ja','Korean':'ko','Chinese':'zh'}
 for index,voice in enumerate(manifest.get('voices',[])):
-    name=digest(voice['path'].lower())[:20]+'.ogg'
+    fingerprint=hashlib.sha256((export/voice['file']).read_bytes()).hexdigest()
+    name=media_name(voice['path'],fingerprint,media_cache,'ogg')
+    next_media_cache[voice['path'].lower()]={'sha256':fingerprint,'name':name}
     target=audio_dir/name
     try:
         if not target.exists():
@@ -161,10 +169,37 @@ for index,voice in enumerate(manifest.get('voices',[])):
             finally:
                 if wave.exists():wave.unlink()
         locale=audio_locales[voice['locale']]
-        records.append({'id':'voice:'+voice['ownerId']+':'+locale+':'+voice['eventName'],'kind':'audio','namespace':'NTE_ProfileVoice','gameId':voice['eventName'],'ownerId':voice['ownerId'],'values':{},'details':{'locale':locale,'eventName':voice['eventName'],'virtualPath':voice['path']},'assets':[{'path':voice['path'],'url':'/nte-meta/game-audio/'+name}],'term':False})
+        details={'locale':locale,'eventName':voice['eventName'],'virtualPath':voice['path']}
+        values={}
+        if voice.get('binding')=='character-voice-map':
+            # The game maps owner -> NPC voice family. Only exact localized leaf
+            # events become profile lines; container/random/shout banks do not.
+            match=re.fullmatch(r'Play_Vo_Char_(.+?)_([A-Za-z]+)_(\d{3})',voice['eventName'])
+            if match:
+                speaker,category,number=match.groups()
+                values=translations.get(f'ST_File::{speaker}_{category}_{number}',{})
+                title=translations.get(f'ST_File::{category}_{speaker}_{number}',{}).get('ru') or translations.get(f'ST_File::{category}_{number}',{}).get('ru','')
+                if values.get('ru') and title:
+                    details.update({'binding':'character-voice-map','titleRu':title,'contentRu':values['ru']})
+        records.append({'id':'voice:'+voice['ownerId']+':'+locale+':'+voice['eventName'],'kind':'audio','namespace':'NTE_ProfileVoice','gameId':voice['eventName'],'ownerId':voice['ownerId'],'values':values,'details':details,'assets':[{'path':voice['path'],'url':'/nte-meta/game-audio/'+name}],'term':False})
     except Exception as error:
         audio_errors.append({'event':voice['eventName'],'locale':voice['locale'],'error':str(error)})
     if index and index%500==0:print(f'Audio {index}/{len(manifest.get("voices",[]))}',flush=True)
+
+# One Wwise event may contain alternate takes. Keep its media together instead
+# of emitting duplicate reference IDs or duplicate profile lines.
+voice_records={}
+other_records=[]
+for record in records:
+    if record['kind']!='audio':
+        other_records.append(record)
+        continue
+    existing=voice_records.get(record['id'])
+    if existing:
+        existing['assets'].extend(asset for asset in record['assets'] if asset not in existing['assets'])
+    else:
+        voice_records[record['id']]=record
+records=other_records+list(voice_records.values())
 
 # Optional external completion stays distinguishable from native archive rows.
 supplement_path=args.source/'supplement.json'
@@ -304,3 +339,4 @@ report['chunksSha256']=hashlib.sha256((content/'chunks.jsonl.gz').read_bytes()).
 (content/'manifest.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 print(compact({k:report[k] for k in ['localizationKeys','records','kinds','textures']}))
 if image_errors or audio_errors:raise SystemExit('Некоторые медиа не обработаны. Подробности сохранены в manifest.json; исправьте ошибки перед публикацией.')
+cache_path.write_text(json.dumps(next_media_cache,separators=(',',':')),encoding='utf-8')

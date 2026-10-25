@@ -2863,7 +2863,7 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
   const languageLines = lines.filter(
     (line) => line.language === activeLanguage,
   );
-  const pageSize = 6;
+  const pageSize = 5;
   const pageCount = Math.max(1, Math.ceil(languageLines.length / pageSize));
   const currentPage = Math.min(voicePage, pageCount);
   const visibleLines = languageLines.slice(
@@ -3796,8 +3796,10 @@ function GuideHero({
         referrerPolicy="no-referrer"
       />
       <div>
-        <p className="eyebrow">Гайд на {character.name}</p>
-        <h1>{guide.title}</h1>
+        <div className="guide-hero-title">
+          <p className="eyebrow">Гайд на {character.name}</p>
+          <h1>{guide.title}</h1>
+        </div>
         <p className="guide-hero-summary">
           {stripEditorialText(guide.summary)}
         </p>
@@ -3865,11 +3867,12 @@ function GuideDetail({
         .sort((a, b) => a.position - b.position)
         .map((section) => ({
           ...section,
+          displayVisual: visualFromLegacy(section, character),
           title:
             cleanGuideText(section.title) ||
             guideSectionTypeLabel(section.type),
         })),
-    [guide.sections],
+    [guide.sections, character],
   );
   const guideNavigation = useMemo(
     () => [
@@ -3933,10 +3936,11 @@ function GuideDetail({
       <section className="guide-layout">
         <aside className="toc" aria-label="Навигация по гайду">
           <strong>Разделы</strong>
-          {guideNavigation.map((section) => (
+          {guideNavigation.map((section, index) => (
             <button
               type="button"
               key={section.id}
+              aria-label={section.title}
               className={activeGuideSection === section.id ? 'active' : ''}
               aria-current={
                 activeGuideSection === section.id ? 'location' : undefined
@@ -3944,16 +3948,16 @@ function GuideDetail({
               onClick={() => {
                 setActiveGuideSection(section.id);
                 document.getElementById(section.id)?.scrollIntoView({
-                  behavior: window.matchMedia(
-                    '(prefers-reduced-motion: reduce)',
-                  ).matches
-                    ? 'auto'
-                    : 'smooth',
+                  behavior: 'instant',
                   block: 'start',
                 });
               }}
             >
-              {section.title}
+              <span className="guide-toc-index" aria-hidden="true">
+                {String(index + 1).padStart(2, '0')}
+              </span>
+              <span>{section.title}</span>
+              <ChevronRight aria-hidden="true" />
             </button>
           ))}
         </aside>
@@ -3965,10 +3969,8 @@ function GuideDetail({
               key={section.id}
             >
               <h2>{section.title}</h2>
-              {visualFromLegacy(section, character) ? (
-                <GuideVisualView
-                  value={visualFromLegacy(section, character)!}
-                />
+              {section.displayVisual ? (
+                <GuideVisualView value={section.displayVisual} />
               ) : (
                 <MarkdownPreview value={cleanGuideText(section.content)} />
               )}

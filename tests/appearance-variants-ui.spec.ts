@@ -30,7 +30,7 @@ async function owner(page: Page) {
   );
 }
 
-test('варианты гардероба и озвучки переключаются отдельно от общих механик, реплики по шесть', async ({
+test('варианты гардероба и озвучки переключаются отдельно от общих механик, реплики по пять', async ({
   page,
   request,
 }) => {
@@ -161,21 +161,21 @@ test('варианты гардероба и озвучки переключаю
     await expect(
       picker.getByRole('button', { name: 'Мужской вариант', exact: true }),
     ).toHaveAttribute('aria-pressed', 'true');
-    await expect(voices.locator('.voice-line-list article')).toHaveCount(6);
+    await expect(voices.locator('.voice-line-list article')).toHaveCount(5);
     await voices
       .getByRole('group', { name: 'Страницы реплик' })
       .getByRole('button', { name: /вперёд/ })
       .click();
-    await expect(voices.locator('.voice-line-list article')).toHaveCount(1);
+    await expect(voices.locator('.voice-line-list article')).toHaveCount(2);
     await navigation
       .getByRole('button', { name: 'Способности', exact: true })
       .click();
     await navigation
       .getByRole('button', { name: 'Озвучка', exact: true })
       .click();
-    await expect(voices.locator('.voice-line-list article')).toHaveCount(1);
+    await expect(voices.locator('.voice-line-list article')).toHaveCount(2);
     await voices.getByRole('tab', { name: /Английский/ }).click();
-    await expect(voices.locator('.voice-line-list article')).toHaveCount(6);
+    await expect(voices.locator('.voice-line-list article')).toHaveCount(5);
     const upload = page.locator('.comment-form .image-upload');
     await upload.scrollIntoViewIfNeeded();
     expect((await upload.boundingBox())!.height).toBeLessThanOrEqual(46);
@@ -389,7 +389,7 @@ test('редактор сохраняет вариант, изображение
   expect(a11y.violations).toEqual([]);
 });
 
-test('опубликованные профили: калькулятор, быстрые переходы, гардероб Зеро и шесть реплик', async ({
+test('опубликованные профили: калькулятор, быстрые переходы, гардероб Зеро и пять реплик', async ({
   page,
   request,
 }, testInfo) => {
@@ -520,7 +520,7 @@ test('опубликованные профили: калькулятор, бы�
     const voice = page.locator('#character-voice');
     for (const name of [/Английский/, /Японский/]) {
       await voice.getByRole('tab', { name }).click();
-      await expect(voice.locator('.voice-line-list article')).toHaveCount(6);
+      await expect(voice.locator('.voice-line-list article')).toHaveCount(5);
     }
     const upload = page.locator('.comment-form .image-upload__button');
     expect((await upload.boundingBox())!.height).toBe(width >= 900 ? 34 : 44);
@@ -598,18 +598,12 @@ test('опубликованные профили: калькулятор, бы�
   }
   await page.getByRole('button', { name: 'Озвучка', exact: true }).click();
   const voices = page.locator('#character-voice');
-  await expect(voices.locator('audio')).toHaveCount(0);
-  await expect(
-    voices.getByText(
-      'В текущем снимке нет привязанных реплик для этого варианта.',
-      { exact: true },
-    ),
-  ).toBeVisible();
+  await expect(voices.locator('audio')).toHaveCount(5);
   await voices
     .getByRole('group', { name: 'Вариант озвучки' })
     .getByRole('button', { name: 'Мужской вариант', exact: true })
     .click();
-  await expect(voices.locator('audio')).toHaveCount(6);
+  await expect(voices.locator('audio')).toHaveCount(5);
   const duration = await voices
     .locator('audio')
     .first()

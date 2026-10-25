@@ -1242,7 +1242,7 @@
     opacity: 1;
   }
   .page-stepper button:not(:disabled):active {
-    transform: scale(0.91);
+    transform: scale(0.96);
     background: var(--pink);
   }
   .page-stepper button:not(:disabled):hover {
@@ -1435,7 +1435,7 @@
   }
   .character-profile-page .wardrobe-gallery__copy {
     display: grid;
-    grid-template-rows: auto 236px auto 56px 112px 48px;
+    grid-template-rows: auto 236px auto 56px 112px;
   }
   .character-profile-page .wardrobe-thumbnails--grid {
     max-block-size: 236px;
@@ -1476,7 +1476,7 @@
   }
   @media (max-width: 600px) {
     .character-profile-page .wardrobe-gallery__copy {
-      grid-template-rows: auto 196px auto 72px 128px 48px;
+      grid-template-rows: auto 196px auto 72px 128px;
     }
     .character-profile-page
       :is(.wardrobe-thumbnails--rail, .wardrobe-thumbnails--grid) {
@@ -1527,7 +1527,7 @@
     cursor: pointer;
   }
   .character-profile-page .wardrobe-gallery__copy--single {
-    grid-template-rows: auto 56px 112px 48px;
+    grid-template-rows: auto 56px 112px;
     align-content: center;
   }
   .guide-add-section {

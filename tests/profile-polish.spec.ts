@@ -168,31 +168,29 @@ test('биография, уровни навыка, гардероб и стр�
     await expect(friendship.locator('.gift-grid article')).toHaveCount(9);
     const wardrobe = page.locator('#character-wardrobe');
     await wardrobe.scrollIntoViewIfNeeded();
-    const outfits = wardrobe.getByRole('group', {
-      name: 'Гардероб',
-      exact: true,
-    });
-    await expect(outfits.getByRole('button', { name: /назад/ })).toBeDisabled();
-    await outfits.getByRole('button', { name: /вперёд/ }).click();
-    await expect(
-      outfits.getByRole('button', { name: /вперёд/ }),
-    ).toBeDisabled();
+    await expect(wardrobe.locator('.page-stepper')).toHaveCount(0);
+    const outfits = wardrobe
+      .getByRole('group', { name: 'Выбор наряда' })
+      .getByRole('button');
+    await outfits.last().click();
+    await expect(outfits.last()).toHaveAttribute('aria-pressed', 'true');
     await wardrobe.getByRole('button', { name: /Открыть изображение/ }).click();
     await expect(page.locator('.skin-lightbox[open]')).toBeVisible({
       timeout: 1000,
     });
+    await expect(page.locator('.skin-lightbox .page-stepper')).toHaveCount(0);
     await page
       .getByRole('button', { name: 'Закрыть полноразмерное изображение' })
       .click();
     const voice = page.locator('#character-voice');
     await voice.getByRole('tab', { name: /Японский/ }).click();
     const pages = voice.getByRole('group', { name: 'Страницы реплик' });
-    await expect(voice.locator('.voice-line-list article')).toHaveCount(6);
+    await expect(voice.locator('.voice-line-list article')).toHaveCount(5);
     await pages.getByRole('button', { name: /вперёд/ }).click();
-    await expect(voice.locator('.voice-line-list article')).toHaveCount(3);
+    await expect(voice.locator('.voice-line-list article')).toHaveCount(4);
     await expect(pages.getByRole('button', { name: /вперёд/ })).toBeDisabled();
     await voice.getByRole('tab', { name: /Английский/ }).click();
-    await expect(voice.locator('.voice-line-list article')).toHaveCount(6);
+    await expect(voice.locator('.voice-line-list article')).toHaveCount(5);
     await expect(pages.getByRole('button', { name: /назад/ })).toBeDisabled();
     const upload = page.locator('.comment-form .image-upload__button');
     expect((await upload.boundingBox())!.height).toBe(width >= 900 ? 34 : 44);
@@ -237,7 +235,7 @@ test('переход к основным статам не перескакив�
     await page.waitForLoadState('networkidle');
     await expect
       .poll(async () => Math.round((await target.boundingBox())!.y))
-      .toBe(96);
+      .toBe(width < 1024 ? 144 : 112);
     const header = await page.locator('.site-header').boundingBox();
     expect((await target.boundingBox())!.y).toBeGreaterThan(
       header!.y + header!.height,

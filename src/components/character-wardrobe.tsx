@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import type { CharacterSkin } from '../types';
 import { resolveAssetUrl } from '../lib/assets';
-import { PageStepper } from './page-stepper';
 
 export function CharacterWardrobe({ skins }: { skins: CharacterSkin[] }) {
   const [index, setIndex] = useState(0);
@@ -115,13 +114,6 @@ export function CharacterWardrobe({ skins }: { skins: CharacterSkin[] }) {
           >
             <p>{skin.description}</p>
           </div>
-          <PageStepper
-            label="Гардероб"
-            unit="Наряд"
-            value={activeIndex + 1}
-            total={skins.length}
-            onChange={(value) => setIndex(value - 1)}
-          />
         </div>
       </div>
       <dialog
@@ -154,13 +146,6 @@ export function CharacterWardrobe({ skins }: { skins: CharacterSkin[] }) {
               <p className="eyebrow">Гардероб</p>
               <h2>{skin.name}</h2>
               {skin.description ? <p>{skin.description}</p> : null}
-              <PageStepper
-                label="Полноразмерный гардероб"
-                unit="Наряд"
-                value={activeIndex + 1}
-                total={skins.length}
-                onChange={(value) => setIndex(value - 1)}
-              />
             </div>
           </div>
         ) : null}

@@ -80,8 +80,7 @@
     font-style: italic;
     text-shadow: 2px 2px #101113;
   }
-  .character-dossier > h1::after {
-    content: 'NTE';
+  .character-dossier__watermark {
     position: absolute;
     inset-inline-end: 0;
     inset-block-end: -14px;

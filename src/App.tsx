@@ -3385,7 +3385,12 @@ function CharacterDetailPage({
           <p className="eyebrow">
             {character.originalName} · {profile.faction || 'Фракция уточняется'}
           </p>
-          <h1>{character.name}</h1>
+          <h1>
+            <span className="character-dossier__watermark" aria-hidden="true">
+              NTE
+            </span>
+            {character.name}
+          </h1>
           <dl className="guide-facts character-profile-facts">
             <div>
               <dt>День рождения</dt>

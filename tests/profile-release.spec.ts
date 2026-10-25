@@ -23,7 +23,9 @@ test('готовая сборка: досье, стабильный гардер
   for (const width of [360, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(base + '#/characters/adler');
-    await expect(page.locator('.character-dossier h1')).toHaveText('Адлер');
+    await expect(page.locator('.character-dossier h1')).toHaveAccessibleName(
+      'Адлер',
+    );
     await page
       .locator('.character-lore-hero > img')
       .evaluate((img: HTMLImageElement) => img.decode());
@@ -45,7 +47,9 @@ test('готовая сборка: досье, стабильный гардер
     await page.goto(
       base + '#/characters/' + characters.find((c) => c.id === 'zankou')!.slug,
     );
-    await expect(page.locator('.character-dossier h1')).toHaveText('Занку');
+    await expect(page.locator('.character-dossier h1')).toHaveAccessibleName(
+      'Занку',
+    );
     await page.getByRole('button', { name: 'Гардероб', exact: true }).click();
     const stage = page.locator('.wardrobe-gallery__stage').first();
     const sizes: number[] = [];

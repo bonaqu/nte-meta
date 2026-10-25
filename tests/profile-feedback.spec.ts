@@ -26,12 +26,26 @@ test('общий профиль: читаемые сведения, задерж
     skins: JSON.parse(
       await readFile('tests/fixtures/profile-polish.json', 'utf8'),
     ).skins,
-    gifts: ['010', '028', '041', '142'].map((id) => ({
-      id: 'Food_' + id,
-      name: 'Food_' + id,
-      iconUrl: '',
-      effect: 'Симпатия +100',
-    })),
+    gifts: [
+      ...['010', '028', '041', '142'].map((id) => ({
+        id: 'Food_' + id,
+        name: 'Food_' + id,
+        iconUrl: '',
+        effect: 'Симпатия +100',
+      })),
+      {
+        id: 'SpecialGift_letter',
+        name: 'Рукописное письмо',
+        iconUrl: '',
+        effect: 'Симпатия +2000',
+      },
+      {
+        id: 'manual-letter',
+        name: 'Письмо, написанное от руки',
+        iconUrl: '',
+        effect: 'Личная запись',
+      },
+    ],
   };
   await page.route('**/api/characters', (route) =>
     route.fulfill({ json: { data: characters } }),
@@ -72,7 +86,16 @@ test('общий профиль: читаемые сведения, задерж
         exact: true,
       }),
     ).toBeVisible();
-    await expect(gifts.locator('img')).toHaveCount(4);
+    await expect(gifts.locator('img')).toHaveCount(5);
+    await expect(
+      gifts.getByRole('heading', { name: 'Рукописное письмо', exact: true }),
+    ).toHaveCount(1);
+    await expect(
+      gifts.getByRole('heading', {
+        name: 'Письмо, написанное от руки',
+        exact: true,
+      }),
+    ).toHaveCount(0);
     const trigger = gifts.getByRole('button', {
       name: 'Подробнее: Освежающий ледник',
       exact: true,
@@ -278,11 +301,19 @@ test('опубликованный общий UI: сведения, подарк
     await page.getByRole('button', { name: 'Дружба', exact: true }).click();
     const letter = page.locator('.gift-grid .game-item').filter({
       has: page.getByRole('heading', {
-        name: 'Письмо, написанное от руки',
+        name: 'Рукописное письмо',
         exact: true,
       }),
     });
     await expect(letter.locator('img')).toHaveCount(1);
+    await expect(
+      page
+        .locator('.gift-grid')
+        .getByRole('heading', {
+          name: 'Письмо, написанное от руки',
+          exact: true,
+        }),
+    ).toHaveCount(0);
     await expect
       .poll(() =>
         letter

@@ -17,6 +17,20 @@ export function resolveNativeItem<
       }
     : item;
 }
+/** Only proven native aliases share identity; a shared texture is not enough. */
+export function nativeGiftIdentity(id: string, name: string) {
+  const key = id.toLowerCase();
+  const label = name
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, '');
+  if (
+    key === 'specialgift_letter' ||
+    ['рукописноеписьмо', 'письмонаписанноеотруки'].includes(label)
+  )
+    return 'specialgift_letter';
+  return /^food_\d+$/.test(key) ? `food_${Number(key.split('_')[1])}` : key;
+}
 export function displayItemName(name: string) {
   return name === 'Показушное платье с рукавами'
     ? 'Подол платья тщеславия'

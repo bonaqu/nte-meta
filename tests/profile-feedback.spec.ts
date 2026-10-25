@@ -100,15 +100,43 @@ test('общий профиль: читаемые сведения, задерж
       name: 'Подробнее: Освежающий ледник',
       exact: true,
     });
+    await page.mouse.move(0, 0);
+    // Measure both events in the browser. A runner-side 250ms wait also includes
+    // RPC/scheduler latency and can observe the panel after the 500ms deadline.
+    await trigger.evaluate((node) => {
+      let entered = 0;
+      node.addEventListener(
+        'mouseover',
+        () => {
+          entered = performance.now();
+        },
+        { once: true, capture: true },
+      );
+      (window as unknown as { hoverDelay: Promise<number> }).hoverDelay =
+        new Promise((resolve) => {
+          document
+            .getElementById(node.getAttribute('aria-controls')!)!
+            .addEventListener(
+              'beforetoggle',
+              (event) => {
+                if ((event as ToggleEvent).newState === 'open')
+                  resolve(performance.now() - entered);
+              },
+              { once: true },
+            );
+        });
+    });
     await trigger.hover();
     const detail = page.getByRole('dialog', {
       name: 'Освежающий ледник',
       exact: true,
     });
-    await expect(detail).not.toBeVisible();
-    await page.waitForTimeout(250);
-    await expect(detail).not.toBeVisible();
     await expect(detail).toBeVisible();
+    const delay = await page.evaluate(
+      () => (window as unknown as { hoverDelay: Promise<number> }).hoverDelay,
+    );
+    console.log(JSON.stringify({ width, hoverDelayMs: delay }));
+    expect(Math.round(delay)).toBeGreaterThanOrEqual(500);
     await detail
       .getByRole('button', { name: 'Закрыть описание предмета' })
       .click();
@@ -307,12 +335,10 @@ test('опубликованный общий UI: сведения, подарк
     });
     await expect(letter.locator('img')).toHaveCount(1);
     await expect(
-      page
-        .locator('.gift-grid')
-        .getByRole('heading', {
-          name: 'Письмо, написанное от руки',
-          exact: true,
-        }),
+      page.locator('.gift-grid').getByRole('heading', {
+        name: 'Письмо, написанное от руки',
+        exact: true,
+      }),
     ).toHaveCount(0);
     await expect
       .poll(() =>

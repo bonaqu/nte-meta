@@ -143,6 +143,22 @@ test('общий профиль: читаемые сведения, задерж
   expect(errors).toEqual([]);
 });
 
+test('старое название письма использует ту же игровую иконку и описание', async () => {
+  const icons = JSON.parse(
+    await readFile('src/data/native-item-icons.json', 'utf8'),
+  );
+  expect(icons['письмонаписанноеотруки']).toBe(icons['рукописноеписьмо']);
+  expect(icons['письмонаписанноеотруки']).toMatch(
+    /game-assets\/[a-f0-9]{20}\.webp$/,
+  );
+  const descriptions = JSON.parse(
+    await readFile('src/data/native-item-descriptions.json', 'utf8'),
+  );
+  expect(descriptions.byName['письмонаписанноеотруки']).toBe(
+    'specialgift_letter',
+  );
+});
+
 test('миграция подарков сохраняет ручные названия, изображения и порядок', async () => {
   const db = new DatabaseSync(':memory:');
   db.exec(
@@ -258,6 +274,26 @@ test('опубликованный общий UI: сведения, подарк
       await facts.screenshot({
         path: testInfo.outputPath(`live-facts-${width}.png`),
       });
+    await page.goto(base + '#/characters/mint');
+    await page.getByRole('button', { name: 'Дружба', exact: true }).click();
+    const letter = page.locator('.gift-grid .game-item').filter({
+      has: page.getByRole('heading', {
+        name: 'Письмо, написанное от руки',
+        exact: true,
+      }),
+    });
+    await expect(letter.locator('img')).toHaveCount(1);
+    await expect
+      .poll(() =>
+        letter
+          .locator('img')
+          .evaluate(
+            (node) =>
+              (node as HTMLImageElement).complete &&
+              (node as HTMLImageElement).naturalWidth > 0,
+          ),
+      )
+      .toBe(true);
     await page.goto(base + '#/characters/akane');
     await page.getByRole('button', { name: 'Дружба', exact: true }).click();
     const gifts = page.locator('.gift-grid');
@@ -292,11 +328,9 @@ test('опубликованный общий UI: сведения, подарк
       .getByRole('button', { name: 'Лента костюмов', exact: true })
       .click();
     if (width === 360 || width === 1440)
-      await page
-        .locator('.wardrobe-gallery')
-        .screenshot({
-          path: testInfo.outputPath(`live-wardrobe-${width}.png`),
-        });
+      await page.locator('.wardrobe-gallery').screenshot({
+        path: testInfo.outputPath(`live-wardrobe-${width}.png`),
+      });
     await page.goto(base + '#/guides/hotori-burst-guide');
     await expect(page.locator('.guide-page .toc')).toBeVisible();
     await page.locator('.guide-page .toc button').last().click();
@@ -308,11 +342,9 @@ test('опубликованный общий UI: сведения, подарк
     await page.goto(base + '#/tierlists');
     await expect(page.locator('.tierlists-page .tier-row')).toHaveCount(5);
     if (width === 360 || width === 1440)
-      await page
-        .locator('.tier-preview')
-        .screenshot({
-          path: testInfo.outputPath(`live-tierlist-${width}.png`),
-        });
+      await page.locator('.tier-preview').screenshot({
+        path: testInfo.outputPath(`live-tierlist-${width}.png`),
+      });
     const footer = page.locator('.site-footer');
     await footer.scrollIntoViewIfNeeded();
     await expect(footer.getByRole('link')).toHaveCount(4);
@@ -326,5 +358,25 @@ test('опубликованный общий UI: сведения, подарк
       ),
     ).toBe(true);
   }
+  // These are the only four published gift textures supplied by the media proxy;
+  // every other gift resolves to an installed local texture.
+  const remoteGiftImages = await page.evaluate(async () =>
+    Promise.all(
+      ['025', '034', '018', '026'].map(
+        (id) =>
+          new Promise<{ id: string; width: number }>((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve({ id, width: img.naturalWidth });
+            img.onerror = () => reject(new Error(`Gift icon ${id} failed`));
+            img.src =
+              'https://nte-meta-api.bonaqu.workers.dev/api/media?url=' +
+              encodeURIComponent(
+                `https://www.neverness.app/assets/codex/likeability/Food_${id}.webp`,
+              );
+          }),
+      ),
+    ),
+  );
+  expect(remoteGiftImages.every((row) => row.width > 0)).toBe(true);
   expect(errors).toEqual([]);
 });

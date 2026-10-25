@@ -3,7 +3,11 @@ import { useLayoutEffect, useState } from 'react';
 import { ItemDetails } from './item-details';
 import { Star } from 'lucide-react';
 import type { CharacterProfile } from '../types';
-import { resolveItemIcon, resolveNativeItem } from '../lib/item-icons';
+import {
+  resolveItemIcon,
+  resolveNativeItem,
+  nativeGiftIdentity,
+} from '../lib/item-icons';
 export function CharacterFriendship({
   gifts,
   friendship,
@@ -30,7 +34,9 @@ export function CharacterFriendship({
             .filter(
               (gift, index, all) =>
                 all.findIndex(
-                  (row) => row.id.toLowerCase() === gift.id.toLowerCase(),
+                  (row) =>
+                    nativeGiftIdentity(row.id, row.name) ===
+                    nativeGiftIdentity(gift.id, gift.name),
                 ) === index,
             )
             .map((gift) => (

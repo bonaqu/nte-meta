@@ -104,12 +104,14 @@ function collect(value) {
   }
 }
 let previousAliases = {};
+try {
+  previousAliases = JSON.parse(await readFile(arg('--output'), 'utf8'));
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error;
+}
+collect(Object.keys(previousAliases).map((iconUrl) => ({ iconUrl })));
 if (process.argv.includes('--catalog'))
   collect(JSON.parse(await readFile(arg('--catalog'), 'utf8')));
-else {
-  previousAliases = JSON.parse(await readFile(arg('--output'), 'utf8'));
-  collect(Object.keys(previousAliases).map((iconUrl) => ({ iconUrl })));
-}
 // Reference records prove name/ID equivalence for sources which omit zeroes in
 // icon filenames (Food_128 vs the native Food_0128); do not guess by number.
 for (const row of records)
@@ -128,6 +130,8 @@ for (const [url, rows] of imported) {
       'static.wikia.nocookie.net',
       'img.game8.co',
       'ntewiki.org',
+      'static.nanoka.cc',
+      'www.kaiden.gg',
     ].includes(u.hostname)
   )
     continue;
@@ -141,12 +145,29 @@ for (const [url, rows] of imported) {
       .filter((row) => normalized(row.name))
       .flatMap((row) => [...(names.get(normalized(row.name)) || [])]),
   );
-  let local =
-    u.hostname === 'www.neverness.app' && byName.size === 1
+  // These CDNs expose exact Unreal paths. Match the complete native path;
+  // a repeated filename or translated character name cannot pick another art.
+  const nativePrefix =
+    u.hostname === 'static.nanoka.cc'
+      ? '/assets/nte/Game/'
+      : u.hostname === 'www.kaiden.gg'
+        ? '/img/nte/'
+        : '';
+  const nativePath =
+    nativePrefix && u.pathname.startsWith(nativePrefix)
+      ? 'HT/Content/' +
+        decodeURIComponent(u.pathname.slice(nativePrefix.length)).replace(
+          /\.(?:webp|png|jpe?g)$/i,
+          '.uasset',
+        )
+      : '';
+  let local = nativePrefix
+    ? families.get(family(nativePath))?.url
+    : u.hostname === 'www.neverness.app' && byName.size === 1
       ? [...byName][0]
       : image(stem);
   if (!local && u.hostname === 'www.neverness.app') local = itemImage(stem);
-  if (!local && byName.size === 1) local = [...byName][0];
+  if (!local && !nativePrefix && byName.size === 1) local = [...byName][0];
   if (!local && u.hostname === 'static.wikia.nocookie.net') {
     const candidates = names.get(normalized(stem));
     if (candidates?.size === 1) local = [...candidates][0];

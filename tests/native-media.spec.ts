@@ -33,6 +33,48 @@ test('повторная подготовка сопоставлений без 
   }
 });
 
+test('нативные CDN сопоставляются по полному пути, каталог сохраняет прежние привязки', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'nte-native-cdn-'));
+  const path = join(directory, 'aliases.json');
+  const catalog = join(directory, 'catalog.json');
+  const suffix =
+    'UI/UI/Appearance/Fashion/1024/YH_lihui_fashionshop_mingyin.webp';
+  const nanoka = 'https://static.nanoka.cc/assets/nte/Game/' + suffix;
+  const kaiden = 'https://www.kaiden.gg/img/nte/' + suffix;
+  const wrong = nanoka.replace('/1024/', '/9999/');
+  try {
+    await writeFile(path, JSON.stringify(aliases));
+    await writeFile(
+      catalog,
+      JSON.stringify([
+        { splashUrl: nanoka },
+        { imageUrl: kaiden },
+        { imageUrl: wrong, name: 'Аканэ Рин' },
+      ]),
+    );
+    await promisify(execFile)(process.execPath, [
+      'scripts/game-data/build-asset-aliases.mjs',
+      '--output',
+      path,
+      '--catalog',
+      catalog,
+    ]);
+    const result = JSON.parse(await readFile(path, 'utf8'));
+    expect(result[nanoka]).toMatch(
+      /^\/nte-meta\/game-assets\/[a-f0-9]{20}\.webp$/,
+    );
+    expect(result[kaiden]).toBe(result[nanoka]);
+    expect(result[wrong]).toBeUndefined();
+    for (const [source, target] of Object.entries(aliases))
+      expect(result[source]).toBe(target);
+    await access('public/' + result[nanoka].replace('/nte-meta/', ''));
+  } finally {
+    await unlink(path);
+    await unlink(catalog);
+    await rmdir(directory);
+  }
+});
+
 test('старые иконки сопоставлены существующим изображениям установленного клиента', async () => {
   const images = new Set<string>();
   for (const line of gunzipSync(
@@ -81,6 +123,40 @@ test('старые иконки сопоставлены существующи�
   expect(
     aliases['https://www.neverness.app/assets/codex/likeability/Food_128.webp'],
   ).toBe('/nte-meta/game-assets/f79631e0db88b5cd494f.webp');
+});
+
+test('Аканэ: большой арт из старой ссылки CDN загружается локально', async ({
+  page,
+  request,
+}, info) => {
+  const cdn =
+    'https://static.nanoka.cc/assets/nte/Game/UI/UI/Appearance/Fashion/1024/YH_lihui_fashionshop_mingyin.webp';
+  const characters = (
+    await (await request.get('http://127.0.0.1:8788/api/characters')).json()
+  ).data;
+  characters.find((row: { id: string }) => row.id === 'akane').splashUrl = cdn;
+  await page.route('**/api/characters', (route) =>
+    route.fulfill({ json: { data: characters } }),
+  );
+  const remoteRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url() === cdn) remoteRequests.push(request.url());
+  });
+  await page.setViewportSize({ width: 360, height: 900 });
+  await page.goto(
+    (process.env.NTE_NATIVE_CDN_REVIEW_URL || '/') + '#/characters/akane',
+  );
+  const hero = page.locator('.character-lore-hero > img');
+  await expect(hero).toHaveAttribute(
+    'src',
+    /\/game-assets\/[a-f0-9]{20}\.webp$/,
+  );
+  await hero.evaluate((img: HTMLImageElement) => img.decode());
+  expect(
+    await hero.evaluate((img: HTMLImageElement) => img.naturalWidth),
+  ).toBeGreaterThan(0);
+  expect(remoteRequests).toEqual([]);
+  await hero.screenshot({ path: info.outputPath('akane-native-splash.png') });
 });
 
 test('Адлер: старые навыки, пробуждения и материалы загружают локальные иконки на четырёх ширинах', async ({

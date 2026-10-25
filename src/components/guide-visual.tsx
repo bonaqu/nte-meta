@@ -143,7 +143,7 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
               : undefined
           }
         >
-          {value.kind !== 'stats' ? (
+          {value.kind !== 'stats' && !equipment ? (
             <span
               className="guide-visual__position"
               aria-label={`Позиция ${index + 1}`}
@@ -172,7 +172,10 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
                   {categoryLabels[item.category || 'replacement']}
                 </small>
               ) : null}
-              <h3>{item.name}</h3>
+              {value.kind === 'rotation' &&
+              /^шаг\s*\d+\s*$/iu.test(item.name) ? null : (
+                <h3>{item.name}</h3>
+              )}
             </div>
             {item.description ? <p>{item.description}</p> : null}
             {item.stats.length ? (
@@ -180,7 +183,11 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
                 {item.stats.map((stat, i) => (
                   <div key={i}>
                     <dt>
-                      <StatIcons label={stat.label} />
+                      {!/^\s*\d+\s*(?:предмет|част|модул|piece|pc)/iu.test(
+                        stat.label,
+                      ) ? (
+                        <StatIcons label={stat.label} />
+                      ) : null}
                       {stat.label}
                     </dt>
                     <dd>{stat.value}</dd>

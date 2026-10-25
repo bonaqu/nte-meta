@@ -46,7 +46,7 @@ test('опубликованные пакеты: Аканэ и оба вариа
         'Корейский',
       ]) {
         await voices.getByRole('tab', { name: new RegExp(language) }).click();
-        await expect(voices.locator('audio')).toHaveCount(6);
+        await expect(voices.locator('audio')).toHaveCount(5);
         const audio = voices.locator('audio').first();
         await audio.evaluate(async (element: HTMLAudioElement) => {
           await element.play();
@@ -159,7 +159,7 @@ test('готовая сборка: досье, стабильный гардер
   await expect(library).toBeVisible();
   for (const language of ['Японский', 'Английский', 'Китайский', 'Корейский']) {
     await library.getByRole('tab', { name: new RegExp(language) }).click();
-    await expect(library.locator('audio')).toHaveCount(6);
+    await expect(library.locator('audio')).toHaveCount(5);
     const playback = await library
       .locator('audio')
       .first()

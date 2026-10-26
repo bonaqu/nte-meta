@@ -42,11 +42,13 @@ test('дуга: отложенная подсказка, игровые хара
   const arcs = page.locator('.guide-visual--arcs');
   await arcs.scrollIntoViewIfNeeded();
   const item = arcs.locator(':scope > li').first();
-  await item.hover({ position: { x: 30, y: 60 } });
+  await item.getByRole('button', { name: /^Подробнее:/ }).hover();
   await page.waitForTimeout(200);
   await expect(page.locator('.item-detail-popover:popover-open')).toHaveCount(
     0,
   );
+  // Moving from the info control to the same card must not cancel its hover.
+  await item.hover({ position: { x: 30, y: 60 } });
   const sheet = page.locator('.item-detail-popover:popover-open');
   await expect(sheet).toBeVisible();
   await expect(sheet.locator('.item-detail-popover__stats')).toBeVisible();

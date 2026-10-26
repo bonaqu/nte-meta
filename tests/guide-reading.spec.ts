@@ -55,6 +55,15 @@ test('гайд: навигация, экипировка и мобильная �
         path: info.outputPath(`guide-arcs-${width}.png`),
       });
     await navigation
+      .getByRole('button', { name: 'Приоритет прокачки навыков', exact: true })
+      .click();
+    const priorities = page.locator('.guide-visual--skills');
+    await expect(priorities).toBeInViewport();
+    if (width === 360 || width === 1440)
+      await priorities.screenshot({
+        path: info.outputPath(`guide-priorities-${width}.png`),
+      });
+    await navigation
       .getByRole('button', { name: 'Базовая ротация', exact: true })
       .click();
     const rotation = page.locator('.guide-visual--rotation');

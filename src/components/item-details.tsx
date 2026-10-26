@@ -172,8 +172,8 @@ export function ItemDetails({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={panelId}
-        onMouseEnter={scheduleShow}
-        onMouseLeave={leave}
+        onMouseEnter={hoverParent ? undefined : scheduleShow}
+        onMouseLeave={hoverParent ? undefined : leave}
         onFocus={(event) => {
           if (skipFocus.current) {
             skipFocus.current = false;

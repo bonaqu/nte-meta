@@ -48,9 +48,11 @@ export function ItemDetails({
 }) {
   const panelId = useId();
   const panel = useRef<HTMLDivElement>(null);
+  const sheet = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [open, setOpen] = useState(false);
+  const [requested, setRequested] = useState(false);
   const skipFocus = useRef(false);
   const [foundDetail, setDetail] = useState(() => lookup?.(id, name));
   const detail = foundDetail || suppliedDetail;
@@ -61,33 +63,44 @@ export function ItemDetails({
   const hide = () => panel.current?.hidePopover();
   const cancel = () => clearTimeout(timer.current);
   const position = useCallback(() => {
-    const sheet = panel.current;
+    const card = sheet.current;
     const button = trigger.current;
-    if (!sheet || !button) return;
-    const anchor = button.getBoundingClientRect();
-    const bounds = sheet.getBoundingClientRect();
-    const left = Math.max(
-      12,
-      Math.min(anchor.left, innerWidth - bounds.width - 12),
-    );
+    if (!card || !button) return;
+    const anchor = (
+      hoverParent ? button.parentElement : button
+    )?.getBoundingClientRect();
+    if (!anchor) return;
+    const bounds = card.getBoundingClientRect();
+    const side =
+      anchor.right + bounds.width + 20 <= innerWidth
+        ? anchor.right + 8
+        : anchor.left - bounds.width - 8 >= 12
+          ? anchor.left - bounds.width - 8
+          : anchor.left;
+    const left = Math.max(12, Math.min(side, innerWidth - bounds.width - 12));
     const below = anchor.bottom + 8;
     const top =
       below + bounds.height <= innerHeight - 12
         ? below
         : Math.max(12, anchor.top - bounds.height - 8);
-    sheet.style.left = `${left}px`;
-    sheet.style.top = `${top}px`;
-  }, []);
+    card.style.left = `${left}px`;
+    card.style.top = `${top}px`;
+  }, [hoverParent]);
   const show = () => {
     cancel();
+    setRequested(true);
     panel.current?.showPopover();
+    if (panel.current) panel.current.scrollTop = 0;
     position();
   };
   const scheduleShow = () => {
     cancel();
+    setRequested(true);
     timer.current = setTimeout(show, 500);
   };
   useEffect(() => {
+    setDetail(lookup?.(id, name));
+    if (!requested) return;
     let mounted = true;
     loadRegistry()
       .then((find) => {
@@ -102,7 +115,7 @@ export function ItemDetails({
     return () => {
       mounted = false;
     };
-  }, [id, name]);
+  }, [id, name, requested]);
   useLayoutEffect(() => {
     if (panel.current?.matches(':popover-open')) position();
   }, [detail, pending, position]);
@@ -110,7 +123,7 @@ export function ItemDetails({
     cancel();
     timer.current = setTimeout(() => {
       if (
-        !panel.current?.matches(':hover, :focus-within') &&
+        !sheet.current?.matches(':hover, :focus-within') &&
         !trigger.current?.matches(':hover, :focus-visible')
       )
         hide();
@@ -126,6 +139,7 @@ export function ItemDetails({
     const host = trigger.current?.parentElement;
     const enter = () => {
       clearTimeout(timer.current);
+      setRequested(true);
       timer.current = setTimeout(() => {
         panel.current?.showPopover();
         position();
@@ -134,7 +148,7 @@ export function ItemDetails({
     const leave = () => {
       clearTimeout(timer.current);
       timer.current = setTimeout(() => {
-        if (!panel.current?.matches(':hover, :focus-within'))
+        if (!sheet.current?.matches(':hover, :focus-within'))
           panel.current?.hidePopover();
       }, 160);
     };
@@ -189,12 +203,8 @@ export function ItemDetails({
       {createPortal(
         <div
           ref={panel}
-          id={panelId}
           popover="auto"
-          className="item-detail-popover"
-          data-rarity={detail?.rarity}
-          role="dialog"
-          aria-labelledby={`${panelId}-name`}
+          className="item-detail-overlay"
           onToggle={(event) =>
             setOpen(event.currentTarget.matches(':popover-open'))
           }
@@ -204,61 +214,70 @@ export function ItemDetails({
               close();
             }
           }}
-          onMouseEnter={cancel}
-          onMouseLeave={leave}
-          onBlur={leave}
         >
-          <div className="item-detail-popover__type">
-            {detail?.type === 'Валюта' ? (
-              <Coins aria-hidden="true" />
-            ) : (
-              <Package aria-hidden="true" />
-            )}
-            <span>{detail?.type || 'Предмет'}</span>
-            <button
-              type="button"
-              aria-label="Закрыть описание предмета"
-              onClick={close}
-            >
-              <X aria-hidden="true" />
-            </button>
-          </div>
-          <header role="presentation">
-            {icon ? <img src={icon} alt="" width="96" height="96" /> : null}
-            <div>
-              <small>{context}</small>
-              <h3 id={`${panelId}-name`}>{name}</h3>
-              {quantity ? (
-                <strong className="item-detail-popover__quantity">
-                  ×{quantity}
-                </strong>
+          <div
+            ref={sheet}
+            id={panelId}
+            className="item-detail-popover item-detail-sheet"
+            data-rarity={detail?.rarity}
+            role="dialog"
+            aria-labelledby={`${panelId}-name`}
+            onMouseEnter={cancel}
+            onMouseLeave={leave}
+            onBlur={leave}
+          >
+            <div className="item-detail-popover__type">
+              {detail?.type === 'Валюта' ? (
+                <Coins aria-hidden="true" />
+              ) : (
+                <Package aria-hidden="true" />
+              )}
+              <span>{detail?.type || 'Предмет'}</span>
+              <button
+                type="button"
+                aria-label="Закрыть описание предмета"
+                onClick={close}
+              >
+                <X aria-hidden="true" />
+              </button>
+            </div>
+            <header role="presentation">
+              {icon ? <img src={icon} alt="" width="96" height="96" /> : null}
+              <div>
+                <small>{context}</small>
+                <h3 id={`${panelId}-name`}>{name}</h3>
+                {quantity ? (
+                  <strong className="item-detail-popover__quantity">
+                    ×{quantity}
+                  </strong>
+                ) : null}
+              </div>
+            </header>
+            <div className="item-detail-popover__text">
+              {detail?.stats?.length ? (
+                <dl className="item-detail-popover__stats">
+                  {detail.stats.map((stat, index) => (
+                    <div key={index}>
+                      <dt>{stat.label}</dt>
+                      <dd>{stat.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
+              {detail?.usage ? (
+                <p className="item-detail-popover__usage">{detail.usage}</p>
+              ) : null}
+              {detail?.description ? <p>{detail.description}</p> : null}
+              {pending ? (
+                <p role="status">Загружаем описание…</p>
+              ) : !detail ? (
+                <p>
+                  {context === 'Награда за дружбу'
+                    ? 'Награда за достижение этого уровня дружбы.'
+                    : context}
+                </p>
               ) : null}
             </div>
-          </header>
-          <div className="item-detail-popover__text">
-            {detail?.stats?.length ? (
-              <dl className="item-detail-popover__stats">
-                {detail.stats.map((stat, index) => (
-                  <div key={index}>
-                    <dt>{stat.label}</dt>
-                    <dd>{stat.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : null}
-            {detail?.usage ? (
-              <p className="item-detail-popover__usage">{detail.usage}</p>
-            ) : null}
-            {detail?.description ? <p>{detail.description}</p> : null}
-            {pending ? (
-              <p role="status">Загружаем описание…</p>
-            ) : !detail ? (
-              <p>
-                {context === 'Награда за дружбу'
-                  ? 'Награда за достижение этого уровня дружбы.'
-                  : context}
-              </p>
-            ) : null}
           </div>
         </div>,
         document.body,

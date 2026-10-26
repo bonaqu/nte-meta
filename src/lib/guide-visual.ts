@@ -192,6 +192,15 @@ export function isPrivateGuideSection(section: GuideSection) {
 export function stripEditorialText(text: string) {
   return cleanGuideText(text)
     .replace(
+      /\s+из\s+(?:Neverness\.gg|Kaiden(?:\.gg)?|Wotpack(?:\.ru)?)/giu,
+      '',
+    )
+    .replace(/\s+(?:Kaiden(?:\.gg)?|Neverness\.gg)(?=[\s.,;]|$)/giu, '')
+    .replace(
+      /\s*Рекомендации стартовые: персонаж выходит 21 октября, поэтому сравнение составов ещё может меняться\./gu,
+      '',
+    )
+    .replace(
       /\s*Награда за уровень в проверенном источнике не указана\.?/giu,
       '',
     )

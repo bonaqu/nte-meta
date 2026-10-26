@@ -190,16 +190,12 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
               />
             </Suspense>
           ) : null}
-          {value.kind !== 'stats' && !equipment ? (
+          {value.kind === 'rotation' ? (
             <span
               className="guide-visual__position"
               aria-label={`Позиция ${index + 1}`}
             >
-              {value.kind === 'skills'
-                ? items
-                    .slice(0, index + 1)
-                    .filter((row, i) => i === 0 || !equalPriority(row)).length
-                : index + 1}
+              {index + 1}
             </span>
           ) : null}
           {value.kind === 'stats' ? (
@@ -228,7 +224,9 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
                 <h3>{item.name}</h3>
               )}
             </div>
-            {item.description ? <p>{item.description}</p> : null}
+            {item.description && value.kind !== 'stats' ? (
+              <p>{item.description}</p>
+            ) : null}
             {item.stats.length ? (
               <dl className="guide-visual__stats">
                 {item.stats.map((stat, i) => (
@@ -468,17 +466,19 @@ export function GuideVisualEditor({
                 onChange={(e) => patch(item.id, { name: e.target.value })}
               />
             </label>
-            <label>
-              Краткое описание
-              <textarea
-                value={item.description}
-                maxLength={6000}
-                rows={3}
-                onChange={(e) =>
-                  patch(item.id, { description: e.target.value })
-                }
-              />
-            </label>
+            {value.kind !== 'stats' ? (
+              <label>
+                Краткое описание
+                <textarea
+                  value={item.description}
+                  maxLength={6000}
+                  rows={3}
+                  onChange={(e) =>
+                    patch(item.id, { description: e.target.value })
+                  }
+                />
+              </label>
+            ) : null}
             {value.kind === 'stats' ? (
               <label>
                 Характеристика из игры

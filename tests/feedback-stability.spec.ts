@@ -4,6 +4,15 @@ import vm from 'node:vm';
 import AxeBuilder from '@axe-core/playwright';
 import { visualFromImport } from '../src/lib/guide-visual';
 import { localizeGuideSkills } from '../src/lib/profile-presentation';
+import { stripEditorialText } from '../src/lib/guide-visual';
+
+test('публичный текст состава сохраняет рекомендации без упоминаний сайтов', () => {
+  expect(
+    stripEditorialText(
+      'Шинку · Ирой — состав Kaiden. Наналли · Ирой — вариант Цветения из Neverness.gg.',
+    ),
+  ).toBe('Шинку · Ирой — состав. Наналли · Ирой — вариант Цветения.');
+});
 
 test('равный приоритет проходит импорт, валидацию API и повторное чтение', async () => {
   const value = visualFromImport('skills', [
@@ -44,19 +53,28 @@ test('дуга: отложенная подсказка, игровые хара
   const item = arcs.locator(':scope > li').first();
   await item.getByRole('button', { name: /^Подробнее:/ }).hover();
   await page.waitForTimeout(200);
-  await expect(page.locator('.item-detail-popover:popover-open')).toHaveCount(
-    0,
-  );
+  await expect(
+    page.locator('.item-detail-overlay:popover-open .item-detail-popover'),
+  ).toHaveCount(0);
   // Moving from the info control to the same card must not cancel its hover.
   await item.hover({ position: { x: 30, y: 60 } });
-  const sheet = page.locator('.item-detail-popover:popover-open');
+  const sheet = page.locator(
+    '.item-detail-overlay:popover-open .item-detail-popover',
+  );
   await expect(sheet).toBeVisible();
   await expect(sheet.locator('.item-detail-popover__stats')).toBeVisible();
   await expect(sheet).not.toContainText(/\{\d+\}/);
   expect(
+    await sheet.evaluate((node) => ({
+      overflow: getComputedStyle(node).overflowY,
+      contentFits: node.scrollHeight <= node.clientHeight + 1,
+      width: node.getBoundingClientRect().width,
+    })),
+  ).toMatchObject({ overflow: 'visible', contentFits: true });
+  expect(
     (
       await new AxeBuilder({ page })
-        .include('.item-detail-popover:popover-open')
+        .include('.item-detail-overlay:popover-open .item-detail-popover')
         .analyze()
     ).violations,
   ).toEqual([]);

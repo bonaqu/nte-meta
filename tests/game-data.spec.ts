@@ -567,6 +567,83 @@ test('нативный профиль Хатор: исходные статы, �
   }
 });
 
+test('видимые начальные характеристики используют игровые метаданные и проценты, не выдумывая отсутствующие значения', async () => {
+  const records = JSON.parse(
+    await readFile('tests/fixtures/game-data-native-hathor.json', 'utf8'),
+  ) as SourceRecord[];
+  const metadata = JSON.parse(
+    await readFile('tests/fixtures/native-attributes.json', 'utf8'),
+  ) as SourceRecord[];
+  const f = await contract([...records, ...metadata]);
+  try {
+    const source = await f.m.buildLocalGameCharacterSource(f.env, {
+      originalName: 'Hathor',
+      name: 'Хатор',
+    });
+    const stats = JSON.parse(
+      source.suggestions.find((s) => s.field === 'profile.baseStats')!.value,
+    ) as { id: string; label: string; value: string }[];
+    expect(stats).toHaveLength(23);
+    expect(new Set(stats.map((s) => s.id)).size).toBe(23);
+    expect(stats.find((s) => s.id === 'ChargeGetEfficiencyBase')).toEqual({
+      id: 'ChargeGetEfficiencyBase',
+      label: 'Скорость зарядки',
+      value: '100%',
+    });
+    expect(stats.find((s) => s.id === 'Mag')).toEqual({
+      id: 'Mag',
+      label: 'Интенсивность цикла',
+      value: '0',
+    });
+    expect(stats.find((s) => s.id === 'DamageResistCosmos')).toEqual({
+      id: 'DamageResistCosmos',
+      label: 'Сопротивление космосу',
+      value: '0%',
+    });
+    expect(
+      stats.some((s) =>
+        [
+          'StrengthMax',
+          'HealUp',
+          'HealBeUp',
+          'AtkAdd',
+          'SumCosmosEfficiency',
+        ].includes(s.id),
+      ),
+    ).toBe(false);
+    expect(stats.every((s) => /[А-Яа-яЁё]/.test(s.label))).toBe(true);
+    const pack = records.find((r) => r.namespace === 'DT_PlayerPackData')!;
+    f.db
+      .prepare(
+        'INSERT INTO game_record_overrides(id,chunk_id,overrides_json,search_text,revision) VALUES(?,?,?,?,1)',
+      )
+      .run(
+        pack.id,
+        pack.id.split('|')[0],
+        JSON.stringify({
+          details: { ...pack.details, ChargeGetEfficiencyBase: 1.125 },
+        }),
+        'override',
+      );
+    const edited = await f.m.buildLocalGameCharacterSource(f.env, {
+      originalName: 'Hathor',
+      name: 'Хатор',
+    });
+    expect(
+      JSON.parse(
+        edited.suggestions.find((s) => s.field === 'profile.baseStats')!.value,
+      ),
+    ).toContainEqual(
+      expect.objectContaining({
+        id: 'ChargeGetEfficiencyBase',
+        value: '112.5%',
+      }),
+    );
+  } finally {
+    f.db.close();
+  }
+});
+
 test('кэш калькулятора исключает повторное чтение корпуса и обновляется после ручной правки', async () => {
   const records = JSON.parse(
     await readFile('tests/fixtures/game-data-native-hathor.json', 'utf8'),

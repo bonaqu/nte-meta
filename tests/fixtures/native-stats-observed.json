@@ -1,0 +1,809 @@
+[
+  {
+    "id": "adler",
+    "updatedAt": "2026-07-27 10:18:27",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "257b18b8-079f-4222-bdce-3bd2d9addb9f",
+          "label": "ОЗ",
+          "value": "1180"
+        },
+        {
+          "id": "3ab3cec5-35e8-43f8-9037-1f269129269d",
+          "label": "АТК",
+          "value": "55"
+        },
+        {
+          "id": "8f0c1cb7-eb59-43ed-93c7-91db1454a115",
+          "label": "ЗАЩ",
+          "value": "82"
+        },
+        {
+          "id": "8a33fb8e-63bb-46f0-a426-f1d35bbf7c1c",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "8186457d-0add-4a55-a8f3-14017aeab741",
+          "label": "Урон крит.",
+          "value": "50%"
+        },
+        {
+          "id": "39399d84-cf64-488d-af71-572214afcce2",
+          "label": "Усиление урона",
+          "value": "0%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "akane",
+    "updatedAt": "2026-10-21 16:33:23",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "HPMaxBase",
+          "label": "ОЗ",
+          "value": "1320"
+        },
+        {
+          "id": "AtkBase",
+          "label": "АТК",
+          "value": "80"
+        },
+        {
+          "id": "DefBase",
+          "label": "ЗАЩ",
+          "value": "76"
+        },
+        {
+          "id": "CritBase",
+          "label": "Шанс крит. попадания",
+          "value": "5%"
+        },
+        {
+          "id": "CritDamageBase",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "aurelia",
+    "updatedAt": "2026-07-27 10:07:15",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "8fede771-7990-4809-a011-0b26007149db",
+          "label": "ОЗ",
+          "value": "980"
+        },
+        {
+          "id": "27278371-3437-4a7f-a104-3871ce70a180",
+          "label": "АТК",
+          "value": "76"
+        },
+        {
+          "id": "972551d6-2322-46e6-9c79-2a9bf436b863",
+          "label": "ЗАЩ",
+          "value": "60"
+        },
+        {
+          "id": "6b91d48a-9680-4cfd-8ba5-6afb0ee453e3",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "15d926a1-b05c-439e-aa27-37f201f38d3e",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "baicang",
+    "updatedAt": "2026-07-01 09:11:10",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "53b85daf-15a6-46b6-bb01-a4048d13177e",
+          "label": "ОЗ",
+          "value": "1370"
+        },
+        {
+          "id": "c093b04b-50a0-4f0a-87a8-70ecd8863cd4",
+          "label": "АТК",
+          "value": "81"
+        },
+        {
+          "id": "78730ee9-b6bb-4857-95ef-269a861e239d",
+          "label": "ЗАЩ",
+          "value": "66"
+        },
+        {
+          "id": "3ddb54d2-766a-46f5-91ee-4439075fd8fb",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "634212d5-f600-4efa-8f3f-78bd7121d7a6",
+          "label": "Урон крит.",
+          "value": "50%"
+        },
+        {
+          "id": "ef5c3a7a-3cb5-4d52-a2f2-58daa298f64c",
+          "label": "Усиление урона",
+          "value": "0%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "blackbird",
+    "updatedAt": "2026-10-22 22:24:48",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "HPMaxBase",
+          "label": "ОЗ",
+          "value": "1280"
+        },
+        {
+          "id": "AtkBase",
+          "label": "АТК",
+          "value": "84"
+        },
+        {
+          "id": "DefBase",
+          "label": "ЗАЩ",
+          "value": "73"
+        },
+        {
+          "id": "CritBase",
+          "label": "Шанс крит. попадания",
+          "value": "5%"
+        },
+        {
+          "id": "CritDamageBase",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "daffodill",
+    "updatedAt": "2026-07-17 22:04:33",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "757517d1-85ad-4ee2-b079-822928dc77fa",
+          "label": "ОЗ",
+          "value": "1335"
+        },
+        {
+          "id": "ba67f215-b522-45c0-b91e-62da3689bf49",
+          "label": "АТК",
+          "value": "81"
+        },
+        {
+          "id": "eb44baf6-6397-4f1e-8479-15b4d6a4da46",
+          "label": "ЗАЩ",
+          "value": "72"
+        },
+        {
+          "id": "8784e7c0-9b4a-4da9-b76f-c02a206f5d39",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "c3a9f418-0a68-4739-8d3b-358b29826114",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "zankou",
+    "updatedAt": "2026-10-21 03:56:00",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "HPMaxBase",
+          "label": "ОЗ",
+          "value": "1280"
+        },
+        {
+          "id": "AtkBase",
+          "label": "АТК",
+          "value": "83"
+        },
+        {
+          "id": "DefBase",
+          "label": "ЗАЩ",
+          "value": "75"
+        },
+        {
+          "id": "CritBase",
+          "label": "Шанс крит. попадания",
+          "value": "5%"
+        },
+        {
+          "id": "CritDamageBase",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "iroi",
+    "updatedAt": "2026-10-21 03:56:00",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "HPMaxBase",
+          "label": "ОЗ",
+          "value": "1420"
+        },
+        {
+          "id": "AtkBase",
+          "label": "АТК",
+          "value": "75"
+        },
+        {
+          "id": "DefBase",
+          "label": "ЗАЩ",
+          "value": "75"
+        },
+        {
+          "id": "CritBase",
+          "label": "Шанс крит. попадания",
+          "value": "5%"
+        },
+        {
+          "id": "CritDamageBase",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "lacrimosa",
+    "updatedAt": "2026-06-30 12:51:29",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "8a04f069-6dc9-4bcb-a604-d25adf6f5af7",
+          "label": "ОЗ",
+          "value": "1320"
+        },
+        {
+          "id": "53fe2986-d533-4c64-be40-56628a7fd248",
+          "label": "АТК",
+          "value": "80"
+        },
+        {
+          "id": "f5238801-b348-4ee7-9469-c3ae338c6449",
+          "label": "ЗАЩ",
+          "value": "75"
+        },
+        {
+          "id": "65cbaf98-ff3d-4cfe-89b9-63f0a67aff6f",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "407e6347-ae6d-4484-a332-80b9a83b47d2",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "linko",
+    "updatedAt": "2026-10-21 03:56:00",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "HPMaxBase",
+          "label": "ОЗ",
+          "value": "1280"
+        },
+        {
+          "id": "AtkBase",
+          "label": "АТК",
+          "value": "82"
+        },
+        {
+          "id": "DefBase",
+          "label": "ЗАЩ",
+          "value": "76"
+        },
+        {
+          "id": "CritBase",
+          "label": "Шанс крит. попадания",
+          "value": "5%"
+        },
+        {
+          "id": "CritDamageBase",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "mint",
+    "updatedAt": "2026-07-17 20:03:39",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "b747870d-ae1e-418a-a5d7-c39d1be90498",
+          "label": "ОЗ",
+          "value": "1000"
+        },
+        {
+          "id": "95b2df37-41d6-43de-8815-bcfe716c0388",
+          "label": "АТК",
+          "value": "75"
+        },
+        {
+          "id": "0e021bcf-28fb-42e2-88a7-9ebf024e8f1b",
+          "label": "ЗАЩ",
+          "value": "60"
+        },
+        {
+          "id": "bca8995e-f047-42ba-919f-a5ddcb8476aa",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "f0788fcd-c9db-485a-bf2c-373884749980",
+          "label": "Урон крит.",
+          "value": "50%"
+        },
+        {
+          "id": "4166edd2-4c97-41b0-8b6d-e9090d08d9fc",
+          "label": "Усиление урона",
+          "value": "0%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "nanally",
+    "updatedAt": "2026-07-02 19:48:17",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "7ca6507b-004d-403b-97c6-c0c2335b4ffa",
+          "label": "ОЗ",
+          "value": "1320"
+        },
+        {
+          "id": "e0b0a2cd-aa9f-4606-95e9-f4ea2ec3f395",
+          "label": "АТК",
+          "value": "80"
+        },
+        {
+          "id": "8c45b147-991b-497a-954a-1b549478bd39",
+          "label": "ЗАЩ",
+          "value": "75"
+        },
+        {
+          "id": "c85777d4-ec66-4a33-a44d-831eec2abc80",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "6929952f-689d-441b-9428-d00c88aa72bc",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "sakiri",
+    "updatedAt": "2026-07-02 18:37:34",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "f89eff1c-6643-4680-b864-61782bc9001b",
+          "label": "ОЗ",
+          "value": "1360"
+        },
+        {
+          "id": "bca07e4b-058f-4ba6-b719-cdd5b8b1586b",
+          "label": "АТК",
+          "value": "78"
+        },
+        {
+          "id": "be280892-a706-4e49-9f19-fbbe0f48b087",
+          "label": "ЗАЩ",
+          "value": "75"
+        },
+        {
+          "id": "79d322bb-6b88-4dbe-b282-661772c7c11d",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "3921db33-7549-4f67-ba10-b469a2f2f84d",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "skia",
+    "updatedAt": "2026-06-30 13:22:54",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "d35a82f0-220d-4613-b845-7537fde55807",
+          "label": "ОЗ",
+          "value": "1100"
+        },
+        {
+          "id": "91f0039f-2577-4ab6-a9a0-c6705948bbda",
+          "label": "АТК",
+          "value": "70"
+        },
+        {
+          "id": "dfe0190b-a235-4a9b-974d-8a1b8b59f680",
+          "label": "ЗАЩ",
+          "value": "55"
+        },
+        {
+          "id": "08bf323d-6898-453d-a1a5-aa2ba296f4d3",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "fec52be7-faa3-478e-9f42-f78c8b83fa4c",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "fadia",
+    "updatedAt": "2026-06-30 12:54:29",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "2d839d6b-e30c-46b4-84ba-5aadcae8566d",
+          "label": "ОЗ",
+          "value": "1410"
+        },
+        {
+          "id": "bdb647ab-205e-4288-b4fb-0e1ba6ae3347",
+          "label": "АТК",
+          "value": "75"
+        },
+        {
+          "id": "99cdfd65-68a5-4b9a-a605-6e8aed048bde",
+          "label": "ЗАЩ",
+          "value": "75"
+        },
+        {
+          "id": "a831bab0-53a1-4706-8f47-2b12dfd63a0d",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "ad1bc88d-58ee-4bc8-af6d-6f8ca0454056",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "haniel",
+    "updatedAt": "2026-06-30 13:28:54",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "9f7eac01-1397-44f3-b774-e9a92000e8eb",
+          "label": "ОЗ",
+          "value": "1130"
+        },
+        {
+          "id": "4fc399fe-8ea2-4e74-8a59-93b0e61daae0",
+          "label": "АТК",
+          "value": "62"
+        },
+        {
+          "id": "7406f048-4896-44b3-966b-e6bba6777a0e",
+          "label": "ЗАЩ",
+          "value": "70"
+        },
+        {
+          "id": "021d35cb-67f1-4f17-be79-9473362979f5",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "18a15248-d640-44b7-b5a2-8a847fe6e615",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "chaos",
+    "updatedAt": "2026-06-30 12:50:16",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "HPMaxBase",
+          "label": "ОЗ",
+          "value": "1300"
+        },
+        {
+          "id": "AtkBase",
+          "label": "АТК",
+          "value": "80"
+        },
+        {
+          "id": "DefBase",
+          "label": "ЗАЩ",
+          "value": "76"
+        },
+        {
+          "id": "CritBase",
+          "label": "Шанс крит. попадания",
+          "value": "5%"
+        },
+        {
+          "id": "CritDamageBase",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "hathor",
+    "updatedAt": "2026-06-30 13:08:06",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "a73f4c8b-a31a-4c5b-a621-1459ae665a07",
+          "label": "ОЗ",
+          "value": "1320"
+        },
+        {
+          "id": "6e42be67-b3d6-458d-b653-90dd7b7d2252",
+          "label": "АТК",
+          "value": "81"
+        },
+        {
+          "id": "137d7fdc-db1a-4880-a135-c6ef38d687ed",
+          "label": "ЗАЩ",
+          "value": "73"
+        },
+        {
+          "id": "b76f8942-39d8-4a88-b9a6-60e8e8537dfd",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "e94fab11-2127-4920-804a-75e9d2922767",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "hotori",
+    "updatedAt": "2026-07-23 13:53:58",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "9586157b-bb6f-4961-968b-cdf713985d26",
+          "label": "ОЗ",
+          "value": "1330"
+        },
+        {
+          "id": "8d163e64-c627-4461-aa00-467d884a8e8c",
+          "label": "АТК",
+          "value": "82"
+        },
+        {
+          "id": "f92bd1f3-b1aa-485b-8ebc-5bafa229fb93",
+          "label": "ЗАЩ",
+          "value": "70"
+        },
+        {
+          "id": "f861c8ae-0b34-437a-847e-fea6d7cc28d8",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "fcdd138c-dd6f-471b-b4c5-059b18bbfd9d",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "jiuyuan",
+    "updatedAt": "2026-06-30 13:10:34",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "e35fe8b6-ab8f-42d8-9d9f-b01bb6ed0560",
+          "label": "ОЗ",
+          "value": "1290"
+        },
+        {
+          "id": "0ce11509-035a-44e7-8121-7f5d623c2226",
+          "label": "АТК",
+          "value": "82"
+        },
+        {
+          "id": "05b1969e-a232-4d85-98d7-1e460d174762",
+          "label": "ЗАЩ",
+          "value": "75"
+        },
+        {
+          "id": "fa3d609d-2810-4c27-ac16-95cc15271333",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "06e5a8ff-8c55-41f1-bc3c-92052b56a884",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "chiz",
+    "updatedAt": "2026-06-30 13:12:29",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "5a59c865-7544-4c4b-9b8e-c28c3c8a0247",
+          "label": "ОЗ",
+          "value": "1280"
+        },
+        {
+          "id": "70e25e0c-1259-4a0f-a874-a33321917cfe",
+          "label": "АТК",
+          "value": "83"
+        },
+        {
+          "id": "d8a33593-b4a0-4b0d-84df-960f1e2dc26b",
+          "label": "ЗАЩ",
+          "value": "75"
+        },
+        {
+          "id": "508d1fcb-401b-4e14-998d-66a501111704",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "c9a6835c-0093-42f7-a2e7-28653aa537e2",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "ec50ff3d-4340-4dad-89b4-1e14b95d6c21",
+    "updatedAt": "2026-08-25 11:17:01",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "HPMaxBase",
+          "label": "ОЗ",
+          "value": "1330"
+        },
+        {
+          "id": "AtkBase",
+          "label": "АТК",
+          "value": "80"
+        },
+        {
+          "id": "DefBase",
+          "label": "ЗАЩ",
+          "value": "74"
+        },
+        {
+          "id": "CritBase",
+          "label": "Шанс крит. попадания",
+          "value": "5%"
+        },
+        {
+          "id": "CritDamageBase",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "edgar",
+    "updatedAt": "2026-06-30 13:25:55",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "f7216ae2-1981-4c29-bcef-a7422b0709c4",
+          "label": "ОЗ",
+          "value": "1350"
+        },
+        {
+          "id": "38611ccb-132e-470e-a4f6-b99c62a1d9ee",
+          "label": "АТК",
+          "value": "53"
+        },
+        {
+          "id": "b9e3c105-cf92-4440-b829-6ce4a0cf549d",
+          "label": "ЗАЩ",
+          "value": "68"
+        },
+        {
+          "id": "3a539d9b-00f3-452f-b2e5-050162f42f81",
+          "label": "Шанс крит.",
+          "value": "5%"
+        },
+        {
+          "id": "142121ea-167a-4052-81a7-e6cbb601e5ab",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  },
+  {
+    "id": "esper-zero",
+    "updatedAt": "2026-07-28 14:58:37",
+    "profile": {
+      "baseStats": [
+        {
+          "id": "HPMaxBase",
+          "label": "ОЗ",
+          "value": "1250"
+        },
+        {
+          "id": "AtkBase",
+          "label": "АТК",
+          "value": "85"
+        },
+        {
+          "id": "DefBase",
+          "label": "ЗАЩ",
+          "value": "75"
+        },
+        {
+          "id": "CritBase",
+          "label": "Шанс крит. попадания",
+          "value": "5%"
+        },
+        {
+          "id": "CritDamageBase",
+          "label": "Урон крит.",
+          "value": "50%"
+        }
+      ]
+    }
+  }
+]

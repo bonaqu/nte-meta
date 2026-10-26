@@ -1,5 +1,6 @@
 import { AbilityAttributesField } from '../../components/ability-attributes-field';
 import { QuantityControl } from '../../components/quantity-control';
+import { statIdentity } from '../../lib/stat-identity';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ImageUploadButton } from '../../components/image-field';
 import {
@@ -1298,7 +1299,7 @@ export function AdminCharacterEditor({
         next.profile.baseStats = mergeRowsByKey(
           next.profile.baseStats,
           parsed as CharacterStat[],
-          (item) => item.label,
+          statIdentity,
         );
       } else if (
         suggestion.field === 'profile.abilityIcons' &&

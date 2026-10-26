@@ -18,7 +18,7 @@ import { LevelSelector } from './components/level-selector';
 import { CharacterWardrobe } from './components/character-wardrobe';
 import { CharacterSectionNav } from './components/character-section-nav';
 import { CharacterAppearanceSelector } from './components/character-appearance-selector';
-import { resolveStatIcon } from './lib/native-icons';
+import { CharacterStats } from './components/character-stats';
 import { orderedAbilities } from './lib/profile-presentation';
 import {
   isPrivateGuideSection,
@@ -3410,26 +3410,7 @@ function CharacterDetailPage({
           label="Вариант способностей"
           onChange={selectAppearance}
         />
-        {profile.baseStats.length ? (
-          <dl className="character-stat-grid">
-            {profile.baseStats.map((stat) => (
-              <div key={stat.id}>
-                <dt>
-                  <img
-                    className="native-stat-icon"
-                    src={resolveStatIcon(stat.label)}
-                    alt=""
-                    width="24"
-                    height="24"
-                    loading="lazy"
-                  />
-                  {stat.label}
-                </dt>
-                <dd>{stat.value}</dd>
-              </div>
-            ))}
-          </dl>
-        ) : null}
+        <CharacterStats stats={profile.baseStats} />
         {abilities.length ? (
           <CharacterAbilityBrowser key={character.id} abilities={abilities} />
         ) : (

@@ -4,6 +4,7 @@ import { resolveAssetUrl } from '../lib/assets';
 import { newVisualItem, guideSkillPresentation } from '../lib/guide-visual';
 import { ImageField } from './image-field';
 import { lazy, Suspense, useState } from 'react';
+import { RotationSequence } from './rotation-sequence';
 import { findEquipment } from '../lib/api';
 import { resolveStatIcons } from '../lib/native-icons';
 const ItemDetails = lazy(() =>
@@ -129,6 +130,45 @@ function equalPriority(item: GuideVisualItem) {
   );
 }
 export function GuideVisualView({ value }: { value: GuideVisual }) {
+  if (value.kind === 'rotation')
+    return (
+      <RotationSequence
+        className="guide-basic-rotation"
+        endLabel="Конец цепочки"
+        steps={value.items.map((item) => ({
+          id: item.id,
+          content: (
+            <div className="guide-rotation-action">
+              {item.imageUrl ? (
+                <img
+                  src={resolveAssetUrl(item.imageUrl)}
+                  alt=""
+                  width="40"
+                  height="40"
+                  loading="lazy"
+                />
+              ) : null}
+              <div>
+                {!/^шаг\s*\d+\s*$/iu.test(item.name) && item.name ? (
+                  <h3>{item.name}</h3>
+                ) : null}
+                {item.description ? <p>{item.description}</p> : null}
+                {item.stats.length ? (
+                  <dl className="guide-visual__stats">
+                    {item.stats.map((stat, i) => (
+                      <div key={i}>
+                        <dt>{stat.label}</dt>
+                        <dd>{stat.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : null}
+              </div>
+            </div>
+          ),
+        }))}
+      />
+    );
   const equipment = value.kind === 'arcs' || value.kind === 'cartridges';
   const items = equipment
     ? [...value.items].sort(
@@ -190,14 +230,6 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
               />
             </Suspense>
           ) : null}
-          {value.kind === 'rotation' ? (
-            <span
-              className="guide-visual__position"
-              aria-label={`Позиция ${index + 1}`}
-            >
-              {index + 1}
-            </span>
-          ) : null}
           {value.kind === 'stats' ? (
             <StatIcons label={item.name} imageUrl={item.imageUrl} />
           ) : nativeEquipmentImage(item.name, value.kind, item.imageUrl) ? (
@@ -219,14 +251,11 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
                   {categoryLabels[item.category || 'replacement']}
                 </small>
               ) : null}
-              {value.kind === 'rotation' &&
-              /^шаг\s*\d+\s*$/iu.test(item.name) ? null : (
-                <h3>
-                  {value.kind === 'skills'
-                    ? guideSkillPresentation(item).name
-                    : item.name}
-                </h3>
-              )}
+              <h3>
+                {value.kind === 'skills'
+                  ? guideSkillPresentation(item).name
+                  : item.name}
+              </h3>
             </div>
             {value.kind === 'skills' && guideSkillPresentation(item).type ? (
               <p className="guide-skill-type">

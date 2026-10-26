@@ -19,6 +19,7 @@ import { CharacterWardrobe } from './components/character-wardrobe';
 import { CharacterSectionNav } from './components/character-section-nav';
 import { CharacterAppearanceSelector } from './components/character-appearance-selector';
 import { CharacterStats } from './components/character-stats';
+import { RotationSequence } from './components/rotation-sequence';
 import { orderedAbilities } from './lib/profile-presentation';
 import {
   isPrivateGuideSection,
@@ -60,7 +61,6 @@ import {
   Pencil,
   Pin,
   Plus,
-  Play,
   Reply,
   RotateCw,
   Search,
@@ -4112,26 +4112,13 @@ function TeamCard({
         })}
       </div>
       {hasRotation ? (
-        <div className="team-rotation-sequence">
-          <div className="rotation-sequence-heading">
-            <span>
-              <Play aria-hidden="true" /> Старт
-            </span>
-            <strong>Командная ротация</strong>
-          </div>
-          <ol>
-            {rotationSteps.map((step, index) => (
-              <li key={`${team.id}-step-${index}`}>
-                <span className="rotation-step-index">{index + 1}</span>
-                <span>{step}</span>
-              </li>
-            ))}
-          </ol>
-          <div className="rotation-cycle-end">
-            <RotateCw aria-hidden="true" />
-            <span>Конец цепочки · повторить цикл с первого шага</span>
-          </div>
-        </div>
+        <RotationSequence
+          title="Командная ротация"
+          steps={rotationSteps.map((step, index) => ({
+            id: `${team.id}-step-${index}`,
+            content: <span>{step}</span>,
+          }))}
+        />
       ) : null}
     </article>
   );

@@ -102,7 +102,7 @@ test('общий профиль: читаемые сведения, задерж
     });
     await page.mouse.move(0, 0);
     // Measure both events in the browser. A runner-side 250ms wait also includes
-    // RPC/scheduler latency and can observe the panel after the 500ms deadline.
+    // RPC/scheduler latency and can observe the panel after the 750ms deadline.
     await trigger.evaluate((node) => {
       let entered = 0;
       node.addEventListener(
@@ -137,7 +137,7 @@ test('общий профиль: читаемые сведения, задерж
       () => (window as unknown as { hoverDelay: Promise<number> }).hoverDelay,
     );
     console.log(JSON.stringify({ width, hoverDelayMs: delay }));
-    expect(Math.round(delay)).toBeGreaterThanOrEqual(500);
+    expect(Math.round(delay)).toBeGreaterThanOrEqual(750);
     await detail
       .getByRole('button', { name: 'Закрыть описание предмета' })
       .click();
@@ -145,7 +145,7 @@ test('общий профиль: читаемые сведения, задерж
     await trigger.hover();
     await page.waitForTimeout(150);
     await page.mouse.move(0, 0);
-    await page.waitForTimeout(550);
+    await page.waitForTimeout(800);
     await expect(detail).not.toBeVisible();
     await trigger.focus();
     await page.keyboard.press('Enter');

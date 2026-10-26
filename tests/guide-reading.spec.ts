@@ -90,7 +90,12 @@ test('гайд: навигация, экипировка и мобильная �
     await navigation
       .getByRole('button', { name: 'Базовая ротация', exact: true })
       .click();
-    const rotation = page.locator('.guide-visual--rotation');
+    const chain = page.locator('.guide-basic-rotation.team-rotation-sequence');
+    await expect(chain.getByText('Старт', { exact: true })).toBeVisible();
+    await expect(
+      chain.getByText('Конец цепочки', { exact: true }),
+    ).toBeVisible();
+    const rotation = chain.locator('ol');
     await expect(rotation).toBeInViewport();
     const lefts = await rotation
       .locator(':scope > li')
@@ -99,14 +104,12 @@ test('гайд: навигация, экипировка и мобильная �
     const offsets = await rotation.locator(':scope > li').evaluateAll((nodes) =>
       nodes.map((node) => {
         const number = node
-          .querySelector('.guide-visual__position')!
+          .querySelector('.rotation-step-index')!
           .getBoundingClientRect();
         const body = node
-          .querySelector('.guide-visual__body')!
+          .querySelector('.guide-rotation-action')!
           .getBoundingClientRect();
-        return Math.abs(
-          number.top + number.height / 2 - body.top - body.height / 2,
-        );
+        return Math.abs(number.top - body.top);
       }),
     );
     expect(Math.max(...offsets)).toBeLessThan(1);
@@ -114,13 +117,20 @@ test('гайд: навигация, экипировка и мобильная �
       await rotation
         .locator(':scope > li')
         .evaluateAll((nodes) =>
-          nodes.every((node) =>
-            ['none', 'normal'].includes(
-              getComputedStyle(node, '::after').content,
+          nodes
+            .slice(0, -1)
+            .every(
+              (node) =>
+                !['none', 'normal'].includes(
+                  getComputedStyle(node, '::after').content,
+                ),
             ),
-          ),
         ),
     ).toBe(true);
+    if (width === 360 || width === 1440)
+      await chain.screenshot({
+        path: info.outputPath(`guide-rotation-${width}.png`),
+      });
     await expect(page.locator('.guide-visual--stats > li p')).toHaveCount(0);
     for (const stat of await page.locator('.guide-visual--stats > li').all()) {
       const icon = (await stat

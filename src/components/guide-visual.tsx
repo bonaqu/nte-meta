@@ -3,10 +3,12 @@ import type { Character, GuideVisual, GuideVisualItem } from '../types';
 import { resolveAssetUrl } from '../lib/assets';
 import { newVisualItem } from '../lib/guide-visual';
 import { ImageField } from './image-field';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { findEquipment } from '../lib/api';
 import { resolveStatIcons } from '../lib/native-icons';
-import { ItemDetails } from './item-details';
+const ItemDetails = lazy(() =>
+  import('./item-details').then((module) => ({ default: module.ItemDetails })),
+);
 import {
   nativeEquipmentImage,
   orderedAbilities,
@@ -166,25 +168,27 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
           }
         >
           {equipment ? (
-            <ItemDetails
-              id={item.id}
-              name={item.name.replace(/^(?:Дуга|Картридж):\s*/i, '')}
-              iconUrl={nativeEquipmentImage(
-                item.name,
-                value.kind,
-                item.imageUrl,
-              )}
-              context={value.kind === 'arcs' ? 'Дуга' : 'Картридж'}
-              iconOnly
-              hoverParent
-              suppliedDetail={{
-                name: item.name,
-                description: item.description,
-                usage: '',
-                type: value.kind === 'arcs' ? 'Дуга' : 'Картридж',
-                stats: item.stats,
-              }}
-            />
+            <Suspense fallback={null}>
+              <ItemDetails
+                id={item.id}
+                name={item.name.replace(/^(?:Дуга|Картридж):\s*/i, '')}
+                iconUrl={nativeEquipmentImage(
+                  item.name,
+                  value.kind,
+                  item.imageUrl,
+                )}
+                context={value.kind === 'arcs' ? 'Дуга' : 'Картридж'}
+                iconOnly
+                hoverParent
+                suppliedDetail={{
+                  name: item.name,
+                  description: item.description,
+                  usage: '',
+                  type: value.kind === 'arcs' ? 'Дуга' : 'Картридж',
+                  stats: item.stats,
+                }}
+              />
+            </Suspense>
           ) : null}
           {value.kind !== 'stats' && !equipment ? (
             <span

@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { lazy, Suspense, useId, useRef, useState } from 'react';
 import {
   ArrowRight,
   Calculator,
@@ -14,7 +14,9 @@ import {
 } from '../lib/progression';
 import { resolveAssetUrl } from '../lib/assets';
 import { QuantityControl } from './quantity-control';
-import { ItemDetails } from './item-details';
+const ItemDetails = lazy(() =>
+  import('./item-details').then((module) => ({ default: module.ItemDetails })),
+);
 
 export function ProgressionCalculator({
   name,
@@ -172,14 +174,16 @@ export function ProgressionCalculator({
                 </span>
               </button>
               {arc ? (
-                <ItemDetails
-                  id={arc.id}
-                  name={arc.name}
-                  iconUrl={arc.iconUrl || ''}
-                  context="Дуга"
-                  iconOnly
-                  hoverParent
-                />
+                <Suspense fallback={null}>
+                  <ItemDetails
+                    id={arc.id}
+                    name={arc.name}
+                    iconUrl={arc.iconUrl || ''}
+                    context="Дуга"
+                    iconOnly
+                    hoverParent
+                  />
+                </Suspense>
               ) : null}
               <button
                 ref={arcToggle}
@@ -263,14 +267,16 @@ export function ProgressionCalculator({
                         <span>{row.name}</span>
                       </button>
 
-                      <ItemDetails
-                        id={row.id}
-                        name={row.name}
-                        iconUrl={row.iconUrl || ''}
-                        context="Дуга"
-                        iconOnly
-                        hoverParent
-                      />
+                      <Suspense fallback={null}>
+                        <ItemDetails
+                          id={row.id}
+                          name={row.name}
+                          iconUrl={row.iconUrl || ''}
+                          context="Дуга"
+                          iconOnly
+                          hoverParent
+                        />
+                      </Suspense>
                     </div>
                   ))}
               </div>
@@ -409,14 +415,16 @@ export function ProgressionCalculator({
                       ...result.materials,
                     ].map((item) => (
                       <article key={item.id}>
-                        <ItemDetails
-                          id={item.id}
-                          name={item.name}
-                          iconUrl={item.iconUrl}
-                          context="Материал развития"
-                          quantity={item.amount.toLocaleString('ru-RU')}
-                          iconOnly
-                        />
+                        <Suspense fallback={null}>
+                          <ItemDetails
+                            id={item.id}
+                            name={item.name}
+                            iconUrl={item.iconUrl}
+                            context="Материал развития"
+                            quantity={item.amount.toLocaleString('ru-RU')}
+                            iconOnly
+                          />
+                        </Suspense>
 
                         {item.iconUrl ? (
                           <img

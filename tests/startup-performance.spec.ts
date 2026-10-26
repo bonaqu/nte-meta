@@ -38,7 +38,7 @@ test('холодная загрузка профиля не ждёт втори�
     const cdp = await context.newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.addInitScript(() => {
-      const metrics = { lcp: 0, cls: 0 };
+      const metrics = { lcp: 0, cls: 0, shifts: [] as unknown[] };
       (window as unknown as { nteMetrics: typeof metrics }).nteMetrics =
         metrics;
       new PerformanceObserver((list) => {
@@ -48,8 +48,23 @@ test('холодная загрузка профиля не ждёт втори�
         for (const e of list.getEntries() as (PerformanceEntry & {
           value: number;
           hadRecentInput: boolean;
+          sources?: Array<{
+            node?: Element;
+            previousRect: DOMRectReadOnly;
+            currentRect: DOMRectReadOnly;
+          }>;
         })[])
-          if (!e.hadRecentInput) metrics.cls += e.value;
+          if (!e.hadRecentInput) {
+            metrics.cls += e.value;
+            metrics.shifts.push({
+              value: e.value,
+              sources: e.sources?.map((source) => ({
+                node: source.node?.className || source.node?.tagName,
+                previous: source.previousRect.toJSON(),
+                current: source.currentRect.toJSON(),
+              })),
+            });
+          }
       }).observe({ type: 'layout-shift', buffered: true });
     });
     await page.route('**/api/**', async (route) => {
@@ -103,5 +118,8 @@ test('холодная загрузка профиля не ждёт втори�
     ),
   );
   if (!process.env.NTE_STARTUP_BASELINE)
-    for (const run of runs) expect(run.readyMs).toBeLessThan(4000);
+    for (const run of runs) {
+      expect(run.readyMs).toBeLessThan(4000);
+      expect(run.cls).toBeLessThan(0.1);
+    }
 });

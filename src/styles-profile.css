@@ -1570,6 +1570,10 @@
 }
 
 @layer polish {
+  /* Keep the footer below the fold until the real route replaces its skeleton. */
+  .site-main--loading {
+    min-block-size: 100svh;
+  }
   .item-details-trigger.item-details-trigger--equipment {
     inset: 4px 4px auto auto;
     inline-size: 44px;

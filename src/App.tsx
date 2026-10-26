@@ -719,7 +719,11 @@ function App() {
           onClick={() => setMobileOpen(false)}
         />
       ) : null}
-      <main id="main-content" className="site-main">
+      <main
+        id="main-content"
+        className={`site-main${loading ? ' site-main--loading' : ''}`}
+        aria-busy={loading}
+      >
         {error ? (
           <div className="portal-load-error">
             <StatusBanner tone="danger" text={error} />

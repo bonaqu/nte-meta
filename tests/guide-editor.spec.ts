@@ -293,6 +293,17 @@ test('визуальная дуга: поиск, загрузка файла, с
     .getByRole('group', { name: 'Навыки для секции гайда' })
     .getByRole('button', { name: /Проверочный навык из игры/ });
   await choice.click();
+  await dialog
+    .getByRole('button', { name: 'Дублировать', exact: true })
+    .click();
+  const secondSkill = dialog.locator('.visual-item-editor').nth(1);
+  await secondSkill.locator('summary').click();
+  await secondSkill
+    .getByLabel('Одинаковый приоритет с предыдущим навыком')
+    .check();
+  await expect(
+    dialog.locator('.visual-section-preview [data-priority-relation="equal"]'),
+  ).toHaveCount(1);
   await expect(choice).toHaveAttribute('aria-pressed', 'true');
   await expect(dialog.locator('.visual-section-preview')).toContainText(
     'Проверочный навык из игры',
@@ -358,6 +369,10 @@ test('визуальная дуга: поиск, загрузка файла, с
     name: 'Проверочный навык из игры',
     imageUrl: '/nte-meta/game-assets/ad87d2a73478180243f0.webp',
   });
+  expect(
+    guide.sections.find((s) => s.id === 'visual-skills-persisted')?.visual
+      ?.items[1].equalPriority,
+  ).toBe(true);
   expect(
     guide.sections.find((s) => s.id === 'visual-stats-persisted')?.visual
       ?.items[0],

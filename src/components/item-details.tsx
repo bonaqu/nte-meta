@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { Coins, Info, Package, X } from 'lucide-react';
 import type { ItemDescription } from '../lib/item-descriptions';
 import { resolveItemIcon } from '../lib/item-icons';
+import { resolveAssetUrl } from '../lib/assets';
 type Lookup = (id: string, name: string) => ItemDescription | undefined;
 let lookup: Lookup | undefined;
 let registry: Promise<Lookup> | undefined;
@@ -33,6 +34,8 @@ export function ItemDetails({
   context,
   quantity,
   iconOnly = false,
+  hoverParent = false,
+  suppliedDetail,
 }: {
   id: string;
   name: string;
@@ -40,6 +43,8 @@ export function ItemDetails({
   context: string;
   quantity?: string;
   iconOnly?: boolean;
+  hoverParent?: boolean;
+  suppliedDetail?: ItemDescription;
 }) {
   const panelId = useId();
   const panel = useRef<HTMLDivElement>(null);
@@ -47,9 +52,12 @@ export function ItemDetails({
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [open, setOpen] = useState(false);
   const skipFocus = useRef(false);
-  const [detail, setDetail] = useState(() => lookup?.(id, name));
+  const [foundDetail, setDetail] = useState(() => lookup?.(id, name));
+  const detail = foundDetail || suppliedDetail;
   const [pending, setPending] = useState(!lookup);
-  const icon = resolveItemIcon(name, iconUrl);
+  const icon = resolveAssetUrl(
+    iconUrl || detail?.iconUrl || resolveItemIcon(name),
+  );
   const hide = () => panel.current?.hidePopover();
   const cancel = () => clearTimeout(timer.current);
   const position = useCallback(() => {
@@ -113,6 +121,31 @@ export function ItemDetails({
     hide();
     trigger.current?.focus({ preventScroll: true });
   };
+  useEffect(() => {
+    if (!hoverParent) return;
+    const host = trigger.current?.parentElement;
+    const enter = () => {
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        panel.current?.showPopover();
+        position();
+      }, 500);
+    };
+    const leave = () => {
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        if (!panel.current?.matches(':hover, :focus-within'))
+          panel.current?.hidePopover();
+      }, 160);
+    };
+    host?.addEventListener('mouseenter', enter);
+    host?.addEventListener('mouseleave', leave);
+    return () => {
+      host?.removeEventListener('mouseenter', enter);
+      host?.removeEventListener('mouseleave', leave);
+      clearTimeout(timer.current);
+    };
+  }, [hoverParent, position]);
   useEffect(() => () => clearTimeout(timer.current), []);
   useEffect(() => {
     if (!open) return;
@@ -134,7 +167,7 @@ export function ItemDetails({
       <button
         ref={trigger}
         type="button"
-        className={`item-details-trigger${iconOnly ? ' item-details-trigger--icon' : ''}`}
+        className={`item-details-trigger${iconOnly ? ' item-details-trigger--icon' : ''}${hoverParent ? ' item-details-trigger--equipment' : ''}`}
         aria-label={`Подробнее: ${name}`}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -203,6 +236,16 @@ export function ItemDetails({
             </div>
           </header>
           <div className="item-detail-popover__text">
+            {detail?.stats?.length ? (
+              <dl className="item-detail-popover__stats">
+                {detail.stats.map((stat, index) => (
+                  <div key={index}>
+                    <dt>{stat.label}</dt>
+                    <dd>{stat.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
             {detail?.usage ? (
               <p className="item-detail-popover__usage">{detail.usage}</p>
             ) : null}

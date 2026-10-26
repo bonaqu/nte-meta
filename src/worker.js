@@ -13469,6 +13469,10 @@ function validateGuideVisual(value) {
       name: cleanString(item.name || '', 0, 600),
       imageUrl,
       description: cleanString(item.description || '', 0, 6000),
+      equalPriority:
+        value.kind === 'skills' && typeof item.equalPriority === 'boolean'
+          ? item.equalPriority
+          : undefined,
       category: ['signature', 'replacement', 'budget'].includes(item.category)
         ? item.category
         : undefined,
@@ -14882,18 +14886,22 @@ async function buildLocalGameCharacterSource(env, character) {
       description: plain(description?.values.ru || ''),
     };
   });
-  const structuredSkills = records.filter(
-    (r) =>
-      r.namespace === 'DT_GameplayAbilityTipsData' &&
-      (!abilityMenu.length || menuIds.has(r.gameId.toLowerCase())) &&
-      Array.isArray(r.details.AbilityDescription),
-  ).sort((a,b) => {
-    const rank = (record) => {
-      const at=abilityMenu.findIndex((row)=>row.id.toLowerCase()===record.gameId.toLowerCase());
-      return at<0 ? 100 : at;
-    };
-    return rank(a)-rank(b);
-  });
+  const structuredSkills = records
+    .filter(
+      (r) =>
+        r.namespace === 'DT_GameplayAbilityTipsData' &&
+        (!abilityMenu.length || menuIds.has(r.gameId.toLowerCase())) &&
+        Array.isArray(r.details.AbilityDescription),
+    )
+    .sort((a, b) => {
+      const rank = (record) => {
+        const at = abilityMenu.findIndex(
+          (row) => row.id.toLowerCase() === record.gameId.toLowerCase(),
+        );
+        return at < 0 ? 100 : at;
+      };
+      return rank(a) - rank(b);
+    });
   const numberText = (n) => String(Number(n.toFixed(4)));
   function curveValues(curve, percent) {
     const keys = [...(curve.Keys || [])].sort((a, b) => a.Time - b.Time);
@@ -15089,13 +15097,20 @@ async function buildLocalGameCharacterSource(env, character) {
       const line = lines.find(
         (l) => l.AudioEvent?.AssetPathName?.split('.').at(-1) === r.gameId,
       );
-      const mapped = !line && r.details.binding === 'character-voice-map' && r.details.titleRu && r.details.contentRu;
+      const mapped =
+        !line &&
+        r.details.binding === 'character-voice-map' &&
+        r.details.titleRu &&
+        r.details.contentRu;
       return (line || mapped) && r.assets[0]
         ? [
             {
               id: `${r.details.locale}-${r.gameId}`.slice(0, 80),
               title: line ? ru(line.Title) : plain(r.details.titleRu),
-              description: (line ? ru(line.Content) : plain(r.details.contentRu)).slice(0, 1000),
+              description: (line
+                ? ru(line.Content)
+                : plain(r.details.contentRu)
+              ).slice(0, 1000),
               language: languageNames[r.details.locale],
               audioUrl: r.assets[0].url,
             },

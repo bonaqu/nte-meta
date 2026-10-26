@@ -5,7 +5,10 @@ import type {
   GuideVisualItem,
   GuideVisualKind,
 } from '../types';
-import { nativeEquipmentImage } from './profile-presentation';
+import {
+  nativeEquipmentImage,
+  localizeGuideSkills,
+} from './profile-presentation';
 
 export function cleanGuideText(text: string) {
   return text.replace(/<!--\s*import:[\s\S]*?-->/gi, '').trim();
@@ -28,8 +31,14 @@ function presentVisual(visual: GuideVisual): GuideVisual {
       )
       .map((item) => ({
         ...item,
-        name: cleanGuideText(item.name),
-        description: cleanGuideText(item.description),
+        name:
+          visual.kind === 'skills'
+            ? localizeGuideSkills(cleanGuideText(item.name))
+            : cleanGuideText(item.name),
+        description:
+          visual.kind === 'skills'
+            ? localizeGuideSkills(cleanGuideText(item.description))
+            : cleanGuideText(item.description),
         imageUrl: nativeEquipmentImage(item.name, visual.kind, item.imageUrl),
       })),
   };
@@ -146,6 +155,10 @@ export function visualFromImport(
         name: String(item.name || item.title || item.label || ''),
         imageUrl: String(item.imageUrl || item.iconUrl || ''),
         description: String(item.description || item.value || ''),
+        equalPriority:
+          typeof item.equalPriority === 'boolean'
+            ? item.equalPriority
+            : undefined,
         category:
           (item.category as GuideVisualItem['category']) ||
           (kind === 'arcs' || kind === 'cartridges'

@@ -50,6 +50,28 @@ export async function buildProfileIndex(rows) {
       if (name) abilities[key(name)] = names;
   }
   const equipment = [];
+  const skillTerms = {};
+  const conflicting = new Set();
+  for (const row of rows.filter(
+    (r) =>
+      r.namespace === 'DT_GameplayAbilityTipsData' ||
+      (/SkillDes$/.test(r.namespace) && /_name$/i.test(r.gameId)),
+  )) {
+    const strip = (s) =>
+      String(s || '')
+        .replace(
+          /^(?:Basic Attack|Redirect Skill|Support Skill|Ultimate|Базовая атака|Навык перенаправления|Навык поддержки|Сверхспособность):\s*/i,
+          '',
+        )
+        .trim();
+    const en = strip(row.values.en);
+    const ruName = strip(row.values.ru);
+    if (en.length < 3 || en.length > 100 || !/[А-Яа-яЁё]/.test(ruName))
+      continue;
+    if (skillTerms[en] && skillTerms[en] !== ruName) conflicting.add(en);
+    skillTerms[en] = ruName;
+  }
+  for (const term of conflicting) delete skillTerms[term];
   for (const row of rows.filter((r) =>
     ['NTE_ReferenceWeapon', 'DT_EquipmentSuitData'].includes(r.namespace),
   )) {
@@ -67,7 +89,7 @@ export async function buildProfileIndex(rows) {
   }
   await writeFile(
     'src/data/native-profile-index.json',
-    JSON.stringify({ abilities, equipment }, null, 2) + '\n',
+    JSON.stringify({ abilities, equipment, skillTerms }, null, 2) + '\n',
   );
   process.stdout.write(
     `Profile index: ${Object.keys(abilities).length} identities, ${equipment.length} equipment images\n`,

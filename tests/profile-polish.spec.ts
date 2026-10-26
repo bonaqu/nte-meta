@@ -172,7 +172,15 @@ test('биография, уровни навыка, гардероб и стр�
     const outfits = wardrobe
       .getByRole('group', { name: 'Выбор наряда' })
       .getByRole('button');
+    const wardrobeHeight = (await wardrobe
+      .locator('.wardrobe-gallery__stage')
+      .boundingBox())!.height;
     await outfits.last().click();
+    expect(
+      (await wardrobe.locator('.wardrobe-gallery__stage').boundingBox())!
+        .height,
+    ).toBe(wardrobeHeight);
+    await expect(wardrobe.getByText('Наряд', { exact: true })).toHaveCount(0);
     await expect(outfits.last()).toHaveAttribute('aria-pressed', 'true');
     await wardrobe.getByRole('button', { name: /Открыть изображение/ }).click();
     await expect(page.locator('.skin-lightbox[open]')).toBeVisible({
@@ -186,8 +194,14 @@ test('биография, уровни навыка, гардероб и стр�
     await voice.getByRole('tab', { name: /Японский/ }).click();
     const pages = voice.getByRole('group', { name: 'Страницы реплик' });
     await expect(voice.locator('.voice-line-list article')).toHaveCount(5);
+    const firstVoiceHeight = (await voice
+      .locator('.voice-line-list')
+      .boundingBox())!.height;
     await pages.getByRole('button', { name: /вперёд/ }).click();
     await expect(voice.locator('.voice-line-list article')).toHaveCount(4);
+    expect(
+      (await voice.locator('.voice-line-list').boundingBox())!.height,
+    ).toBe(firstVoiceHeight);
     await expect(pages.getByRole('button', { name: /вперёд/ })).toBeDisabled();
     await voice.getByRole('tab', { name: /Английский/ }).click();
     await expect(voice.locator('.voice-line-list article')).toHaveCount(5);

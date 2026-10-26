@@ -6,6 +6,7 @@ import { ImageField } from './image-field';
 import { useState } from 'react';
 import { findEquipment } from '../lib/api';
 import { resolveStatIcons } from '../lib/native-icons';
+import { ItemDetails } from './item-details';
 import {
   nativeEquipmentImage,
   orderedAbilities,
@@ -119,6 +120,12 @@ const categoryLabels = {
   replacement: 'На замену',
   budget: 'Бюджетный вариант',
 };
+function equalPriority(item: GuideVisualItem) {
+  return (
+    item.equalPriority ??
+    /одинаковый приоритет с предыдущим/iu.test(item.description)
+  );
+}
 export function GuideVisualView({ value }: { value: GuideVisual }) {
   const equipment = value.kind === 'arcs' || value.kind === 'cartridges';
   const items = equipment
@@ -133,22 +140,62 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
       )
     : value.items;
   return (
-    <ol className={`guide-visual guide-visual--${value.kind}`}>
+    <ol
+      className={`guide-visual guide-visual--${value.kind}`}
+      tabIndex={value.kind === 'skills' ? 0 : undefined}
+      aria-label={
+        value.kind === 'skills'
+          ? 'Последовательность приоритета навыков'
+          : undefined
+      }
+    >
       {items.map((item, index) => (
         <li
           key={item.id}
+          data-priority-relation={
+            value.kind === 'skills' && index > 0
+              ? equalPriority(item)
+                ? 'equal'
+                : 'next'
+              : undefined
+          }
           className={
             equipment
               ? `guide-visual__equipment guide-visual__equipment--${item.category || 'replacement'}`
               : undefined
           }
         >
+          {equipment ? (
+            <ItemDetails
+              id={item.id}
+              name={item.name.replace(/^(?:Дуга|Картридж):\s*/i, '')}
+              iconUrl={nativeEquipmentImage(
+                item.name,
+                value.kind,
+                item.imageUrl,
+              )}
+              context={value.kind === 'arcs' ? 'Дуга' : 'Картридж'}
+              iconOnly
+              hoverParent
+              suppliedDetail={{
+                name: item.name,
+                description: item.description,
+                usage: '',
+                type: value.kind === 'arcs' ? 'Дуга' : 'Картридж',
+                stats: item.stats,
+              }}
+            />
+          ) : null}
           {value.kind !== 'stats' && !equipment ? (
             <span
               className="guide-visual__position"
               aria-label={`Позиция ${index + 1}`}
             >
-              {index + 1}
+              {value.kind === 'skills'
+                ? items
+                    .slice(0, index + 1)
+                    .filter((row, i) => i === 0 || !equalPriority(row)).length
+                : index + 1}
             </span>
           ) : null}
           {value.kind === 'stats' ? (
@@ -280,6 +327,18 @@ export function GuideVisualEditor({
             role="group"
             aria-label={`Позиция ${index + 1}: ${item.name || 'Новая позиция'}`}
           >
+            {value.kind === 'skills' && index > 0 ? (
+              <label className="guide-priority-equal">
+                <input
+                  type="checkbox"
+                  checked={equalPriority(item)}
+                  onChange={(event) =>
+                    patch(item.id, { equalPriority: event.target.checked })
+                  }
+                />
+                Одинаковый приоритет с предыдущим навыком
+              </label>
+            ) : null}
             <div className="button-row">
               <button
                 type="button"

@@ -63,6 +63,20 @@ test('гайд: навигация, экипировка и мобильная �
       .locator(':scope > li')
       .evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().left));
     expect(new Set(lefts).size).toBe(1);
+    const offsets = await rotation.locator(':scope > li').evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const number = node
+          .querySelector('.guide-visual__position')!
+          .getBoundingClientRect();
+        const body = node
+          .querySelector('.guide-visual__body')!
+          .getBoundingClientRect();
+        return Math.abs(
+          number.top + number.height / 2 - body.top - body.height / 2,
+        );
+      }),
+    );
+    expect(Math.max(...offsets)).toBeLessThan(1);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth + 1,

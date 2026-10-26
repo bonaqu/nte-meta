@@ -1,4 +1,4 @@
-import { lazy, Suspense, useId, useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import {
   ArrowRight,
   Calculator,
@@ -14,9 +14,7 @@ import {
 } from '../lib/progression';
 import { resolveAssetUrl } from '../lib/assets';
 import { QuantityControl } from './quantity-control';
-const ItemDetails = lazy(() =>
-  import('./item-details').then((module) => ({ default: module.ItemDetails })),
-);
+import { ItemDetails } from './item-details';
 
 export function ProgressionCalculator({
   name,
@@ -173,6 +171,16 @@ export function ProgressionCalculator({
                   <strong>{arc?.name || 'Нет совместимых дуг'}</strong>
                 </span>
               </button>
+              {arc ? (
+                <ItemDetails
+                  id={arc.id}
+                  name={arc.name}
+                  iconUrl={arc.iconUrl || ''}
+                  context="Дуга"
+                  iconOnly
+                  hoverParent
+                />
+              ) : null}
               <button
                 ref={arcToggle}
                 type="button"
@@ -230,30 +238,40 @@ export function ProgressionCalculator({
                       .includes(query.trim().toLowerCase()),
                   )
                   .map((row) => (
-                    <button
-                      type="button"
-                      key={row.id}
-                      aria-pressed={arc?.id === row.id}
-                      onClick={() => {
-                        setArcId(row.id);
-                        setOwned({});
-                        setArcPickerOpen(false);
-                        arcToggle.current?.focus();
-                      }}
-                    >
-                      {row.iconUrl ? (
-                        <img
-                          src={resolveAssetUrl(row.iconUrl)}
-                          alt=""
-                          width="64"
-                          height="64"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <Orbit aria-hidden="true" />
-                      )}
-                      <span>{row.name}</span>
-                    </button>
+                    <div className="arc-picker-option" key={row.id}>
+                      <button
+                        type="button"
+                        aria-pressed={arc?.id === row.id}
+                        onClick={() => {
+                          setArcId(row.id);
+                          setOwned({});
+                          setArcPickerOpen(false);
+                          arcToggle.current?.focus();
+                        }}
+                      >
+                        {row.iconUrl ? (
+                          <img
+                            src={resolveAssetUrl(row.iconUrl)}
+                            alt=""
+                            width="64"
+                            height="64"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <Orbit aria-hidden="true" />
+                        )}
+                        <span>{row.name}</span>
+                      </button>
+
+                      <ItemDetails
+                        id={row.id}
+                        name={row.name}
+                        iconUrl={row.iconUrl || ''}
+                        context="Дуга"
+                        iconOnly
+                        hoverParent
+                      />
+                    </div>
                   ))}
               </div>
               {!arcs.some((row) =>
@@ -391,16 +409,15 @@ export function ProgressionCalculator({
                       ...result.materials,
                     ].map((item) => (
                       <article key={item.id}>
-                        <Suspense fallback={null}>
-                          <ItemDetails
-                            id={item.id}
-                            name={item.name}
-                            iconUrl={item.iconUrl}
-                            context="Материал развития"
-                            quantity={item.amount.toLocaleString('ru-RU')}
-                            iconOnly
-                          />
-                        </Suspense>
+                        <ItemDetails
+                          id={item.id}
+                          name={item.name}
+                          iconUrl={item.iconUrl}
+                          context="Материал развития"
+                          quantity={item.amount.toLocaleString('ru-RU')}
+                          iconOnly
+                        />
+
                         {item.iconUrl ? (
                           <img
                             src={resolveAssetUrl(item.iconUrl)}

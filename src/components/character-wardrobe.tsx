@@ -105,7 +105,6 @@ export function CharacterWardrobe({ skins }: { skins: CharacterSkin[] }) {
               ))}
             </div>
           ) : null}
-          <p className="eyebrow">Наряд</p>
           <h3>{skin.name}</h3>
           <div
             className="wardrobe-gallery__description"

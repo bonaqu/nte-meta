@@ -6,6 +6,8 @@ export type ItemDescription = {
   usage: string;
   type?: string;
   rarity?: number;
+  iconUrl?: string;
+  stats?: Array<{ label: string; value: string }>;
 };
 const entries: Record<string, ItemDescription> = dictionary.byId;
 const names: Record<string, string> = dictionary.byName;

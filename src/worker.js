@@ -13469,6 +13469,10 @@ function validateGuideVisual(value) {
       name: cleanString(item.name || '', 0, 600),
       imageUrl,
       description: cleanString(item.description || '', 0, 6000),
+      skillType:
+        value.kind === 'skills'
+          ? cleanString(item.skillType || '', 0, 120)
+          : undefined,
       equalPriority:
         value.kind === 'skills' && typeof item.equalPriority === 'boolean'
           ? item.equalPriority
@@ -15247,6 +15251,64 @@ function gameProgressionStages(stages, phases = []) {
     }));
 }
 
+function gameSkillProgression(menu) {
+  if (!Array.isArray(menu)) return [];
+  return menu.flatMap((ability) => {
+    if (
+      !ability ||
+      typeof ability.id !== 'string' ||
+      !ability.id ||
+      ability.id.length > 160
+    )
+      return [];
+    const rows = ability.materials;
+    if (!Array.isArray(rows) || !rows.length || rows.length > 20) return [];
+    const levels = rows.map((row) => Number(row?.level));
+    if (
+      new Set(levels).size !== levels.length ||
+      rows.some(
+        (row, index) =>
+          !row ||
+          !/^\d+$/.test(String(row.level)) ||
+          !Number.isInteger(levels[index]) ||
+          levels[index] < 1 ||
+          levels[index] > 20 ||
+          !Array.isArray(row.items_id) ||
+          !Array.isArray(row.amount) ||
+          !row.items_id.length ||
+          row.items_id.length > 12 ||
+          row.items_id.length !== row.amount.length ||
+          row.items_id.some(
+            (id) => typeof id !== 'string' || !id || id.length > 160,
+          ) ||
+          row.amount.some(
+            (value) =>
+              !Number.isSafeInteger(value) || value < 0 || value > 1000000000,
+          ),
+      )
+    )
+      return [];
+    return [
+      {
+        id: String(ability.id),
+        type: String(ability.type || ''),
+        kind:
+          ability.type === 'city'
+            ? 'city'
+            : ability.ability_type === 'Passive'
+              ? 'support'
+              : 'combat',
+        stages: rows.map((row) => ({
+          level: String(row.level),
+          fromLevel: Number(row.level) - 1,
+          items_id: row.items_id,
+          amount: row.amount,
+        })),
+      },
+    ];
+  });
+}
+
 async function handleGameData(request, env, parts) {
   if (parts[1] === 'progression' && request.method === 'GET') {
     const cache = globalThis.caches?.default;
@@ -15273,7 +15335,7 @@ async function handleGameData(request, env, parts) {
         byte.toString(16).padStart(2, '0'),
       ).join('');
       const cacheUrl = new URL(request.url);
-      cacheUrl.searchParams.set('__reference', 'progression-v3-' + version);
+      cacheUrl.searchParams.set('__reference', 'progression-v4-' + version);
       cacheRequest = new globalThis.Request(cacheUrl.toString());
       const hit = await cache.match(cacheRequest).catch(() => null);
       if (hit) {
@@ -15353,6 +15415,10 @@ async function handleGameData(request, env, parts) {
         arcTypeId: typeFor(row),
         arcType: arcTypes[typeFor(row)] || '',
         iconUrl: row.assets[0]?.url || '',
+        skills:
+          row.namespace === 'NTE_ReferenceCharacter'
+            ? gameSkillProgression(row.details.abilityMenu)
+            : [],
         stages: gameProgressionStages(
           row.details.breakthrough || row.details.materials || [],
           row.namespace === 'NTE_ReferenceCharacter'
@@ -15383,6 +15449,11 @@ async function handleGameData(request, env, parts) {
         ...experienceIds,
         ...costs.flatMap((row) =>
           row.stages.flatMap((stage) => stage.items_id || []),
+        ),
+        ...costs.flatMap((row) =>
+          row.skills.flatMap((skill) =>
+            skill.stages.flatMap((stage) => stage.items_id),
+          ),
         ),
       ]),
     ];

@@ -188,6 +188,7 @@ export interface GuideVisualItem {
   description: string;
   category?: 'signature' | 'replacement' | 'budget';
   equalPriority?: boolean;
+  skillType?: string;
   stats: Array<{ label: string; value: string }>;
   sourceUrl?: string;
 }

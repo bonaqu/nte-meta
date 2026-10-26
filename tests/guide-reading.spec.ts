@@ -60,6 +60,16 @@ test('гайд: навигация, экипировка и мобильная �
     const priorities = page.locator('.guide-visual--skills');
     await expect(priorities).toBeInViewport();
     await expect(priorities.locator('.guide-visual__position')).toHaveCount(0);
+    const priority = priorities.locator(':scope > li').first();
+    const icon = (await priority.locator(':scope > img').boundingBox())!;
+    const label = (await priority.locator('h3').boundingBox())!;
+    expect(label.x).toBeGreaterThan(icon.x + icon.width);
+    expect(
+      Math.abs(label.y + label.height / 2 - icon.y - icon.height / 2),
+    ).toBeLessThan(1);
+    await expect(priority.locator('.guide-skill-type')).toHaveText(
+      'Навык перенаправления',
+    );
     const arrows = await priorities
       .locator(':scope > li[data-priority-relation]')
       .evaluateAll((nodes) =>
@@ -112,6 +122,15 @@ test('гайд: навигация, экипировка и мобильная �
         ),
     ).toBe(true);
     await expect(page.locator('.guide-visual--stats > li p')).toHaveCount(0);
+    for (const stat of await page.locator('.guide-visual--stats > li').all()) {
+      const icon = (await stat
+        .locator(':scope > .guide-stat-icons')
+        .boundingBox())!;
+      const text = (await stat.locator('h3').boundingBox())!;
+      expect(
+        Math.abs(icon.y + icon.height / 2 - text.y - text.height / 2),
+      ).toBeLessThan(1);
+    }
     const cartridges = page.locator('.guide-visual--cartridges');
     await cartridges.scrollIntoViewIfNeeded();
     if (width === 360 || width === 1440)

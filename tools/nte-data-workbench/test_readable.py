@@ -5,10 +5,23 @@ import subprocess
 import tempfile
 import unittest
 
-from readable import category, export_readable, safe
+from readable import category, export_readable, safe, skill_cost_sections
 
 
 class ReadableTests(unittest.TestCase):
+    def test_skill_costs_have_names_levels_and_exact_totals(self):
+        progression = {'items': {'gold': {'name': 'Жук-монета', 'iconUrl': 'coin.webp'}}}
+        option = {'skills': [{'id': 'GA_Test', 'type': 'melee', 'kind': 'combat', 'stages': [
+            {'level': '2', 'fromLevel': 1, 'items_id': ['gold'], 'amount': [2000]},
+            {'level': '3', 'fromLevel': 2, 'items_id': ['gold'], 'amount': [5000]},
+        ]}]}
+        profile = {'abilities': [{'id': 'GA_Test_name', 'type': 'Базовая атака', 'name': 'Избавление'}]}
+        sections = skill_cost_sections(option, profile, progression)
+        self.assertEqual(sections[0]['name'], 'Избавление')
+        self.assertEqual(sections[0]['totals'], [('Жук-монета', 7000, 'coin.webp')])
+        self.assertEqual(sections[0]['stages'][0], (1, '2', 'Жук-монета', 2000))
+        with self.assertRaises(ValueError): skill_cost_sections(option, profile, {'items': {}})
+
     def test_player_sections_named_playable_media_and_safe_workbook(self):
         from PIL import Image
         from openpyxl import load_workbook
@@ -39,12 +52,20 @@ class ReadableTests(unittest.TestCase):
             ]
             records.extend({'namespace': 'UI', 'kind': 'image', 'gameId': str(i), 'values': {}, 'details': {}, 'assets': [{'url': '/nte-meta/game-assets/icon.webp', 'path': 'HT/Content/UI/icon.uasset'}]} for i in range(101))
             data = {'characters': [{'ownerId': '1025', 'name': 'Хатор', 'values': {'ru': 'Хатор', 'en': 'Hathor', 'ja': 'ハソール', 'zh': '哈索尔'}, 'profile': profile}], 'equipment': [], 'progression': {'costs': [], 'characterExp': []}}
+            data['progression']['items'] = {'gold': {'name': 'Жук-монета', 'iconUrl': '/nte-meta/game-assets/icon.webp'}}
+            data['progression']['costs'] = [{'id': '1025', 'kind': 'character', 'stages': [], 'skills': [
+                {'id': 'basic', 'type': 'melee', 'kind': 'combat', 'stages': [
+                    {'level': '2', 'fromLevel': 1, 'items_id': ['gold'], 'amount': [2000]},
+                    {'level': '3', 'fromLevel': 2, 'items_id': ['gold'], 'amount': [5000]},
+                ]},
+            ]}]
             result = export_readable(repo, out, {'1025': 'Хатор'}, lambda: iter(records), True, lambda _: None, data=data)
             self.assertEqual(result, {'characters': 1, 'equipment': 0, 'items': 1, 'mp3': 1, 'png': 1})
             folder = out / 'Для игрока/Персонажи/1025 — Хатор'
             self.assertIn('Доставщица из Хетэро.', (folder / '01 — Биография.html').read_text(encoding='utf-8'))
             self.assertIn('Удвоенная вместимость', (folder / '04 — Пробуждения и резонанс.html').read_text(encoding='utf-8'))
             self.assertIn('Спасибо!', (folder / '08 — Озвучка.html').read_text(encoding='utf-8'))
+            self.assertIn('Всего для этого навыка', (folder / '05 — Прокачка.html').read_text(encoding='utf-8'))
             mp3 = next((folder / 'Медиа/Озвучка/Английский').glob('Подарок получен I*.mp3'))
             subprocess.run([ffmpeg, '-v', 'error', '-i', str(mp3), '-f', 'null', '-'], check=True, capture_output=True)
             png = next((folder / 'Медиа/Изображения').glob('Гардероб*.png'))
@@ -56,6 +77,8 @@ class ReadableTests(unittest.TestCase):
             self.assertEqual(workbook['Характеристики'].auto_filter.ref, 'A1:C2')
             self.assertEqual(workbook['Характеристики']['C2'].data_type, 's')
             self.assertIsNotNone(workbook['Реплики']['E2'].hyperlink)
+            self.assertEqual(workbook['Итоги навыков']['F2'].value, '7000')
+            self.assertEqual(workbook['Прокачка навыков']['E2'].value, '2')
             workbook.close()
 
     def test_categories_follow_actual_item_types_and_material_ids(self):

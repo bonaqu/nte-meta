@@ -17,7 +17,7 @@ test('публичный текст состава сохраняет реком
 test('равный приоритет проходит импорт, валидацию API и повторное чтение', async () => {
   const value = visualFromImport('skills', [
     { name: 'Первый' },
-    { name: 'Второй', equalPriority: true },
+    { name: 'Второй', equalPriority: true, skillType: 'Навык поддержки' },
   ]);
   const context = vm.createContext({ crypto, URL, Response });
   new vm.Script(
@@ -28,6 +28,11 @@ test('равный приоритет проходит импорт, валид�
   ).runInContext(context);
   const validated = context.validate(value);
   expect(validated.items[1].equalPriority).toBe(true);
+  expect(validated.items[1].skillType).toBe('Навык поддержки');
+  expect(
+    visualFromImport('skills', JSON.stringify(validated.items)).items[1]
+      .skillType,
+  ).toBe('Навык поддержки');
   expect(
     visualFromImport('skills', JSON.stringify(validated.items)).items[1]
       .equalPriority,
@@ -47,10 +52,20 @@ test('равный приоритет проходит импорт, валид�
 test('дуга: отложенная подсказка, игровые характеристики, Escape и клавиатура', async ({
   page,
 }, info) => {
-  await page.goto('/#/guides/iroi-build-guide');
+  await page.goto(
+    (process.env.NTE_GUIDE_REVIEW_URL || '/') + '#/guides/iroi-build-guide',
+  );
   const arcs = page.locator('.guide-visual--arcs');
   await arcs.scrollIntoViewIfNeeded();
   const item = arcs.locator(':scope > li').first();
+  const imageBounds = (await item.locator(':scope > img').boundingBox())!;
+  const triggerBounds = (await item
+    .getByRole('button', { name: /^Подробнее:/ })
+    .boundingBox())!;
+  expect(Math.abs(imageBounds.width - triggerBounds.width)).toBeLessThan(1);
+  expect(Math.abs(imageBounds.height - triggerBounds.height)).toBeLessThan(1);
+  expect(Math.abs(imageBounds.x - triggerBounds.x)).toBeLessThan(1);
+  expect(Math.abs(imageBounds.y - triggerBounds.y)).toBeLessThan(1);
   await item.getByRole('button', { name: /^Подробнее:/ }).hover();
   await page.waitForTimeout(200);
   await expect(
@@ -63,6 +78,11 @@ test('дуга: отложенная подсказка, игровые хара
   );
   await expect(sheet).toBeVisible();
   await expect(sheet.locator('.item-detail-popover__stats')).toBeVisible();
+  expect(
+    await sheet
+      .locator('.item-detail-popover__type')
+      .evaluate((node) => getComputedStyle(node).borderTopLeftRadius),
+  ).toBe('14px');
   await expect(sheet).not.toContainText(/\{\d+\}/);
   expect(
     await sheet.evaluate((node) => ({

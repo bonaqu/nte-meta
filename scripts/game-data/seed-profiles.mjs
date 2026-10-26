@@ -11,24 +11,40 @@ const key = (value) =>
       '',
     )
     .replace(/[^\p{L}\p{N}]/gu, '');
+const materialGroup = (row) => {
+  const source = key(row.source);
+  return /поддерж|пассив/.test(source)
+    ? 'support'
+    : /повседнев|город/.test(source)
+      ? 'city'
+      : /навык|способност/.test(source)
+        ? 'combat'
+        : /дуг|оруж/.test(source)
+          ? 'arc'
+          : /прорыв|возвыш/.test(source)
+            ? 'ascension'
+            : 'other';
+};
 const identity = (field, row) =>
-  field === 'awakenings'
-    ? `${row.kind || 'awakening'}:${row.level}`
-    : field === 'friendship'
-      ? String(row.level)
-      : field === 'voiceLines'
-        ? key(row.language) +
-          ':' +
-          key(String(row.title || '').replace(/^(?:обо|об|о)\s+/i, ''))
-        : field === 'voiceActors'
-          ? key(row.language)
-          : field === 'baseStats'
-            ? key(row.label).startsWith('шанскрит')
-              ? 'crit'
-              : key(row.label).includes('крит')
-                ? 'critDamage'
-                : key(row.label)
-            : key(row.name);
+  field === 'materials'
+    ? materialGroup(row) + ':' + key(row.name)
+    : field === 'awakenings'
+      ? `${row.kind || 'awakening'}:${row.level}`
+      : field === 'friendship'
+        ? String(row.level)
+        : field === 'voiceLines'
+          ? key(row.language) +
+            ':' +
+            key(String(row.title || '').replace(/^(?:обо|об|о)\s+/i, ''))
+          : field === 'voiceActors'
+            ? key(row.language)
+            : field === 'baseStats'
+              ? key(row.label).startsWith('шанскрит')
+                ? 'crit'
+                : key(row.label).includes('крит')
+                  ? 'critDamage'
+                  : key(row.label)
+              : key(row.name);
 const legacyVoicePlaceholder = (row) =>
   /^https:\/\/static\.wikia\.nocookie\.net\/neverness-to-everness\/images\/[^/]+\/[^/]+\/VO_/.test(
     row.audioUrl || '',
@@ -42,7 +58,10 @@ export function mergeNativeCollection(field, current, incoming) {
     const index = current.findIndex(
       (old, i) =>
         !used.has(i) &&
-        ((row.id && row.id === old.id) ||
+        ((row.id &&
+          row.id === old.id &&
+          (field !== 'materials' ||
+            materialGroup(row) === materialGroup(old))) ||
           identity(field, row) === identity(field, old)),
     );
     if (index < 0) return row;

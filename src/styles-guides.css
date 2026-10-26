@@ -122,6 +122,12 @@
     grid-template-columns: 88px minmax(0, 1fr);
     align-items: start;
   }
+  .guide-visual__equipment:has(> img) > .item-details-trigger--icon {
+    inset: 16px auto auto 16px;
+    inline-size: 88px;
+    block-size: 88px;
+    border-radius: 12px;
+  }
   .guide-visual__equipment .guide-visual__body {
     display: contents;
   }
@@ -161,6 +167,7 @@
     border-radius: 14px;
     background: #292a2f;
     padding: 14px;
+    align-items: center;
   }
   .guide-visual--stats .guide-visual__heading h3 {
     margin: 0;
@@ -237,7 +244,8 @@
     scroll-snap-align: start;
   }
   .guide-visual--skills > li:has(> img) {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: center;
   }
   .guide-visual--skills > li > img {
     inline-size: 40px;
@@ -247,7 +255,47 @@
     padding: 4px;
   }
   .guide-visual--skills .guide-visual__body {
+    display: contents;
+  }
+  .guide-visual--skills .guide-visual__heading {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .guide-visual--skills .guide-visual__body > p {
     grid-column: 1 / -1;
+  }
+  .guide-visual--skills .guide-visual__body > .guide-skill-type {
+    color: #c7c9d0;
+    margin: 4px 0 0;
+  }
+  .guide-visual--skills > li:not(:has(> img)) .guide-visual__heading {
+    grid-column: 1 / -1;
+  }
+  .guide-visual--skills > li > img {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .guide-visual--stats .guide-visual__body {
+    align-self: center;
+  }
+  .guide-visual--stats .guide-stat-icons {
+    align-self: center;
+  }
+  .guide-visual--rotation > li:not(:last-child) .guide-visual__position::after {
+    content: '';
+    position: absolute;
+    inset-block-end: -20px;
+    inline-size: 9px;
+    block-size: 9px;
+    border-inline-end: 2px solid #ffc575;
+    border-block-end: 2px solid #ffc575;
+    transform: rotate(45deg);
+  }
+  .guide-visual--rotation .guide-visual__position {
+    position: relative;
+  }
+  .guide-visual--rotation .guide-visual__body {
+    border-inline-start: 3px solid #c9c8c4;
   }
   .guide-visual--skills .guide-visual__heading h3 {
     font-size: 0.86rem;
@@ -314,6 +362,7 @@
     border-radius: 14px;
     background: #292a2f;
     border: 1px solid #505158;
+    border-inline-start: 3px solid #c9c8c4;
   }
   .guide-visual--rotation .guide-visual__body > p {
     margin: 0;

@@ -228,9 +228,11 @@ test('визуальная дуга: поиск, загрузка файла, с
     const id =
       body.visual?.kind === 'stats'
         ? 'visual-stats-persisted'
-        : body.visual?.kind === 'skills'
-          ? 'visual-skills-persisted'
-          : 'visual-arc-persisted';
+        : body.visual?.kind === 'cartridges'
+          ? 'visual-cartridges-persisted'
+          : body.visual?.kind === 'skills'
+            ? 'visual-skills-persisted'
+            : 'visual-arc-persisted';
     guide.sections.push({
       ...body,
       id,
@@ -245,6 +247,12 @@ test('визуальная дуга: поиск, загрузка файла, с
     route.fulfill({ json: { data: { success: true } } }),
   );
   await page.goto(`/#/guides/${guide.slug}`);
+  await expect(
+    page.getByRole('button', { name: 'Редактировать гайд', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator('dialog:not([open]) .editor-shell__body > *'),
+  ).toHaveCount(0);
   await page
     .getByRole('button', { name: 'Редактировать гайд', exact: true })
     .click();
@@ -308,6 +316,30 @@ test('визуальная дуга: поиск, загрузка файла, с
   await expect(dialog.locator('.visual-section-preview')).toContainText(
     'Проверочный навык из игры',
   );
+  await expect(
+    dialog
+      .locator('.visual-item-editor')
+      .first()
+      .getByLabel('Тип навыка', { exact: true }),
+  ).toHaveValue('Навык');
+  await dialog
+    .getByRole('button', { name: 'Лучшие картриджи', exact: true })
+    .click();
+  await dialog
+    .getByRole('button', { name: 'Добавить элемент', exact: true })
+    .click();
+  const cartridge = dialog.locator('.visual-item-editor').first();
+  await cartridge
+    .getByLabel('Название', { exact: true })
+    .fill('Проверочный картридж');
+  await cartridge
+    .getByLabel('Почему этот картридж подходит (необязательно)', {
+      exact: true,
+    })
+    .fill('Выбираю для восстановления энергии команды.');
+  await expect(dialog.locator('.visual-section-preview')).toContainText(
+    'Выбираю для восстановления энергии команды.',
+  );
   await dialog
     .getByRole('button', { name: 'Основные статы', exact: true })
     .click();
@@ -370,12 +402,17 @@ test('визуальная дуга: поиск, загрузка файла, с
       ?.items[0],
   ).toMatchObject({
     name: 'Проверочный навык из игры',
+    skillType: 'Навык',
     imageUrl: '/nte-meta/game-assets/ad87d2a73478180243f0.webp',
   });
   expect(
     guide.sections.find((s) => s.id === 'visual-skills-persisted')?.visual
       ?.items[1].equalPriority,
   ).toBe(true);
+  expect(
+    guide.sections.find((s) => s.id === 'visual-cartridges-persisted')?.visual
+      ?.items[0].description,
+  ).toBe('Выбираю для восстановления энергии команды.');
   expect(
     guide.sections.find((s) => s.id === 'visual-stats-persisted')?.visual
       ?.items[0],

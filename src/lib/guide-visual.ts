@@ -29,18 +29,31 @@ function presentVisual(visual: GuideVisual): GuideVisual {
           cleanGuideText(item.name) ||
           cleanGuideText(item.description),
       )
-      .map((item) => ({
-        ...item,
-        name:
-          visual.kind === 'skills'
-            ? localizeGuideSkills(cleanGuideText(item.name))
-            : cleanGuideText(item.name),
-        description:
-          visual.kind === 'skills'
-            ? localizeGuideSkills(cleanGuideText(item.description))
-            : cleanGuideText(item.description),
-        imageUrl: nativeEquipmentImage(item.name, visual.kind, item.imageUrl),
-      })),
+      .map((item) => {
+        const next = {
+          ...item,
+          name:
+            visual.kind === 'skills'
+              ? localizeGuideSkills(cleanGuideText(item.name))
+              : cleanGuideText(item.name),
+          description:
+            visual.kind === 'skills'
+              ? localizeGuideSkills(cleanGuideText(item.description))
+              : cleanGuideText(item.description),
+          imageUrl: nativeEquipmentImage(item.name, visual.kind, item.imageUrl),
+        };
+        if (visual.kind !== 'skills') return next;
+        const skill = guideSkillPresentation(next);
+        return {
+          ...next,
+          name: skill.name,
+          skillType: skill.type || undefined,
+          description: skill.note,
+          equalPriority:
+            next.equalPriority ??
+            /одинаковый приоритет с предыдущим/iu.test(next.description),
+        };
+      }),
   };
 }
 
@@ -75,6 +88,25 @@ export function newVisualItem(name = ''): GuideVisualItem {
     description: '',
     stats: [],
   };
+}
+export function guideSkillPresentation(item: GuideVisualItem) {
+  const isType = (text: string) =>
+    /^(?:Базовая атака|Навык(?: перенаправления| поддержки)?|Сверхспособность|Пассивный навык|Повседневный навык)$/iu.test(
+      text.trim(),
+    );
+  const description = item.description
+    .replace(
+      /\s*—\s*одинаковый приоритет (?:со следующим|с предыдущим) навыком\.?/giu,
+      '',
+    )
+    .trim();
+  return isType(item.name) && description
+    ? { name: description, type: item.skillType || item.name, note: '' }
+    : {
+        name: item.name,
+        type: item.skillType || (isType(description) ? description : ''),
+        note: isType(description) ? '' : description,
+      };
 }
 export function visualFromLegacy(
   section: GuideSection,
@@ -155,6 +187,10 @@ export function visualFromImport(
         name: String(item.name || item.title || item.label || ''),
         imageUrl: String(item.imageUrl || item.iconUrl || ''),
         description: String(item.description || item.value || ''),
+        skillType:
+          kind === 'skills' && typeof item.skillType === 'string'
+            ? item.skillType.slice(0, 120)
+            : undefined,
         equalPriority:
           typeof item.equalPriority === 'boolean'
             ? item.equalPriority

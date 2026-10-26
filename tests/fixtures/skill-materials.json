@@ -1,0 +1,1269 @@
+{
+  "costs": [
+    {
+      "id": "1057",
+      "kind": "character",
+      "name": "Аканэ Рин",
+      "originalName": "Akane Rin",
+      "arcTypeId": 2,
+      "arcType": "Жидкий",
+      "iconUrl": "",
+      "skills": [
+        {
+          "id": "GA_Akane_Melee",
+          "type": "melee",
+          "kind": "combat",
+          "stages": [
+            {
+              "level": "2",
+              "fromLevel": 1,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv1",
+                "OrdinaryMonMaterial_04_lv1"
+              ],
+              "amount": [2000, 2, 2]
+            },
+            {
+              "level": "3",
+              "fromLevel": 2,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv1",
+                "OrdinaryMonMaterial_04_lv1"
+              ],
+              "amount": [5000, 3, 3]
+            },
+            {
+              "level": "4",
+              "fromLevel": 3,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv1",
+                "OrdinaryMonMaterial_04_lv1"
+              ],
+              "amount": [10000, 5, 5]
+            },
+            {
+              "level": "5",
+              "fromLevel": 4,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv2",
+                "OrdinaryMonMaterial_04_lv2"
+              ],
+              "amount": [20000, 2, 2]
+            },
+            {
+              "level": "6",
+              "fromLevel": 5,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv2",
+                "OrdinaryMonMaterial_04_lv2"
+              ],
+              "amount": [40000, 3, 3]
+            },
+            {
+              "level": "7",
+              "fromLevel": 6,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv2",
+                "OrdinaryMonMaterial_04_lv2",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [60000, 5, 5, 1]
+            },
+            {
+              "level": "8",
+              "fromLevel": 7,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv3",
+                "OrdinaryMonMaterial_04_lv3",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [80000, 3, 3, 1]
+            },
+            {
+              "level": "9",
+              "fromLevel": 8,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv3",
+                "OrdinaryMonMaterial_04_lv3",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [100000, 5, 5, 2]
+            },
+            {
+              "level": "10",
+              "fromLevel": 9,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv3",
+                "OrdinaryMonMaterial_04_lv3",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [120000, 8, 8, 4]
+            }
+          ]
+        },
+        {
+          "id": "GA_Akane_Skill",
+          "type": "skill",
+          "kind": "combat",
+          "stages": [
+            {
+              "level": "2",
+              "fromLevel": 1,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv1",
+                "OrdinaryMonMaterial_04_lv1"
+              ],
+              "amount": [2000, 2, 2]
+            },
+            {
+              "level": "3",
+              "fromLevel": 2,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv1",
+                "OrdinaryMonMaterial_04_lv1"
+              ],
+              "amount": [5000, 3, 3]
+            },
+            {
+              "level": "4",
+              "fromLevel": 3,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv1",
+                "OrdinaryMonMaterial_04_lv1"
+              ],
+              "amount": [10000, 5, 5]
+            },
+            {
+              "level": "5",
+              "fromLevel": 4,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv2",
+                "OrdinaryMonMaterial_04_lv2"
+              ],
+              "amount": [20000, 2, 2]
+            },
+            {
+              "level": "6",
+              "fromLevel": 5,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv2",
+                "OrdinaryMonMaterial_04_lv2"
+              ],
+              "amount": [40000, 3, 3]
+            },
+            {
+              "level": "7",
+              "fromLevel": 6,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv2",
+                "OrdinaryMonMaterial_04_lv2",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [60000, 5, 5, 1]
+            },
+            {
+              "level": "8",
+              "fromLevel": 7,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv3",
+                "OrdinaryMonMaterial_04_lv3",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [80000, 3, 3, 1]
+            },
+            {
+              "level": "9",
+              "fromLevel": 8,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv3",
+                "OrdinaryMonMaterial_04_lv3",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [100000, 5, 5, 2]
+            },
+            {
+              "level": "10",
+              "fromLevel": 9,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv3",
+                "OrdinaryMonMaterial_04_lv3",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [120000, 8, 8, 4]
+            }
+          ]
+        },
+        {
+          "id": "GA_Akane_UltraSkill",
+          "type": "ultraskill",
+          "kind": "combat",
+          "stages": [
+            {
+              "level": "2",
+              "fromLevel": 1,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv1",
+                "OrdinaryMonMaterial_04_lv1"
+              ],
+              "amount": [2000, 2, 2]
+            },
+            {
+              "level": "3",
+              "fromLevel": 2,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv1",
+                "OrdinaryMonMaterial_04_lv1"
+              ],
+              "amount": [5000, 3, 3]
+            },
+            {
+              "level": "4",
+              "fromLevel": 3,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv1",
+                "OrdinaryMonMaterial_04_lv1"
+              ],
+              "amount": [10000, 5, 5]
+            },
+            {
+              "level": "5",
+              "fromLevel": 4,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv2",
+                "OrdinaryMonMaterial_04_lv2"
+              ],
+              "amount": [20000, 2, 2]
+            },
+            {
+              "level": "6",
+              "fromLevel": 5,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv2",
+                "OrdinaryMonMaterial_04_lv2"
+              ],
+              "amount": [40000, 3, 3]
+            },
+            {
+              "level": "7",
+              "fromLevel": 6,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv2",
+                "OrdinaryMonMaterial_04_lv2",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [60000, 5, 5, 1]
+            },
+            {
+              "level": "8",
+              "fromLevel": 7,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv3",
+                "OrdinaryMonMaterial_04_lv3",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [80000, 3, 3, 1]
+            },
+            {
+              "level": "9",
+              "fromLevel": 8,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv3",
+                "OrdinaryMonMaterial_04_lv3",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [100000, 5, 5, 2]
+            },
+            {
+              "level": "10",
+              "fromLevel": 9,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv3",
+                "OrdinaryMonMaterial_04_lv3",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [120000, 8, 8, 4]
+            }
+          ]
+        },
+        {
+          "id": "GA_Akane_QTE",
+          "type": "qte",
+          "kind": "combat",
+          "stages": [
+            {
+              "level": "2",
+              "fromLevel": 1,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv1",
+                "OrdinaryMonMaterial_04_lv1"
+              ],
+              "amount": [2000, 2, 2]
+            },
+            {
+              "level": "3",
+              "fromLevel": 2,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv1",
+                "OrdinaryMonMaterial_04_lv1"
+              ],
+              "amount": [5000, 3, 3]
+            },
+            {
+              "level": "4",
+              "fromLevel": 3,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv1",
+                "OrdinaryMonMaterial_04_lv1"
+              ],
+              "amount": [10000, 5, 5]
+            },
+            {
+              "level": "5",
+              "fromLevel": 4,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv2",
+                "OrdinaryMonMaterial_04_lv2"
+              ],
+              "amount": [20000, 2, 2]
+            },
+            {
+              "level": "6",
+              "fromLevel": 5,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv2",
+                "OrdinaryMonMaterial_04_lv2"
+              ],
+              "amount": [40000, 3, 3]
+            },
+            {
+              "level": "7",
+              "fromLevel": 6,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv2",
+                "OrdinaryMonMaterial_04_lv2",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [60000, 5, 5, 1]
+            },
+            {
+              "level": "8",
+              "fromLevel": 7,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv3",
+                "OrdinaryMonMaterial_04_lv3",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [80000, 3, 3, 1]
+            },
+            {
+              "level": "9",
+              "fromLevel": 8,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv3",
+                "OrdinaryMonMaterial_04_lv3",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [100000, 5, 5, 2]
+            },
+            {
+              "level": "10",
+              "fromLevel": 9,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv3",
+                "OrdinaryMonMaterial_04_lv3",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [120000, 8, 8, 4]
+            }
+          ]
+        },
+        {
+          "id": "GA_Akane_Passive_1",
+          "type": "passive",
+          "kind": "support",
+          "stages": [
+            {
+              "level": "1",
+              "fromLevel": 0,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv2",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [30000, 2, 1]
+            }
+          ]
+        },
+        {
+          "id": "GA_Akane_Passive_2",
+          "type": "passive",
+          "kind": "support",
+          "stages": [
+            {
+              "level": "1",
+              "fromLevel": 0,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_04_lv3",
+                "weeklycloneboss_a01_01"
+              ],
+              "amount": [40000, 1, 2]
+            }
+          ]
+        },
+        {
+          "id": "City_Ability_Akane_01",
+          "type": "city",
+          "kind": "city",
+          "stages": [
+            {
+              "level": "1",
+              "fromLevel": 0,
+              "items_id": ["CityAbility_UpMaterial", "fons"],
+              "amount": [2, 500]
+            },
+            {
+              "level": "2",
+              "fromLevel": 1,
+              "items_id": ["CityAbility_UpMaterial", "fons"],
+              "amount": [4, 1500]
+            },
+            {
+              "level": "3",
+              "fromLevel": 2,
+              "items_id": ["CityAbility_UpMaterial", "fons"],
+              "amount": [10, 3600]
+            },
+            {
+              "level": "4",
+              "fromLevel": 3,
+              "items_id": ["CityAbility_UpMaterial", "fons"],
+              "amount": [16, 6400]
+            },
+            {
+              "level": "5",
+              "fromLevel": 4,
+              "items_id": ["CityAbility_UpMaterial", "fons"],
+              "amount": [24, 10000]
+            }
+          ]
+        },
+        {
+          "id": "City_Ability_Akane_02",
+          "type": "city",
+          "kind": "city",
+          "stages": [
+            {
+              "level": "1",
+              "fromLevel": 0,
+              "items_id": ["CityAbility_UpMaterial", "fons"],
+              "amount": [16, 6400]
+            },
+            {
+              "level": "2",
+              "fromLevel": 1,
+              "items_id": ["CityAbility_UpMaterial", "fons"],
+              "amount": [24, 10000]
+            }
+          ]
+        }
+      ],
+      "stages": [
+        {
+          "level": "30",
+          "items_id": ["OrdinaryMonMaterial_04_lv1", "gold"],
+          "amount": [5, 25000],
+          "fromLevel": 20
+        },
+        {
+          "level": "40",
+          "items_id": [
+            "OrdinaryMonMaterial_04_lv1",
+            "Worldboss_material_02",
+            "gold"
+          ],
+          "amount": [12, 2, 50000],
+          "fromLevel": 30
+        },
+        {
+          "level": "50",
+          "items_id": [
+            "OrdinaryMonMaterial_04_lv2",
+            "Worldboss_material_02",
+            "gold"
+          ],
+          "amount": [6, 8, 75000],
+          "fromLevel": 40
+        },
+        {
+          "level": "60",
+          "items_id": [
+            "OrdinaryMonMaterial_04_lv2",
+            "Worldboss_material_02",
+            "gold"
+          ],
+          "amount": [12, 16, 100000],
+          "fromLevel": 50
+        },
+        {
+          "level": "70",
+          "items_id": [
+            "OrdinaryMonMaterial_04_lv3",
+            "Worldboss_material_02",
+            "gold"
+          ],
+          "amount": [6, 24, 125000],
+          "fromLevel": 60
+        },
+        {
+          "level": "80",
+          "items_id": [
+            "OrdinaryMonMaterial_04_lv3",
+            "Worldboss_material_02",
+            "gold"
+          ],
+          "amount": [9, 36, 150000],
+          "fromLevel": 70
+        }
+      ]
+    },
+    {
+      "id": "1033",
+      "kind": "character",
+      "name": "Адлер",
+      "originalName": "Adler",
+      "arcTypeId": 5,
+      "arcType": "Гибридный",
+      "iconUrl": "",
+      "skills": [
+        {
+          "id": "GA_Adler_Melee",
+          "type": "melee",
+          "kind": "combat",
+          "stages": [
+            {
+              "level": "2",
+              "fromLevel": 1,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv1",
+                "OrdinaryMonMaterial_03_lv1"
+              ],
+              "amount": [2000, 2, 2]
+            },
+            {
+              "level": "3",
+              "fromLevel": 2,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv1",
+                "OrdinaryMonMaterial_03_lv1"
+              ],
+              "amount": [5000, 3, 3]
+            },
+            {
+              "level": "4",
+              "fromLevel": 3,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv1",
+                "OrdinaryMonMaterial_03_lv1"
+              ],
+              "amount": [10000, 5, 5]
+            },
+            {
+              "level": "5",
+              "fromLevel": 4,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv2",
+                "OrdinaryMonMaterial_03_lv2"
+              ],
+              "amount": [20000, 2, 2]
+            },
+            {
+              "level": "6",
+              "fromLevel": 5,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv2",
+                "OrdinaryMonMaterial_03_lv2"
+              ],
+              "amount": [40000, 3, 3]
+            },
+            {
+              "level": "7",
+              "fromLevel": 6,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv2",
+                "OrdinaryMonMaterial_03_lv2",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [60000, 5, 5, 1]
+            },
+            {
+              "level": "8",
+              "fromLevel": 7,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv3",
+                "OrdinaryMonMaterial_03_lv3",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [80000, 3, 3, 1]
+            },
+            {
+              "level": "9",
+              "fromLevel": 8,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv3",
+                "OrdinaryMonMaterial_03_lv3",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [100000, 5, 5, 2]
+            },
+            {
+              "level": "10",
+              "fromLevel": 9,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv3",
+                "OrdinaryMonMaterial_03_lv3",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [120000, 8, 8, 4]
+            }
+          ]
+        },
+        {
+          "id": "GA_Adler_Skill",
+          "type": "skill",
+          "kind": "combat",
+          "stages": [
+            {
+              "level": "2",
+              "fromLevel": 1,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv1",
+                "OrdinaryMonMaterial_03_lv1"
+              ],
+              "amount": [2000, 2, 2]
+            },
+            {
+              "level": "3",
+              "fromLevel": 2,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv1",
+                "OrdinaryMonMaterial_03_lv1"
+              ],
+              "amount": [5000, 3, 3]
+            },
+            {
+              "level": "4",
+              "fromLevel": 3,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv1",
+                "OrdinaryMonMaterial_03_lv1"
+              ],
+              "amount": [10000, 5, 5]
+            },
+            {
+              "level": "5",
+              "fromLevel": 4,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv2",
+                "OrdinaryMonMaterial_03_lv2"
+              ],
+              "amount": [20000, 2, 2]
+            },
+            {
+              "level": "6",
+              "fromLevel": 5,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv2",
+                "OrdinaryMonMaterial_03_lv2"
+              ],
+              "amount": [40000, 3, 3]
+            },
+            {
+              "level": "7",
+              "fromLevel": 6,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv2",
+                "OrdinaryMonMaterial_03_lv2",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [60000, 5, 5, 1]
+            },
+            {
+              "level": "8",
+              "fromLevel": 7,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv3",
+                "OrdinaryMonMaterial_03_lv3",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [80000, 3, 3, 1]
+            },
+            {
+              "level": "9",
+              "fromLevel": 8,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv3",
+                "OrdinaryMonMaterial_03_lv3",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [100000, 5, 5, 2]
+            },
+            {
+              "level": "10",
+              "fromLevel": 9,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv3",
+                "OrdinaryMonMaterial_03_lv3",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [120000, 8, 8, 4]
+            }
+          ]
+        },
+        {
+          "id": "GA_Adler_UltraSkill",
+          "type": "ultraskill",
+          "kind": "combat",
+          "stages": [
+            {
+              "level": "2",
+              "fromLevel": 1,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv1",
+                "OrdinaryMonMaterial_03_lv1"
+              ],
+              "amount": [2000, 2, 2]
+            },
+            {
+              "level": "3",
+              "fromLevel": 2,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv1",
+                "OrdinaryMonMaterial_03_lv1"
+              ],
+              "amount": [5000, 3, 3]
+            },
+            {
+              "level": "4",
+              "fromLevel": 3,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv1",
+                "OrdinaryMonMaterial_03_lv1"
+              ],
+              "amount": [10000, 5, 5]
+            },
+            {
+              "level": "5",
+              "fromLevel": 4,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv2",
+                "OrdinaryMonMaterial_03_lv2"
+              ],
+              "amount": [20000, 2, 2]
+            },
+            {
+              "level": "6",
+              "fromLevel": 5,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv2",
+                "OrdinaryMonMaterial_03_lv2"
+              ],
+              "amount": [40000, 3, 3]
+            },
+            {
+              "level": "7",
+              "fromLevel": 6,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv2",
+                "OrdinaryMonMaterial_03_lv2",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [60000, 5, 5, 1]
+            },
+            {
+              "level": "8",
+              "fromLevel": 7,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv3",
+                "OrdinaryMonMaterial_03_lv3",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [80000, 3, 3, 1]
+            },
+            {
+              "level": "9",
+              "fromLevel": 8,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv3",
+                "OrdinaryMonMaterial_03_lv3",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [100000, 5, 5, 2]
+            },
+            {
+              "level": "10",
+              "fromLevel": 9,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv3",
+                "OrdinaryMonMaterial_03_lv3",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [120000, 8, 8, 4]
+            }
+          ]
+        },
+        {
+          "id": "GA_Adler_QTE",
+          "type": "qte",
+          "kind": "combat",
+          "stages": [
+            {
+              "level": "2",
+              "fromLevel": 1,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv1",
+                "OrdinaryMonMaterial_03_lv1"
+              ],
+              "amount": [2000, 2, 2]
+            },
+            {
+              "level": "3",
+              "fromLevel": 2,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv1",
+                "OrdinaryMonMaterial_03_lv1"
+              ],
+              "amount": [5000, 3, 3]
+            },
+            {
+              "level": "4",
+              "fromLevel": 3,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv1",
+                "OrdinaryMonMaterial_03_lv1"
+              ],
+              "amount": [10000, 5, 5]
+            },
+            {
+              "level": "5",
+              "fromLevel": 4,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv2",
+                "OrdinaryMonMaterial_03_lv2"
+              ],
+              "amount": [20000, 2, 2]
+            },
+            {
+              "level": "6",
+              "fromLevel": 5,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv2",
+                "OrdinaryMonMaterial_03_lv2"
+              ],
+              "amount": [40000, 3, 3]
+            },
+            {
+              "level": "7",
+              "fromLevel": 6,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv2",
+                "OrdinaryMonMaterial_03_lv2",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [60000, 5, 5, 1]
+            },
+            {
+              "level": "8",
+              "fromLevel": 7,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv3",
+                "OrdinaryMonMaterial_03_lv3",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [80000, 3, 3, 1]
+            },
+            {
+              "level": "9",
+              "fromLevel": 8,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv3",
+                "OrdinaryMonMaterial_03_lv3",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [100000, 5, 5, 2]
+            },
+            {
+              "level": "10",
+              "fromLevel": 9,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv3",
+                "OrdinaryMonMaterial_03_lv3",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [120000, 8, 8, 4]
+            }
+          ]
+        },
+        {
+          "id": "GA_Adler_Passive_1",
+          "type": "passive",
+          "kind": "support",
+          "stages": [
+            {
+              "level": "1",
+              "fromLevel": 0,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv2",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [30000, 2, 1]
+            }
+          ]
+        },
+        {
+          "id": "GA_Adler_Passive_2",
+          "type": "passive",
+          "kind": "support",
+          "stages": [
+            {
+              "level": "1",
+              "fromLevel": 0,
+              "items_id": [
+                "gold",
+                "SkillUpMaterial_03_lv3",
+                "weeklycloneboss_a02_01"
+              ],
+              "amount": [40000, 1, 2]
+            }
+          ]
+        },
+        {
+          "id": "City_Ability_adler_01",
+          "type": "city",
+          "kind": "city",
+          "stages": [
+            {
+              "level": "1",
+              "fromLevel": 0,
+              "items_id": ["CityAbility_UpMaterial", "fons"],
+              "amount": [2, 500]
+            },
+            {
+              "level": "2",
+              "fromLevel": 1,
+              "items_id": ["CityAbility_UpMaterial", "fons"],
+              "amount": [4, 1500]
+            },
+            {
+              "level": "3",
+              "fromLevel": 2,
+              "items_id": ["CityAbility_UpMaterial", "fons"],
+              "amount": [10, 3600]
+            },
+            {
+              "level": "4",
+              "fromLevel": 3,
+              "items_id": ["CityAbility_UpMaterial", "fons"],
+              "amount": [16, 6400]
+            },
+            {
+              "level": "5",
+              "fromLevel": 4,
+              "items_id": ["CityAbility_UpMaterial", "fons"],
+              "amount": [24, 10000]
+            }
+          ]
+        }
+      ],
+      "stages": [
+        {
+          "level": "30",
+          "fromLevel": 20,
+          "items_id": ["OrdinaryMonMaterial_03_lv1"],
+          "amount": [5],
+          "cost_gold": 25000
+        },
+        {
+          "level": "40",
+          "fromLevel": 30,
+          "items_id": ["OrdinaryMonMaterial_03_lv1", "Worldboss_material_04"],
+          "amount": [12, 2],
+          "cost_gold": 50000
+        },
+        {
+          "level": "50",
+          "fromLevel": 40,
+          "items_id": ["OrdinaryMonMaterial_03_lv2", "Worldboss_material_04"],
+          "amount": [6, 8],
+          "cost_gold": 75000
+        },
+        {
+          "level": "60",
+          "fromLevel": 50,
+          "items_id": ["OrdinaryMonMaterial_03_lv2", "Worldboss_material_04"],
+          "amount": [12, 16],
+          "cost_gold": 100000
+        },
+        {
+          "level": "70",
+          "fromLevel": 60,
+          "items_id": ["OrdinaryMonMaterial_03_lv3", "Worldboss_material_04"],
+          "amount": [6, 24],
+          "cost_gold": 125000
+        },
+        {
+          "level": "80",
+          "fromLevel": 70,
+          "items_id": ["OrdinaryMonMaterial_03_lv3", "Worldboss_material_04"],
+          "amount": [9, 36],
+          "cost_gold": 150000
+        }
+      ]
+    }
+  ],
+  "items": {
+    "CityAbility_UpMaterial": {
+      "name": "Семя без снов",
+      "iconUrl": "/nte-meta/game-assets/e4b24c90f68170366e90.webp"
+    },
+    "OrdinaryMonMaterial_03_lv1": {
+      "name": "Размытая цифра",
+      "iconUrl": "/nte-meta/game-assets/6f817d0efcfbe2610b36.webp"
+    },
+    "OrdinaryMonMaterial_03_lv2": {
+      "name": "Неразгаданная цифра",
+      "iconUrl": "/nte-meta/game-assets/eae9df2b0900d64c8d2a.webp"
+    },
+    "OrdinaryMonMaterial_03_lv3": {
+      "name": "Искажённая цифра",
+      "iconUrl": "/nte-meta/game-assets/22a825484fdf416c0973.webp"
+    },
+    "OrdinaryMonMaterial_04_lv1": {
+      "name": "Приостановленный бред",
+      "iconUrl": "/nte-meta/game-assets/b14695f0c914cfe66873.webp"
+    },
+    "OrdinaryMonMaterial_04_lv2": {
+      "name": "Страстный бред",
+      "iconUrl": "/nte-meta/game-assets/a938a4e987c5c53ea295.webp"
+    },
+    "OrdinaryMonMaterial_04_lv3": {
+      "name": "Необыкновенный бред",
+      "iconUrl": "/nte-meta/game-assets/5ced2edf9c1c82ef3a06.webp"
+    },
+    "SkillUpMaterial_03_lv1": {
+      "name": "Первые ожидания",
+      "iconUrl": "/nte-meta/game-assets/4649498bd0ed41515ab1.webp"
+    },
+    "SkillUpMaterial_03_lv2": {
+      "name": "Известная усталость",
+      "iconUrl": "/nte-meta/game-assets/3be78458ed59daa7300c.webp"
+    },
+    "SkillUpMaterial_03_lv3": {
+      "name": "Черная шляпа",
+      "iconUrl": "/nte-meta/game-assets/76e6ac0d06c9727c0812.webp"
+    },
+    "SkillUpMaterial_04_lv1": {
+      "name": "Синхронность мышления",
+      "iconUrl": "/nte-meta/game-assets/240d6fec1c873c3e339b.webp"
+    },
+    "SkillUpMaterial_04_lv2": {
+      "name": "Резонанс веры",
+      "iconUrl": "/nte-meta/game-assets/e8483a815b232466c3e1.webp"
+    },
+    "SkillUpMaterial_04_lv3": {
+      "name": "Ночь бьющихся сердец",
+      "iconUrl": "/nte-meta/game-assets/01dde726ecf4112cbecb.webp"
+    },
+    "fons": {
+      "name": "Фонс",
+      "iconUrl": "/nte-meta/game-assets/bf9d740bc6156750e7e0.webp"
+    },
+    "gold": {
+      "name": "Жук-монета",
+      "iconUrl": "/nte-meta/game-assets/1b18d9d4ea6bc5c9d300.webp"
+    },
+    "weeklycloneboss_a01_01": {
+      "name": "Печать хорошего мальчика",
+      "iconUrl": "/nte-meta/game-assets/5aeef45a222d6df44e76.webp"
+    },
+    "weeklycloneboss_a02_01": {
+      "name": "Подол платья тщеславия",
+      "iconUrl": "/nte-meta/game-assets/32da56167413ed9ebecd.webp"
+    }
+  },
+  "profileAbilities": {
+    "adler": [
+      {
+        "id": "ability-1m6y4tw",
+        "type": "Базовая атака",
+        "name": "Избавление",
+        "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/skills/Adler_Melee.png"
+      },
+      {
+        "id": "ability-1i6khf1",
+        "type": "Навык",
+        "name": "Проклятие зла",
+        "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/skills/Adler_Skill.png"
+      },
+      {
+        "id": "ability-1inhugo",
+        "type": "Сверхспособность",
+        "name": "Спокойствие",
+        "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/skills/Adler_UltraSkill.png"
+      },
+      {
+        "id": "ability-7ny4ug",
+        "type": "Навык поддержки",
+        "name": "Идеальное отражение",
+        "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/skills/Adler_QTE.png"
+      },
+      {
+        "id": "ability-1w2as9b",
+        "type": "Пассивный навык",
+        "name": "Умеренность",
+        "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/skills/Adler_Pas1.png"
+      },
+      {
+        "id": "ability-1eojm57",
+        "type": "Пассивный навык",
+        "name": "Праведное сердце",
+        "iconUrl": "https://interactivemap.app/neverness-to-everness/database/assets/skills/Adler_Pas2.png"
+      },
+      {
+        "id": "daabeaa1-c9c5-4c66-80a1-02822ac929cd",
+        "type": "Повседневный навык",
+        "name": "Кофейный мастер",
+        "iconUrl": "/nte-meta/game-assets/24ca96ea1e7934e5cf5a.webp"
+      }
+    ],
+    "akane": [
+      {
+        "id": "f75991d9-4d92-4c86-918b-bc00f6e3036e",
+        "type": "Базовая атака",
+        "name": "Струнный клинок",
+        "iconUrl": "/nte-meta/game-assets/23c20db8531648abd235.webp"
+      },
+      {
+        "id": "f66d9ae1-f9be-42a8-872d-bc4678c13675",
+        "type": "Навык",
+        "name": "Ритмическая волна",
+        "iconUrl": "/nte-meta/game-assets/f009892b425f141ccc05.webp"
+      },
+      {
+        "id": "GA_Akane_UltraSkill_End_name",
+        "type": "Сверхспособность",
+        "name": "Звуковой удар",
+        "iconUrl": "/nte-meta/game-assets/fef649cbf515bb5b2cc6.webp"
+      },
+      {
+        "id": "GA_Akane_QTE_name",
+        "type": "Навык поддержки",
+        "name": "Альтерированный аккорд",
+        "iconUrl": "/nte-meta/game-assets/e528a3ac414ad4ce9546.webp"
+      },
+      {
+        "id": "GA_Akane_Passive1_name",
+        "type": "Пассивный навык",
+        "name": "Абсолютный слух",
+        "iconUrl": "/nte-meta/game-assets/a153c7ecd5c868b57040.webp"
+      },
+      {
+        "id": "GA_Akane_Passive2_name",
+        "type": "Пассивный навык",
+        "name": "Звёздный гимн",
+        "iconUrl": "/nte-meta/game-assets/a153c7ecd5c868b57040.webp"
+      },
+      {
+        "id": "GA_Akane_Skill_Gitar_name",
+        "type": "Навык перенаправления",
+        "name": "Играть по слуху",
+        "iconUrl": "/nte-meta/game-assets/f009892b425f141ccc05.webp"
+      },
+      {
+        "id": "City_Ability_Akane_01",
+        "type": "Городской пассивный навык",
+        "name": "Фирменный коктейль",
+        "iconUrl": "/nte-meta/game-assets/2ec38429b2b7dc4bfe65.webp"
+      },
+      {
+        "id": "City_Ability_Akane_02",
+        "type": "Городской пассивный навык",
+        "name": "Блистательный кумир",
+        "iconUrl": "/nte-meta/game-assets/e3dcd8b30da1ff381602.webp"
+      }
+    ]
+  }
+}

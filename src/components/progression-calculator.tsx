@@ -173,6 +173,18 @@ export function ProgressionCalculator({
                   <strong>{arc?.name || 'Нет совместимых дуг'}</strong>
                 </span>
               </button>
+              {arc ? (
+                <Suspense fallback={null}>
+                  <ItemDetails
+                    id={arc.id}
+                    name={arc.name}
+                    iconUrl={arc.iconUrl || ''}
+                    context="Дуга"
+                    iconOnly
+                    hoverParent
+                  />
+                </Suspense>
+              ) : null}
               <button
                 ref={arcToggle}
                 type="button"
@@ -230,30 +242,42 @@ export function ProgressionCalculator({
                       .includes(query.trim().toLowerCase()),
                   )
                   .map((row) => (
-                    <button
-                      type="button"
-                      key={row.id}
-                      aria-pressed={arc?.id === row.id}
-                      onClick={() => {
-                        setArcId(row.id);
-                        setOwned({});
-                        setArcPickerOpen(false);
-                        arcToggle.current?.focus();
-                      }}
-                    >
-                      {row.iconUrl ? (
-                        <img
-                          src={resolveAssetUrl(row.iconUrl)}
-                          alt=""
-                          width="64"
-                          height="64"
-                          loading="lazy"
+                    <div className="arc-picker-option" key={row.id}>
+                      <button
+                        type="button"
+                        aria-pressed={arc?.id === row.id}
+                        onClick={() => {
+                          setArcId(row.id);
+                          setOwned({});
+                          setArcPickerOpen(false);
+                          arcToggle.current?.focus();
+                        }}
+                      >
+                        {row.iconUrl ? (
+                          <img
+                            src={resolveAssetUrl(row.iconUrl)}
+                            alt=""
+                            width="64"
+                            height="64"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <Orbit aria-hidden="true" />
+                        )}
+                        <span>{row.name}</span>
+                      </button>
+
+                      <Suspense fallback={null}>
+                        <ItemDetails
+                          id={row.id}
+                          name={row.name}
+                          iconUrl={row.iconUrl || ''}
+                          context="Дуга"
+                          iconOnly
+                          hoverParent
                         />
-                      ) : (
-                        <Orbit aria-hidden="true" />
-                      )}
-                      <span>{row.name}</span>
-                    </button>
+                      </Suspense>
+                    </div>
                   ))}
               </div>
               {!arcs.some((row) =>
@@ -401,6 +425,7 @@ export function ProgressionCalculator({
                             iconOnly
                           />
                         </Suspense>
+
                         {item.iconUrl ? (
                           <img
                             src={resolveAssetUrl(item.iconUrl)}

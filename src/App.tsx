@@ -81,7 +81,7 @@ import {
   SkeletonGrid,
   StatusBanner,
 } from './components/ui-state';
-import { emptySiteData, seedData } from './data/seed';
+import { useSiteBootstrap } from './lib/use-site-bootstrap';
 import {
   changePassword,
   createComment,
@@ -100,7 +100,6 @@ import {
   loadReactionSummary,
   loadSettings,
   loadSiteData,
-  loadSources,
   loadSystemStatus,
   loadUsers,
   loadWarnings,
@@ -108,7 +107,6 @@ import {
   lookupGuideInfo,
   lookupTierSources,
   logout,
-  me,
   register,
   removeReaction,
   saveEntity,
@@ -201,14 +199,6 @@ function canPlayDirectAudio(url: string) {
 function formatProfileDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   return formatDate(value);
-}
-
-function formatPortalLoadError(error: unknown) {
-  const rawMessage =
-    error instanceof Error ? error.message : 'Сервис временно недоступен';
-  const reason = rawMessage.replace(/^\/api\/[^:]+:\s*/u, '').trim();
-  const normalizedReason = reason.replace(/[.!?]+$/u, '');
-  return `Не удалось загрузить данные портала. ${normalizedReason}. Повторите загрузку.`;
 }
 
 const AdminCharacterEditor = lazy(() =>
@@ -486,90 +476,9 @@ function useHashRoute() {
 function App() {
   const route = useHashRoute();
   const hasRemoteApi = hasApiBase();
-  const [data, setData] = useState<SiteData>(() =>
-    hasRemoteApi ? emptySiteData : seedData,
-  );
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, setData, user, updateViewer, loading, error, retry } =
+    useSiteBootstrap(route);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [error, setError] = useState('');
-  const [loadAttempt, setLoadAttempt] = useState(0);
-  const loadedPrivateSourcesForRef = useRef('');
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function init() {
-      setLoading(true);
-      setError('');
-      const [currentUser, siteData] = await Promise.all([me(), loadSiteData()]);
-      const viewer = currentUser.ok ? currentUser.data : null;
-
-      if (!mounted) {
-        return;
-      }
-
-      setData(siteData);
-      setUser(viewer);
-      setLoading(false);
-    }
-
-    init().catch((loadError: unknown) => {
-      if (!mounted) return;
-      setError(formatPortalLoadError(loadError));
-      setLoading(false);
-    });
-
-    return () => {
-      mounted = false;
-    };
-  }, [loadAttempt]);
-
-  useEffect(() => {
-    const staffId =
-      user && roleWeight[user.role] >= roleWeight.editor ? user.id : '';
-    if (!staffId) {
-      loadedPrivateSourcesForRef.current = '';
-      return;
-    }
-    if (loadedPrivateSourcesForRef.current === staffId) return;
-
-    let mounted = true;
-    loadedPrivateSourcesForRef.current = staffId;
-    loadSources().then((result) => {
-      if (!mounted || !result.ok) {
-        if (!result.ok) loadedPrivateSourcesForRef.current = '';
-        return;
-      }
-      setData((current) => ({ ...current, sources: result.data }));
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [user]);
-
-  async function updateViewer(next: User | null) {
-    if (next?.id !== user?.id || next?.role !== user?.role) {
-      try {
-        const fresh = await loadSiteData({
-          includePrivate: Boolean(
-            next && roleWeight[next.role] >= roleWeight.editor,
-          ),
-        });
-        setData(fresh);
-        loadedPrivateSourcesForRef.current =
-          next && roleWeight[next.role] >= roleWeight.editor ? next.id : '';
-      } catch (reason) {
-        if (!next) {
-          setData(emptySiteData);
-          setUser(null);
-        }
-        setError(formatPortalLoadError(reason));
-        return;
-      }
-    }
-    setUser(next);
-  }
 
   useLayoutEffect(() => {
     setMobileOpen(false);
@@ -810,15 +719,15 @@ function App() {
           onClick={() => setMobileOpen(false)}
         />
       ) : null}
-      <main id="main-content" className="site-main">
+      <main
+        id="main-content"
+        className={`site-main${loading ? ' site-main--loading' : ''}`}
+        aria-busy={loading}
+      >
         {error ? (
           <div className="portal-load-error">
             <StatusBanner tone="danger" text={error} />
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => setLoadAttempt((current) => current + 1)}
-            >
+            <button className="ghost-button" type="button" onClick={retry}>
               <RotateCw aria-hidden="true" /> Повторить загрузку
             </button>
           </div>
@@ -828,7 +737,7 @@ function App() {
             tone="info"
             text={
               hasApiBase()
-                ? 'Синхронизируем свежие данные с NTE Meta API...'
+                ? 'Загружаем страницу…'
                 : 'Готовим локальные демо-данные...'
             }
           />
@@ -2907,12 +2816,16 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
       >
         {visibleLines.map((line) => (
           <article key={`${line.language}:${line.id}`}>
-            <div>
+            <div className="voice-line-title" tabIndex={0}>
               <strong>{line.title}</strong>
               <span>{line.language}</span>
             </div>
             <div className="voice-line-media">
-              {line.description ? <p>{line.description}</p> : null}
+              {line.description ? (
+                <p tabIndex={0} aria-label={`Текст реплики: ${line.title}`}>
+                  {line.description}
+                </p>
+              ) : null}
               <VoiceLinePlayer line={line} />
             </div>
           </article>

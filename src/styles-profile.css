@@ -803,6 +803,7 @@
   }
   .character-profile-page .wardrobe-gallery__stage {
     grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.1fr);
+    align-items: start;
     padding: 16px;
     border: 1px solid #4c4d53;
     border-radius: 18px;
@@ -1154,6 +1155,8 @@
     padding: 20px;
   }
   .character-profile-page .skin-media {
+    block-size: 500px;
+    max-block-size: 500px;
     border-radius: 16px;
     border: 1px solid #55565c;
     background: radial-gradient(ellipse at bottom, #34343a, #141518 75%);
@@ -1195,11 +1198,11 @@
     padding: 8px 4px 12px;
   }
   .character-profile-page .wardrobe-thumbnails--rail button {
-    flex: 0 0 140px;
+    flex: 0 0 164px;
     scroll-snap-align: center;
   }
   .character-profile-page .wardrobe-thumbnails--rail img {
-    block-size: 200px;
+    block-size: 232px;
   }
   .character-profile-page .wardrobe-thumbnails button {
     transition:
@@ -1347,10 +1350,10 @@
       padding: 12px;
     }
     .character-profile-page .wardrobe-thumbnails--rail button {
-      flex-basis: 116px;
+      flex-basis: 144px;
     }
     .character-profile-page .wardrobe-thumbnails--rail img {
-      block-size: 160px;
+      block-size: 192px;
     }
     .site-footer {
       padding: 18px;
@@ -1435,15 +1438,15 @@
   }
   .character-profile-page .wardrobe-gallery__copy {
     display: grid;
-    grid-template-rows: auto 236px auto 56px 112px;
+    grid-template-rows: 56px 304px 56px 112px;
   }
   .character-profile-page .wardrobe-thumbnails--grid {
-    max-block-size: 236px;
+    max-block-size: 304px;
     overflow-y: auto;
     align-content: start;
   }
   .character-profile-page .wardrobe-thumbnails--rail {
-    block-size: 236px;
+    block-size: 304px;
   }
   .character-profile-page .wardrobe-gallery__copy > h3 {
     align-content: center;
@@ -1466,9 +1469,22 @@
   }
   .skin-lightbox-layout > img {
     background:
-      repeating-linear-gradient(135deg, transparent 0 5px, #ffffff03 5px 6px),
-      linear-gradient(155deg, #202125 0 42%, #3b2030 42% 51%, #16171b 51%);
+      radial-gradient(ellipse at 50% 85%, #77716c33, transparent 50%),
+      linear-gradient(
+        165deg,
+        transparent 35%,
+        #c2376b22 35% 42%,
+        transparent 42%
+      ),
+      repeating-linear-gradient(
+        165deg,
+        #ffffff03 0 44px,
+        transparent 44px 88px
+      ),
+      #131417;
     background-size: auto;
+    border: 1px solid #56575e;
+    border-radius: 18px;
   }
   .skin-lightbox-layout > div {
     background: #222327;
@@ -1476,12 +1492,12 @@
   }
   @media (max-width: 600px) {
     .character-profile-page .wardrobe-gallery__copy {
-      grid-template-rows: auto 196px auto 72px 128px;
+      grid-template-rows: 56px 264px 72px 128px;
     }
     .character-profile-page
       :is(.wardrobe-thumbnails--rail, .wardrobe-thumbnails--grid) {
-      block-size: 196px;
-      max-block-size: 196px;
+      block-size: 264px;
+      max-block-size: 264px;
     }
   }
 }
@@ -1527,7 +1543,7 @@
     cursor: pointer;
   }
   .character-profile-page .wardrobe-gallery__copy--single {
-    grid-template-rows: auto 56px 112px;
+    grid-template-rows: 56px 112px;
     align-content: center;
   }
   .guide-add-section {
@@ -1549,6 +1565,128 @@
       min-block-size: 34px;
       padding-block: 4px;
       border-radius: 999px;
+    }
+  }
+}
+
+@layer polish {
+  /* Keep the footer below the fold until the real route replaces its skeleton. */
+  .site-main--loading {
+    min-block-size: 100svh;
+  }
+  .item-details-trigger.item-details-trigger--equipment {
+    inset: 4px 4px auto auto;
+    inline-size: 44px;
+    block-size: 44px;
+    min-block-size: 44px;
+    display: block;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    box-shadow: none;
+  }
+  .item-details-trigger.item-details-trigger--equipment:focus-visible {
+    outline: 2px solid var(--pink);
+    outline-offset: -3px;
+  }
+  .item-details-trigger.item-details-trigger--equipment > svg {
+    inset: 12px;
+    inline-size: 20px;
+    block-size: 20px;
+    background: #141518;
+    color: #eeeef0;
+  }
+  .progression-arc-control,
+  .arc-picker-option {
+    position: relative;
+  }
+  .arc-picker-option > button:first-child {
+    inline-size: 100%;
+    block-size: 100%;
+    padding-inline-end: 38px;
+  }
+  .character-profile-page
+    .progression-arc-control
+    > .item-details-trigger--equipment {
+    inset: 10px auto auto 10px;
+  }
+  .item-detail-popover__stats {
+    display: grid;
+    gap: 6px;
+    margin: 0 0 10px;
+  }
+  .item-detail-popover__stats > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    background: #f0efec;
+    border-radius: 10px;
+    padding: 8px 12px;
+  }
+  .item-detail-popover__stats dd {
+    margin: 0;
+    font-weight: 700;
+    color: #202125;
+  }
+  .item-detail-popover__stats dt {
+    color: #4b4d52;
+  }
+  .character-profile-page .wardrobe-thumbnails--grid {
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  }
+  .character-profile-page .wardrobe-thumbnails span {
+    min-block-size: 36px;
+    align-content: center;
+  }
+  .character-profile-page .wardrobe-gallery__copy--single {
+    align-self: center;
+  }
+  .character-profile-page .voice-line-list {
+    grid-template-rows: repeat(5, 148px);
+  }
+  .character-profile-page .voice-line-list article {
+    block-size: 148px;
+    min-block-size: 0;
+    content-visibility: visible;
+    overflow: hidden;
+  }
+  .character-profile-page .voice-line-list article > div:first-child {
+    max-block-size: 112px;
+    overflow-y: auto;
+  }
+  .character-profile-page .voice-line-media > p {
+    max-block-size: 62px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .character-profile-page .voice-line-media audio {
+    block-size: 54px;
+  }
+  @media (max-width: 760px) {
+    .character-profile-page .wardrobe-gallery__stage {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .character-profile-page .wardrobe-gallery .skin-media {
+      inline-size: 100%;
+      block-size: 440px;
+      max-block-size: 440px;
+    }
+    .character-profile-page .voice-line-list {
+      grid-template-rows: repeat(5, 224px);
+    }
+    .character-profile-page .voice-line-list article {
+      block-size: 224px;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: 52px minmax(0, 1fr);
+      gap: 8px;
+    }
+    .character-profile-page .voice-line-list article > div:first-child {
+      max-block-size: 52px;
+    }
+    .character-profile-page .voice-line-media > p {
+      max-block-size: 72px;
     }
   }
 }

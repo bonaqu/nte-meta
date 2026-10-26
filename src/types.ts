@@ -187,6 +187,7 @@ export interface GuideVisualItem {
   imageUrl: string;
   description: string;
   category?: 'signature' | 'replacement' | 'budget';
+  equalPriority?: boolean;
   stats: Array<{ label: string; value: string }>;
   sourceUrl?: string;
 }

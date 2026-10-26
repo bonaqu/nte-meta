@@ -1,6 +1,7 @@
 // Russian item details from the extracted localization. No machine-generated lore.
 import { readFile, writeFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
+import { equipmentDescriptions } from './build-equipment-descriptions.mjs';
 
 import { pathToFileURL } from 'node:url';
 
@@ -218,6 +219,10 @@ export async function buildItemDescriptions(rows) {
     if (!wanted.has(byName[key])) delete byName[key];
   for (const key of Object.keys(aliases))
     if (!wanted.has(aliases[key])) delete aliases[key];
+  for (const row of equipmentDescriptions(rows)) {
+    byId[row.id] = row.detail;
+    for (const name of row.names) byName[normalize(name)] = row.id;
+  }
   await writeFile(
     'src/data/native-item-descriptions.json',
     JSON.stringify({ byId, byName, aliases }) + '\n',

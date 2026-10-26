@@ -55,6 +55,15 @@ test('гайд: навигация, экипировка и мобильная �
         path: info.outputPath(`guide-arcs-${width}.png`),
       });
     await navigation
+      .getByRole('button', { name: 'Приоритет прокачки навыков', exact: true })
+      .click();
+    const priorities = page.locator('.guide-visual--skills');
+    await expect(priorities).toBeInViewport();
+    if (width === 360 || width === 1440)
+      await priorities.screenshot({
+        path: info.outputPath(`guide-priorities-${width}.png`),
+      });
+    await navigation
       .getByRole('button', { name: 'Базовая ротация', exact: true })
       .click();
     const rotation = page.locator('.guide-visual--rotation');
@@ -63,6 +72,20 @@ test('гайд: навигация, экипировка и мобильная �
       .locator(':scope > li')
       .evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().left));
     expect(new Set(lefts).size).toBe(1);
+    const offsets = await rotation.locator(':scope > li').evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const number = node
+          .querySelector('.guide-visual__position')!
+          .getBoundingClientRect();
+        const body = node
+          .querySelector('.guide-visual__body')!
+          .getBoundingClientRect();
+        return Math.abs(
+          number.top + number.height / 2 - body.top - body.height / 2,
+        );
+      }),
+    );
+    expect(Math.max(...offsets)).toBeLessThan(1);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth + 1,

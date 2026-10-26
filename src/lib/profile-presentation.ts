@@ -7,6 +7,24 @@ const key = (s: string) =>
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]/gu, '');
 const abilityOrders: Record<string, Record<string, number>> = index.abilities;
+const skillTerms = Object.entries(index.skillTerms)
+  .sort((a, b) => b[0].length - a[0].length)
+  .map(
+    ([en, ru]) =>
+      [
+        new RegExp(
+          `(?<![\\p{L}\\p{N}])${en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`,
+          'giu',
+        ),
+        ru,
+      ] as const,
+  );
+export function localizeGuideSkills(text: string) {
+  return skillTerms.reduce(
+    (value, [pattern, translation]) => value.replace(pattern, translation),
+    text,
+  );
+}
 export function orderedAbilities(
   abilities: CharacterAbility[],
   ...names: string[]

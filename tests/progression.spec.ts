@@ -238,7 +238,9 @@ test('профиль: совместимые дуги, настоящие пре
   await calculator
     .getByRole('button', { name: 'Выбрать дугу', exact: true })
     .click();
-  const arcButtons = calculator.locator('.arc-picker__options button');
+  const arcButtons = calculator.locator(
+    '.arc-picker__options button[aria-pressed]',
+  );
   const compatible = native.costs.filter(
     (row) => row.kind === 'arc' && row.arcTypeId === 5,
   );

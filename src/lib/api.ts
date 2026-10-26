@@ -58,11 +58,11 @@ export function hasApiBase() {
 async function request<T>(
   path: string,
   init: RequestInit = {},
-  options: { timeoutMs?: number } = {},
+  options: { timeoutMs?: number; anonymous?: boolean } = {},
 ): Promise<ApiResult<T>> {
   const timeoutMs = options.timeoutMs ?? API_REQUEST_TIMEOUT_MS;
   const deadline = Date.now() + timeoutMs;
-  const result = await requestOnce<T>(path, init, { timeoutMs });
+  const result = await requestOnce<T>(path, init, { ...options, timeoutMs });
   // Retry a safe read once, within the original time budget. Never repeat a
   // login, upload or editorial mutation after an uncertain network response.
   const safeRead =
@@ -80,6 +80,7 @@ async function request<T>(
     const remaining = deadline - Date.now();
     if (init.signal?.aborted || remaining <= 0) return result;
     return requestOnce<T>(path, init, {
+      ...options,
       timeoutMs: remaining,
     });
   }
@@ -89,7 +90,7 @@ async function request<T>(
 async function requestOnce<T>(
   path: string,
   init: RequestInit,
-  options: { timeoutMs: number },
+  options: { timeoutMs: number; anonymous?: boolean },
 ): Promise<ApiResult<T>> {
   if (!API_BASE) {
     return {
@@ -105,7 +106,8 @@ async function requestOnce<T>(
     headers.set('Content-Type', 'application/json');
   }
 
-  if (sessionToken) {
+  if (options.anonymous) headers.delete('Authorization');
+  else if (sessionToken) {
     headers.set('Authorization', `Bearer ${sessionToken}`);
   }
 
@@ -128,7 +130,7 @@ async function requestOnce<T>(
       // Authenticated/editorial refreshes must never reuse a guest's cached collection.
       cache: 'no-store',
       headers,
-      credentials: 'include',
+      credentials: options.anonymous ? 'omit' : 'include',
       signal: controller.signal,
     });
     const payload = (await response.json().catch(() => ({}))) as {
@@ -236,6 +238,34 @@ export async function loadSiteData(
 
 export async function loadEntityCollection<T>(path: string) {
   return request<T[]>(path);
+}
+
+export const publicCollectionKeys = [
+  'characters',
+  'guides',
+  'rotations',
+  'tierlists',
+  'teams',
+  'news',
+  'leaks',
+  'threads',
+] as const;
+export type PublicCollectionKey = (typeof publicCollectionKeys)[number];
+export const publicCacheScope = API_BASE;
+
+/** Only anonymous responses may enter the persistent public snapshot. */
+export async function loadPublicCollection<K extends PublicCollectionKey>(
+  key: K,
+) {
+  const result = await request<SiteData[K]>(
+    `/api/${key}`,
+    {},
+    { anonymous: true },
+  );
+  if (!result.ok) throw new Error(result.error);
+  if (!Array.isArray(result.data))
+    throw new Error('Некорректный ответ сервера.');
+  return result.data;
 }
 
 export async function loadSources() {

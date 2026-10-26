@@ -737,7 +737,7 @@
     "HT/Content/DataTable/Skill/GlobalCharacterData/DT_GlobalValueLinkoData.uasset"
   ],
   "source": "Local installed game archives including PatchPaks; original strings preserved",
-  "datasetSha256": "e0b084c9771c9ac22d90f3f737af35dcef0957dbbceb9650063701addef7e918",
+  "datasetSha256": "72b11050255713a9b7b41883b245f9fbc8d761d2563c1a5a2f33931fa3874de4",
   "chunks": 1088,
   "repairedCsvRows": {
     "ru": 425,
@@ -760,5 +760,5 @@
     "gifts": 138,
     "failures": []
   },
-  "chunksSha256": "51aed3f716636dc8a3db4717af847e431060b5bd7a128574d1fa5cd78e50cc4a"
+  "chunksSha256": "be9827a5834cf1da7017108a9d13d0b3b18ff95c45bc7b1769ad7de37effb607"
 }

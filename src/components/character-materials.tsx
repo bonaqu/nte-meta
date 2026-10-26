@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeftRight, ImageIcon, Swords, TrendingUp } from 'lucide-react';
-import type { CharacterMaterial } from '../types';
+import type { CharacterAbility, CharacterMaterial } from '../types';
+import { SkillMaterials } from './skill-materials';
 import { loadProgressionData } from '../lib/api';
 import {
   findProfileProgression,
+  applySkillCostOverrides,
   calculateProgression,
   type ProgressionData,
   type ProgressionOption,
@@ -16,11 +18,15 @@ export function CharacterMaterials({
   materials,
   name,
   originalName,
+  appearanceId,
+  abilities,
   onLayout,
 }: {
   materials: CharacterMaterial[];
   name: string;
   originalName: string;
+  appearanceId?: string;
+  abilities: CharacterAbility[];
   onLayout?: () => void;
 }) {
   // Align after React changes the loading/result block, before it is painted.
@@ -47,7 +53,12 @@ export function CharacterMaterials({
         setError(response.error);
         return;
       }
-      const option = findProfileProgression(response.data, name, originalName);
+      const option = findProfileProgression(
+        response.data,
+        name,
+        originalName,
+        appearanceId,
+      );
       if (option?.stages.length) setNative({ data: response.data, option });
       setError('');
     };
@@ -65,7 +76,17 @@ export function CharacterMaterials({
       cancelled = true;
       observer.disconnect();
     };
-  }, [name, originalName, attempt]);
+  }, [name, originalName, appearanceId, attempt]);
+  const skills = native
+    ? applySkillCostOverrides(
+        native.data,
+        native.option.skills || [],
+        materials,
+      )
+    : [];
+  const manualSupport = materials.some((row) =>
+    /поддерж|пассив/i.test(row.source),
+  );
   const stages = native?.option.stages || [];
   const selectedStage = stages.find((stage) => stage.level === stageId);
   const totals = new Map<string, number>();
@@ -122,6 +143,12 @@ export function CharacterMaterials({
   for (const row of materials) {
     const source = row.source.toLowerCase();
     if (
+      skills.some((skill) => skill.kind === 'combat') &&
+      /навык|способност/.test(source) &&
+      !/поддерж|пассив|повседнев|город/.test(source)
+    )
+      continue;
+    if (
       ascension &&
       /^(?:материалы прорыва|уровень возвышения → количество:.*)$/.test(source)
     )
@@ -144,7 +171,7 @@ export function CharacterMaterials({
   }
   return (
     <div ref={root} className="character-material-groups">
-      {pending ? <p role="status">Загружаем материалы возвышения…</p> : null}
+      {pending ? <p role="status">Загружаем материалы прокачки…</p> : null}
       {error ? (
         <div className="inline-load-error">
           <p role="alert">{error}</p>
@@ -265,6 +292,25 @@ export function CharacterMaterials({
           </div>
         </section>
       ))}
+      {native
+        ? (['combat', 'support', 'city'] as const).map((kind) => {
+            const rows = skills.filter((skill) => skill.kind === kind);
+            // Existing editorial passive totals remain authoritative; unlike a
+            // per-level table, an aggregate cannot safely be split between skills.
+            if (!rows.length || (kind === 'support' && manualSupport))
+              return null;
+            return (
+              <SkillMaterials
+                key={`${native.option.id}-${kind}`}
+                data={native.data}
+                skills={rows}
+                abilities={abilities}
+                name={name}
+                originalName={originalName}
+              />
+            );
+          })
+        : null}
     </div>
   );
 }

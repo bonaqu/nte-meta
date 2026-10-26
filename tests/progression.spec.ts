@@ -1,7 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import type { CharacterAbility } from '../src/types';
 import {
   calculateProgression,
+  calculateSkillProgression,
+  applySkillCostOverrides,
   findProfileProgression,
   type ProgressionData,
 } from '../src/lib/progression';
@@ -52,6 +55,170 @@ const data: ProgressionData = {
     { id: 'dye', kind: 'arc', experience: 500 },
   ],
 };
+test('стоимость навыков: границы, общий итог, пропуски и ручные количества', () => {
+  const skills = [
+    {
+      id: 'melee',
+      type: 'melee',
+      kind: 'combat' as const,
+      stages: [
+        { level: '2', items_id: ['gold', 'mat'], amount: [2000, 2] },
+        { level: '3', items_id: ['gold', 'mat'], amount: [5000, 3] },
+      ],
+    },
+  ];
+  expect(
+    calculateSkillProgression(data, skills, 1, 3).materials,
+  ).toContainEqual(expect.objectContaining({ id: 'gold', amount: 7000 }));
+  expect(
+    calculateSkillProgression(data, skills, 2, 3).materials,
+  ).toContainEqual(expect.objectContaining({ id: 'mat', amount: 3 }));
+  expect(calculateSkillProgression(data, skills, 2, 2).materials).toEqual([]);
+  expect(calculateSkillProgression(data, skills, 1, 4).missing).toEqual([
+    'melee:4',
+  ]);
+  expect(() => calculateSkillProgression(data, skills, 3, 1)).toThrow();
+  const updated = applySkillCostOverrides(data, skills, [
+    {
+      id: 'manual',
+      name: 'Материал',
+      iconUrl: '',
+      source: 'Материалы навыков',
+      amount: 'Ур. 2: ×7; Ур. 3: ×8',
+    },
+  ]);
+  expect(
+    calculateSkillProgression(data, updated, 1, 3).materials,
+  ).toContainEqual(expect.objectContaining({ id: 'mat', amount: 15 }));
+  expect(skills[0].stages[0].amount[1]).toBe(2);
+});
+
+test('полные материалы навыков: выбор иконками, сумма диапазона, ручные пассивные расходы и четыре ширины', async ({
+  page,
+  request,
+}, testInfo) => {
+  test.setTimeout(90000);
+  const native = JSON.parse(
+    await readFile('tests/fixtures/progression-native.json', 'utf8'),
+  ) as ProgressionData;
+  const skills = JSON.parse(
+    await readFile('tests/fixtures/skill-materials.json', 'utf8'),
+  ) as Pick<ProgressionData, 'costs' | 'items'> & {
+    profileAbilities: Record<string, CharacterAbility[]>;
+  };
+  native.costs = native.costs.map((row) => ({
+    ...row,
+    skills: skills.costs.find((item) => item.id === row.id)?.skills,
+  }));
+  native.costs.push(
+    ...skills.costs.filter(
+      (item) => !native.costs.some((row) => row.id === item.id),
+    ),
+  );
+  native.items = { ...native.items, ...skills.items };
+  const characters = (
+    await (await request.get('http://127.0.0.1:8788/api/characters')).json()
+  ).data;
+  const adler = characters.find((row: { id: string }) => row.id === 'adler');
+  adler.profile = {
+    ...adler.profile,
+    ...JSON.parse(
+      await readFile('tests/fixtures/progression-profile.json', 'utf8'),
+    ),
+  };
+  for (const character of characters)
+    if (skills.profileAbilities[character.id])
+      character.profile.abilities = skills.profileAbilities[character.id].map(
+        (ability) => ({ ...ability, description: '' }),
+      );
+  adler.profile.materials = adler.profile.materials.filter(
+    (row: { name: string; source: string }) =>
+      row.name !== 'Жук-монета' || !/поддерж/i.test(row.source),
+  );
+  adler.profile.materials.push({
+    id: 'manual-gold-passive',
+    name: 'Жук-монета',
+    iconUrl: '',
+    source: 'Материалы навыков поддержки',
+    amount:
+      'Материалы навыков поддержки: ×30 000; Материалы навыков поддержки: ×60 000',
+  });
+  await page.route('**/api/characters', (route) =>
+    route.fulfill({ json: { data: characters } }),
+  );
+  await page.route('**/api/game-data/progression', (route) =>
+    route.fulfill({ json: { data: native } }),
+  );
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/#/characters/adler');
+  await page.getByRole('button', { name: 'Прокачка', exact: true }).click();
+  const combat = page.getByRole('region', {
+    name: 'Прокачка боевых навыков',
+    exact: true,
+  });
+  await expect(combat.locator('.skill-cost-picker > button')).toHaveCount(5);
+  await expect(combat).toContainText('1 748 000');
+  await combat.locator('.skill-cost-picker > button').nth(1).click();
+  await expect(combat).toContainText('437 000');
+  await combat.getByLabel('Целевой уровень навыка', { exact: true }).dblclick();
+  await combat.getByLabel('Целевой уровень навыка', { exact: true }).fill('3');
+  await combat
+    .getByLabel('Целевой уровень навыка', { exact: true })
+    .press('Enter');
+  await expect(combat).toContainText('7 000');
+  await expect(
+    page.getByRole('region', { name: 'Навыки поддержки', exact: true }),
+  ).toContainText('90 000');
+  const city = page.getByRole('region', {
+    name: 'Повседневные навыки',
+    exact: true,
+  });
+  await expect(city).toContainText('22 000');
+  for (const width of [360, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await combat.scrollIntoViewIfNeeded();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+      String(width),
+    ).toBe(true);
+    for (const image of await combat.locator('img').all())
+      await expect
+        .poll(() =>
+          image.evaluate(
+            (img: HTMLImageElement) => img.complete && img.naturalWidth > 0,
+          ),
+        )
+        .toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath(`skill-materials-${width}.png`),
+    });
+  }
+  const { default: AxeBuilder } = await import('@axe-core/playwright');
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .include('.character-material-groups')
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await page.goto('/#/characters/akane');
+  await page.getByRole('button', { name: 'Прокачка', exact: true }).click();
+  const akaneCity = page.getByRole('region', {
+    name: 'Повседневные навыки',
+    exact: true,
+  });
+  await expect(akaneCity.locator('.skill-cost-picker > button')).toHaveCount(3);
+  await expect(akaneCity.getByRole('alert')).toHaveCount(0);
+  await akaneCity.locator('.skill-cost-picker > button').nth(2).click();
+  await expect(
+    akaneCity.getByLabel('Целевой уровень навыка', { exact: true }),
+  ).toHaveAttribute('aria-valuemax', '2');
+  await expect(akaneCity.getByRole('alert')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
 test('границы возвышения, опыт персонажа/дуги, запас и инвентарь считаются раздельно', () => {
   expect(findProfileProgression(data, 'Хатор', 'Hathor')?.id).toBe('1025');
   expect(

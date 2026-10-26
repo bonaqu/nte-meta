@@ -89,7 +89,7 @@ export function EditorShell({
               <X aria-hidden="true" />
             </button>
           </header>
-          <div className="editor-shell__body">{children}</div>
+          <div className="editor-shell__body">{open ? children : null}</div>
         </div>
       </dialog>
       <dialog

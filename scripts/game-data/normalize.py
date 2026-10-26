@@ -5,6 +5,7 @@ from pathlib import Path
 from PIL import Image
 from localization_csv import localized_rows
 from media_cache import media_name
+from reference_metadata import ability_menu
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--source', type=Path, required=True)
@@ -247,7 +248,7 @@ if supplement:
     for item in supplement['characters']:
         data=item['data']
         selected={k:data[k] for k in ['id','name','breakthrough','gift_reward','preferrable_gifts','stats'] if k in data}
-        selected['abilityMenu']=[{k:ability[k] for k in ['id','type','ability_type'] if k in ability} for ability in data.get('abilities',[])]
+        selected['abilityMenu']=ability_menu(data.get('abilities',[]))
         records.append(external_record('character','NTE_ReferenceCharacter',data['id'],selected,item['url'],data['id']))
         native_fashions={row['gameId'].lower() for row in records if row['kind']=='wardrobe' and row['id'].startswith('row:')}
         for fashion in data.get('fashion',[]):

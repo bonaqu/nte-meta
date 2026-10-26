@@ -956,6 +956,109 @@ test('игровой калькулятор: все 25 вариантов име
   }
 });
 
+test('все 25 вариантов передают полные стоимости боевых, пассивных и городских навыков с названиями и иконками', async () => {
+  const records = gunzipSync(
+    await readFile('scripts/content/game-data/chunks.jsonl.gz'),
+  )
+    .toString('utf8')
+    .trim()
+    .split('\n')
+    .flatMap((line) =>
+      (JSON.parse(line).records as SourceRecord[]).filter(
+        (row) =>
+          row.namespace === 'NTE_ReferenceCharacter' ||
+          row.namespace === 'NTE_ReferenceItem' ||
+          row.namespace === 'NTE_ReferenceCurrency',
+      ),
+    );
+  const f = await contract(records);
+  try {
+    const data = (await (await f.api('progression')).json())
+      .data as ProgressionData;
+    const characters = data.costs.filter((row) => row.kind === 'character');
+    expect(characters).toHaveLength(25);
+    for (const character of characters) {
+      expect(
+        character.skills?.filter((skill) => skill.kind === 'combat'),
+        character.name,
+      ).toHaveLength(4);
+      expect(
+        character.skills?.filter((skill) => skill.kind === 'support'),
+        character.name,
+      ).toHaveLength(2);
+      expect(
+        character.skills?.some((skill) => skill.kind === 'city'),
+        character.name,
+      ).toBe(true);
+      for (const skill of character.skills || []) {
+        const expected =
+          skill.kind === 'combat'
+            ? [2, 3, 4, 5, 6, 7, 8, 9, 10]
+            : skill.kind === 'city'
+              ? Array.from(
+                  {
+                    length: Math.max(
+                      ...skill.stages.map((stage) => Number(stage.level)),
+                    ),
+                  },
+                  (_, i) => i + 1,
+                )
+              : [1];
+        expect(
+          skill.stages.map((stage) => Number(stage.level)),
+          character.name + skill.id,
+        ).toEqual(expected);
+        for (const stage of skill.stages)
+          for (const id of stage.items_id) {
+            expect(data.items[id]?.name, id).toMatch(/[а-яё]/i);
+            expect(data.items[id]?.iconUrl, id).toContain('game-assets/');
+          }
+      }
+    }
+    const adler = characters.find((row) => row.id === '1033')!;
+    const gold = adler
+      .skills!.filter((skill) => skill.kind === 'combat')
+      .flatMap((skill) => skill.stages)
+      .reduce(
+        (total, stage) =>
+          total + (stage.amount[stage.items_id.indexOf('gold')] || 0),
+        0,
+      );
+    expect(gold).toBe(1748000);
+    const record = records.find(
+      (row) =>
+        row.namespace === 'NTE_ReferenceCharacter' && row.gameId === '1033',
+    )!;
+    const original = (
+      await (await f.api('record?id=' + encodeURIComponent(record.id))).json()
+    ).data;
+    const menu = structuredClone(record.details.abilityMenu) as Array<{
+      materials: Array<{ amount: number[] }>;
+    }>;
+    menu[0].materials[0].amount[0] = 1234;
+    await f.api('record', {
+      id: record.id,
+      revision: original.revision,
+      overrides: { details: { abilityMenu: menu } },
+    });
+    const changed = (await (await f.api('progression')).json())
+      .data as ProgressionData;
+    expect(
+      changed.costs.find((row) => row.id === '1033')?.skills?.[0].stages[0]
+        .amount[0],
+    ).toBe(1234);
+    f.insert(records);
+    const repeated = (await (await f.api('progression')).json())
+      .data as ProgressionData;
+    expect(
+      repeated.costs.find((row) => row.id === '1033')?.skills?.[0].stages[0]
+        .amount[0],
+    ).toBe(1234);
+  } finally {
+    f.db.close();
+  }
+});
+
 test('импорт подарков связывает Food_142, Food_0142_name и игровую текстуру', async () => {
   const records = JSON.parse(
     await readFile('tests/fixtures/game-data-native-hathor.json', 'utf8'),

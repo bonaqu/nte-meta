@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, Plus, Trash2, Copy } from 'lucide-react';
 import type { Character, GuideVisual, GuideVisualItem } from '../types';
 import { resolveAssetUrl } from '../lib/assets';
-import { newVisualItem } from '../lib/guide-visual';
+import { newVisualItem, guideSkillPresentation } from '../lib/guide-visual';
 import { ImageField } from './image-field';
 import { lazy, Suspense, useState } from 'react';
 import { findEquipment } from '../lib/api';
@@ -221,10 +221,23 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
               ) : null}
               {value.kind === 'rotation' &&
               /^шаг\s*\d+\s*$/iu.test(item.name) ? null : (
-                <h3>{item.name}</h3>
+                <h3>
+                  {value.kind === 'skills'
+                    ? guideSkillPresentation(item).name
+                    : item.name}
+                </h3>
               )}
             </div>
-            {item.description && value.kind !== 'stats' ? (
+            {value.kind === 'skills' && guideSkillPresentation(item).type ? (
+              <p className="guide-skill-type">
+                {guideSkillPresentation(item).type}
+              </p>
+            ) : null}
+            {value.kind === 'skills' ? (
+              guideSkillPresentation(item).note ? (
+                <p>{guideSkillPresentation(item).note}</p>
+              ) : null
+            ) : item.description && value.kind !== 'stats' ? (
               <p>{item.description}</p>
             ) : null}
             {item.stats.length ? (
@@ -436,6 +449,12 @@ export function GuideVisualEditor({
                       onClick={() =>
                         patch(item.id, {
                           name: ability.name,
+                          ...(value.kind === 'skills'
+                            ? {
+                                skillType: ability.type,
+                                description: guideSkillPresentation(item).note,
+                              }
+                            : {}),
                           imageUrl: ability.iconUrl,
                         })
                       }
@@ -466,9 +485,23 @@ export function GuideVisualEditor({
                 onChange={(e) => patch(item.id, { name: e.target.value })}
               />
             </label>
+            {value.kind === 'skills' ? (
+              <label>
+                Тип навыка
+                <input
+                  value={item.skillType || guideSkillPresentation(item).type}
+                  maxLength={120}
+                  onChange={(event) =>
+                    patch(item.id, { skillType: event.target.value })
+                  }
+                />
+              </label>
+            ) : null}
             {value.kind !== 'stats' ? (
               <label>
-                Краткое описание
+                {value.kind === 'cartridges'
+                  ? 'Почему этот картридж подходит (необязательно)'
+                  : 'Краткое описание'}
                 <textarea
                   value={item.description}
                   maxLength={6000}

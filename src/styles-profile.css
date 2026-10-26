@@ -738,6 +738,7 @@
     color: #f1f1f3;
     font-weight: 700;
     border-block-end: 1px solid #46474d;
+    border-radius: 14px 14px 0 0;
   }
   .item-detail-popover__type > svg {
     color: #c8c9ce;
@@ -1708,6 +1709,68 @@
     }
     .character-profile-page .voice-line-media > p {
       max-block-size: 72px;
+    }
+  }
+}
+@layer components {
+  .skill-cost-picker {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-block: 4px 12px;
+  }
+  .skill-cost-picker > button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-block-size: 64px;
+    flex: 1 0 160px;
+    max-inline-size: 260px;
+    padding: 8px 12px;
+    text-align: start;
+    border: 1px solid #5a5b60;
+    border-radius: 14px;
+    background: #121316;
+    color: #f4f4f5;
+    transition:
+      border-color 120ms,
+      background 120ms;
+  }
+  .skill-cost-picker > button[aria-pressed='true'] {
+    border-color: #ff438f;
+    background: #30222a;
+    box-shadow: inset 0 -2px #ff438f;
+  }
+  .skill-cost-picker > button small {
+    display: block;
+    color: #b9bdc5;
+    font-weight: 400;
+  }
+  .skill-cost-picker__icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 44px;
+    block-size: 44px;
+    border-radius: 50%;
+    background: #292a2d;
+    border: 1px solid #686a70;
+  }
+  .skill-cost-picker__icon img {
+    inline-size: 36px;
+    block-size: 36px;
+    object-fit: contain;
+  }
+  .skill-cost-range {
+    display: grid;
+    gap: 12px;
+    margin-block: 4px 12px;
+  }
+  .skill-materials .game-item strong {
+    color: #ffbf76;
+  }
+  @media (min-width: 768px) {
+    .skill-cost-range {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 }

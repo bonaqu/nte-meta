@@ -3470,7 +3470,9 @@ function CharacterDetailPage({
         <Suspense fallback={<p role="status">Загрузка материалов…</p>}>
           <CharacterMaterials
             onLayout={alignCharacterScrollAnchor}
-            key={character.id}
+            key={`${character.id}-${activeAppearance?.id || 'default'}`}
+            appearanceId={activeAppearance?.id}
+            abilities={abilities}
             name={character.name}
             originalName={character.originalName}
             materials={profile.materials}

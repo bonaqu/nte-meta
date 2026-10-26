@@ -51,6 +51,34 @@ def table(headers, rows):
     return '<div class="scroll"><table><thead><tr>' + ''.join('<th>' + esc(h) + '</th>' for h in headers) + '</tr></thead><tbody>' + ''.join('<tr>' + ''.join('<td>' + esc(v) + '</td>' for v in row) + '</tr>' for row in rows) + '</tbody></table></div>'
 
 
+def skill_cost_sections(option, profile, progression):
+    """Named per-skill totals and destination levels, without losing numeric costs."""
+    labels = {'melee': 'Базовая атака', 'skill': 'Навык', 'ultraskill': 'Сверхспособность',
+              'qte': 'Навык поддержки', 'passive': 'Пассивный навык', 'city': 'Повседневный навык'}
+    groups = {'combat': 'Боевые навыки', 'support': 'Пассивные навыки', 'city': 'Повседневные навыки'}
+    normalize = lambda value: re.sub(r'[^\w]', '', str(value).lower().removesuffix('_name'))
+    result = []
+    occurrences = {}
+    for skill in option.get('skills', []):
+        kind = skill['type']; label = labels.get(kind, 'Навык')
+        index = occurrences.get(kind, 0); occurrences[kind] = index + 1
+        abilities = profile.get('abilities', [])
+        matches = [row for row in abilities if row['type'] == label]
+        ability = next((row for row in abilities if normalize(row.get('id')) == normalize(skill['id'])), None)
+        if ability is None: ability = matches[index] if index < len(matches) else {}
+        totals = {}; stages = []
+        for stage in skill['stages']:
+            for item_id, amount in zip(stage['items_id'], stage['amount']):
+                item = progression['items'].get(item_id, {})
+                if not item.get('name'): raise ValueError('Missing skill material name: ' + item_id)
+                totals[item_id] = totals.get(item_id, 0) + amount
+                stages.append((stage.get('fromLevel', int(stage['level']) - 1), stage['level'], item['name'], amount))
+        result.append({'group': groups[skill['kind']], 'type': label, 'name': ability.get('name', label),
+                       'iconUrl': ability.get('iconUrl', ''), 'stages': stages,
+                       'totals': [(progression['items'][item]['name'], count, progression['items'][item].get('iconUrl', '')) for item, count in totals.items()]})
+    return result
+
+
 def category(row):
     key = row['gameId'].lower()
     for prefix, name in [
@@ -283,7 +311,15 @@ def _export_readable(repository, destination, owners, source_records, include_me
                         body += '<h2>На уровне ' + esc(stage.get('fromLevel')) + ' → предел ' + esc(stage['level']) + '</h2>' + table(['Материал', 'Нужно'], rows)
                         for item, amount in rows: excel('Возвышение', ['Персонаж', 'На уровне', 'Новый предел', 'Материал', 'Количество'], [name, stage.get('fromLevel'), stage['level'], item, amount])
                 body += '<h2>Всего на возвышения</h2>'
-                for r in profile.get(field, []): body += '<article>' + media.image(r.get('iconUrl', ''), folder, r['name']) + '<h3>' + esc(r['name']) + '</h3><p>' + esc(r.get('quantity')) + '</p><p>' + esc(r.get('source')) + '</p></article>'
+                for r in profile.get(field, []): body += '<article>' + media.image(r.get('iconUrl', ''), folder, r['name']) + '<h3>' + esc(r['name']) + '</h3><p>' + esc(r.get('amount', r.get('quantity'))) + '</p><p>' + esc(r.get('source')) + '</p></article>'
+                for skill in skill_cost_sections(option or {}, profile, data.get('progression', {})):
+                    body += '<article><h2>' + esc(skill['group'] + ' · ' + skill['type']) + '</h2>' + media.image(skill['iconUrl'], folder, 'Навык — ' + skill['name']) + '<h3>' + esc(skill['name']) + '</h3><h4>Всего для этого навыка</h4>'
+                    for item, amount, icon in skill['totals']:
+                        body += '<article>' + media.image(icon, folder, item) + '<h4>' + esc(item) + ' ×' + esc(amount) + '</h4></article>'
+                        excel('Итоги навыков', ['Персонаж', 'Раздел', 'Тип навыка', 'Навык', 'Материал', 'Количество'], [name, skill['group'], skill['type'], skill['name'], item, amount])
+                    body += '<details><summary>Материалы по уровням</summary>' + table(['С уровня', 'До уровня', 'Материал', 'Количество'], skill['stages']) + '</details></article>'
+                    for start, end, item, amount in skill['stages']:
+                        excel('Прокачка навыков', ['Персонаж', 'Раздел', 'Навык', 'С уровня', 'До уровня', 'Материал', 'Количество'], [name, skill['group'], skill['name'], start, end, item, amount])
                 body += '<details><summary>Опыт для каждого следующего уровня</summary>' + table(['Текущий уровень', 'Опыт до следующего'], [(r['level'], r['exp']) for r in data.get('progression', {}).get('characterExp', []) if r['level'] < 80]) + '</details>'
             elif field == 'friendship':
                 body += '<h2>Уровни симпатии и награды</h2>'

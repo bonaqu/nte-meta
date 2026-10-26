@@ -3,6 +3,45 @@ import { readFile, readdir } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import { mergeNativeCollection } from '../scripts/game-data/seed-profiles.mjs';
 
+test('один предмет для возвышения, боевых и пассивных навыков сохраняет отдельные суммы и ручную правку', () => {
+  const current = [
+    {
+      id: 'gold',
+      name: 'Жук-монета',
+      amount: '525000',
+      source: 'Уровень возвышения → количество: 20 → 30: 25000',
+    },
+    {
+      id: 'support-gold',
+      name: 'Жук-монета',
+      amount: '×90 000',
+      source: 'Материалы навыков поддержки',
+    },
+  ];
+  const incoming = [
+    { ...current[0] },
+    {
+      id: 'skill-combat-gold',
+      name: 'Жук-монета',
+      amount: '1748000',
+      source: 'Материалы боевых навыков',
+    },
+    {
+      id: 'passive-gold',
+      name: 'Жук-монета',
+      amount: '70000',
+      source: 'Материалы навыков поддержки',
+    },
+  ];
+  const result = mergeNativeCollection('materials', current, incoming);
+  expect(result.map((row) => row.amount)).toEqual([
+    '525000',
+    '1748000',
+    '×90 000',
+  ]);
+  expect(mergeNativeCollection('materials', result, incoming)).toEqual(result);
+});
+
 test('исправление иконки городского навыка Минт сохраняет все прочие значения и свои изображения', async () => {
   const db = new DatabaseSync(':memory:');
   try {

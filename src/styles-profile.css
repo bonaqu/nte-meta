@@ -1624,6 +1624,10 @@
   .item-detail-popover__stats dd {
     margin: 0;
     font-weight: 700;
+    color: #202125;
+  }
+  .item-detail-popover__stats dt {
+    color: #4b4d52;
   }
   .character-profile-page .wardrobe-thumbnails--grid {
     grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));

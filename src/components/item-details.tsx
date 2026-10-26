@@ -223,7 +223,7 @@ export function ItemDetails({
               <X aria-hidden="true" />
             </button>
           </div>
-          <header>
+          <header role="presentation">
             {icon ? <img src={icon} alt="" width="96" height="96" /> : null}
             <div>
               <small>{context}</small>

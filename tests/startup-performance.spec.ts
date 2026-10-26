@@ -29,9 +29,10 @@ test('холодная загрузка профиля не ждёт втори�
     );
   }
   const runs = [];
+  const width = Number(process.env.NTE_STARTUP_WIDTH || 360);
   for (let i = 0; i < 3; i++) {
     const context = await browser.newContext({
-      viewport: { width: 360, height: 900 },
+      viewport: { width, height: 900 },
     });
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
@@ -96,7 +97,7 @@ test('холодная загрузка профиля не ждёт втори�
   await writeFile(
     info.outputPath('startup-metrics.json'),
     JSON.stringify(
-      { viewport: 360, cpuRate: 4, secondaryDelayMs: 8000, runs },
+      { viewport: width, cpuRate: 4, secondaryDelayMs: 8000, runs },
       null,
       2,
     ),

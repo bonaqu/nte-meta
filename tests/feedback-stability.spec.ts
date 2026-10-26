@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import AxeBuilder from '@axe-core/playwright';
 import { visualFromImport } from '../src/lib/guide-visual';
 import { localizeGuideSkills } from '../src/lib/profile-presentation';
 
@@ -50,6 +51,13 @@ test('дуга: отложенная подсказка, игровые хара
   await expect(sheet).toBeVisible();
   await expect(sheet.locator('.item-detail-popover__stats')).toBeVisible();
   await expect(sheet).not.toContainText(/\{\d+\}/);
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .include('.item-detail-popover:popover-open')
+        .analyze()
+    ).violations,
+  ).toEqual([]);
   await sheet.screenshot({ path: info.outputPath('arc-sheet.png') });
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);

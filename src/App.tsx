@@ -2812,7 +2812,7 @@ function CharacterVoiceLibrary({ lines }: { lines: CharacterVoiceLine[] }) {
       >
         {visibleLines.map((line) => (
           <article key={`${line.language}:${line.id}`}>
-            <div>
+            <div className="voice-line-title" tabIndex={0}>
               <strong>{line.title}</strong>
               <span>{line.language}</span>
             </div>

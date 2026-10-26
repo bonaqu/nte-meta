@@ -645,14 +645,17 @@
   .item-details-trigger:is(:hover, :focus-visible, [aria-expanded='true']) {
     box-shadow: inset 0 0 0 2px var(--pink);
   }
-  .item-detail-popover {
-    position: fixed;
+  .item-detail-sheet {
     inset: auto;
     margin: 0;
     padding: 0;
-    inline-size: min(390px, calc(100vw - 24px));
-    max-block-size: min(540px, calc(100dvh - 24px));
-    overflow-y: auto;
+    inline-size: fit-content;
+    min-inline-size: min(390px, calc(100vw - 24px));
+    max-inline-size: min(640px, calc(100vw - 24px));
+    position: absolute;
+    pointer-events: auto;
+    max-block-size: none;
+    overflow: visible;
     border: 2px solid #54565c;
     border-radius: 16px;
     background: #e5e4e0;
@@ -661,7 +664,7 @@
     font-size: 0.88rem;
     line-height: 1.5;
   }
-  .item-detail-popover > header {
+  .item-detail-sheet > header {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) 44px;
     align-items: center;
@@ -671,22 +674,22 @@
     border-block-end: 4px solid var(--pink);
     color: #f4f4f6;
   }
-  .item-detail-popover header > img {
+  .item-detail-sheet header > img {
     object-fit: contain;
     background: #303137;
     border-radius: 10px;
   }
-  .item-detail-popover h3 {
+  .item-detail-sheet h3 {
     margin: 2px 0 0;
     font-size: 1rem;
     line-height: 1.3;
     overflow-wrap: anywhere;
   }
-  .item-detail-popover small {
+  .item-detail-sheet small {
     color: #ffc575;
     font-size: 0.7rem;
   }
-  .item-detail-popover button {
+  .item-detail-sheet button {
     inline-size: 44px;
     block-size: 44px;
     padding: 10px;
@@ -698,11 +701,11 @@
   .item-detail-popover__text {
     padding: 16px;
   }
-  .item-detail-popover p {
+  .item-detail-sheet p {
     white-space: pre-line;
     margin: 0;
   }
-  .item-detail-popover p + p {
+  .item-detail-sheet p + p {
     margin-block-start: 14px;
     padding-block-start: 14px;
     border-block-start: 1px solid #b8b7b4;
@@ -710,19 +713,19 @@
   .item-detail-popover__usage {
     font-weight: 700;
   }
-  .item-detail-popover {
+  .item-detail-sheet {
     --item-color: #50535e;
   }
-  .item-detail-popover[data-rarity='2'] {
+  .item-detail-sheet[data-rarity='2'] {
     --item-color: #178577;
   }
-  .item-detail-popover[data-rarity='3'] {
+  .item-detail-sheet[data-rarity='3'] {
     --item-color: #3158cf;
   }
-  .item-detail-popover[data-rarity='4'] {
+  .item-detail-sheet[data-rarity='4'] {
     --item-color: #b51c9b;
   }
-  .item-detail-popover[data-rarity='5'] {
+  .item-detail-sheet[data-rarity='5'] {
     --item-color: #ba7e09;
   }
   .item-detail-popover__type {
@@ -739,7 +742,7 @@
   .item-detail-popover__type > svg {
     color: #c8c9ce;
   }
-  .item-detail-popover > header {
+  .item-detail-sheet > header {
     grid-template-columns: 96px minmax(0, 1fr);
     min-block-size: 138px;
     padding: 16px;
@@ -750,7 +753,7 @@
       #202125 90%
     );
   }
-  .item-detail-popover header > img {
+  .item-detail-sheet header > img {
     inline-size: 96px;
     block-size: 96px;
     padding: 8px;
@@ -776,7 +779,7 @@
     border-radius: 10px;
     background: #f0efec;
   }
-  .item-detail-popover p + p {
+  .item-detail-sheet p + p {
     margin-block-start: 6px;
     padding: 12px;
     border: 0;
@@ -1081,7 +1084,7 @@
       align-items: start;
       flex-direction: column;
     }
-    .item-detail-popover > header {
+    .item-detail-sheet > header {
       gap: 8px;
     }
   }
@@ -1503,6 +1506,24 @@
 }
 
 @layer polish {
+  .item-detail-overlay {
+    position: fixed;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100dvh;
+    max-inline-size: none;
+    max-block-size: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    overflow-y: auto;
+    pointer-events: none;
+  }
+  .item-detail-overlay::backdrop {
+    pointer-events: none;
+    background: transparent;
+  }
   .local-character-import__overview {
     display: flex;
     align-items: center;

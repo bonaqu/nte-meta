@@ -59,6 +59,20 @@ test('гайд: навигация, экипировка и мобильная �
       .click();
     const priorities = page.locator('.guide-visual--skills');
     await expect(priorities).toBeInViewport();
+    await expect(priorities.locator('.guide-visual__position')).toHaveCount(0);
+    const arrows = await priorities
+      .locator(':scope > li[data-priority-relation]')
+      .evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const arrow = getComputedStyle(node, '::before');
+          return {
+            top: parseFloat(arrow.top),
+            height: node.getBoundingClientRect().height,
+          };
+        }),
+      );
+    for (const arrow of arrows)
+      expect(Math.abs(arrow.top - arrow.height / 2)).toBeLessThan(2);
     if (width === 360 || width === 1440)
       await priorities.screenshot({
         path: info.outputPath(`guide-priorities-${width}.png`),
@@ -86,6 +100,24 @@ test('гайд: навигация, экипировка и мобильная �
       }),
     );
     expect(Math.max(...offsets)).toBeLessThan(1);
+    expect(
+      await rotation
+        .locator(':scope > li')
+        .evaluateAll((nodes) =>
+          nodes.every((node) =>
+            ['none', 'normal'].includes(
+              getComputedStyle(node, '::after').content,
+            ),
+          ),
+        ),
+    ).toBe(true);
+    await expect(page.locator('.guide-visual--stats > li p')).toHaveCount(0);
+    const cartridges = page.locator('.guide-visual--cartridges');
+    await cartridges.scrollIntoViewIfNeeded();
+    if (width === 360 || width === 1440)
+      await cartridges.screenshot({
+        path: info.outputPath(`guide-cartridges-${width}.png`),
+      });
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth + 1,

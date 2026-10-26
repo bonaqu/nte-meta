@@ -3292,6 +3292,8 @@ function CharacterDetailPage({
           width="520"
           height="620"
           loading="eager"
+          decoding="async"
+          fetchPriority="high"
           referrerPolicy="no-referrer"
         />
         <div className="character-dossier">

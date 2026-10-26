@@ -318,9 +318,12 @@ test('визуальная дуга: поиск, загрузка файла, с
   await statItem
     .getByLabel('Характеристика из игры')
     .selectOption('Бонус урона Лакшаны');
-  await statItem
-    .getByLabel('Краткое описание', { exact: true })
-    .fill('Приоритет основного стата');
+  await expect(
+    statItem.getByLabel('Краткое описание', { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    dialog.locator('.visual-section-preview .guide-visual--stats p'),
+  ).toHaveCount(0);
   await expect(
     dialog.locator('.visual-section-preview .guide-stat-icons img'),
   ).toHaveAttribute('src', /e7404c0c82eef53a2290\.webp$/);
@@ -378,7 +381,7 @@ test('визуальная дуга: поиск, загрузка файла, с
       ?.items[0],
   ).toMatchObject({
     name: 'Бонус урона Лакшаны',
-    description: 'Приоритет основного стата',
+    description: '',
     imageUrl: '',
   });
   await dialog.getByRole('button', { name: 'Закрыть редактор' }).click();

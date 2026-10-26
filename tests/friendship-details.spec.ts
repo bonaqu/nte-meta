@@ -165,7 +165,7 @@ test('награды и подарки показывают игровые оп�
     if (width === 360 || width === 1440) {
       const a11y = await new AxeBuilder({ page })
         .include('#character-friendship')
-        .include('.item-detail-popover:popover-open')
+        .include('.item-detail-overlay:popover-open .item-detail-popover')
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
         .analyze();
       expect(a11y.violations).toEqual([]);

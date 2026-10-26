@@ -116,6 +116,7 @@ test('общий профиль: читаемые сведения, задерж
         new Promise((resolve) => {
           document
             .getElementById(node.getAttribute('aria-controls')!)!
+            .closest('[popover]')!
             .addEventListener(
               'beforetoggle',
               (event) => {

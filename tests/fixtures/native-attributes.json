@@ -1,0 +1,4841 @@
+[
+  {
+    "id": "stat:00|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistPsychically",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageResistPsychically",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageResistPsychically",
+        "SourceString": "心灵伤害抗性",
+        "LocalizedString": "心灵伤害抗性"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_resistance_hurt_mind_.Icon_attri_resistance_hurt_mind_",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageResistPsychically",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_resistance_hurt_mind_.uasset",
+        "url": "/nte-meta/game-assets/125c40e2802791b4ffc5.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistPsychically",
+    "search": "damageresistpsychically dt_attributestaticdata ",
+    "sourceHash": "3e7abaa72fa2d976b690a6aee6d631103e6f952f1f6180cfda22d68dca0f52c0"
+  },
+  {
+    "id": "stat:01|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:ReactionAnHunDamageUp",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "ReactionAnHunDamageUp",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "ReactionAnHunDamageUp",
+        "SourceString": "黯星伤害增强",
+        "LocalizedString": "黯星伤害增强"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_resistance_hurt_mind_.Icon_attri_resistance_hurt_mind_",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "ReactionAnHunDamageUp",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_resistance_hurt_mind_.uasset",
+        "url": "/nte-meta/game-assets/125c40e2802791b4ffc5.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:ReactionAnHunDamageUp",
+    "search": "reactionanhundamageup dt_attributestaticdata ",
+    "sourceHash": "43498f6d41099ee32d0cb6b69bae24c9abf5d6e3c9151017841a22b5571106c5"
+  },
+  {
+    "id": "stat:03|loc:ST_Attribute::StrengthMax",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "StrengthMax",
+    "ownerId": "",
+    "values": {
+      "ru": "Выносливость",
+      "en": "Stamina",
+      "ja": "スタミナ",
+      "zh": "体力值"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "StrengthMax",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::StrengthMax",
+    "search": "strengthmax st_attribute  выносливость stamina スタミナ 体力值",
+    "sourceHash": "820dc36b9e3cfd76d12f49d86896979450c03bfbe0bf6fb3a739f3a8502afc71"
+  },
+  {
+    "id": "stat:03|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistCosmos",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageResistCosmos",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageResistCosmos",
+        "SourceString": "光属性异能伤害抗性",
+        "LocalizedString": "光属性异能伤害抗性"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_DamageResist_white.Icon_DamageResist_white",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageResistCosmos",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_DamageResist_white.uasset",
+        "url": "/nte-meta/game-assets/10f1822a7e41a8b37859.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistCosmos",
+    "search": "damageresistcosmos dt_attributestaticdata ",
+    "sourceHash": "3a7feece76f16c7b06c17549af61665de67772aa12acec9d20aa45ad766576f7"
+  },
+  {
+    "id": "stat:03|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistIncantation",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageResistIncantation",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageResistIncantation",
+        "SourceString": "咒属性异能伤害抗性",
+        "LocalizedString": "咒属性异能伤害抗性"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_DamageResist_red.Icon_DamageResist_red",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageResistIncantation",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_DamageResist_red.uasset",
+        "url": "/nte-meta/game-assets/f4804f9eb4e13491c3d3.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistIncantation",
+    "search": "damageresistincantation dt_attributestaticdata ",
+    "sourceHash": "94bbdd9c6ff0108d3922fcaa59dc7256be9e69979595aa8b0b035dca10fd3dd5"
+  },
+  {
+    "id": "stat:04|loc:ST_Attribute::HPMax",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "HPMax",
+    "ownerId": "",
+    "values": {
+      "ru": "ОЗ",
+      "en": "HP",
+      "ja": "HP",
+      "zh": "生命值"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "HPMaxBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "HPMaxBase",
+          "field": "FinalAttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "HPMaxUp",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "HPMaxAdd",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "HPMaxAdd",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 5
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::HPMax",
+    "search": "hpmax st_attribute  оз hp hp 生命值",
+    "sourceHash": "1e53970c5912385c783ac49dc441614c96071dcd51c515de3593af549299ca15"
+  },
+  {
+    "id": "stat:04|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:TenacityMax",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "TenacityMax",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "TenacityMax",
+        "SourceString": "韧性值",
+        "LocalizedString": "韧性值"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_TenacityMax.Icon_TenacityMax",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "TenacityMax",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_TenacityMax.uasset",
+        "url": "/nte-meta/game-assets/4887f150e1cba86e64cc.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:TenacityMax",
+    "search": "tenacitymax dt_attributestaticdata ",
+    "sourceHash": "54ad5102416a2aa0360d1f548d2d7ff4becb449b6f5e4f293dbd7769003d6364"
+  },
+  {
+    "id": "stat:04|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpPsycheBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageUpPsycheBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageUpPsyche",
+        "SourceString": "魂属性异能伤害增强",
+        "LocalizedString": "魂属性异能伤害增强"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_DamageUp_bule.Icon_DamageUp_bule",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageUpPsycheBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "DamageUpPsyche",
+          "SourceString": "魂属性异能伤害增强",
+          "LocalizedString": "魂属性异能伤害增强"
+        },
+        "FilterCondition": 8
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.0125
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_DamageUp_bule.uasset",
+        "url": "/nte-meta/game-assets/75a01c3718f57e576b08.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpPsycheBase",
+    "search": "damageuppsychebase dt_attributestaticdata ",
+    "sourceHash": "9d9d957970dc3e2b31f93107b64561cbb500c166d92460d77699ec43da76e444"
+  },
+  {
+    "id": "stat:05|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:AtkAdd",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "AtkAdd",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Atk",
+        "SourceString": "攻击力",
+        "LocalizedString": "攻击力"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_gongji.icon_attri_gongji",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "AtkAdd",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "Atk",
+          "SourceString": "攻击力",
+          "LocalizedString": "攻击力"
+        },
+        "FilterCondition": 22
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "AtkAdd_des",
+        "SourceString": "攻击力增加{0}",
+        "LocalizedString": "攻击力增加{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 16
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_gongji.uasset",
+        "url": "/nte-meta/game-assets/ba0908d08ebf5aa48c91.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:AtkAdd",
+    "search": "atkadd dt_attributestaticdata ",
+    "sourceHash": "af29ab60cfa00297a82d5fab83fbc66a5e554bd31085bbdb3b9e5a299febfa48"
+  },
+  {
+    "id": "stat:05|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:MagUp",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "MagUp",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Mag",
+        "SourceString": "环合强度",
+        "LocalizedString": "环合强度"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_surpass.Icon_attri_surpass",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "MagUp",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Mag_des",
+        "SourceString": "环合强度增加{0}",
+        "LocalizedString": "环合强度增加{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_surpass.uasset",
+        "url": "/nte-meta/game-assets/0a61c9cdb481de96357a.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:MagUp",
+    "search": "magup dt_attributestaticdata ",
+    "sourceHash": "d6d344ffa168bb9d75409e5a7fef946292ac7b3a81a4e8634727dce81204f2dd"
+  },
+  {
+    "id": "stat:06|loc:ST_Attribute::DamageResistIncantation",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageResistIncantation",
+    "ownerId": "",
+    "values": {
+      "ru": "Сопротивление чарам",
+      "en": "Incantation Resistance",
+      "ja": "呪異能ダメージ耐性",
+      "zh": "咒属性异能伤害抗性"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageResistIncantation",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageResistIncantation",
+    "search": "damageresistincantation st_attribute  сопротивление чарам incantation resistance 呪異能ダメージ耐性 咒属性异能伤害抗性",
+    "sourceHash": "458747ae15344451d6e7aecfc8c7dd6d5ffe6eee5ac5c86a29826b675e40e35b"
+  },
+  {
+    "id": "stat:06|loc:ST_Attribute::DefUp",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DefUp",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к защите",
+      "en": "DEF Bonus",
+      "ja": "防御力％",
+      "zh": "防御力百分比"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DefUp",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DefUp",
+    "search": "defup st_attribute  бонус к защите def bonus 防御力％ 防御力百分比",
+    "sourceHash": "34d9c0b443cad1e859213ae3c025ec5145d7e0bba1fbb5725b012fea6a31a4a9"
+  },
+  {
+    "id": "stat:06|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:AtkBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "AtkBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Atk",
+        "SourceString": "攻击力",
+        "LocalizedString": "攻击力"
+      },
+      "FinalAttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Atk",
+        "SourceString": "攻击力",
+        "LocalizedString": "攻击力"
+      },
+      "bShowOutside": true,
+      "bShowInner": true,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_gongji.icon_attri_gongji",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "AtkBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_gongji.uasset",
+        "url": "/nte-meta/game-assets/ba0908d08ebf5aa48c91.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:AtkBase",
+    "search": "atkbase dt_attributestaticdata ",
+    "sourceHash": "ca0b6c47685691c7df43d9eaf41612a8bb1a16e9407d92c5fd3c59f4b9f2ab34"
+  },
+  {
+    "id": "stat:06|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:TenacityAntiDestroyEfficiency",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "TenacityAntiDestroyEfficiency",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "TenacityAntiDestroyEfficiency",
+        "SourceString": "韧性抵抗",
+        "LocalizedString": "韧性抵抗"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_TenacityAntiDestroyEfficiency.Icon_TenacityAntiDestroyEfficiency",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "TenacityAntiDestroyEfficiency",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_TenacityAntiDestroyEfficiency.uasset",
+        "url": "/nte-meta/game-assets/558ca69a5a37d0230c47.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:TenacityAntiDestroyEfficiency",
+    "search": "tenacityantidestroyefficiency dt_attributestaticdata ",
+    "sourceHash": "c5ff995de7d23e88f6557a7c990feb26676705f9edc01877e57310b0fe361583"
+  },
+  {
+    "id": "stat:06|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:Comfort",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "Comfort",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Home_1_Comfort",
+        "SourceString": "舒适",
+        "LocalizedString": "舒适"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI/house/FurnitureList/UI_YH_Home_AxIcon_128_1.UI_YH_Home_AxIcon_128_1",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "Comfort",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Home_1_Comfort_D",
+        "SourceString": "每6小时回复：{0}",
+        "LocalizedString": "每6小时回复：{0}"
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI/house/FurnitureList/UI_YH_Home_AxIcon_128_1.uasset",
+        "url": "/nte-meta/game-assets/0877eace09b4af92a6df.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:Comfort",
+    "search": "comfort dt_attributestaticdata ",
+    "sourceHash": "7cfcf2c4e903da243916f58b461e1e34f965bcaf8a28573ff52ea6860b683b7c"
+  },
+  {
+    "id": "stat:08|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:AtkUp",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "AtkUp",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Atk",
+        "SourceString": "攻击力",
+        "LocalizedString": "攻击力"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_gongji.icon_attri_gongji",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "AtkUp",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "AtkUp",
+          "SourceString": "攻击力百分比",
+          "LocalizedString": "攻击力百分比"
+        },
+        "FilterCondition": 28
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "AtkUp_des",
+        "SourceString": "攻击力提升{0}",
+        "LocalizedString": "攻击力提升{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.0125
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_gongji.uasset",
+        "url": "/nte-meta/game-assets/ba0908d08ebf5aa48c91.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:AtkUp",
+    "search": "atkup dt_attributestaticdata ",
+    "sourceHash": "b50c551c189cbfecc0385a0bfd28207c2903b3c44c7a05fa5820aec80c5a8ab7"
+  },
+  {
+    "id": "stat:08|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistNature",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageResistNature",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageResistNature",
+        "SourceString": "灵属性异能伤害抗性",
+        "LocalizedString": "灵属性异能伤害抗性"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_DamageResist_ching.Icon_DamageResist_ching",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageResistNature",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_DamageResist_ching.uasset",
+        "url": "/nte-meta/game-assets/bf9a51add65ef0392f41.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistNature",
+    "search": "damageresistnature dt_attributestaticdata ",
+    "sourceHash": "1dcb77e10ed16b313a90c563d8bb717559454044239f7ddb7922e012dea1b81e"
+  },
+  {
+    "id": "stat:09|loc:ST_Attribute::Def",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Def",
+    "ownerId": "",
+    "values": {
+      "ru": "Защита",
+      "en": "DEF",
+      "ja": "防御力",
+      "zh": "防御力"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DefBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DefBase",
+          "field": "FinalAttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DefUp",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DefAdd",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DefAdd",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 5
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Def",
+    "search": "def st_attribute  защита def 防御力 防御力",
+    "sourceHash": "7b6bbf8334c72a926c8aa199aac97ba9058bef80fc9be24018d8b8e61a32600d"
+  },
+  {
+    "id": "stat:09|loc:ST_Attribute::UnbalIntensity",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "UnbalIntensity",
+    "ownerId": "",
+    "values": {
+      "ru": "Интенсивность разрушения",
+      "en": "Break Intensity",
+      "ja": "ブレイクパワー",
+      "zh": "倾陷强度"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "UnbalIntensity",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "UnbalIntensityBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "UnbalIntensityBase",
+          "field": "AttributeFilterData.FilterViewName"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "UnbalIntensityUp",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "UnbalIntensityAdd",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 5
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::UnbalIntensity",
+    "search": "unbalintensity st_attribute  интенсивность разрушения break intensity ブレイクパワー 倾陷强度",
+    "sourceHash": "a76011e3e3e2ea4b6e156259e4fc3d5cbded81b61ed3926075beb359ffdca180"
+  },
+  {
+    "id": "stat:0a|loc:ST_Attribute::DefUp_des",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DefUp_des",
+    "ownerId": "",
+    "values": {
+      "ru": "Защита +{0}",
+      "en": "DEF +{0}",
+      "ja": "防御力+{0}",
+      "zh": "防御力提升{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DefUp",
+          "field": "EquipmentRandomAttributeName"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DefUp_des",
+    "search": "defup_des st_attribute  защита +{0} def +{0} 防御力+{0} 防御力提升{0}",
+    "sourceHash": "e21503148357edf78c6b3aa92b28c6cd4b94f318c0200fdfdf9554b7ff7607b7"
+  },
+  {
+    "id": "stat:0a|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:HealUp",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "HealUp",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "HealUp",
+        "SourceString": "治疗加成",
+        "LocalizedString": "治疗加成"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_HealUp.Icon_HealUp",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "HealUp",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "HealUp",
+          "SourceString": "治疗加成",
+          "LocalizedString": "治疗加成"
+        },
+        "FilterCondition": 8
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_HealUp.uasset",
+        "url": "/nte-meta/game-assets/78f0e753de8913fc09dd.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:HealUp",
+    "search": "healup dt_attributestaticdata ",
+    "sourceHash": "2529c28ce44c30cb4025bb6510fdccaef278edb46a78ec8b376662f2b4a645b3"
+  },
+  {
+    "id": "stat:0d|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpPsychicallyBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageUpPsychicallyBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageUpPsychically",
+        "SourceString": "心灵伤害增强",
+        "LocalizedString": "心灵伤害增强"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_hurt_mind.Icon_attri_hurt_mind",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageUpPsychicallyBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "DamageUpPsychically",
+          "SourceString": "心灵伤害增强",
+          "LocalizedString": "心灵伤害增强"
+        },
+        "FilterCondition": 8
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_hurt_mind.uasset",
+        "url": "/nte-meta/game-assets/0846d8e258cc168d673a.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpPsychicallyBase",
+    "search": "damageuppsychicallybase dt_attributestaticdata ",
+    "sourceHash": "a527e9ec10af2912d71df54b0d6360b54d8a461d33771b2434de3c5899680f4e"
+  },
+  {
+    "id": "stat:0e|loc:ST_Attribute::DefIgnore",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DefIgnore",
+    "ownerId": "",
+    "values": {
+      "ru": "Пробивание",
+      "en": "Penetration",
+      "ja": "防御無視",
+      "zh": "防御无视"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DefIgnore",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DefIgnore",
+    "search": "defignore st_attribute  пробивание penetration 防御無視 防御无视",
+    "sourceHash": "1c79fc4d132ed2dcf9aefc65344623fe917315fd08791cb25de18e54f16c1a4b"
+  },
+  {
+    "id": "stat:0e|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:UnbalIntensity",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "UnbalIntensity",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "UnbalIntensity",
+        "SourceString": "倾陷强度",
+        "LocalizedString": "倾陷强度"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_strength_qingxian.Icon_attri_strength_qingxian",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "UnbalIntensity",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Unbal_detail",
+        "SourceString": "倾陷强度可以提升倾陷伤害。(倾陷伤害由小队成员共同影响，每个角色的倾陷强度只影响自身部分)\r\n当前该角色倾陷伤害提升{0}%",
+        "LocalizedString": "倾陷强度可以提升倾陷伤害。(倾陷伤害由小队成员共同影响，每个角色的倾陷强度只影响自身部分)\r\n当前该角色倾陷伤害提升{0}%"
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_strength_qingxian.uasset",
+        "url": "/nte-meta/game-assets/564987c69ecfe164d76e.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:UnbalIntensity",
+    "search": "unbalintensity dt_attributestaticdata ",
+    "sourceHash": "b2337d53ae17dc5cb3983b4fc490dfce85d575929c07c5acc42b3ef2c8ec0e74"
+  },
+  {
+    "id": "stat:0f|loc:ST_Attribute::CostGainEfficiency_des",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "CostGainEfficiency_des",
+    "ownerId": "",
+    "values": {
+      "ru": "Скорость зарядки +{0}",
+      "en": "Charge Efficiency +{0}",
+      "ja": "チャージ効率+{0}",
+      "zh": "充能效率提升{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "ChargeGetEfficiencyBase",
+          "field": "EquipmentRandomAttributeName"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::CostGainEfficiency_des",
+    "search": "costgainefficiency_des st_attribute  скорость зарядки +{0} charge efficiency +{0} チャージ効率+{0} 充能效率提升{0}",
+    "sourceHash": "2a6a5bf2ec5940e73c328e0f49441c28325e35d13131915f38364e46b3fe39a2"
+  },
+  {
+    "id": "stat:0f|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:CritDamageAdd",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "CritDamageAdd",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "CritDamage",
+        "SourceString": "暴击伤害",
+        "LocalizedString": "暴击伤害"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_baojishanghai.icon_attri_baojishanghai",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "CritDamageAdd",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "CritDamage",
+          "SourceString": "暴击伤害",
+          "LocalizedString": "暴击伤害"
+        },
+        "FilterCondition": 1
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "CritDamage_des",
+        "SourceString": "暴击伤害提升{0}",
+        "LocalizedString": "暴击伤害提升{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.02
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_baojishanghai.uasset",
+        "url": "/nte-meta/game-assets/56f87c7e7402bf44ff21.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:CritDamageAdd",
+    "search": "critdamageadd dt_attributestaticdata ",
+    "sourceHash": "a234c2bb5008a336c5608e6720c8467e02fde9afdeb7786115232c6c52c32836"
+  },
+  {
+    "id": "stat:12|loc:ST_Attribute::CritDamage_des",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "CritDamage_des",
+    "ownerId": "",
+    "values": {
+      "ru": "Крит. урон +{0}",
+      "en": "CRIT DMG +{0}",
+      "ja": "クリティカルダメージ+{0}",
+      "zh": "暴击伤害提升{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "CritDamageBase",
+          "field": "EquipmentRandomAttributeName"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "CritDamageAdd",
+          "field": "EquipmentRandomAttributeName"
+        }
+      ],
+      "referenceCount": 2
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::CritDamage_des",
+    "search": "critdamage_des st_attribute  крит. урон +{0} crit dmg +{0} クリティカルダメージ+{0} 暴击伤害提升{0}",
+    "sourceHash": "0074e6f3a1caf1de3645b5eb21b418669a54f63859b95a510b82d7bd6a0496ea"
+  },
+  {
+    "id": "stat:13|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DefBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DefBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Def",
+        "SourceString": "防御力",
+        "LocalizedString": "防御力"
+      },
+      "FinalAttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Def",
+        "SourceString": "防御力",
+        "LocalizedString": "防御力"
+      },
+      "bShowOutside": true,
+      "bShowInner": true,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_fangyu.icon_attri_fangyu",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "DefBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_fangyu.uasset",
+        "url": "/nte-meta/game-assets/7a7342aa1474fd72b344.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DefBase",
+    "search": "defbase dt_attributestaticdata ",
+    "sourceHash": "f77e763ae86d399d893e3afc3ad65fe0f8b1d64a6ada519f319a2d4ddf900b32"
+  },
+  {
+    "id": "stat:15|loc:ST_Attribute::CostGainEfficiency",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "CostGainEfficiency",
+    "ownerId": "",
+    "values": {
+      "ru": "Скорость зарядки",
+      "en": "Charge Efficiency",
+      "ja": "チャージ効率",
+      "zh": "充能效率"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "ChargeGetEfficiencyBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "ChargeGetEfficiencyBase",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 2
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::CostGainEfficiency",
+    "search": "costgainefficiency st_attribute  скорость зарядки charge efficiency チャージ効率 充能效率",
+    "sourceHash": "9d8424e9ab6949ab217340c8666ee37c8df9a8bda7a51b2ad78bff4583e1d7c4"
+  },
+  {
+    "id": "stat:15|loc:ST_Attribute::ReactionGuangLingDamageUp",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "ReactionGuangLingDamageUp",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к урону цветения",
+      "en": "Blossom DMG Bonus",
+      "ja": "創生ダメージ強化",
+      "zh": "创生伤害增强"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "ReactionGuangLingDamageUp",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::ReactionGuangLingDamageUp",
+    "search": "reactionguanglingdamageup st_attribute  бонус к урону цветения blossom dmg bonus 創生ダメージ強化 创生伤害增强",
+    "sourceHash": "4e88bad18e9788be3a39b814ed1341d7a6a7263cb9fde56269dc7e161745053a"
+  },
+  {
+    "id": "stat:16|loc:ST_Attribute::Home_4_Collect_D",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Home_4_Collect_D",
+    "ownerId": "",
+    "values": {
+      "ru": "Коллекция: {0}",
+      "en": "Collection: {0}",
+      "ja": "コレクション値：{0}",
+      "zh": "收藏值：{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "Collect",
+          "field": "AttributeDetail"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Home_4_Collect_D",
+    "search": "home_4_collect_d st_attribute  коллекция: {0} collection: {0} コレクション値：{0} 收藏值：{0}",
+    "sourceHash": "c417dbcf92651f0724aa9aaa5486ddb85b0152995a75acdddece21ffa618649b"
+  },
+  {
+    "id": "stat:16|loc:ST_Attribute::ReactionAnHunDamageUp",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "ReactionAnHunDamageUp",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к урону новы",
+      "en": "Nova DMG Bonus",
+      "ja": "暗星ダメージ強化",
+      "zh": "黯星伤害增强"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "ReactionAnHunDamageUp",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::ReactionAnHunDamageUp",
+    "search": "reactionanhundamageup st_attribute  бонус к урону новы nova dmg bonus 暗星ダメージ強化 黯星伤害增强",
+    "sourceHash": "8d94fb1fcdd073bcca017bc6d3c6639591b7fdfe6dac702010613a9dcbda4b86"
+  },
+  {
+    "id": "stat:17|loc:ST_Attribute::DamageResistCosmos",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageResistCosmos",
+    "ownerId": "",
+    "values": {
+      "ru": "Сопротивление космосу",
+      "en": "Cosmos Resistance",
+      "ja": "光異能ダメージ耐性",
+      "zh": "光属性异能伤害抗性"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageResistCosmos",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageResistCosmos",
+    "search": "damageresistcosmos st_attribute  сопротивление космосу cosmos resistance 光異能ダメージ耐性 光属性异能伤害抗性",
+    "sourceHash": "0b4327e52f75bb6d98a41014a746dea54b737c727e2362ab5bdeb337ffafdaaa"
+  },
+  {
+    "id": "stat:17|loc:ST_Attribute::DamageUpGeneral_des",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageUpGeneral_des",
+    "ownerId": "",
+    "values": {
+      "ru": "Урон +{0}",
+      "en": "DMG +{0}",
+      "ja": "ダメージ+{0}",
+      "zh": "伤害增加{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpGeneralBase",
+          "field": "EquipmentRandomAttributeName"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpGeneralAdd",
+          "field": "EquipmentRandomAttributeName"
+        }
+      ],
+      "referenceCount": 2
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageUpGeneral_des",
+    "search": "damageupgeneral_des st_attribute  урон +{0} dmg +{0} ダメージ+{0} 伤害增加{0}",
+    "sourceHash": "16347b0c1d88a46a4aed1316af134c8250fea0d6f687a4597d2785a5dbca794f"
+  },
+  {
+    "id": "stat:17|loc:ST_Attribute::DefAdd_des",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DefAdd_des",
+    "ownerId": "",
+    "values": {
+      "ru": "Защита +{0}",
+      "en": "DEF +{0}",
+      "ja": "防御力+{0}",
+      "zh": "防御力增加{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DefAdd",
+          "field": "EquipmentRandomAttributeName"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DefAdd_des",
+    "search": "defadd_des st_attribute  защита +{0} def +{0} 防御力+{0} 防御力增加{0}",
+    "sourceHash": "ddf9207e692ef29b5336829b9e7223eaaba4b92137f4ca281028f8b9290e0489"
+  },
+  {
+    "id": "stat:17|loc:ST_Attribute::Home_2_Fortune_D",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Home_2_Fortune_D",
+    "ownerId": "",
+    "values": {
+      "ru": "Премия за управление: {0}",
+      "en": "Management Bonus: {0}",
+      "ja": "経営ボーナス：{0}",
+      "zh": "经营加成：{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "Fortune",
+          "field": "AttributeDetail"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Home_2_Fortune_D",
+    "search": "home_2_fortune_d st_attribute  премия за управление: {0} management bonus: {0} 経営ボーナス：{0} 经营加成：{0}",
+    "sourceHash": "80af4b7c62c1d6817963aa9fddcc1ccaf4df8ee7ccd64639942aaf054eba5a77"
+  },
+  {
+    "id": "stat:17|loc:ST_Attribute::Mag_detail",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Mag_detail",
+    "ownerId": "",
+    "values": {
+      "ru": "Интенсивность цикла усиливает эффекты циклов эспера. При запуске цикла эспера действующая интенсивность циклов «Цветения», «Новы» и «Ожога» зависит от участника с наивысшим итоговым значением параметра эффекта. Эффекты «Колдовства» и «Следа» зависят от наносящего урон.<cf>Текущая интенсивность цикла увеличивает урон <cf>«Цветения», «Новы» и «Ожога» на {0} %.<cf>Также увеличивает урон «Колдовства» и «Следа» на {1} %.",
+      "en": "Cycle Intensity enhances Esper Cycle effects. When an Esper Cycle is triggered, the effective Cycle Intensity of Blossom, Nova, and Scorch is determined by the participant with the higher final effect value. The effects of Hexed and Stain are determined by the damage dealer.<cf>Current Cycle Intensity increases <cf>Blossom, Nova, and Scorch DMG by {0}%.<cf>Additionally, increases Hexed and Stain DMG by {1}%.",
+      "ja": "連環パワーは異能連環の効果を高めるステータスである。異能連環が発生した時、「創生」、「暗星」、「濁燃」に有効な連環パワーは、異能連環に参加した両者のうち、最終効果数値が高いほうに依存し、「覆紋」、「浸染」はダメージを与えた者に依存する。<cf>現在の連環パワーにより、<cf>「創生」、「暗星」、「濁燃」によるダメージ+{0}%。<cf>「覆紋」、「浸染」のダメージが追加で+{1}%。",
+      "zh": "环合强度提高异能环合的效果。当异能环合触发时，「创生」、「黯星」、「浊燃」生效的环合强度取决于参与异能环合的两者最终效果数值较高的一方；「覆纹」、「浸染」取决于造成伤害者。<cf>当前环合强度能够让<cf>「创生」、「黯星」、「浊燃」造成的伤害提高{0}%。<cf>「覆纹」、「浸染」的伤害额外提高{1}%。"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "Mag",
+          "field": "AttributeDetail"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Mag_detail",
+    "search": "mag_detail st_attribute  интенсивность цикла усиливает эффекты циклов эспера. при запуске цикла эспера действующая интенсивность циклов «цветения», «новы» и «ожога» зависит от участника с наивысшим итоговым значением параметра эффекта. эффекты «колдовства» и «следа» зависят от наносящего урон.<cf>текущая интенсивность цикла увеличивает урон <cf>«цветения», «новы» и «ожога» на {0} %.<cf>также увеличивает урон «колдовства» и «следа» на {1} %. cycle intensity enhances esper cycle effects. when an esper cycle is triggered, the effective cycle intensity of blossom, nova, and scorch is determined by the participant with the higher final effect value. the effects of hexed and stain are determined by the damage dealer.<cf>current cycle intensity increases <cf>blossom, nova, and scorch dmg by {0}%.<cf>additionally, increases hexed and stain dmg by {1}%. 連環パワーは異能連環の効果を高めるステータスである。異能連環が発生した時、「創生」、「暗星」、「濁燃」に有効な連環パワーは、異能連環に参加した両者のうち、最終効果数値が高いほうに依存し、「覆紋」、「浸染」はダメージを与えた者に依存する。<cf>現在の連環パワーにより、<cf>「創生」、「暗星」、「濁燃」によるダメージ+{0}%。<cf>「覆紋」、「浸染」のダメージが追加で+{1}%。 环合强度提高异能环合的效果。当异能环合触发时，「创生」、「黯星」、「浊燃」生效的环合强度取决于参与异能环合的两者最终效果数值较高的一方；「覆纹」、「浸染」取决于造成伤害者。<cf>当前环合强度能够让<cf>「创生」、「黯星」、「浊燃」造成的伤害提高{0}%。<cf>「覆纹」、「浸染」的伤害额外提高{1}%。",
+    "sourceHash": "d19e84098907800a89d3d57cb780b9de9abc929f5e1cfcc5ab839828fdc205a0"
+  },
+  {
+    "id": "stat:17|loc:ST_Attribute::ReactionGeneralDamageUp",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "ReactionGeneralDamageUp",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к урону цикла",
+      "en": "Cycle DMG Bonus",
+      "ja": "連環ダメージ強化",
+      "zh": "环合伤害增强"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "ReactionGeneralDamageUp",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::ReactionGeneralDamageUp",
+    "search": "reactiongeneraldamageup st_attribute  бонус к урону цикла cycle dmg bonus 連環ダメージ強化 环合伤害增强",
+    "sourceHash": "f26c2c232915a8041de895e482af99c0709a3ffbe88660c92f9bd33f6fb78d69"
+  },
+  {
+    "id": "stat:18|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistLakshana",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageResistLakshana",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageResistLakshana",
+        "SourceString": "相属性异能伤害抗性",
+        "LocalizedString": "相属性异能伤害抗性"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_DamageResist_yellow.Icon_DamageResist_yellow",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageResistLakshana",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_DamageResist_yellow.uasset",
+        "url": "/nte-meta/game-assets/923b7b43109f3127ce44.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistLakshana",
+    "search": "damageresistlakshana dt_attributestaticdata ",
+    "sourceHash": "6e5256199869444ab0162d151c672c26153e893b367c026277595a07011b17cc"
+  },
+  {
+    "id": "stat:19|loc:ST_Attribute::DamageUpLakshana",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageUpLakshana",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к урону лакшаны",
+      "en": "Lakshana DMG Bonus",
+      "ja": "相異能ダメージ強化",
+      "zh": "相属性异能伤害增强"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpLakshanaBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpLakshanaBase",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 2
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageUpLakshana",
+    "search": "damageuplakshana st_attribute  бонус к урону лакшаны lakshana dmg bonus 相異能ダメージ強化 相属性异能伤害增强",
+    "sourceHash": "af54d7c03b043e662a7a98e5fc265957006fe35b228865098b7100d529a3bbdc"
+  },
+  {
+    "id": "stat:19|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpGeneralBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageUpGeneralBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageUpGeneral",
+        "SourceString": "通用伤害增强",
+        "LocalizedString": "通用伤害增强"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": true,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_kangxing.icon_attri_kangxing",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageUpGeneralBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "DamageUpGeneral",
+          "SourceString": "通用伤害增强",
+          "LocalizedString": "通用伤害增强"
+        },
+        "FilterCondition": 20
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageUpGeneral_des",
+        "SourceString": "伤害增加{0}",
+        "LocalizedString": "伤害增加{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.01
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_kangxing.uasset",
+        "url": "/nte-meta/game-assets/7758a55d263d2919d42c.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpGeneralBase",
+    "search": "damageupgeneralbase dt_attributestaticdata ",
+    "sourceHash": "b4cb4934eb14923979ab02aefe9ed68b4f6dfa6fa5896952aec01017d3489061"
+  },
+  {
+    "id": "stat:1a|loc:ST_Attribute::DamageResistNature",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageResistNature",
+    "ownerId": "",
+    "values": {
+      "ru": "Сопр. урону анимы",
+      "en": "Anima Resistance",
+      "ja": "霊異能ダメージ耐性",
+      "zh": "灵属性异能伤害抗性"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageResistNature",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageResistNature",
+    "search": "damageresistnature st_attribute  сопр. урону анимы anima resistance 霊異能ダメージ耐性 灵属性异能伤害抗性",
+    "sourceHash": "bfe1639969bae894b43175d044af66316ca7ea37fe3f89e69db085c85351464b"
+  },
+  {
+    "id": "stat:1a|loc:ST_Attribute::HPMaxUp_des",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "HPMaxUp_des",
+    "ownerId": "",
+    "values": {
+      "ru": "ОЗ +{0}",
+      "en": "HP +{0}",
+      "ja": "HP+{0}",
+      "zh": "生命值提升{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "HPMaxUp",
+          "field": "EquipmentRandomAttributeName"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::HPMaxUp_des",
+    "search": "hpmaxup_des st_attribute  оз +{0} hp +{0} hp+{0} 生命值提升{0}",
+    "sourceHash": "53538b9a88070ea97313bc3e23c64c926f0f4e929cf22b3ed9ad369375692347"
+  },
+  {
+    "id": "stat:1a|loc:ST_Attribute::Home_1_Comfort_D",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Home_1_Comfort_D",
+    "ownerId": "",
+    "values": {
+      "ru": "6-часовое восстановление: {0}",
+      "en": "6-Hours Recovery: {0}",
+      "ja": "6時間ごとに回復：{0}",
+      "zh": "每6小时回复：{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "Comfort",
+          "field": "AttributeDetail"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Home_1_Comfort_D",
+    "search": "home_1_comfort_d st_attribute  6-часовое восстановление: {0} 6-hours recovery: {0} 6時間ごとに回復：{0} 每6小时回复：{0}",
+    "sourceHash": "91dda2b440902872dcd02919a9f2b111dea099de0ba0af24b4deb9262f491c20"
+  },
+  {
+    "id": "stat:1a|loc:ST_Attribute::TenacityDestroyEfficiency",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "TenacityDestroyEfficiency",
+    "ownerId": "",
+    "values": {
+      "ru": "Пробой стойкости",
+      "en": "Tenacity Break",
+      "ja": "靭性破壊効率",
+      "zh": "韧性破坏效率"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "TenacityDestroyEfficiency",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::TenacityDestroyEfficiency",
+    "search": "tenacitydestroyefficiency st_attribute  пробой стойкости tenacity break 靭性破壊効率 韧性破坏效率",
+    "sourceHash": "7caac193ffe4c36202aeaf02a8495bdfc995e66ac518a564ae84f3aaee2e2b16"
+  },
+  {
+    "id": "stat:1a|loc:ST_Attribute::Unbal_detail",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Unbal_detail",
+    "ownerId": "",
+    "values": {
+      "ru": "Интенсивность разрушения усиливает урон от разрушения. (На урон от разрушения влияет вся команда, но интенсивность разрушения каждого персонажа влияет только на его индивидуальный вклад).<cf>Урон от разрушения текущего персонажа +{0} %",
+      "en": "Break Intensity enhances Break Damage. (Break Damage is calculated for the whole team, but each character's Break Intensity affects only their own contribution.)<cf>Current character's Break Damage +{0}%",
+      "ja": "ブレイクパワーはブレイクダメージを増加させる（ただし、キャラ個々のブレイクダメージしか強化できない）<cf>このキャラのブレイクダメージ+{0}％",
+      "zh": "倾陷强度可以提升倾陷伤害。(倾陷伤害由小队成员共同影响，每个角色的倾陷强度只影响自身部分)<cf>当前该角色倾陷伤害提升{0}%"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "UnbalIntensity",
+          "field": "AttributeDetail"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Unbal_detail",
+    "search": "unbal_detail st_attribute  интенсивность разрушения усиливает урон от разрушения. (на урон от разрушения влияет вся команда, но интенсивность разрушения каждого персонажа влияет только на его индивидуальный вклад).<cf>урон от разрушения текущего персонажа +{0} % break intensity enhances break damage. (break damage is calculated for the whole team, but each character's break intensity affects only their own contribution.)<cf>current character's break damage +{0}% ブレイクパワーはブレイクダメージを増加させる（ただし、キャラ個々のブレイクダメージしか強化できない）<cf>このキャラのブレイクダメージ+{0}％ 倾陷强度可以提升倾陷伤害。(倾陷伤害由小队成员共同影响，每个角色的倾陷强度只影响自身部分)<cf>当前该角色倾陷伤害提升{0}%",
+    "sourceHash": "4048f9c16ba1164e5b0be96afd33fa630e8f7ebe03edbc8a1cbad86dd2e1d626"
+  },
+  {
+    "id": "stat:1b|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:MagBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "MagBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Mag",
+        "SourceString": "环合强度",
+        "LocalizedString": "环合强度"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_surpass.Icon_attri_surpass",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "MagBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "Mag",
+          "SourceString": "环合强度",
+          "LocalizedString": "环合强度"
+        },
+        "FilterCondition": 28
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Mag_des",
+        "SourceString": "环合强度增加{0}",
+        "LocalizedString": "环合强度增加{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 6
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_surpass.uasset",
+        "url": "/nte-meta/game-assets/0a61c9cdb481de96357a.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:MagBase",
+    "search": "magbase dt_attributestaticdata ",
+    "sourceHash": "1392057c736de535ab520d75cc7d54251f65cba192e8103832dda693aa3e6f1e"
+  },
+  {
+    "id": "stat:1c|loc:ST_Attribute::DamageUpChaos",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageUpChaos",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к урону хаоса",
+      "en": "Chaos DMG Bonus",
+      "ja": "闇異能ダメージ強化",
+      "zh": "暗属性异能伤害增强"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpChaosBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpChaosBase",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 2
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageUpChaos",
+    "search": "damageupchaos st_attribute  бонус к урону хаоса chaos dmg bonus 闇異能ダメージ強化 暗属性异能伤害增强",
+    "sourceHash": "ddd08bc9e179ce9e31176d0147c75d94866f3c71bcab1c5120925e14d3a25c8e"
+  },
+  {
+    "id": "stat:1c|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:Love",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "Love",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Home_3_Love",
+        "SourceString": "喜爱",
+        "LocalizedString": "喜爱"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI/house/FurnitureList/UI_YH_Home_SsIcon_128_1.UI_YH_Home_SsIcon_128_1",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "Love",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Home_3_Love_D",
+        "SourceString": "羁绊效率：{0}",
+        "LocalizedString": "羁绊效率：{0}"
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI/house/FurnitureList/UI_YH_Home_SsIcon_128_1.uasset",
+        "url": "/nte-meta/game-assets/661acfa7044faf55f771.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:Love",
+    "search": "love dt_attributestaticdata ",
+    "sourceHash": "48dfac2d8d3ce8a93c52ede498ea06a66f32b5b5e870ecbe5c32fc4a862344e1"
+  },
+  {
+    "id": "stat:1d|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DefIgnore",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DefIgnore",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DefIgnore",
+        "SourceString": "防御无视",
+        "LocalizedString": "防御无视"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_DefIgnore.Icon_DefIgnore",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DefIgnore",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_DefIgnore.uasset",
+        "url": "/nte-meta/game-assets/22dd0a236c2ee7097c0d.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DefIgnore",
+    "search": "defignore dt_attributestaticdata ",
+    "sourceHash": "5d4b965395aca7116700a38d1b334bb63b38518afb8265089b27e6e234f356d9"
+  },
+  {
+    "id": "stat:1e|loc:ST_Attribute::Mag",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Mag",
+    "ownerId": "",
+    "values": {
+      "ru": "Интенсивность цикла",
+      "en": "Cycle Intensity",
+      "ja": "連環パワー",
+      "zh": "环合强度"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "Mag",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "MagUp",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "MagAdd",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "MagBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "MagBase",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 5
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Mag",
+    "search": "mag st_attribute  интенсивность цикла cycle intensity 連環パワー 环合强度",
+    "sourceHash": "83048c52084fe585b133309cde1c88237df20faad1e4296c430906838d4cdc7b"
+  },
+  {
+    "id": "stat:1e|loc:ST_Attribute::UnbalIntensity_des",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "UnbalIntensity_des",
+    "ownerId": "",
+    "values": {
+      "ru": "Интенсивность разрушения +{0}",
+      "en": "Break Intensity +{0}",
+      "ja": "ブレイクパワー+{0}",
+      "zh": "倾陷强度增加{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "UnbalIntensityBase",
+          "field": "EquipmentRandomAttributeName"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "UnbalIntensityUp",
+          "field": "EquipmentRandomAttributeName"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "UnbalIntensityAdd",
+          "field": "EquipmentRandomAttributeName"
+        }
+      ],
+      "referenceCount": 3
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::UnbalIntensity_des",
+    "search": "unbalintensity_des st_attribute  интенсивность разрушения +{0} break intensity +{0} ブレイクパワー+{0} 倾陷强度增加{0}",
+    "sourceHash": "850728c6c902454b44a24d4e85e24158273e2493c55b791a37d70184d39dcce9"
+  },
+  {
+    "id": "stat:1e|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:HPMaxBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "HPMaxBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "HPMax",
+        "SourceString": "生命值",
+        "LocalizedString": "生命值"
+      },
+      "FinalAttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "HPMax",
+        "SourceString": "生命值",
+        "LocalizedString": "生命值"
+      },
+      "bShowOutside": true,
+      "bShowInner": true,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_shengming.icon_attri_shengming",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "HPMaxBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_shengming.uasset",
+        "url": "/nte-meta/game-assets/f27fa742ed550786a38b.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:HPMaxBase",
+    "search": "hpmaxbase dt_attributestaticdata ",
+    "sourceHash": "f5f41eda80f8808054c2659d619f24fda2039c603ddf404542a4664083c16f09"
+  },
+  {
+    "id": "stat:1e|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:HealBeUp",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "HealBeUp",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "HealBeUp",
+        "SourceString": "受治疗加成",
+        "LocalizedString": "受治疗加成"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_HealBeUp.Icon_HealBeUp",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "HealBeUp",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_HealBeUp.uasset",
+        "url": "/nte-meta/game-assets/757eb00ebc09d465260e.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:HealBeUp",
+    "search": "healbeup dt_attributestaticdata ",
+    "sourceHash": "fd917d4d9b6b112724bc48b64a6d76e1dbcb72661fc15b196fc8ea9f4b720ef2"
+  },
+  {
+    "id": "stat:1f|loc:ST_Attribute::DamageUpGeneral",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageUpGeneral",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к урону",
+      "en": "Universal DMG Bonus",
+      "ja": "汎用ダメージ強化",
+      "zh": "通用伤害增强"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpGeneralBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpGeneralBase",
+          "field": "AttributeFilterData.FilterViewName"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpGeneralAdd",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpGeneralAdd",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 4
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageUpGeneral",
+    "search": "damageupgeneral st_attribute  бонус к урону universal dmg bonus 汎用ダメージ強化 通用伤害增强",
+    "sourceHash": "15f592fe4765c349eb18dc98e7921e0459fae5b227da64e54399f1817c797b1d"
+  },
+  {
+    "id": "stat:22|loc:ST_Attribute::DamageUpCosmos",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageUpCosmos",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к урону космоса",
+      "en": "Cosmos DMG Bonus",
+      "ja": "光異能ダメージ強化",
+      "zh": "光属性异能伤害增强"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpCosmosBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpCosmosBase",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 2
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageUpCosmos",
+    "search": "damageupcosmos st_attribute  бонус к урону космоса cosmos dmg bonus 光異能ダメージ強化 光属性异能伤害增强",
+    "sourceHash": "67f402551edb5d1fe6cd9a60d71ea980e4fc6a51559d87f8677bf8ab2ab1412e"
+  },
+  {
+    "id": "stat:23|loc:ST_Attribute::Home_3_Love_D",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Home_3_Love_D",
+    "ownerId": "",
+    "values": {
+      "ru": "Эффективность связи: {0}",
+      "en": "Bond Efficiency: {0}",
+      "ja": "絆効率：{0}",
+      "zh": "羁绊效率：{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "Love",
+          "field": "AttributeDetail"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Home_3_Love_D",
+    "search": "home_3_love_d st_attribute  эффективность связи: {0} bond efficiency: {0} 絆効率：{0} 羁绊效率：{0}",
+    "sourceHash": "be55413d879e2757e971667216b4c793be240cf4e63c5612d844e5f1136b5879"
+  },
+  {
+    "id": "stat:23|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpIncantationBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageUpIncantationBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageUpIncantation",
+        "SourceString": "咒属性异能伤害增强",
+        "LocalizedString": "咒属性异能伤害增强"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_DamageUp_red.Icon_DamageUp_red",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageUpIncantationBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "DamageUpIncantation",
+          "SourceString": "咒属性异能伤害增强",
+          "LocalizedString": "咒属性异能伤害增强"
+        },
+        "FilterCondition": 8
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.0125
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_DamageUp_red.uasset",
+        "url": "/nte-meta/game-assets/b5507cb8cea8e48c0d5d.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpIncantationBase",
+    "search": "damageupincantationbase dt_attributestaticdata ",
+    "sourceHash": "aa2ae988004d03f7e39f20043a0d57472181bb57f8835b807bc26434fdc3f2b8"
+  },
+  {
+    "id": "stat:23|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:Fortune",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "Fortune",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Home_2_Fortune",
+        "SourceString": "运势",
+        "LocalizedString": "运势"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI/house/FurnitureList/UI_YH_Home_YsIcon_128_1.UI_YH_Home_YsIcon_128_1",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "Fortune",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Home_2_Fortune_D",
+        "SourceString": "经营加成：{0}",
+        "LocalizedString": "经营加成：{0}"
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI/house/FurnitureList/UI_YH_Home_YsIcon_128_1.uasset",
+        "url": "/nte-meta/game-assets/f0a1f0305b695604cd3f.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:Fortune",
+    "search": "fortune dt_attributestaticdata ",
+    "sourceHash": "c9a107580ecb07d4188b14ac3a7f4931215aa9e4107276eed88eb6ca34a22df3"
+  },
+  {
+    "id": "stat:24|loc:ST_Attribute::DamageResistLakshana",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageResistLakshana",
+    "ownerId": "",
+    "values": {
+      "ru": "Сопротивление лакшане",
+      "en": "Lakshana Resistance",
+      "ja": "相異能ダメージ耐性",
+      "zh": "相属性异能伤害抗性"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageResistLakshana",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageResistLakshana",
+    "search": "damageresistlakshana st_attribute  сопротивление лакшане lakshana resistance 相異能ダメージ耐性 相属性异能伤害抗性",
+    "sourceHash": "19a6263952b854635df989e0a8667bef5fcbb3ecced3625d79a766403c2b159d"
+  },
+  {
+    "id": "stat:24|loc:ST_Attribute::DamageUpPsyche",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageUpPsyche",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к урону психики",
+      "en": "Psyche DMG Bonus",
+      "ja": "魂異能ダメージ強化",
+      "zh": "魂属性异能伤害增强"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpPsycheBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpPsycheBase",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 2
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageUpPsyche",
+    "search": "damageuppsyche st_attribute  бонус к урону психики psyche dmg bonus 魂異能ダメージ強化 魂属性异能伤害增强",
+    "sourceHash": "3e406abd3f45300077a3161674b235aa1703c3bff51229701aedeb23e7091477"
+  },
+  {
+    "id": "stat:24|loc:ST_Attribute::Home_4_Collect",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Home_4_Collect",
+    "ownerId": "",
+    "values": {
+      "ru": "Коллекция",
+      "en": "Collection",
+      "ja": "コレクション",
+      "zh": "收藏"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "Collect",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Home_4_Collect",
+    "search": "home_4_collect st_attribute  коллекция collection コレクション 收藏",
+    "sourceHash": "bd406700c236caee89f5f7d3ce1c23142cba2a8c4cb80bca6af5e9fd2a9e6083"
+  },
+  {
+    "id": "stat:24|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:UnbalIntensityUp",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "UnbalIntensityUp",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "UnbalIntensity",
+        "SourceString": "倾陷强度",
+        "LocalizedString": "倾陷强度"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_strength_qingxian.Icon_attri_strength_qingxian",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "UnbalIntensityUp",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "UnbalIntensity_des",
+        "SourceString": "倾陷强度增加{0}",
+        "LocalizedString": "倾陷强度增加{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_strength_qingxian.uasset",
+        "url": "/nte-meta/game-assets/564987c69ecfe164d76e.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:UnbalIntensityUp",
+    "search": "unbalintensityup dt_attributestaticdata ",
+    "sourceHash": "d4216fb07e777feef8fc66dc781a50e28598d35da2798cf5d044f0372d764b2c"
+  },
+  {
+    "id": "stat:24|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:ReactionGuangLingDamageUp",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "ReactionGuangLingDamageUp",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "ReactionGuangLingDamageUp",
+        "SourceString": "创生伤害增强",
+        "LocalizedString": "创生伤害增强"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_resistance_hurt_mind_.Icon_attri_resistance_hurt_mind_",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "ReactionGuangLingDamageUp",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_resistance_hurt_mind_.uasset",
+        "url": "/nte-meta/game-assets/125c40e2802791b4ffc5.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:ReactionGuangLingDamageUp",
+    "search": "reactionguanglingdamageup dt_attributestaticdata ",
+    "sourceHash": "7ae75ea4658b4fa8df7b9b2f3802ee3f30e77154f67224f95c947f045051a3c5"
+  },
+  {
+    "id": "stat:26|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:HPMaxUp",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "HPMaxUp",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "HPMax",
+        "SourceString": "生命值",
+        "LocalizedString": "生命值"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_shengming.icon_attri_shengming",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "HPMaxUp",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "HPMaxUp",
+          "SourceString": "生命值百分比",
+          "LocalizedString": "生命值百分比"
+        },
+        "FilterCondition": 28
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "HPMaxUp_des",
+        "SourceString": "生命值提升{0}",
+        "LocalizedString": "生命值提升{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.0125
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_shengming.uasset",
+        "url": "/nte-meta/game-assets/f27fa742ed550786a38b.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:HPMaxUp",
+    "search": "hpmaxup dt_attributestaticdata ",
+    "sourceHash": "5b481e4735c642a6a5986509eb8ff6170c51d79ec62f2dfb023b8fe95bfb3d6f"
+  },
+  {
+    "id": "stat:26|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:UnbalIntensityBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "UnbalIntensityBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "UnbalIntensity",
+        "SourceString": "倾陷强度",
+        "LocalizedString": "倾陷强度"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_strength_qingxian.Icon_attri_strength_qingxian",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "UnbalIntensityBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "UnbalIntensity",
+          "SourceString": "倾陷强度",
+          "LocalizedString": "倾陷强度"
+        },
+        "FilterCondition": 28
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "UnbalIntensity_des",
+        "SourceString": "倾陷强度增加{0}",
+        "LocalizedString": "倾陷强度增加{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 6
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_strength_qingxian.uasset",
+        "url": "/nte-meta/game-assets/564987c69ecfe164d76e.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:UnbalIntensityBase",
+    "search": "unbalintensitybase dt_attributestaticdata ",
+    "sourceHash": "5778dcc14eeb2a715deede62017aedffd12528db212153266e4b4e2911040593"
+  },
+  {
+    "id": "stat:27|loc:ST_Attribute::Home_1_Comfort",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Home_1_Comfort",
+    "ownerId": "",
+    "values": {
+      "ru": "Комфорт",
+      "en": "Comfort",
+      "ja": "快適度",
+      "zh": "舒适"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "Comfort",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Home_1_Comfort",
+    "search": "home_1_comfort st_attribute  комфорт comfort 快適度 舒适",
+    "sourceHash": "aa4b50d7edcc64f68b1ea550f6f8eaca1ff56c8ab7b65481a9fde59f8cedb390"
+  },
+  {
+    "id": "stat:28|loc:ST_Attribute::Crit",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Crit",
+    "ownerId": "",
+    "values": {
+      "ru": "Шанс крит. удара",
+      "en": "CRIT Rate",
+      "ja": "クリティカル率",
+      "zh": "暴击率"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "CritBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "CritBase",
+          "field": "AttributeFilterData.FilterViewName"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "CritAdd",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "CritAdd",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 4
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Crit",
+    "search": "crit st_attribute  шанс крит. удара crit rate クリティカル率 暴击率",
+    "sourceHash": "24ad594e29ecf27bda7ebfc8328a3fb768931c8e5ee8529cf32656cebdc8f3f4"
+  },
+  {
+    "id": "stat:28|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:ChargeGetEfficiencyBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "ChargeGetEfficiencyBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "CostGainEfficiency",
+        "SourceString": "充能效率",
+        "LocalizedString": "充能效率"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_CostGainEfficiency.Icon_CostGainEfficiency",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "ChargeGetEfficiencyBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "CostGainEfficiency",
+          "SourceString": "充能效率",
+          "LocalizedString": "充能效率"
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "CostGainEfficiency_des",
+        "SourceString": "充能效率提升{0}",
+        "LocalizedString": "充能效率提升{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.015
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_CostGainEfficiency.uasset",
+        "url": "/nte-meta/game-assets/575b92b5d015a8d6efec.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:ChargeGetEfficiencyBase",
+    "search": "chargegetefficiencybase dt_attributestaticdata ",
+    "sourceHash": "1a5413cae9bd1e569150f2f3180e200c30a81aaf7a86b38f632737a2651477da"
+  },
+  {
+    "id": "stat:29|loc:ST_Attribute::DamageUpNature",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageUpNature",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к урону анимы",
+      "en": "Anima DMG Bonus",
+      "ja": "霊異能ダメージ強化",
+      "zh": "灵属性异能伤害增强"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpNatureBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpNatureBase",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 2
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageUpNature",
+    "search": "damageupnature st_attribute  бонус к урону анимы anima dmg bonus 霊異能ダメージ強化 灵属性异能伤害增强",
+    "sourceHash": "ffabca093cdaac824e43f5596dabe1e260852c19d777746c905fd339c0c62dbd"
+  },
+  {
+    "id": "stat:29|loc:ST_Attribute::HPMaxUp",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "HPMaxUp",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к ОЗ",
+      "en": "HP Bonus",
+      "ja": "HP％",
+      "zh": "生命值百分比"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "HPMaxUp",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::HPMaxUp",
+    "search": "hpmaxup st_attribute  бонус к оз hp bonus hp％ 生命值百分比",
+    "sourceHash": "65853657e4914e72dc2afc8bb10162c55a82d515f917028a5c5897d09b177a8b"
+  },
+  {
+    "id": "stat:29|loc:ST_Attribute::TenacityAntiDestroyEfficiency",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "TenacityAntiDestroyEfficiency",
+    "ownerId": "",
+    "values": {
+      "ru": "Сопротивление стойкости",
+      "en": "Tenacity Resistance",
+      "ja": "靭性抵抗",
+      "zh": "韧性抵抗"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "TenacityAntiDestroyEfficiency",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::TenacityAntiDestroyEfficiency",
+    "search": "tenacityantidestroyefficiency st_attribute  сопротивление стойкости tenacity resistance 靭性抵抗 韧性抵抗",
+    "sourceHash": "ababc2eeeca0766aa4c5c0de76b36931803ccad6b5d9bb191e216bfb83575c7f"
+  },
+  {
+    "id": "stat:2a|loc:ST_Attribute::AtkAdd_des",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "AtkAdd_des",
+    "ownerId": "",
+    "values": {
+      "ru": "Атака +{0}",
+      "en": "ATK +{0}",
+      "ja": "攻撃力+{0}",
+      "zh": "攻击力增加{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "AtkAdd",
+          "field": "EquipmentRandomAttributeName"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::AtkAdd_des",
+    "search": "atkadd_des st_attribute  атака +{0} atk +{0} 攻撃力+{0} 攻击力增加{0}",
+    "sourceHash": "f2685cba1f5ca3c965ee268a9065ab2867c3a44cc6cce18cdbc15ad200378b47"
+  },
+  {
+    "id": "stat:2d|loc:ST_Attribute::TenacityMax",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "TenacityMax",
+    "ownerId": "",
+    "values": {
+      "ru": "Стойкость",
+      "en": "Tenacity",
+      "ja": "靭性値",
+      "zh": "韧性值"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "TenacityMax",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::TenacityMax",
+    "search": "tenacitymax st_attribute  стойкость tenacity 靭性値 韧性值",
+    "sourceHash": "d5ac49e871f35c266aaa8a7e25ed41bd37c73fa2ae973fb02d590ca98d143479"
+  },
+  {
+    "id": "stat:2d|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DefUp",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DefUp",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Def",
+        "SourceString": "防御力",
+        "LocalizedString": "防御力"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_fangyu.icon_attri_fangyu",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "DefUp",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "DefUp",
+          "SourceString": "防御力百分比",
+          "LocalizedString": "防御力百分比"
+        },
+        "FilterCondition": 28
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DefUp_des",
+        "SourceString": "防御力提升{0}",
+        "LocalizedString": "防御力提升{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.0175
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_fangyu.uasset",
+        "url": "/nte-meta/game-assets/7a7342aa1474fd72b344.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DefUp",
+    "search": "defup dt_attributestaticdata ",
+    "sourceHash": "2441ff76f01d37ea037146aaacb2cb8075c5da418e4dfa708a525506183b0a5c"
+  },
+  {
+    "id": "stat:2d|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:MagAdd",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "MagAdd",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Mag",
+        "SourceString": "环合强度",
+        "LocalizedString": "环合强度"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_surpass.Icon_attri_surpass",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "MagAdd",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Mag_des",
+        "SourceString": "环合强度增加{0}",
+        "LocalizedString": "环合强度增加{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_surpass.uasset",
+        "url": "/nte-meta/game-assets/0a61c9cdb481de96357a.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:MagAdd",
+    "search": "magadd dt_attributestaticdata ",
+    "sourceHash": "822dc8ae63c9ce2f67a33887703b945a74f6eed8f8577476f3ed6d5ff85b0cab"
+  },
+  {
+    "id": "stat:2e|loc:ST_Attribute::DamageResistChaos",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageResistChaos",
+    "ownerId": "",
+    "values": {
+      "ru": "Сопротивление хаосу",
+      "en": "Chaos Resistance",
+      "ja": "闇異能ダメージ耐性",
+      "zh": "暗属性异能伤害抗性"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageResistChaos",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageResistChaos",
+    "search": "damageresistchaos st_attribute  сопротивление хаосу chaos resistance 闇異能ダメージ耐性 暗属性异能伤害抗性",
+    "sourceHash": "a0fcdcba25032f871773d5cf3fd2d8753c540c6a20ed1e4df05500459da84c62"
+  },
+  {
+    "id": "stat:2e|loc:ST_Attribute::Mag_des",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Mag_des",
+    "ownerId": "",
+    "values": {
+      "ru": "Интенсивность цикла +{0}",
+      "en": "Cycle Intensity +{0}",
+      "ja": "連環パワー+{0}",
+      "zh": "环合强度增加{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "MagUp",
+          "field": "EquipmentRandomAttributeName"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "MagAdd",
+          "field": "EquipmentRandomAttributeName"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "MagBase",
+          "field": "EquipmentRandomAttributeName"
+        }
+      ],
+      "referenceCount": 3
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Mag_des",
+    "search": "mag_des st_attribute  интенсивность цикла +{0} cycle intensity +{0} 連環パワー+{0} 环合强度增加{0}",
+    "sourceHash": "1bf707c169c678a01334972ebd4560e4e73739bd26df18bb6224971b21e1f37e"
+  },
+  {
+    "id": "stat:2e|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:StrengthMax",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "StrengthMax",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "StrengthMax",
+        "SourceString": "体力值",
+        "LocalizedString": "体力值"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_StrengthMax.Icon_StrengthMax",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "StrengthMax",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_StrengthMax.uasset",
+        "url": "/nte-meta/game-assets/b63ad0395008bbd223c3.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:StrengthMax",
+    "search": "strengthmax dt_attributestaticdata ",
+    "sourceHash": "55f4d87430caef8c2255b265ac54d60d91cad8d3ee3b178ef2f0f627a2c75f58"
+  },
+  {
+    "id": "stat:30|loc:ST_Attribute::DamageResistPsychically",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageResistPsychically",
+    "ownerId": "",
+    "values": {
+      "ru": "Сопр. урону когнитивности",
+      "en": "Mental Resistance",
+      "ja": "精神ダメージ耐性",
+      "zh": "心灵伤害抗性"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageResistPsychically",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageResistPsychically",
+    "search": "damageresistpsychically st_attribute  сопр. урону когнитивности mental resistance 精神ダメージ耐性 心灵伤害抗性",
+    "sourceHash": "c67d2c24f129426b803bd1ad89bd38a565dafdd991b0bbb032cdd5567f896431"
+  },
+  {
+    "id": "stat:30|loc:ST_Attribute::HealBeUp",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "HealBeUp",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к полученному лечению",
+      "en": "Healing Received Bonus",
+      "ja": "被治療アップ",
+      "zh": "受治疗加成"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "HealBeUp",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::HealBeUp",
+    "search": "healbeup st_attribute  бонус к полученному лечению healing received bonus 被治療アップ 受治疗加成",
+    "sourceHash": "4c7599c45322e6e03151db7e15e1bb56daba7b35b88ce9a7ae4e78add06e7052"
+  },
+  {
+    "id": "stat:30|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:ReactionGeneralDamageUp",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "ReactionGeneralDamageUp",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "ReactionGeneralDamageUp",
+        "SourceString": "环合伤害增强",
+        "LocalizedString": "环合伤害增强"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_resistance_hurt_mind_.Icon_attri_resistance_hurt_mind_",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "ReactionGeneralDamageUp",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_resistance_hurt_mind_.uasset",
+        "url": "/nte-meta/game-assets/125c40e2802791b4ffc5.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:ReactionGeneralDamageUp",
+    "search": "reactiongeneraldamageup dt_attributestaticdata ",
+    "sourceHash": "be1ca3f1cd935b3e730a2bc66440aaad3ede6fb9c713e36517669efa4f425c3f"
+  },
+  {
+    "id": "stat:31|loc:ST_Attribute::Atk",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Atk",
+    "ownerId": "",
+    "values": {
+      "ru": "Атака",
+      "en": "ATK",
+      "ja": "攻撃力",
+      "zh": "攻击力"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "AtkBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "AtkBase",
+          "field": "FinalAttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "AtkUp",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "AtkAdd",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "AtkAdd",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 5
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Atk",
+    "search": "atk st_attribute  атака atk 攻撃力 攻击力",
+    "sourceHash": "9aad515afa3131b4de4a4fc6cc3ec75c7e9caf9e0e6490255a2a63c78a2429d8"
+  },
+  {
+    "id": "stat:32|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:CritBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "CritBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Crit",
+        "SourceString": "暴击率",
+        "LocalizedString": "暴击率"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": true,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_baoji.icon_attri_baoji",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "CritBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "Crit",
+          "SourceString": "暴击率",
+          "LocalizedString": "暴击率"
+        },
+        "FilterCondition": 28
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Crit_des",
+        "SourceString": "暴击率提升{0}",
+        "LocalizedString": "暴击率提升{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.01
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_baoji.uasset",
+        "url": "/nte-meta/game-assets/ad87d2a73478180243f0.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:CritBase",
+    "search": "critbase dt_attributestaticdata ",
+    "sourceHash": "52432b36f389bf5f18edebd213b5e14d3bf8f5f15e0f88b7a583a8a164d08554"
+  },
+  {
+    "id": "stat:33|loc:ST_Attribute::AtkUp",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "AtkUp",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к атаке",
+      "en": "ATK Bonus",
+      "ja": "攻撃力％",
+      "zh": "攻击力百分比"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "AtkUp",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::AtkUp",
+    "search": "atkup st_attribute  бонус к атаке atk bonus 攻撃力％ 攻击力百分比",
+    "sourceHash": "467e3d1ab576aaba368b2dde19a054ae1b59dda63fcdc6716e6c5f56b6c0cd15"
+  },
+  {
+    "id": "stat:33|loc:ST_Attribute::DamageUpPsychically",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageUpPsychically",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к ментальному урону",
+      "en": "Mental DMG Bonus",
+      "ja": "精神ダメージ強化",
+      "zh": "心灵伤害增强"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpPsychicallyBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpPsychicallyBase",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 2
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageUpPsychically",
+    "search": "damageuppsychically st_attribute  бонус к ментальному урону mental dmg bonus 精神ダメージ強化 心灵伤害增强",
+    "sourceHash": "580b18da62d970ae57dadc83c1816517386d155b922627305ac28d3acd9c3d0a"
+  },
+  {
+    "id": "stat:33|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpGeneralAdd",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageUpGeneralAdd",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageUpGeneral",
+        "SourceString": "通用伤害增强",
+        "LocalizedString": "通用伤害增强"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_kangxing.icon_attri_kangxing",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageUpGeneralAdd",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "DamageUpGeneral",
+          "SourceString": "通用伤害增强",
+          "LocalizedString": "通用伤害增强"
+        },
+        "FilterCondition": 1
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageUpGeneral_des",
+        "SourceString": "伤害增加{0}",
+        "LocalizedString": "伤害增加{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.01
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_kangxing.uasset",
+        "url": "/nte-meta/game-assets/7758a55d263d2919d42c.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpGeneralAdd",
+    "search": "damageupgeneraladd dt_attributestaticdata ",
+    "sourceHash": "8ee087436cee0d551786e2c7e5cf3e3dc9be5ff316137b02b6ffafe6b7a51779"
+  },
+  {
+    "id": "stat:34|loc:ST_Attribute::DamageResistPsyche",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageResistPsyche",
+    "ownerId": "",
+    "values": {
+      "ru": "Сопротивление психике",
+      "en": "Psyche Resistance",
+      "ja": "魂異能ダメージ耐性",
+      "zh": "魂属性异能伤害抗性"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageResistPsyche",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageResistPsyche",
+    "search": "damageresistpsyche st_attribute  сопротивление психике psyche resistance 魂異能ダメージ耐性 魂属性异能伤害抗性",
+    "sourceHash": "be724e3e117b5121329d2d66facc8d9e1941086fae44b1aaace435bf5c341192"
+  },
+  {
+    "id": "stat:34|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpLakshanaBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageUpLakshanaBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageUpLakshana",
+        "SourceString": "相属性异能伤害增强",
+        "LocalizedString": "相属性异能伤害增强"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_DamageUp_yellow.Icon_DamageUp_yellow",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageUpLakshanaBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "DamageUpLakshana",
+          "SourceString": "相属性异能伤害增强",
+          "LocalizedString": "相属性异能伤害增强"
+        },
+        "FilterCondition": 8
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.0125
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_DamageUp_yellow.uasset",
+        "url": "/nte-meta/game-assets/e7404c0c82eef53a2290.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpLakshanaBase",
+    "search": "damageuplakshanabase dt_attributestaticdata ",
+    "sourceHash": "bc2c87d03c9ed5111be874a8061088db017dc9b687742274d538916ad932bd13"
+  },
+  {
+    "id": "stat:34|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistPsyche",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageResistPsyche",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageResistPsyche",
+        "SourceString": "魂属性异能伤害抗性",
+        "LocalizedString": "魂属性异能伤害抗性"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_DamageResist_bule.Icon_DamageResist_bule",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageResistPsyche",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_DamageResist_bule.uasset",
+        "url": "/nte-meta/game-assets/c968ea17237fe1d8cccf.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistPsyche",
+    "search": "damageresistpsyche dt_attributestaticdata ",
+    "sourceHash": "afe3e1d64e40116ef41aa5cc04337b9e8b63e5ebaf976efacc5afba94ff673ac"
+  },
+  {
+    "id": "stat:34|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:Collect",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "Collect",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Home_4_Collect",
+        "SourceString": "收藏",
+        "LocalizedString": "收藏"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI/house/FurnitureList/UI_YH_Home_ScIcon_128_1.UI_YH_Home_ScIcon_128_1",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "None",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Home_4_Collect_D",
+        "SourceString": "收藏值：{0}",
+        "LocalizedString": "收藏值：{0}"
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI/house/FurnitureList/UI_YH_Home_ScIcon_128_1.uasset",
+        "url": "/nte-meta/game-assets/8db217fa5fd5e9e01a14.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:Collect",
+    "search": "collect dt_attributestaticdata ",
+    "sourceHash": "49d3dbdea1ad1700deff6bf1386f97db5d965c9756c7019f15a7dad6b7f707dc"
+  },
+  {
+    "id": "stat:35|loc:ST_Attribute::DamageUpIncantation",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "DamageUpIncantation",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к урону чар",
+      "en": "Incantation DMG Bonus",
+      "ja": "呪異能ダメージ強化",
+      "zh": "咒属性异能伤害增强"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpIncantationBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "DamageUpIncantationBase",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 2
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::DamageUpIncantation",
+    "search": "damageupincantation st_attribute  бонус к урону чар incantation dmg bonus 呪異能ダメージ強化 咒属性异能伤害增强",
+    "sourceHash": "67588d1151452d026c064f4566eced32a6da326891c502e0dfe4a485299e5ff0"
+  },
+  {
+    "id": "stat:35|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:HPMaxAdd",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "HPMaxAdd",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "HPMax",
+        "SourceString": "生命值",
+        "LocalizedString": "生命值"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_shengming.icon_attri_shengming",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "HPMaxAdd",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "HPMax",
+          "SourceString": "生命值",
+          "LocalizedString": "生命值"
+        },
+        "FilterCondition": 22
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "HPMaxAdd_des",
+        "SourceString": "生命值增加{0}",
+        "LocalizedString": "生命值增加{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 200
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_shengming.uasset",
+        "url": "/nte-meta/game-assets/f27fa742ed550786a38b.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:HPMaxAdd",
+    "search": "hpmaxadd dt_attributestaticdata ",
+    "sourceHash": "327e0f9b655bb7f04958d2aa62c8bd1c340cacb42c0ccd6f3b0a92104fedbc8c"
+  },
+  {
+    "id": "stat:35|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:Mag",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "Mag",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Mag",
+        "SourceString": "环合强度",
+        "LocalizedString": "环合强度"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_surpass.Icon_attri_surpass",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "Mag",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Mag_detail",
+        "SourceString": "环合强度提高异能环合的效果。当异能环合触发时，「创生」、「黯星」、「浊燃」生效的环合强度取决于参与异能环合的两者最终效果数值较高的一方；「覆纹」、「浸染」取决于造成伤害者。\r\n当前环合强度能够让\r\n「创生」、「黯星」、「浊燃」造成的伤害提高{0}%。\r\n「覆纹」、「浸染」的伤害额外提高{1}%。",
+        "LocalizedString": "环合强度提高异能环合的效果。当异能环合触发时，「创生」、「黯星」、「浊燃」生效的环合强度取决于参与异能环合的两者最终效果数值较高的一方；「覆纹」、「浸染」取决于造成伤害者。\r\n当前环合强度能够让\r\n「创生」、「黯星」、「浊燃」造成的伤害提高{0}%。\r\n「覆纹」、「浸染」的伤害额外提高{1}%。"
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_surpass.uasset",
+        "url": "/nte-meta/game-assets/0a61c9cdb481de96357a.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:Mag",
+    "search": "mag dt_attributestaticdata ",
+    "sourceHash": "29cd556812f3dce7e6caad2decfe09db4d6c3619d13507880302f47334c1de93"
+  },
+  {
+    "id": "stat:36|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpChaosBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageUpChaosBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageUpChaos",
+        "SourceString": "暗属性异能伤害增强",
+        "LocalizedString": "暗属性异能伤害增强"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_DamageUp_black.Icon_DamageUp_black",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageUpChaosBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "DamageUpChaos",
+          "SourceString": "暗属性异能伤害增强",
+          "LocalizedString": "暗属性异能伤害增强"
+        },
+        "FilterCondition": 8
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.0125
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_DamageUp_black.uasset",
+        "url": "/nte-meta/game-assets/b63760293784e6627a8c.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpChaosBase",
+    "search": "damageupchaosbase dt_attributestaticdata ",
+    "sourceHash": "2e8b7e74710cbf28d55b6c1d46484506cd2065f95df33a55bd1270b1585a96d7"
+  },
+  {
+    "id": "stat:37|loc:ST_Attribute::HPMaxAdd_des",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "HPMaxAdd_des",
+    "ownerId": "",
+    "values": {
+      "ru": "ОЗ +{0}",
+      "en": "HP +{0}",
+      "ja": "HP+{0}",
+      "zh": "生命值增加{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "HPMaxAdd",
+          "field": "EquipmentRandomAttributeName"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::HPMaxAdd_des",
+    "search": "hpmaxadd_des st_attribute  оз +{0} hp +{0} hp+{0} 生命值增加{0}",
+    "sourceHash": "a59c9a5bfec35b663b95a947c6a0e3a0ea82b0aabf4ebb461332865e61e8fb9f"
+  },
+  {
+    "id": "stat:37|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DefAdd",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DefAdd",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Def",
+        "SourceString": "防御力",
+        "LocalizedString": "防御力"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_fangyu.icon_attri_fangyu",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_BASE",
+      "AttributeName": "DefAdd",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "Def",
+          "SourceString": "防御力",
+          "LocalizedString": "防御力"
+        },
+        "FilterCondition": 20
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DefAdd_des",
+        "SourceString": "防御力增加{0}",
+        "LocalizedString": "防御力增加{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 16
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_fangyu.uasset",
+        "url": "/nte-meta/game-assets/7a7342aa1474fd72b344.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DefAdd",
+    "search": "defadd dt_attributestaticdata ",
+    "sourceHash": "9de54a5c99bea232a72f4d1bf5a1be99f939e84948a69a20044cf33546bb532e"
+  },
+  {
+    "id": "stat:37|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:CritDamageBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "CritDamageBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "CritDamage",
+        "SourceString": "暴击伤害",
+        "LocalizedString": "暴击伤害"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": true,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_baojishanghai.icon_attri_baojishanghai",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "CritDamageBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "CritDamage",
+          "SourceString": "暴击伤害",
+          "LocalizedString": "暴击伤害"
+        },
+        "FilterCondition": 28
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "CritDamage_des",
+        "SourceString": "暴击伤害提升{0}",
+        "LocalizedString": "暴击伤害提升{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.02
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_baojishanghai.uasset",
+        "url": "/nte-meta/game-assets/56f87c7e7402bf44ff21.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:CritDamageBase",
+    "search": "critdamagebase dt_attributestaticdata ",
+    "sourceHash": "d4a13007f71b3cb9441cfcbed003f50f6565bc1ee7c002a2d67f51f8c4a20617"
+  },
+  {
+    "id": "stat:38|loc:ST_Attribute::CritDamage",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "CritDamage",
+    "ownerId": "",
+    "values": {
+      "ru": "Крит. урон",
+      "en": "CRIT DMG",
+      "ja": "クリティカルダメージ",
+      "zh": "暴击伤害"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "CritDamageBase",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "CritDamageBase",
+          "field": "AttributeFilterData.FilterViewName"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "CritDamageAdd",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "CritDamageAdd",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 4
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::CritDamage",
+    "search": "critdamage st_attribute  крит. урон crit dmg クリティカルダメージ 暴击伤害",
+    "sourceHash": "b408d46dc979adb734632535a4ce30ca0cb6a1f961c0bb84d1b11095f2a36416"
+  },
+  {
+    "id": "stat:38|loc:ST_Attribute::HealUp",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "HealUp",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к лечению",
+      "en": "Healing Bonus",
+      "ja": "治療アップ",
+      "zh": "治疗加成"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "HealUp",
+          "field": "AttributeText"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "HealUp",
+          "field": "AttributeFilterData.FilterViewName"
+        }
+      ],
+      "referenceCount": 2
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::HealUp",
+    "search": "healup st_attribute  бонус к лечению healing bonus 治療アップ 治疗加成",
+    "sourceHash": "e594e7241b847d79879657af830dd03d5f04c0e6afa5db2e16283f05a643b7e3"
+  },
+  {
+    "id": "stat:39|loc:ST_Attribute::AtkUp_des",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "AtkUp_des",
+    "ownerId": "",
+    "values": {
+      "ru": "Атака +{0}",
+      "en": "ATK +{0}",
+      "ja": "攻撃力+{0}",
+      "zh": "攻击力提升{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "AtkUp",
+          "field": "EquipmentRandomAttributeName"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::AtkUp_des",
+    "search": "atkup_des st_attribute  атака +{0} atk +{0} 攻撃力+{0} 攻击力提升{0}",
+    "sourceHash": "ab2b0e61b51b674b4d269420aceeb5590bd35228f0a607abf8395bdb623c8dd1"
+  },
+  {
+    "id": "stat:3a|loc:ST_Attribute::ReactionZhouAnDamageUp",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "ReactionZhouAnDamageUp",
+    "ownerId": "",
+    "values": {
+      "ru": "Бонус к урону ожога",
+      "en": "Scorch DMG Bonus",
+      "ja": "濁燃ダメージ強化",
+      "zh": "浊燃伤害增强"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "ReactionZhouAnDamageUp",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::ReactionZhouAnDamageUp",
+    "search": "reactionzhouandamageup st_attribute  бонус к урону ожога scorch dmg bonus 濁燃ダメージ強化 浊燃伤害增强",
+    "sourceHash": "b1e80ef7752d6604a8a5f86a539d2db6791763ddd9cadaa7e4c189e5dda741d0"
+  },
+  {
+    "id": "stat:3b|loc:ST_Attribute::Home_2_Fortune",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Home_2_Fortune",
+    "ownerId": "",
+    "values": {
+      "ru": "Удача",
+      "en": "Luck",
+      "ja": "運勢",
+      "zh": "运势"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "Fortune",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Home_2_Fortune",
+    "search": "home_2_fortune st_attribute  удача luck 運勢 运势",
+    "sourceHash": "9703778466bbff02ea27622fa222a6187ae7c7a2916df1a46bdc9ed411c18e4b"
+  },
+  {
+    "id": "stat:3b|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:UnbalIntensityAdd",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "UnbalIntensityAdd",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "UnbalIntensity",
+        "SourceString": "倾陷强度",
+        "LocalizedString": "倾陷强度"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_strength_qingxian.Icon_attri_strength_qingxian",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "UnbalIntensityAdd",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "UnbalIntensity_des",
+        "SourceString": "倾陷强度增加{0}",
+        "LocalizedString": "倾陷强度增加{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_strength_qingxian.uasset",
+        "url": "/nte-meta/game-assets/564987c69ecfe164d76e.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:UnbalIntensityAdd",
+    "search": "unbalintensityadd dt_attributestaticdata ",
+    "sourceHash": "89b1b6fe23dadd01a81de0a5d871712e0692a4ced524c877670228e0d5664683"
+  },
+  {
+    "id": "stat:3b|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:TenacityDestroyEfficiency",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "TenacityDestroyEfficiency",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "TenacityDestroyEfficiency",
+        "SourceString": "韧性破坏效率",
+        "LocalizedString": "韧性破坏效率"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": false,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_TenacityDestroyEfficiency.Icon_TenacityDestroyEfficiency",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "TenacityDestroyEfficiency",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_TenacityDestroyEfficiency.uasset",
+        "url": "/nte-meta/game-assets/406b36e6a4ce0b4506d6.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:TenacityDestroyEfficiency",
+    "search": "tenacitydestroyefficiency dt_attributestaticdata ",
+    "sourceHash": "3cef9ae7ebafa48a4065beab949310a9b64ddfb54bd1d183dfb1ab3257ef23ac"
+  },
+  {
+    "id": "stat:3e|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpNatureBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageUpNatureBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageUpNature",
+        "SourceString": "灵属性异能伤害增强",
+        "LocalizedString": "灵属性异能伤害增强"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_DamageUp_ching.Icon_DamageUp_ching",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageUpNatureBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "DamageUpNature",
+          "SourceString": "灵属性异能伤害增强",
+          "LocalizedString": "灵属性异能伤害增强"
+        },
+        "FilterCondition": 8
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.0125
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_DamageUp_ching.uasset",
+        "url": "/nte-meta/game-assets/3d29b649ced81bfb2123.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpNatureBase",
+    "search": "damageupnaturebase dt_attributestaticdata ",
+    "sourceHash": "d5a1d44a6eb0a52ffdf55a7811b6e10fd2074b52a7787a52e3e729b3baf51585"
+  },
+  {
+    "id": "stat:3e|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:ReactionZhouAnDamageUp",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "ReactionZhouAnDamageUp",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "ReactionZhouAnDamageUp",
+        "SourceString": "浊燃伤害增强",
+        "LocalizedString": "浊燃伤害增强"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_attri_resistance_hurt_mind_.Icon_attri_resistance_hurt_mind_",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "ReactionZhouAnDamageUp",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_attri_resistance_hurt_mind_.uasset",
+        "url": "/nte-meta/game-assets/125c40e2802791b4ffc5.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:ReactionZhouAnDamageUp",
+    "search": "reactionzhouandamageup dt_attributestaticdata ",
+    "sourceHash": "a8eab2ef90589828b47cc09b33cd26d178d11690aa0bc0da756a7a2d4d160fda"
+  },
+  {
+    "id": "stat:3f|loc:ST_Attribute::Crit_des",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Crit_des",
+    "ownerId": "",
+    "values": {
+      "ru": "Шанс крит. удара +{0}",
+      "en": "CRIT Rate +{0}",
+      "ja": "クリティカル率+{0}",
+      "zh": "暴击率提升{0}"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "CritBase",
+          "field": "EquipmentRandomAttributeName"
+        },
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "CritAdd",
+          "field": "EquipmentRandomAttributeName"
+        }
+      ],
+      "referenceCount": 2
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Crit_des",
+    "search": "crit_des st_attribute  шанс крит. удара +{0} crit rate +{0} クリティカル率+{0} 暴击率提升{0}",
+    "sourceHash": "0dfbe2b78fb218e3be16068fd5ff0f6fc92206657fb60a60bb3eb7f3ca297a25"
+  },
+  {
+    "id": "stat:3f|loc:ST_Attribute::Home_3_Love",
+    "kind": "stat",
+    "namespace": "ST_Attribute",
+    "gameId": "Home_3_Love",
+    "ownerId": "",
+    "values": {
+      "ru": "Любовь",
+      "en": "Love",
+      "ja": "ハート",
+      "zh": "喜爱"
+    },
+    "details": {
+      "references": [
+        {
+          "table": "DT_AttributeStaticData",
+          "row": "Love",
+          "field": "AttributeText"
+        }
+      ],
+      "referenceCount": 1
+    },
+    "assets": [],
+    "term": false,
+    "originalId": "loc:ST_Attribute::Home_3_Love",
+    "search": "home_3_love st_attribute  любовь love ハート 喜爱",
+    "sourceHash": "2291d197d2745fb06c0a04415fe0d033fad724c302b36f4d350c7dbd2fc23a90"
+  },
+  {
+    "id": "stat:3f|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:CritAdd",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "CritAdd",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Crit",
+        "SourceString": "暴击率",
+        "LocalizedString": "暴击率"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": false,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/icon_attri_baoji.icon_attri_baoji",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "CritAdd",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "Crit",
+          "SourceString": "暴击率",
+          "LocalizedString": "暴击率"
+        },
+        "FilterCondition": 1
+      },
+      "EquipmentRandomAttributeName": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "Crit_des",
+        "SourceString": "暴击率提升{0}",
+        "LocalizedString": "暴击率提升{0}"
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.01
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/icon_attri_baoji.uasset",
+        "url": "/nte-meta/game-assets/ad87d2a73478180243f0.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:CritAdd",
+    "search": "critadd dt_attributestaticdata ",
+    "sourceHash": "507e6c2c90a3f52b21a3429bb4eedb55df19a4f247bc774bcd0adcdf43d74bec"
+  },
+  {
+    "id": "stat:3f|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpCosmosBase",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageUpCosmosBase",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageUpCosmos",
+        "SourceString": "光属性异能伤害增强",
+        "LocalizedString": "光属性异能伤害增强"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_DamageUp_white.Icon_DamageUp_white",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageUpCosmosBase",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+          "Key": "DamageUpCosmos",
+          "SourceString": "光属性异能伤害增强",
+          "LocalizedString": "光属性异能伤害增强"
+        },
+        "FilterCondition": 8
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0.0125
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_DamageUp_white.uasset",
+        "url": "/nte-meta/game-assets/04bf6f1e076307c6d554.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageUpCosmosBase",
+    "search": "damageupcosmosbase dt_attributestaticdata ",
+    "sourceHash": "d639e15c9445b14d3ad68ee3a144b55fafac26bcb905f25640f9d5144304881d"
+  },
+  {
+    "id": "stat:3f|row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistChaos",
+    "kind": "stat",
+    "namespace": "DT_AttributeStaticData",
+    "gameId": "DamageResistChaos",
+    "ownerId": "",
+    "values": {},
+    "details": {
+      "AttributeText": {
+        "TableId": "/Game/DataTable/PackData/ModifyData/ST_Attribute.ST_Attribute",
+        "Key": "DamageResistChaos",
+        "SourceString": "暗属性异能伤害抗性",
+        "LocalizedString": "暗属性异能伤害抗性"
+      },
+      "FinalAttributeText": {
+        "CultureInvariantString": null
+      },
+      "bShowOutside": false,
+      "bShowInner": true,
+      "bShowPercent": true,
+      "AttributeIcon": {
+        "AssetPathName": "/Game/UI/UI_Icon/Attribute/Icon_DamageResist_black.Icon_DamageResist_black",
+        "SubPathString": ""
+      },
+      "AttributeType": "EAttributeType::AT_UPGRADE",
+      "AttributeName": "DamageResistChaos",
+      "AttributeFilterData": {
+        "FilterViewName": {
+          "CultureInvariantString": null
+        },
+        "FilterCondition": 0
+      },
+      "EquipmentRandomAttributeName": {
+        "CultureInvariantString": null
+      },
+      "AttributeDetail": {
+        "CultureInvariantString": null
+      },
+      "Score": 0
+    },
+    "assets": [
+      {
+        "path": "HT/Content/UI/UI_Icon/Attribute/Icon_DamageResist_black.uasset",
+        "url": "/nte-meta/game-assets/e7999438d29fe6f9773e.webp",
+        "width": 128,
+        "height": 128
+      }
+    ],
+    "term": false,
+    "originalId": "row:HT/Content/DataTable/PackData/ModifyData/DT_AttributeStaticData.uasset:DamageResistChaos",
+    "search": "damageresistchaos dt_attributestaticdata ",
+    "sourceHash": "a84f20752f75df3c0a0c4b2e940627aa7e0b6f07d7c6f2eeb8909b87b4f8e186"
+  }
+]

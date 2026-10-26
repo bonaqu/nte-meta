@@ -1,0 +1,117 @@
+[
+  {
+    "id": "HPMaxBase",
+    "label": "ОЗ",
+    "value": "1320"
+  },
+  {
+    "id": "AtkBase",
+    "label": "АТК",
+    "value": "81"
+  },
+  {
+    "id": "DefBase",
+    "label": "ЗАЩ",
+    "value": "73"
+  },
+  {
+    "id": "CritBase",
+    "label": "Шанс крит. удара",
+    "value": "5%"
+  },
+  {
+    "id": "CritDamageBase",
+    "label": "Урон крит.",
+    "value": "50%"
+  },
+  {
+    "id": "DamageResistPsychically",
+    "label": "Сопр. урону когнитивности",
+    "value": "0%"
+  },
+  {
+    "id": "DamageResistCosmos",
+    "label": "Сопротивление космосу",
+    "value": "0%"
+  },
+  {
+    "id": "DamageResistIncantation",
+    "label": "Сопротивление чарам",
+    "value": "0%"
+  },
+  {
+    "id": "DamageUpPsycheBase",
+    "label": "Бонус к урону психики",
+    "value": "0%"
+  },
+  {
+    "id": "DamageResistNature",
+    "label": "Сопр. урону анимы",
+    "value": "0%"
+  },
+  {
+    "id": "DamageUpPsychicallyBase",
+    "label": "Бонус к ментальному урону",
+    "value": "0%"
+  },
+  {
+    "id": "UnbalIntensity",
+    "label": "Интенсивность разрушения",
+    "value": "0"
+  },
+  {
+    "id": "DamageResistLakshana",
+    "label": "Сопротивление лакшане",
+    "value": "0%"
+  },
+  {
+    "id": "DamageUpGeneralBase",
+    "label": "Бонус к урону",
+    "value": "0%"
+  },
+  {
+    "id": "DamageUpIncantationBase",
+    "label": "Бонус к урону чар",
+    "value": "0%"
+  },
+  {
+    "id": "ChargeGetEfficiencyBase",
+    "label": "Скорость зарядки",
+    "value": "100%"
+  },
+  {
+    "id": "DamageUpLakshanaBase",
+    "label": "Бонус к урону лакшаны",
+    "value": "0%"
+  },
+  {
+    "id": "DamageResistPsyche",
+    "label": "Сопротивление психике",
+    "value": "0%"
+  },
+  {
+    "id": "Mag",
+    "label": "Интенсивность цикла",
+    "value": "0"
+  },
+  {
+    "id": "DamageUpChaosBase",
+    "label": "Бонус к урону хаоса",
+    "value": "0%"
+  },
+  {
+    "id": "DamageUpNatureBase",
+    "label": "Бонус к урону анимы",
+    "value": "0%"
+  },
+  {
+    "id": "DamageUpCosmosBase",
+    "label": "Бонус к урону космоса",
+    "value": "0%"
+  },
+  {
+    "id": "DamageResistChaos",
+    "label": "Сопротивление хаосу",
+    "value": "0%"
+  }
+]

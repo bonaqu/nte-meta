@@ -2,7 +2,8 @@ import statIcons from '../data/native-stat-icons.json';
 import { resolveAssetUrl } from './assets';
 
 const stats: Record<string, string> = statIcons;
-export function resolveStatIcon(label: string) {
+export function resolveStatIcon(label: string, nativeId?: string) {
+  if (nativeId && stats[nativeId]) return resolveAssetUrl(stats[nativeId]);
   const value = label.toLowerCase();
   const element = /лакшан|lakshana/.test(value)
     ? 'Lakshana'

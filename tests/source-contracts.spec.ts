@@ -15,6 +15,7 @@ type Source = {
   resolveUrl?: WorkerContracts['resolveCatalogueImportSource'];
 };
 type WorkerContracts = {
+  nevernessAppCharacterCode: (character: object) => string;
   resolveCatalogueImportSource: (
     source: Source,
     character: object,
@@ -55,7 +56,7 @@ async function workerContracts(fetcher: typeof fetch) {
   });
   new vm.Script(
     source.replace('export default {', 'const worker = {') +
-      '\n globalThis.contracts = { findImportCharacter, fetchImportSource, resolveWotpackGuideSource, resolveCatalogueImportSource };',
+      '\n globalThis.contracts = { findImportCharacter, fetchImportSource, resolveWotpackGuideSource, resolveCatalogueImportSource, nevernessAppCharacterCode };',
   ).runInContext(context);
   return context.contracts as WorkerContracts;
 }
@@ -104,6 +105,16 @@ test('каталог источника находит akane_rin и даёт р�
   );
   expect(result.status).toBe('reference');
   expect(result.suggestions).toEqual([]);
+});
+
+test('Аканэ Рин использует действующий адрес Neverness.app для профиля и гайда', async () => {
+  const m = await workerContracts(async () => new Response(''));
+  for (const character of [
+    { slug: 'akane' },
+    { slug: 'akane-rin' },
+    { originalName: 'Akane Rin' },
+  ])
+    expect(m.nevernessAppCharacterCode(character)).toBe('akane');
 });
 
 test('импорт узнаёт русское имя без учёта регистра и внутренние алиасы', async () => {

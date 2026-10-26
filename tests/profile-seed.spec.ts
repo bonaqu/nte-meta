@@ -3,6 +3,23 @@ import { readFile, readdir } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import { mergeNativeCollection } from '../scripts/game-data/seed-profiles.mjs';
 
+test('начальные характеристики сопоставляются по игровым синонимам и сохраняют ручные значения', () => {
+  const current = [
+    { id: 'manual-hp', label: 'Здоровье', value: '1400' },
+    { id: 'manual-atk', label: 'АТК', value: '90' },
+    { id: 'manual-def', label: 'ЗАЩ', value: '80' },
+  ];
+  const incoming = [
+    { id: 'HPMaxBase', label: 'ОЗ', value: '1320' },
+    { id: 'AtkBase', label: 'Атака', value: '81' },
+    { id: 'DefBase', label: 'Защита', value: '73' },
+    { id: 'ChargeGetEfficiencyBase', label: 'Скорость зарядки', value: '100%' },
+  ];
+  const merged = mergeNativeCollection('baseStats', current, incoming);
+  expect(merged).toEqual([...current, incoming[3]]);
+  expect(mergeNativeCollection('baseStats', merged, incoming)).toEqual(merged);
+});
+
 test('один предмет для возвышения, боевых и пассивных навыков сохраняет отдельные суммы и ручную правку', () => {
   const current = [
     {

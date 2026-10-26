@@ -4566,6 +4566,8 @@ function lineMatchesCharacter(line, character) {
 function nevernessAppCharacterCode(character) {
   const codes = new Map([
     ['adler', 'adler'],
+    ['akane', 'akane'],
+    ['akane-rin', 'akane'],
     ['aurelia', 'mitsuki'],
     ['baicang', 'cang'],
     ['chaos', 'chaos'],
@@ -5843,7 +5845,7 @@ function normalizeBaseStatLabel(value) {
   if (/^(?:atk|attack|атака|атк)$/.test(key)) return 'АТК';
   if (/^(?:def|defense|defence|защита|защ)$/.test(key)) return 'ЗАЩ';
   if (
-    /^(?:crit|crit rate|critical rate|шанс крит|шанс критического удара)$/.test(
+    /^(?:crit|crit rate|critical rate|шанс крит|шанс крит(?:ического)? (?:удара|попадания))$/.test(
       key,
     )
   ) {
@@ -14479,6 +14481,15 @@ async function buildLocalGameCharacterSource(env, character) {
     .bind(owner)
     .all();
   const records = (own.results || []).map((r) => gameRecordView(r));
+  const attributeRows = await env.DB.prepare(
+    GAME_RECORD_SELECT +
+      " WHERE c.kind='stat' AND json_extract(e.value,'$.namespace')='DT_AttributeStaticData'",
+  ).all();
+  const attributes = (attributeRows.results || []).map((r) =>
+    gameRecordView(r),
+  );
+  // Attribute labels and visibility are shared, rather than owned by a character.
+  records.push(...attributes);
   const supplementRecord = records.find(
     (r) => r.namespace === 'NTE_ReferenceCharacter',
   );
@@ -14746,23 +14757,10 @@ async function buildLocalGameCharacterSource(env, character) {
     (r) => r.namespace === 'DT_PlayerPackData',
   )?.details;
   if (pack) {
-    const statFields = [
-      ['HPMaxBase', 'Здоровье', false],
-      ['AtkBase', 'Атака', false],
-      ['DefBase', 'Защита', false],
-      ['CritBase', 'Шанс крит. попадания', true],
-      ['CritDamageBase', 'Крит. урон', true],
-    ];
     add(
       'profile.baseStats',
       'Начальные показатели · уровень 1',
-      statFields
-        .filter(([key]) => Number.isFinite(pack[key]))
-        .map(([id, label, percent]) => ({
-          id,
-          label,
-          value: `${Number((pack[id] * (percent ? 100 : 1)).toFixed(4))}${percent ? '%' : ''}`,
-        })),
+      gameInitialStats(pack, attributes, ru),
     );
   } else if (supplement?.stats?.length) {
     const statNames = {
@@ -15173,6 +15171,39 @@ async function buildLocalGameCharacterSource(env, character) {
     status: source.suggestions.length ? 'ok' : 'reference',
     message: `Игровой ID ${owner}. Официальные строки установленного клиента; перед применением проверьте выбранные поля.`,
   };
+}
+
+function gameInitialStats(pack, attributes, ru) {
+  const fields = new Map([
+    ['HPMaxBase', ['HPMaxBase', 'ОЗ', false]],
+    ['AtkBase', ['AtkBase', 'Атака', false]],
+    ['DefBase', ['DefBase', 'Защита', false]],
+    ['CritBase', ['CritBase', 'Шанс крит. удара', true]],
+    ['CritDamageBase', ['CritDamageBase', 'Крит. урон', true]],
+  ]);
+  for (const { details } of attributes) {
+    if (details.bShowInner !== true) continue;
+    const id = details.AttributeName;
+    if (typeof id !== 'string' || !id) continue;
+    // These final attributes use a Base field in the character's starting pack.
+    const baseAlias =
+      /^(?:Mag|UnbalIntensity|DamageResist(?:Cosmos|Nature|Incantation|Chaos|Psyche|Lakshana|Psychically))$/.test(
+        id,
+      )
+        ? `${id}Base`
+        : id;
+    const sourceField = Object.hasOwn(pack, id) ? id : baseAlias;
+    const label = ru(details.AttributeText);
+    if (label && Number.isFinite(pack[sourceField]))
+      fields.set(id, [sourceField, label, details.bShowPercent === true]);
+  }
+  return [...fields.entries()]
+    .filter(([, [field]]) => Number.isFinite(pack[field]))
+    .map(([id, [field, label, percent]]) => ({
+      id,
+      label,
+      value: `${Number((pack[field] * (percent ? 100 : 1)).toFixed(4))}${percent ? '%' : ''}`,
+    }));
 }
 
 const GAME_RECORD_KINDS = new Set([

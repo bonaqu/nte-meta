@@ -25,6 +25,16 @@ const materialGroup = (row) => {
             ? 'ascension'
             : 'other';
 };
+const statIdentity = (row) => {
+  const label = key(row.label);
+  if (/^(?:hp|health|оз|здоровье)$/.test(label)) return 'health';
+  if (/^(?:atk|attack|атака|атк)$/.test(label)) return 'attack';
+  if (/^(?:def|defense|defence|защита|защ)$/.test(label)) return 'defense';
+  if (label.startsWith('шанскрит')) return 'crit';
+  if (label.includes('крит')) return 'critDamage';
+  if (/^(?:усилениеурона|бонусурона|бонускурону)$/.test(label)) return 'damage';
+  return label;
+};
 const identity = (field, row) =>
   field === 'materials'
     ? materialGroup(row) + ':' + key(row.name)
@@ -39,11 +49,7 @@ const identity = (field, row) =>
           : field === 'voiceActors'
             ? key(row.language)
             : field === 'baseStats'
-              ? key(row.label).startsWith('шанскрит')
-                ? 'crit'
-                : key(row.label).includes('крит')
-                  ? 'critDamage'
-                  : key(row.label)
+              ? statIdentity(row)
               : key(row.name);
 const legacyVoicePlaceholder = (row) =>
   /^https:\/\/static\.wikia\.nocookie\.net\/neverness-to-everness\/images\/[^/]+\/[^/]+\/VO_/.test(

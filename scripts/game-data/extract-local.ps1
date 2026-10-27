@@ -11,11 +11,19 @@ $content=Join-Path $gameRoot 'Client\WindowsNoEditor\HT\Content'
 if(!(Test-Path -LiteralPath $content -PathType Container)){throw 'Game content directory not found'}
 $outputRoot=[IO.Path]::GetFullPath($Output)
 if($outputRoot.StartsWith($gameRoot+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or $outputRoot -eq $gameRoot){throw 'Output must be outside the game directory'}
-$runDirectory=Join-Path $outputRoot (Get-Date -Format 'yyyyMMddTHHmmss')
+$archiveKey=[IO.File]::ReadAllText((Resolve-Path -LiteralPath $ArchiveKeyFile).Path).Trim()
+if($archiveKey -notmatch '^(0x)?[a-fA-F0-9]{64}$'){throw 'Invalid archive key file'}
+foreach($inputFile in $Tool,$Mapping){if(!(Test-Path -LiteralPath $inputFile -PathType Leaf)){throw 'Extraction tool or mapping file not found'}}
+# Never reuse an earlier run directory, including simultaneous starts.
+$runDirectory=Join-Path $outputRoot ((Get-Date -Format 'yyyyMMddTHHmmssfffffff')+'-'+[Guid]::NewGuid().ToString('N').Substring(0,8))
 $mount=Join-Path $runDirectory 'mount\HT'
-New-Item -ItemType Directory -Path $mount -Force | Out-Null
+New-Item -ItemType Directory -Path $mount | Out-Null
 '{"status":"running"}' | Set-Content -LiteralPath (Join-Path $runDirectory 'extraction-status.json') -Encoding utf8
 $archives=@()
+$links=@()
+$compatibilityError=$false
+$locationPushed=$false
+try {
 foreach($folder in 'Paks','PatchPaks','TagPatchPaks'){
  $destination=Join-Path $mount "Content\$folder"
  $sourceFolder=Join-Path $content $folder
@@ -23,17 +31,15 @@ foreach($folder in 'Paks','PatchPaks','TagPatchPaks'){
  # Directory junctions work across local volumes without copying game archives.
  # Extractors only read Content; aes.txt and every output stay in the run folder.
  New-Item -ItemType Junction -Path $destination -Target $sourceFolder | Out-Null
+ $links+=@{path=$destination;target=$sourceFolder}
  foreach($file in Get-ChildItem -LiteralPath $sourceFolder -File | Where-Object Extension -in '.pak','.utoc','.ucas'){
   $archives+=@{folder=$folder;name=$file.Name;bytes=$file.Length;modifiedUtc=$file.LastWriteTimeUtc.ToString('o')}
  }
 }
-$archiveKey=[IO.File]::ReadAllText((Resolve-Path -LiteralPath $ArchiveKeyFile).Path).Trim()
-if($archiveKey -notmatch '^(0x)?[a-fA-F0-9]{64}$'){throw 'Invalid archive key file'}
 [IO.File]::WriteAllText((Join-Path $mount 'aes.txt'),$archiveKey)
 $archives | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runDirectory 'archives.json') -Encoding utf8
-$compatibilityError=$false
 Push-Location (Split-Path -Parent $Tool)
-try {
+$locationPushed=$true
  foreach($locale in 'ru','en','ja','zh-Hans'){
   $destination=Join-Path $runDirectory "localization\$locale"
   New-Item -ItemType Directory -Path $destination -Force | Out-Null
@@ -62,14 +68,14 @@ try {
  @{status='failed';compatibilityError=$compatibilityError;finishedUtc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runDirectory 'extraction-status.json') -Encoding utf8
  throw
 } finally {
- Pop-Location
+ if($locationPushed){Pop-Location}
  # These are temporary directory junctions, never copied archives. Remove only
  # the junction itself, with no recursion into the installed game's directory.
- foreach($folder in 'Paks','PatchPaks','TagPatchPaks'){
-  $link=Join-Path $mount "Content\$folder"
+ foreach($createdLink in $links){
+  $link=$createdLink.path
   if(Test-Path -LiteralPath $link){
    $item=Get-Item -LiteralPath $link
-   if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -and $item.Target -eq (Join-Path $content $folder)){
+   if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -and $item.Target -eq $createdLink.target){
     [IO.Directory]::Delete($link)
    }
   }

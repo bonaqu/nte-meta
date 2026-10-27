@@ -183,9 +183,8 @@ class Workbench(tk.Tk):
             self.command(['pwsh','-NoProfile','-File',str(REPOSITORY/'scripts/game-data/extract-local.ps1'),
                 '-GameDirectory',values['game'],'-Tool',values['tool'],'-Mapping',values['mapping'],
                 '-ArchiveKeyFile',values['key'],'-Output',values['output']])
-            candidates=sorted(p for p in Path(values['output']).iterdir() if (p/'export/extraction.json').exists())
-            if candidates:
-                latest=candidates[-1]
+            latest=snapshot_folder(Path(values['output']))
+            if latest:
                 if previous and latest != previous:
                     reused=reuse_snapshot_files(latest,previous)
                     self.messages.put(('log',f"Переиспользовано файлов: {reused['reused']}; новых: {reused['added']}; изменённых версий: {reused['changed']}. Предыдущая выгрузка сохранена."))

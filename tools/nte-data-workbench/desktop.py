@@ -195,7 +195,7 @@ class Desktop(QMainWindow):
         changes = len(result['added']) + len(result['changed']) + len(result['removed'])
         self.game_status.setText(f'Изменилось архивов: {changes}. Доступно обновление игровых данных.' if result['needsExtraction'] else 'Архивы не изменились. Рабочая выгрузка актуальна.')
         if result.get('compatibilityError'):
-            self.game_status.setText('Обновление игры обнаружено, но последняя попытка чтения архивов не удалась. Проверьте совместимость инструмента и файла ключа через «Пути и все инструменты». Прежняя рабочая выгрузка сохранена.')
+            self.game_status.setText('Файлы игры изменились, но повторные попытки чтения архивов не удались. Дождитесь окончания загрузок в лаунчере и повторите выгрузку. Журнал доступен через «Пути и все инструменты». Прежняя рабочая выгрузка сохранена.')
 
     def launch_tool(self, action=None):
         if self.tool and self.tool.poll() is None: return

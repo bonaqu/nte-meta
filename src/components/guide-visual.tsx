@@ -4,7 +4,6 @@ import { resolveAssetUrl } from '../lib/assets';
 import { newVisualItem, guideSkillPresentation } from '../lib/guide-visual';
 import { ImageField } from './image-field';
 import { lazy, Suspense, useState } from 'react';
-import { RotationSequence } from './rotation-sequence';
 import { findEquipment } from '../lib/api';
 import { resolveStatIcons } from '../lib/native-icons';
 const ItemDetails = lazy(() =>
@@ -132,12 +131,12 @@ function equalPriority(item: GuideVisualItem) {
 export function GuideVisualView({ value }: { value: GuideVisual }) {
   if (value.kind === 'rotation')
     return (
-      <RotationSequence
-        className="guide-basic-rotation"
-        endLabel="Конец цепочки"
-        steps={value.items.map((item) => ({
-          id: item.id,
-          content: (
+      <ol className="guide-basic-rotation" aria-label="Шаги базовой ротации">
+        {value.items.map((item, index) => (
+          <li key={item.id}>
+            <span className="guide-rotation-index" aria-hidden="true">
+              {index + 1}
+            </span>
             <div className="guide-rotation-action">
               {item.imageUrl ? (
                 <img
@@ -165,9 +164,9 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
                 ) : null}
               </div>
             </div>
-          ),
-        }))}
-      />
+          </li>
+        ))}
+      </ol>
     );
   const equipment = value.kind === 'arcs' || value.kind === 'cartridges';
   const items = equipment

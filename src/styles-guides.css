@@ -281,12 +281,61 @@
   .guide-visual--stats .guide-stat-icons {
     align-self: center;
   }
+  .guide-basic-rotation {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .guide-basic-rotation > li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    min-inline-size: 0;
+  }
+  .guide-basic-rotation > li:not(:only-child)::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 16px;
+    inset-block: -6px;
+    inline-size: 2px;
+    background: linear-gradient(var(--pink), var(--cyan));
+    opacity: 0.65;
+  }
+  .guide-basic-rotation > li:first-child::before {
+    inset-block-start: 50%;
+  }
+  .guide-basic-rotation > li:last-child::before {
+    inset-block-end: 50%;
+  }
+  .guide-rotation-index {
+    position: relative;
+    display: grid;
+    place-items: center;
+    inline-size: 34px;
+    block-size: 34px;
+    border: 2px solid var(--cyan);
+    border-radius: 50%;
+    background: #10171b;
+    color: var(--cyan);
+    font-size: 0.76rem;
+    font-weight: 900;
+    line-height: 1;
+  }
   .guide-rotation-action {
     display: flex;
     align-items: flex-start;
     gap: 10px;
     min-inline-size: 0;
     overflow-wrap: anywhere;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--panel);
+    line-height: 1.5;
   }
   .guide-rotation-action > img {
     flex: 0 0 40px;

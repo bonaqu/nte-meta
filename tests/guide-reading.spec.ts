@@ -90,12 +90,12 @@ test('гайд: навигация, экипировка и мобильная �
     await navigation
       .getByRole('button', { name: 'Базовая ротация', exact: true })
       .click();
-    const chain = page.locator('.guide-basic-rotation.team-rotation-sequence');
-    await expect(chain.getByText('Старт', { exact: true })).toBeVisible();
+    const chain = page.locator('.guide-basic-rotation');
+    await expect(chain).not.toHaveClass(/team-rotation-sequence/);
     await expect(
-      chain.getByText('Конец цепочки', { exact: true }),
-    ).toBeVisible();
-    const rotation = chain.locator('ol');
+      chain.locator('.rotation-sequence-heading, .rotation-cycle-end'),
+    ).toHaveCount(0);
+    const rotation = chain;
     await expect(rotation).toBeInViewport();
     const lefts = await rotation
       .locator(':scope > li')
@@ -104,12 +104,14 @@ test('гайд: навигация, экипировка и мобильная �
     const offsets = await rotation.locator(':scope > li').evaluateAll((nodes) =>
       nodes.map((node) => {
         const number = node
-          .querySelector('.rotation-step-index')!
+          .querySelector('.guide-rotation-index')!
           .getBoundingClientRect();
         const body = node
           .querySelector('.guide-rotation-action')!
           .getBoundingClientRect();
-        return Math.abs(number.top - body.top);
+        return Math.abs(
+          number.top + number.height / 2 - body.top - body.height / 2,
+        );
       }),
     );
     expect(Math.max(...offsets)).toBeLessThan(1);
@@ -122,7 +124,7 @@ test('гайд: навигация, экипировка и мобильная �
             .every(
               (node) =>
                 !['none', 'normal'].includes(
-                  getComputedStyle(node, '::after').content,
+                  getComputedStyle(node, '::before').content,
                 ),
             ),
         ),

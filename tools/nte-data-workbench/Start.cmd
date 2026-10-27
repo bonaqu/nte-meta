@@ -6,4 +6,4 @@ if not exist "%NTE_PYTHON%" (
   pause
   exit /b 1
 )
-start "" "%NTE_PYTHON%" "%~dp0app.py"
+start "" "%NTE_PYTHON%" "%~dp0desktop.py"

@@ -5,6 +5,8 @@ import json
 import os
 import re
 import subprocess
+import hashlib
+import uuid
 from pathlib import Path
 
 ARCHIVE_FOLDERS = ('Paks', 'PatchPaks', 'TagPatchPaks')
@@ -66,3 +68,40 @@ def check_update(game: Path, source: Path) -> dict:
     current = archive_inventory(game)
     delta = compare_archives(current, json.loads(baseline.read_text(encoding='utf-8-sig')))
     return dict(snapshot=str(snapshot), archiveCount=len(current), needsExtraction=any(delta.values()), **delta)
+
+
+def reuse_snapshot_files(current: Path, previous: Path) -> dict:
+    """Deduplicate immutable exports after a successful extraction, preserving both versions."""
+    current, previous = current.resolve(), previous.resolve()
+    if current == previous or current in previous.parents or previous in current.parents:
+        raise ValueError('Новая и предыдущая выгрузки должны быть разными папками одного уровня.')
+    if snapshot_folder(current) != current or snapshot_folder(previous) != previous:
+        raise ValueError('Обе выгрузки должны быть завершены.')
+    result = dict(reused=0, changed=0, added=0, reusedBytes=0, crossVolume=0)
+    def digest(path):
+        with path.open('rb') as stream:
+            return hashlib.file_digest(stream, 'sha256').digest()
+    # These are read-only extractor payloads. Mutable manifests, user edits and
+    # media-cache.json are deliberately independent in every snapshot.
+    for relative, extensions in [('localization', {'.csv'}), ('export/tables', {'.json'}),
+                                 ('export/textures', {'.bin'}), ('export/audio', {'.wem'})]:
+        for target in (current / relative).rglob('*'):
+            if not target.is_file() or target.suffix.lower() not in extensions: continue
+            if target.is_symlink() or not target.resolve().is_relative_to(current): continue
+            source = previous / target.relative_to(current)
+            if not source.is_file(): result['added'] += 1; continue
+            if source.is_symlink() or not source.resolve().is_relative_to(previous): continue
+            if target.stat().st_size != source.stat().st_size or digest(target) != digest(source):
+                result['changed'] += 1; continue
+            if target.stat().st_dev != source.stat().st_dev:
+                result['crossVolume'] += 1; continue
+            temporary = target.with_name(target.name + '.' + uuid.uuid4().hex + '.reuse')
+            try:
+                os.link(source, temporary)
+                os.replace(temporary, target)
+            finally:
+                if temporary.exists(): temporary.unlink()
+            result['reused'] += 1
+            result['reusedBytes'] += target.stat().st_size
+    (current / 'incremental-report.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), 'utf-8')
+    return result

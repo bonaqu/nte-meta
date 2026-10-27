@@ -3,8 +3,14 @@ name: Deploy GitHub Pages
 on:
   push:
     branches: [bonaqu_projects]
+    paths-ignore:
+      - tools/nte-data-workbench/**
+      - scripts/game-data/extract-local.ps1
   pull_request:
     branches: [bonaqu_projects]
+    paths-ignore:
+      - tools/nte-data-workbench/**
+      - scripts/game-data/extract-local.ps1
   workflow_dispatch:
     inputs:
       full_suite:

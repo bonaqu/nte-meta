@@ -25,15 +25,6 @@
     block-size: auto;
     max-block-size: 160px;
   }
-  .guide-visual__position {
-    display: grid;
-    place-items: center;
-    border: 1px solid var(--cyan);
-    color: var(--cyan);
-    min-block-size: 32px;
-    inline-size: 32px;
-    border-radius: 50%;
-  }
   .guide-visual__body {
     min-inline-size: 0;
     overflow-wrap: anywhere;
@@ -86,11 +77,6 @@
   .guide-visual__stats dd {
     margin: 4px 0 0;
     font-weight: 700;
-  }
-  .guide-visual--rotation > li {
-    border-inline-start: 1px solid var(--cyan);
-    margin-inline-start: 16px;
-    padding-inline-start: 12px;
   }
   .visual-section-editor,
   .visual-item-editor,
@@ -9299,24 +9285,6 @@
   .guide-visual--stats > li > img {
     inline-size: 40px;
     block-size: 40px;
-  }
-  .guide-visual--rotation > li {
-    margin-inline: 0;
-    padding-inline-start: 0;
-    border-inline-start: 0;
-    position: relative;
-  }
-  .guide-visual--rotation > li:not(:last-child)::after {
-    content: '';
-    position: absolute;
-    inset-inline-start: 15px;
-    inset-block: 50px -5px;
-    inline-size: 1px;
-    background: var(--border-strong);
-  }
-  .guide-visual--rotation .guide-visual__position {
-    background: var(--panel);
-    color: var(--cyan);
   }
   .visual-item-editor {
     padding: 0;

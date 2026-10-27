@@ -43,7 +43,7 @@ test('новые персонажи имеют читаемые гайды, би
       ).toHaveCount(0);
       await expect(page.locator('.guide-visual--arcs')).toBeVisible();
       await expect(page.locator('.guide-visual--cartridges')).toBeVisible();
-      await expect(page.locator('.guide-visual--rotation')).toBeVisible();
+      await expect(page.locator('.guide-basic-rotation')).toBeVisible();
       const size = await page.evaluate(() => ({
         width: document.documentElement.clientWidth,
         scroll: document.documentElement.scrollWidth,

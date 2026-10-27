@@ -12,6 +12,7 @@ import type { ItemDescription } from '../lib/item-descriptions';
 import { resolveItemIcon } from '../lib/item-icons';
 import { resolveAssetUrl } from '../lib/assets';
 type Lookup = (id: string, name: string) => ItemDescription | undefined;
+const HOVER_DELAY_MS = 750;
 let lookup: Lookup | undefined;
 let registry: Promise<Lookup> | undefined;
 function loadRegistry() {
@@ -96,7 +97,7 @@ export function ItemDetails({
   const scheduleShow = () => {
     cancel();
     setRequested(true);
-    timer.current = setTimeout(show, 500);
+    timer.current = setTimeout(show, HOVER_DELAY_MS);
   };
   useEffect(() => {
     setDetail(lookup?.(id, name));
@@ -143,7 +144,7 @@ export function ItemDetails({
       timer.current = setTimeout(() => {
         panel.current?.showPopover();
         position();
-      }, 500);
+      }, HOVER_DELAY_MS);
     };
     const leave = () => {
       clearTimeout(timer.current);

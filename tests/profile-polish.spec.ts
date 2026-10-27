@@ -312,7 +312,9 @@ test('все шаги ротации выровнены, статы показы
   for (const width of [360, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/#/guides/akane-build-guide');
-    const steps = page.locator('.guide-visual--rotation > li');
+    const steps = page.locator(
+      '.guide-basic-rotation.team-rotation-sequence > ol > li',
+    );
     await expect(steps).toHaveCount(5);
     const offsets = await steps.evaluateAll((nodes) =>
       nodes.map((node) => node.getBoundingClientRect().left),

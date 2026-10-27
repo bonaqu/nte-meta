@@ -6,6 +6,24 @@ param(
  [string]$Output = 'E:\CODEX - IMPORT HERE TEMP FILES AND OTHER\nte-meta\extracts'
 )
 $ErrorActionPreference='Stop'
+function Invoke-ArchiveCommand {
+ param([string]$Executable,[string[]]$Arguments,[string]$Log)
+ for($attempt=1;$attempt -le 3;$attempt++){
+  $attemptLog="$Log.attempt-$attempt.log"
+  & $Executable @Arguments *> $attemptLog
+  $exitCode=$LASTEXITCODE
+  $message=[IO.File]::ReadAllText($attemptLog)
+  Copy-Item -LiteralPath $attemptLog -Destination $Log -Force
+  # The same valid archives can intermittently fail at provider startup.
+  # Retry only before any virtual files were mounted, never arbitrary errors.
+  $mountFailure=$message -match 'Provider initialized\. Found 0 virtual files\.' -and $message -match 'No valid files found|Failed to initialize file provider'
+  if($exitCode -eq 0 -and !$mountFailure){return}
+  if(!$mountFailure){throw "Extraction command failed. See $Log"}
+  if($attempt -lt 3){Write-Output "Повторное открытие архивов: попытка $($attempt+1) из 3."}
+ }
+ $script:compatibilityError=$true
+ throw "Не удалось прочитать архивы после трёх попыток. Журнал: $Log. Дождитесь окончания загрузок в лаунчере и повторите выгрузку. Прежняя рабочая выгрузка сохранена; этот снимок не будет опубликован."
+}
 $gameRoot=(Resolve-Path -LiteralPath $GameDirectory).Path
 $content=Join-Path $gameRoot 'Client\WindowsNoEditor\HT\Content'
 if(!(Test-Path -LiteralPath $content -PathType Container)){throw 'Game content directory not found'}
@@ -44,18 +62,13 @@ $locationPushed=$true
   $destination=Join-Path $runDirectory "localization\$locale"
   New-Item -ItemType Directory -Path $destination -Force | Out-Null
   $log=Join-Path $runDirectory "localization-$locale.log"
-  & $Tool $mount "$destination\" "--path=HT/Content/Localization/Game/$locale/" '-v=NTE' *> $log
+  Invoke-ArchiveCommand -Executable $Tool -Arguments @($mount,"$destination\","--path=HT/Content/Localization/Game/$locale/",'-v=NTE') -Log $log
   if(!(Get-ChildItem -LiteralPath $destination -Filter '*_0_P.csv')){
-   if([IO.File]::ReadAllText($log) -match 'No valid files found|different AES key|Failed to initialize file provider'){
-    $compatibilityError=$true
-    throw 'Не удалось открыть архивы текущей версии игры. Проверьте совместимость инструмента и файла ключа в параметрах. Предыдущая рабочая выгрузка сохранена; этот снимок не будет опубликован.'
-   }
    throw "Localization extraction failed for $locale. See $log"
   }
  }
  $project=Join-Path $PSScriptRoot 'extractor'
- & dotnet run --project $project -- ([IO.Path]::ChangeExtension($Tool,'.dll')) $mount $Mapping (Join-Path $runDirectory 'export') *> (Join-Path $runDirectory 'extraction.log')
- if($LASTEXITCODE -ne 0){throw 'Game table/texture extraction failed. See extraction.log'}
+ Invoke-ArchiveCommand -Executable 'dotnet' -Arguments @('run','--project',$project,'--',([IO.Path]::ChangeExtension($Tool,'.dll')),$mount,$Mapping,(Join-Path $runDirectory 'export')) -Log (Join-Path $runDirectory 'extraction.log')
  $after=@()
  foreach($folder in 'Paks','PatchPaks','TagPatchPaks'){
   foreach($file in Get-ChildItem -LiteralPath (Join-Path $content $folder) -File | Where-Object Extension -in '.pak','.utoc','.ucas'){

@@ -7,9 +7,9 @@
     "zh"
   ],
   "localizationKeys": 113100,
-  "records": 207326,
+  "records": 207389,
   "kinds": {
-    "localization": 142689,
+    "localization": 142752,
     "skill": 3622,
     "awakening": 210,
     "wardrobe": 754,
@@ -737,7 +737,7 @@
     "HT/Content/DataTable/Skill/GlobalCharacterData/DT_GlobalValueLinkoData.uasset"
   ],
   "source": "Local installed game archives including PatchPaks; original strings preserved",
-  "datasetSha256": "72b11050255713a9b7b41883b245f9fbc8d761d2563c1a5a2f33931fa3874de4",
+  "datasetSha256": "503dacc6eac87e1749f4552fb8f7a58d9f9bfdf73f96f2ef2afb6a596fb2369f",
   "chunks": 1088,
   "repairedCsvRows": {
     "ru": 425,
@@ -760,5 +760,5 @@
     "gifts": 138,
     "failures": []
   },
-  "chunksSha256": "be9827a5834cf1da7017108a9d13d0b3b18ff95c45bc7b1769ad7de37effb607"
+  "chunksSha256": "8d24a12bcc16b6f17296d7bd80638f98ede7950d88e29b238188b6abed92fb5a"
 }

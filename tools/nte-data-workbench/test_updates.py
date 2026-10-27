@@ -16,6 +16,48 @@ from media_cache import media_name
 
 class UpdateTests(TestCase):
     @skipUnless(os.name == 'nt' and shutil.which('pwsh'), 'NTFS junction lifecycle is checked on Windows')
+    def test_repeated_failed_runs_keep_separate_snapshots_and_cleanup_preparation(self):
+        with TemporaryDirectory() as directory:
+            root=Path(directory); content=root/'game/Client/WindowsNoEditor/HT/Content'
+            for name in ['Paks','PatchPaks','TagPatchPaks']:(content/name).mkdir(parents=True)
+            original=content/'Paks/fixture.pak';original.write_bytes(b'untouched game')
+            key=root/'key.txt';key.write_text('0'*64)
+            mapping=root/'test.usmap';mapping.write_bytes(b'fixture')
+            tool=root/'mock.cmd';tool.write_text('@echo No valid files found\n@exit /b 1\n')
+            output=root/'extracts'
+            script=Path(__file__).resolve().parents[2]/'scripts/game-data/extract-local.ps1'
+            # Force an identical clock value: even two starts in one tick must
+            # create separate diagnostic snapshots, never overwrite old files.
+            wrapper=root/'repeat.ps1'
+            wrapper.write_text('param($script,$game,$tool,$mapping,$key,$output)\n'
+                'function Get-Date {param($Format) "20261027T1200000000000"}\n'
+                'foreach($attempt in 1..2){try { & $script -GameDirectory $game -Tool $tool -Mapping $mapping -ArchiveKeyFile $key -Output $output } catch {}}\n')
+            result=subprocess.run(['pwsh','-NoProfile','-File',str(wrapper),str(script),str(root/'game'),str(tool),str(mapping),str(key),str(output)],
+                capture_output=True,encoding='utf-8',errors='replace',creationflags=subprocess.CREATE_NO_WINDOW,timeout=30)
+            self.assertEqual(result.returncode,0,result.stderr)
+            snapshots=list(output.iterdir());self.assertEqual(len(snapshots),2)
+            for snapshot in snapshots:
+                self.assertEqual(json.loads((snapshot/'extraction-status.json').read_text('utf-8-sig'))['status'],'failed')
+                self.assertFalse((snapshot/'mount/HT/Content/Paks').exists())
+            # A setup error after the first junction must clean that junction,
+            # too; the original archive is never removed or traversed.
+            (content/'PatchPaks').rmdir()
+            failed=subprocess.run(['pwsh','-NoProfile','-File',str(script),'-GameDirectory',str(root/'game'),'-Tool',str(tool),
+                '-Mapping',str(mapping),'-ArchiveKeyFile',str(key),'-Output',str(output)],capture_output=True,
+                encoding='utf-8',errors='replace',creationflags=subprocess.CREATE_NO_WINDOW,timeout=30)
+            self.assertNotEqual(failed.returncode,0)
+            self.assertEqual(len(list(output.iterdir())),3)
+            for snapshot in output.iterdir():self.assertFalse((snapshot/'mount/HT/Content/Paks').exists())
+            self.assertEqual(original.read_bytes(),b'untouched game')
+            # Invalid input is rejected before creating a run or any junction.
+            key.write_text('invalid')
+            invalid=subprocess.run(['pwsh','-NoProfile','-File',str(script),'-GameDirectory',str(root/'game'),'-Tool',str(tool),
+                '-Mapping',str(mapping),'-ArchiveKeyFile',str(key),'-Output',str(output)],capture_output=True,
+                encoding='utf-8',errors='replace',creationflags=subprocess.CREATE_NO_WINDOW,timeout=30)
+            self.assertNotEqual(invalid.returncode,0)
+            self.assertEqual(len(list(output.iterdir())),3)
+
+    @skipUnless(os.name == 'nt' and shutil.which('pwsh'), 'NTFS junction lifecycle is checked on Windows')
     def test_incompatible_archives_mark_failed_and_unlink_only_mount(self):
         with TemporaryDirectory() as directory:
             root=Path(directory); content=root/'game/Client/WindowsNoEditor/HT/Content'

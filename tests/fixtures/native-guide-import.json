@@ -1,0 +1,35 @@
+{
+  "sources": [
+    {
+      "id": "local-game-guide-1075",
+      "name": "Рекомендации из клиента игры",
+      "url": "https://bonaqu.github.io/nte-meta/#/admin/game-data",
+      "trust": "высокий",
+      "status": "ok"
+    }
+  ],
+  "suggestions": [
+    {
+      "id": "local-game-guide-1075:guide.bestArcs",
+      "field": "guide.bestArcs",
+      "label": "Дуги · рекомендации игры",
+      "value": "[{\"id\":\"fork_Door\",\"name\":\"Неверные врата\",\"imageUrl\":\"/nte-meta/game-assets/902a5e7f87caad81f895.webp\",\"description\":\"Не открывай эти врата. Не уходи отсюда. Разве не лучше остаться в тепле?\\nУвеличивает атаку на 16%.\\nКогда владелец восстанавливает ОЗ, наносимый им урон анимы увеличивается на 30%, а урон, наносимый всеми союзниками, — на 15% в течение 20 сек. Эффекты с одинаковым названием не складываются. При повторном срабатывании длительность обновляется.\",\"stats\":[{\"label\":\"АТК (ур. 80)\",\"value\":\"570\"},{\"label\":\"АТК (ур. 80)\",\"value\":\"30%\"}],\"category\":\"signature\"},{\"id\":\"fork_Castle\",\"name\":\"Зов искаженного города\",\"imageUrl\":\"/nte-meta/game-assets/c74ee2ea8b4ab4d14cb6.webp\",\"description\":\"Увеличивает бонус к лечению на 12% на 10 сек., когда владелец применяет навык перенаправления. Эффект не складывается.\\nКогда мир начинает искажаться и кричит так, что никто не может понять, кто из нас сможет сохранить рассудок?\",\"stats\":[{\"label\":\"АТК (ур. 80)\",\"value\":\"395\"},{\"label\":\"ОЗ (ур. 80)\",\"value\":\"37.5%\"}],\"category\":\"replacement\"}]",
+      "sourceName": "Рекомендации из клиента игры",
+      "sourceUrl": "https://bonaqu.github.io/nte-meta/#/admin/game-data",
+      "confidence": "high",
+      "note": "Рекомендация клиента игры; редактор выбирает, применять ли её к гайду.",
+      "qualityFlags": []
+    },
+    {
+      "id": "local-game-guide-1075:guide.mainStats",
+      "field": "guide.mainStats",
+      "label": "Основные статы · рекомендации игры",
+      "value": "[{\"id\":\"AtkUp\",\"name\":\"Атака %\",\"imageUrl\":\"/nte-meta/game-assets/ba0908d08ebf5aa48c91.webp\",\"description\":\"\",\"stats\":[]},{\"id\":\"HealUp\",\"name\":\"Бонус к лечению %\",\"imageUrl\":\"/nte-meta/game-assets/78f0e753de8913fc09dd.webp\",\"description\":\"\",\"stats\":[]},{\"id\":\"DamageUpNatureBase\",\"name\":\"Бонус к урону анимы %\",\"imageUrl\":\"/nte-meta/game-assets/3d29b649ced81bfb2123.webp\",\"description\":\"\",\"stats\":[]},{\"id\":\"DamageUpGeneralBase\",\"name\":\"Бонус к урону %\",\"imageUrl\":\"/nte-meta/game-assets/7758a55d263d2919d42c.webp\",\"description\":\"\",\"stats\":[]},{\"id\":\"AtkAdd\",\"name\":\"Атака\",\"imageUrl\":\"/nte-meta/game-assets/ba0908d08ebf5aa48c91.webp\",\"description\":\"\",\"stats\":[]}]",
+      "sourceName": "Рекомендации из клиента игры",
+      "sourceUrl": "https://bonaqu.github.io/nte-meta/#/admin/game-data",
+      "confidence": "high",
+      "note": "Рекомендация клиента игры; редактор выбирает, применять ли её к гайду.",
+      "qualityFlags": []
+    }
+  ]
+}

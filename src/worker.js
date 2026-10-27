@@ -11481,11 +11481,25 @@ async function handleGuideImportLookup(request, env) {
     slug,
   };
   return withImportDeadline(request.signal, async (deadline) => {
-    const sourceResults = await mapWithConcurrency(
-      selectImportSources(guideImportSources(slug, importCharacter)),
-      IMPORT_FETCH_CONCURRENCY,
-      (source) => fetchImportSource(source, importCharacter, deadline),
-    );
+    const [sourceResults, localSources] = await Promise.all([
+      mapWithConcurrency(
+        selectImportSources(guideImportSources(slug, importCharacter)),
+        IMPORT_FETCH_CONCURRENCY,
+        (source) => fetchImportSource(source, importCharacter, deadline),
+      ),
+      buildLocalGameGuideSources(env, importCharacter).catch(() => [
+        {
+          id: 'local-game-guide',
+          name: 'Рекомендации из клиента игры',
+          url: 'https://bonaqu.github.io/nte-meta/#/admin/game-data',
+          trust: 'высокий',
+          status: 'error',
+          suggestions: [],
+          message:
+            'Игровой каталог временно недоступен. Повторите поиск позднее.',
+        },
+      ]),
+    ]);
     const icons = sourceResults.flatMap((source) => source.skillIcons || []);
     const suggestions = dedupeGuideImportSuggestions(
       sourceResults.flatMap((source) => source.suggestions),
@@ -11521,6 +11535,12 @@ async function handleGuideImportLookup(request, env) {
       return { ...item, value: JSON.stringify(enriched) };
     });
     await localizeGameImportSuggestions(env, suggestions);
+
+    // Preserve native lists as separate choices rather than mixing them into web consensus.
+    sourceResults.unshift(...localSources);
+    suggestions.unshift(
+      ...localSources.flatMap((source) => source.suggestions),
+    );
 
     return json({
       data: {
@@ -14203,7 +14223,7 @@ async function localizeGameImportSuggestions(env, suggestions) {
   }
 }
 
-async function findLocalGameEquipment(env, query, kind) {
+async function findLocalGameEquipment(env, query, kind, gameId = '') {
   const source = {
     name: 'Локальные файлы игры · русский текст и изображения',
     status: 'empty',
@@ -14225,8 +14245,12 @@ async function findLocalGameEquipment(env, query, kind) {
     .map((r) => gameRecordView(r))
     .filter(
       (r) =>
-        Object.values(r.values).some((v) => v.toLowerCase().includes(key)) &&
-        !/^buff_/i.test(r.gameId),
+        (gameId
+          ? r.gameId.replace(/_name$/i, '').toLowerCase() ===
+            gameId.toLowerCase()
+          : Object.values(r.values).some((v) =>
+              v.toLowerCase().includes(key),
+            )) && !/^buff_/i.test(r.gameId),
     )
     .slice(0, 6);
   for (const name of names) {
@@ -14305,15 +14329,7 @@ async function findLocalGameEquipment(env, query, kind) {
   };
 }
 
-async function buildLocalGameCharacterSource(env, character) {
-  const source = {
-    id: 'local-installed-game',
-    name: 'Локальные файлы игры · RU/EN/JA/ZH',
-    url: 'https://bonaqu.github.io/nte-meta/#/admin/game-data',
-    trust: 'высокий',
-    status: 'reference',
-    suggestions: [],
-  };
+async function resolveLocalGameCharacterIdentities(env, character) {
   const names = [character.originalName, character.name]
     .filter(Boolean)
     .map((n) => n.trim().toLowerCase());
@@ -14349,6 +14365,241 @@ async function buildLocalGameCharacterSource(env, character) {
       );
     if (references.length) identities = references;
   }
+  return { names, identities, activeRows, activeIds };
+}
+
+async function buildLocalGameGuideSources(env, character) {
+  const { identities, activeRows, activeIds } =
+    await resolveLocalGameCharacterIdentities(env, character);
+  const owners = [
+    ...new Set(
+      identities
+        .filter(
+          (row) =>
+            activeIds.has(row.ownerId) &&
+            (!character.gameDataOwnerId ||
+              row.ownerId === character.gameDataOwnerId),
+        )
+        .map((row) => row.ownerId),
+    ),
+  ].sort();
+  const sources = [];
+  for (const owner of owners) {
+    const appearance =
+      (activeRows.results || [])
+        .map((row) => gameRecordView(row))
+        .find((row) => row.gameId === owner)?.details.PlayerAppearanceAsset
+        ?.AssetPathName || '';
+    const variant = /_female\//i.test(appearance)
+      ? 'женский вариант'
+      : /_male\//i.test(appearance)
+        ? 'мужской вариант'
+        : '';
+    const source = {
+      id: `local-game-guide-${owner}`,
+      ownerId: owner,
+      name:
+        'Рекомендации из клиента игры' +
+        (owners.length > 1 && variant ? ` · ${variant}` : ''),
+      url: 'https://bonaqu.github.io/nte-meta/#/admin/game-data',
+      trust: 'высокий',
+      status: 'reference',
+      suggestions: [],
+      recommendations: { arcs: [], stats: [], stages: [], unresolved: [] },
+    };
+    const rows = await env.DB.prepare(
+      GAME_RECORD_SELECT +
+        " WHERE (c.kind IN ('character','skill') AND json_extract(e.value,'$.ownerId')=? AND json_extract(e.value,'$.namespace') IN ('DT_CultivationGuideData','DT_GameplayAbilityTipsData')) OR (c.kind='stat' AND json_extract(e.value,'$.namespace')='DT_AttributeStaticData') LIMIT 300",
+    )
+      .bind(owner)
+      .all();
+    const records = (rows.results || []).map((row) => gameRecordView(row));
+    const guide = records.find(
+      (row) =>
+        row.namespace === 'DT_CultivationGuideData' && row.gameId === owner,
+    )?.details;
+    if (!guide) continue;
+    const attributes = (guide.RecommendAttrList || []).map((id) =>
+      records.find(
+        (row) =>
+          row.namespace === 'DT_AttributeStaticData' && row.gameId === id,
+      ),
+    );
+    const tips = records.filter(
+      (row) => row.namespace === 'DT_GameplayAbilityTipsData',
+    );
+    const refKey = (value) =>
+      value?.Key
+        ? `${value.Namespace ?? value.TableId?.split('.').at(-1) ?? ''}::${value.Key}`
+        : '';
+    const keys = [
+      ...new Set(
+        [
+          ...attributes.map((row) => refKey(row?.details.AttributeText)),
+          ...tips.map((row) => refKey(row.details.Name)),
+        ].filter(Boolean),
+      ),
+    ];
+    const strings = keys.length
+      ? await env.DB.prepare(
+          GAME_RECORD_SELECT +
+            " WHERE json_extract(e.value,'$.namespace')||'::'||json_extract(e.value,'$.gameId') IN (SELECT value FROM json_each(?))",
+        )
+          .bind(JSON.stringify(keys))
+          .all()
+      : { results: [] };
+    const dictionary = new Map(
+      (strings.results || []).map((raw) => {
+        const row = gameRecordView(raw);
+        return [`${row.namespace}::${row.gameId}`, row.values.ru || ''];
+      }),
+    );
+    const ru = (value) =>
+      String(
+        value?.CultureInvariantString || dictionary.get(refKey(value)) || '',
+      )
+        .replace(/<[^>]+>/g, '')
+        .trim();
+    const recommendations = source.recommendations;
+    for (const [index, arc] of (guide.RecommendForkList || []).entries()) {
+      const found = await findLocalGameEquipment(
+        env,
+        '',
+        'arcs',
+        String(arc.ForkItemId),
+      );
+      const item = found.items[0];
+      if (!item?.name || !item.imageUrl) {
+        recommendations.unresolved.push(`arc:${arc.ForkItemId}`);
+        continue;
+      }
+      recommendations.arcs.push({
+        id: arc.ForkItemId,
+        name: item.name.slice(0, 600),
+        imageUrl: item.imageUrl,
+        description: item.description.slice(0, 6000),
+        stats: item.stats.slice(0, 24),
+        category: index ? 'replacement' : 'signature',
+      });
+    }
+    for (const [index, attribute] of attributes.entries()) {
+      const name = ru(attribute?.details.AttributeText);
+      const imageUrl = attribute?.assets[0]?.url;
+      if (!name || !imageUrl) {
+        recommendations.unresolved.push(
+          `stat:${guide.RecommendAttrList[index]}`,
+        );
+        continue;
+      }
+      recommendations.stats.push({
+        id: attribute.gameId,
+        name: (name + (attribute.details.bShowPercent ? ' %' : '')).slice(
+          0,
+          600,
+        ),
+        imageUrl,
+        description: '',
+        stats: [],
+      });
+    }
+    for (const [index, stage] of (
+      guide.WorldLevelRecommendList || []
+    ).entries()) {
+      const list =
+        /_male\//i.test(appearance) && stage.MaleSkillRecommendGradeList?.length
+          ? stage.MaleSkillRecommendGradeList
+          : stage.SkillRecommendGradeList || [];
+      const skills = [];
+      for (const entry of list) {
+        const tip = tips.find(
+          (row) =>
+            row.gameId.toLowerCase() === String(entry.AbilityId).toLowerCase(),
+        );
+        const name = ru(tip?.details.Name);
+        const path =
+          tip?.details.icon?.AssetPathName?.split('.')[0]?.toLowerCase();
+        const imageUrl = tip?.assets.find(
+          (asset) =>
+            asset.path
+              ?.replace(/^HT\/Content\//i, '/Game/')
+              .replace(/\.uasset$/i, '')
+              .toLowerCase() === path,
+        )?.url;
+        const level = Number(entry.RecommendLevel);
+        if (
+          !name ||
+          !imageUrl ||
+          !Number.isInteger(level) ||
+          level < 1 ||
+          level > 20
+        ) {
+          recommendations.unresolved.push(`skill:${entry.AbilityId}`);
+          continue;
+        }
+        const skillType = /ultra|ultimate/i.test(tip.gameId)
+          ? 'Сверхспособность'
+          : /qte/i.test(tip.gameId)
+            ? 'Навык поддержки'
+            : /melee/i.test(tip.gameId)
+              ? 'Базовая атака'
+              : 'Навык перенаправления';
+        skills.push({ id: tip.gameId, name, imageUrl, skillType, level });
+      }
+      recommendations.stages.push({
+        stage: index + 1,
+        characterLevel: stage.CharacterRecommendLevel,
+        arcLevel: stage.ForkRecommendLevel,
+        skills,
+      });
+    }
+    // Native target levels do not prove a combat priority or optimized rotation.
+    // Keep them in semantic exports; only confirmed equipment/stat lists enter guide sections.
+    for (const [field, label, items, missingPrefix] of [
+      [
+        'guide.bestArcs',
+        'Дуги · рекомендации игры',
+        recommendations.arcs,
+        'arc:',
+      ],
+      [
+        'guide.mainStats',
+        'Основные статы · рекомендации игры',
+        recommendations.stats,
+        'stat:',
+      ],
+    ]) {
+      if (recommendations.unresolved.some((id) => id.startsWith(missingPrefix)))
+        continue;
+      const suggestion = makeImportSuggestion(
+        field,
+        label,
+        items,
+        source,
+        'high',
+        'Рекомендация клиента игры; редактор выбирает, применять ли её к гайду.',
+      );
+      if (suggestion) source.suggestions.push(suggestion);
+    }
+    source.status = source.suggestions.length ? 'ok' : 'reference';
+    source.message = recommendations.unresolved.length
+      ? 'Часть игровых ID не сопоставлена. Неполные разделы не предлагаются для импорта.'
+      : 'Дуги и основные характеристики из игровых рекомендаций.';
+    sources.push(source);
+  }
+  return sources;
+}
+
+async function buildLocalGameCharacterSource(env, character) {
+  const source = {
+    id: 'local-installed-game',
+    name: 'Локальные файлы игры · RU/EN/JA/ZH',
+    url: 'https://bonaqu.github.io/nte-meta/#/admin/game-data',
+    trust: 'высокий',
+    status: 'reference',
+    suggestions: [],
+  };
+  const { names, identities, activeRows, activeIds } =
+    await resolveLocalGameCharacterIdentities(env, character);
   if (
     !character.gameDataOwnerId &&
     identities.length > 1 &&

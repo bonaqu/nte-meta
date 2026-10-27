@@ -1,4 +1,67 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+
+test('нативные рекомендации отдельно принимаются в визуальную секцию гайда', async ({
+  page,
+}) => {
+  const native = JSON.parse(
+    await readFile('tests/fixtures/native-guide-import.json', 'utf8'),
+  );
+  await page.route('**/api/guide-import/lookup', (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          ...importResponse('Рекомендации клиента найдены.').data,
+          ...native,
+          found: true,
+        },
+      },
+    }),
+  );
+  await openAuthenticatedProfile(page);
+  for (const width of [360, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/#/guides/iroi-build-guide');
+    await page
+      .getByRole('button', { name: 'Редактировать гайд', exact: true })
+      .click();
+    const dialog = page.locator('dialog[open]');
+    await dialog
+      .getByRole('button', { name: 'Найти источники гайда', exact: true })
+      .click();
+    await expect(dialog.locator('#guide-import-status')).toHaveText(
+      'Рекомендации клиента найдены.',
+    );
+    await dialog
+      .getByRole('button', { name: 'Принять Секция: лучшие дуги', exact: true })
+      .click();
+    await dialog
+      .getByRole('navigation', { name: 'Разделы редактора гайда' })
+      .getByRole('button', { name: 'Секции', exact: true })
+      .click();
+    const preview = dialog.locator(
+      '.visual-section-preview .guide-visual--arcs',
+    );
+    await expect(preview.locator(':scope > li')).toHaveCount(2);
+    const names = JSON.parse(native.suggestions[0].value).map(
+      (row: { name: string }) => row.name,
+    );
+    await expect(preview.locator('h3')).toHaveText(names);
+    await expect(preview.locator(':scope > li > img')).toHaveCount(2);
+    for (const image of await preview.locator(':scope > li > img').all())
+      await expect
+        .poll(() =>
+          image.evaluate((node) => (node as HTMLImageElement).naturalWidth),
+        )
+        .toBeGreaterThan(0);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    ).toBe(true);
+    await page.reload();
+  }
+});
 
 type ImportSuggestionFixture = {
   id: string;

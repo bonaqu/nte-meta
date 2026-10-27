@@ -3,7 +3,7 @@ param(
  [string]$Tool = 'D:\CODEX\Programs\UEExtractor\1.0.8.7\UEExtractor.exe',
  [Parameter(Mandatory=$true)][string]$Mapping,
  [Parameter(Mandatory=$true)][string]$ArchiveKeyFile,
- [string]$Output = 'D:\CODEX\Tasks\nte-local-data'
+ [string]$Output = 'E:\CODEX - IMPORT HERE TEMP FILES AND OTHER\nte-meta\extracts'
 )
 $ErrorActionPreference='Stop'
 $gameRoot=(Resolve-Path -LiteralPath $GameDirectory).Path
@@ -51,6 +51,19 @@ try {
  }
  if(($after | ConvertTo-Json -Compress) -ne ($archives | ConvertTo-Json -Compress)){throw 'Game archives changed during extraction. Wait for the launcher to finish, then create a new snapshot. This run is not ready to publish.'}
  '{"status":"complete"}' | Set-Content -LiteralPath (Join-Path $runDirectory 'extraction-status.json') -Encoding utf8
-} finally {Pop-Location}
+} finally {
+ Pop-Location
+ # These are temporary directory junctions, never copied archives. Remove only
+ # the junction itself, with no recursion into the installed game's directory.
+ foreach($folder in 'Paks','PatchPaks','TagPatchPaks'){
+  $link=Join-Path $mount "Content\$folder"
+  if(Test-Path -LiteralPath $link){
+   $item=Get-Item -LiteralPath $link
+   if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -and $item.Target -eq (Join-Path $content $folder)){
+    [IO.Directory]::Delete($link)
+   }
+  }
+ }
+}
 Write-Output "Local extraction: $runDirectory"
 Write-Output 'Run normalize.py with --source pointing to this directory, then validate.py before publishing.'

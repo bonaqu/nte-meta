@@ -16,7 +16,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from exporter import export
-from updates import check_update, snapshot_folder, profile_migration
+from updates import check_update, snapshot_folder, profile_migration, reuse_snapshot_files
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 SETTINGS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'NTEMetaWorkbench/settings.json'
@@ -26,7 +26,7 @@ DEFAULTS = {
     'mapping': r'D:\CODEX\Tasks\nte-local-data\NTE_Latest.usmap',
     'key': r'D:\CODEX\Tasks\nte-local-data\mount\HT\aes.txt',
     'output': r'E:\CODEX - IMPORT HERE TEMP FILES AND OTHER\nte-meta\extracts',
-    'source': r'D:\CODEX\Tasks\nte-local-data',
+    'source': r'E:\CODEX - IMPORT HERE TEMP FILES AND OTHER\nte-meta\extracts',
     'last_export': '',
 }
 
@@ -171,8 +171,14 @@ class Workbench(tk.Tk):
 
     def extract(self):
         values={k:v.get() for k,v in self.values.items()}
-        try: prior_supplement=snapshot_folder(Path(values['source']))/'supplement.json'
-        except ValueError: prior_supplement=None
+        try:
+            previous=snapshot_folder(Path(values['source']))
+            prior_supplement=previous/'supplement.json'
+            unchanged=not check_update(Path(values['game']),previous)['needsExtraction']
+        except (ValueError,OSError): previous=None; prior_supplement=None; unchanged=False
+        if unchanged and messagebox.askyesno('Архивы не изменились', 'Игра не изменилась с последней выгрузки. Использовать готовые файлы без повторного извлечения?\n\n«Нет» — создать новую полную проверочную выгрузку.'):
+            self.values['source'].set(str(previous));self.save_settings()
+            self.status.set('Используется готовая выгрузка: '+str(previous));return
         def operation():
             self.command(['pwsh','-NoProfile','-File',str(REPOSITORY/'scripts/game-data/extract-local.ps1'),
                 '-GameDirectory',values['game'],'-Tool',values['tool'],'-Mapping',values['mapping'],
@@ -180,6 +186,9 @@ class Workbench(tk.Tk):
             candidates=sorted(p for p in Path(values['output']).iterdir() if (p/'export/extraction.json').exists())
             if candidates:
                 latest=candidates[-1]
+                if previous and latest != previous:
+                    reused=reuse_snapshot_files(latest,previous)
+                    self.messages.put(('log',f"Переиспользовано файлов: {reused['reused']}; новых: {reused['added']}; изменённых версий: {reused['changed']}. Предыдущая выгрузка сохранена."))
                 prior_cache=prior_supplement.parent/'export/media-cache.json' if prior_supplement else None
                 if prior_cache and prior_cache.is_file():shutil.copy2(prior_cache,latest/'export/media-cache.json')
                 if prior_supplement and prior_supplement.is_file() and not (latest/'supplement.json').exists():
@@ -284,4 +293,11 @@ class Workbench(tk.Tk):
         self.save_settings();self.destroy()
 
 
-if __name__=='__main__':Workbench().mainloop()
+if __name__=='__main__':
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--action',choices=['extract','normalize','export_data','prepare_characters','publish_data'])
+    arguments=parser.parse_args()
+    window=Workbench()
+    if arguments.action:window.after(250,lambda:getattr(window,arguments.action)())
+    window.mainloop()

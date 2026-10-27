@@ -4,13 +4,33 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
-from updates import snapshot_folder, compare_archives, profile_migration
+from updates import snapshot_folder, compare_archives, profile_migration, reuse_snapshot_files
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts/game-data'))
 from media_cache import media_name
 
 
 class UpdateTests(TestCase):
+    def test_incremental_export_reuses_identical_payloads_but_preserves_old_versions(self):
+        with TemporaryDirectory() as directory:
+            old,new=Path(directory)/'old',Path(directory)/'new'
+            for folder in [old,new]:
+                (folder/'export/tables').mkdir(parents=True)
+                (folder/'export/audio/English').mkdir(parents=True)
+                (folder/'export/extraction.json').write_text('{}')
+                (folder/'export/media-cache.json').write_text('{}')
+                (folder/'export/tables/same.json').write_text('{"name":"same"}')
+            (old/'export/audio/English/42.wem').write_bytes(b'old voice')
+            (new/'export/audio/English/42.wem').write_bytes(b'new voice')
+            (new/'export/tables/added.json').write_text('{"name":"new character"}')
+            result=reuse_snapshot_files(new,old)
+            self.assertEqual((result['reused'],result['changed'],result['added']),(1,1,1))
+            self.assertTrue((old/'export/tables/same.json').samefile(new/'export/tables/same.json'))
+            self.assertFalse((old/'export/media-cache.json').samefile(new/'export/media-cache.json'))
+            self.assertEqual((old/'export/audio/English/42.wem').read_bytes(),b'old voice')
+            self.assertEqual((new/'export/audio/English/42.wem').read_bytes(),b'new voice')
+            with self.assertRaises(ValueError):reuse_snapshot_files(old,old)
+
     def test_media_cache_changes_url_when_payload_changes(self):
         path='HT/Content/WwiseAudio/Media/English/42.wem'
         cache={path.lower():dict(sha256='old',name='a'*20+'.ogg')}

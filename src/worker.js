@@ -7681,8 +7681,7 @@ function extractGuideTeamRows(html) {
     seen.add(key);
     rows.push({
       title,
-      description:
-        'Состав извлечён из таблицы команд источника. Проверьте актуальность патча и добавьте ротацию перед публикацией.',
+      description: '',
     });
   };
 
@@ -8099,6 +8098,16 @@ function localizeImportedGuideText(value) {
     ['Anima Damage', 'урон Анимой'],
     ['Healing bonus', 'бонус лечения'],
     ['Universal DMG', 'универсальный урон'],
+    ['Incantation DMG', 'Бонус урона чар'],
+    ['Anima DMG', 'Бонус урона Анимы'],
+    ['Chaos DMG', 'Бонус урона Хаоса'],
+    ['Psyche DMG', 'Бонус урона Психики'],
+    ['Lakshana DMG', 'Бонус урона Лакшаны'],
+    ['Energy Recharge', 'Скорость зарядки'],
+    ['Charge Efficiency', 'Скорость зарядки'],
+    ['DEF', 'Защита'],
+    ['HP', 'ОЗ'],
+    ['CRIT', 'Критические характеристики'],
     ['Flat ATK', 'плоская АТК'],
     ['ATK%', 'АТК%'],
     ['DPS', 'ДД'],
@@ -8116,6 +8125,61 @@ function localizeImportedGuideText(value) {
     );
   }
   return result.trim();
+}
+
+function enrichGuideSkillPriority(rows, icons = []) {
+  const output = [];
+  const canonical = (value) => {
+    const name = localizeImportedGuideText(value)
+      .replace(/^\s*\d+[.)]\s+/, '')
+      .replace(/Redirect навык/gi, 'Навык перенаправления')
+      .trim();
+    return /^навык$/i.test(name) ? 'Навык перенаправления' : name;
+  };
+  for (const raw of rows) {
+    const row = raw && typeof raw === 'object' ? raw : { name: String(raw) };
+    const chainInDescription =
+      ((!row.name && !row.title) ||
+        /^(?:приоритет|порядок)/i.test(row.name || row.title || '')) &&
+      (String(row.description || '').match(/[→>=]/g) || []).length >= 2 &&
+      /skill|ultimate|attack|навык|атака|сверхспособность/i.test(
+        row.description || '',
+      );
+    const text = chainInDescription
+      ? row.description
+      : row.name || row.title || '';
+    const parts = text.split(/\s*([→>=])\s*/);
+    for (let index = 0; index < parts.length; index += 2) {
+      const name = canonical(parts[index]);
+      if (!name) continue;
+      let icon = icons.find((icon) =>
+        [icon.name, icon.type].some(
+          (label) =>
+            normalizeImportSearch(canonical(label)) ===
+            normalizeImportSearch(name),
+        ),
+      );
+      // Keep the source's order, but prefer an exact owning-character native
+      // icon/name after its skill type has been identified.
+      if (icon?.type) {
+        icon =
+          icons.find((entry) => entry.native && entry.type === icon.type) ||
+          icon;
+      }
+      output.push({
+        ...row,
+        name: icon?.name || name,
+        skillType: icon?.type || row.skillType || '',
+        imageUrl: icon?.iconUrl || row.imageUrl || '',
+        description: chainInDescription ? '' : row.description || '',
+        stats: row.stats || [],
+        equalPriority:
+          output.length > 0 &&
+          (index ? parts[index - 1] === '=' : row.equalPriority === true),
+      });
+    }
+  }
+  return output;
 }
 
 function parseIcyVeinsGuideImport(html, source, character) {
@@ -8147,8 +8211,7 @@ function parseIcyVeinsGuideImport(html, source, character) {
       arcs.push({
         name: `Дуга: ${sourceName}`,
         imageUrl: normalizeExternalImageUrl(match[1]),
-        description:
-          'Название и позиция найдены в актуальном гайде. Перед публикацией замените название на официальную русскую локализацию, если она доступна.',
+        description: '',
       });
       if (arcs.length >= 6) break;
     }
@@ -8179,9 +8242,9 @@ function parseIcyVeinsGuideImport(html, source, character) {
         .map((item) => normalizeImportedRuText(item))
         .filter(Boolean)
         .slice(0, 8)
-        .map((item, index) => ({
-          title: `${index + 1}. ${item}`,
-          description: 'Приоритет характеристики по данным актуального гайда.',
+        .map((item) => ({
+          title: item,
+          description: '',
         }));
     suggestions.push(
       makeImportSuggestion(
@@ -8210,15 +8273,7 @@ function parseIcyVeinsGuideImport(html, source, character) {
         (line.match(/(?:>|=)/g) || []).length >= 2 &&
         /skill|ultimate|attack/i.test(line),
     );
-    const rows = localizeImportedGuideText(priorityLine || '')
-      .split(/\s*(?:>|=)\s*/)
-      .map((item) => normalizeImportedRuText(item))
-      .filter(Boolean)
-      .slice(0, 8)
-      .map((item, index) => ({
-        title: `${index + 1}. ${item}`,
-        description: 'Порядок прокачки навыков по данным актуального гайда.',
-      }));
+    const rows = enrichGuideSkillPriority([priorityLine || '']).slice(0, 8);
     suggestions.push(
       makeImportSuggestion(
         'guide.skillPriority',
@@ -8256,8 +8311,7 @@ function parseIcyVeinsGuideImport(html, source, character) {
       seen.add(key);
       teams.push({
         title,
-        description:
-          'Состав извлечён из актуальной таблицы команд. Добавьте русское объяснение синергии и ротацию перед публикацией.',
+        description: '',
       });
       if (teams.length >= 8) break;
     }
@@ -8383,8 +8437,7 @@ function parseKaidenGuideImport(html, source, character) {
           [
             {
               title: members.join(' + '),
-              description:
-                'Основной рекомендуемый состав по данным актуального гайда. Перед публикацией проверьте патч и добавьте ротацию команды.',
+              description: '',
             },
           ],
           source,
@@ -8404,8 +8457,8 @@ function parseKaidenGuideImport(html, source, character) {
       .map((value) => value.trim())
       .filter(Boolean)
       .slice(0, 8)
-      .map((value, index) => ({
-        title: `${index + 1}. ${value}`,
+      .map((value) => ({
+        title: value,
         description: '',
       }));
     suggestions.push(
@@ -10930,30 +10983,32 @@ function dedupeGuideImportSuggestions(items) {
       (left, right) =>
         importSuggestionScore(right) - importSuggestionScore(left),
     );
-    if (field === 'guide.videoUrl') {
-      const seenUrls = new Set();
-      const uniqueVideos = sorted
+    // Ordered recommendations are complete alternatives. Combining their rows
+    // would invent a rotation/priority that no source actually recommends.
+    if (
+      ['guide.videoUrl', 'guide.skillPriority', 'guide.rotations'].includes(
+        field,
+      )
+    ) {
+      const seenValues = new Set();
+      const variants = sorted
         .filter((item) => {
           if (
             !isUsefulImportCollectionValue(item.value) ||
-            seenUrls.has(item.value)
+            seenValues.has(item.value)
           ) {
             return false;
           }
-          seenUrls.add(item.value);
+          seenValues.add(item.value);
           return true;
         })
         .slice(0, 3);
       result.push(
-        ...uniqueVideos.map((item) => ({
+        ...variants.map((item) => ({
           ...item,
           agreementCount: 1,
-          variantCount: uniqueVideos.length,
-          qualityFlags: importSuggestionQualityFlags(
-            item,
-            1,
-            uniqueVideos.length,
-          ),
+          variantCount: variants.length,
+          qualityFlags: importSuggestionQualityFlags(item, 1, variants.length),
         })),
       );
       continue;
@@ -11500,38 +11555,28 @@ async function handleGuideImportLookup(request, env) {
         },
       ]),
     ]);
-    const icons = sourceResults.flatMap((source) => source.skillIcons || []);
+    const nativeIcons =
+      localSources.length === 1
+        ? (localSources[0].recommendations?.stages || []).flatMap((stage) =>
+            stage.skills.map((skill) => ({
+              name: skill.name,
+              type: skill.skillType,
+              iconUrl: skill.imageUrl,
+              native: true,
+            })),
+          )
+        : [];
+    const icons = [
+      ...nativeIcons,
+      ...sourceResults.flatMap((source) => source.skillIcons || []),
+    ];
     const suggestions = dedupeGuideImportSuggestions(
       sourceResults.flatMap((source) => source.suggestions),
     ).map((item) => {
       if (item.field !== 'guide.skillPriority') return item;
       const rows = parseImportSuggestionJson(item);
       if (!Array.isArray(rows)) return item;
-      const enriched = rows.flatMap((row) => {
-        const text =
-          typeof row === 'string'
-            ? row
-            : /→|>/.test(row.description || '')
-              ? row.description
-              : row.name || row.title || '';
-        return text.split(/→|>/).map((name) => {
-          name = localizeImportedGuideText(name)
-            .replace(/Redirect навык/gi, 'Навык перенаправления')
-            .trim();
-          const icon = icons.find(
-            (icon) =>
-              normalizeImportSearch(icon.name) ===
-                normalizeImportSearch(name) ||
-              normalizeImportSearch(icon.type) === normalizeImportSearch(name),
-          );
-          return {
-            name,
-            imageUrl: icon?.iconUrl || row.imageUrl || '',
-            description: icon?.name || '',
-            stats: [],
-          };
-        });
-      });
+      const enriched = enrichGuideSkillPriority(rows, icons);
       return { ...item, value: JSON.stringify(enriched) };
     });
     await localizeGameImportSuggestions(env, suggestions);

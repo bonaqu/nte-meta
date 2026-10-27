@@ -1096,6 +1096,53 @@ test('рекомендации клиента: 25 вариантов, русск
       imported.suggestions.map((row: { field: string }) => row.field),
     ).toEqual(['guide.bestArcs', 'guide.mainStats']);
     expect(JSON.parse(imported.fields['guide.bestArcs'])).toHaveLength(2);
+    // The public lookup must retain the web source's order/equality while
+    // resolving its generic skill labels to this exact native character.
+    f.context.priorityFixture =
+      '<h1>Adler Guide</h1><h2>Adler Skill Priority</h2><p>Skill = Ultimate &gt; Basic Attack &gt; Support Skill</p>';
+    new vm.Script(`
+      fetch=async()=>new Response(globalThis.priorityFixture);
+      guideImportSources=()=>[{id:'icy-veins-build-guide',name:'Icy Veins',url:'https://www.icy-veins.com/neverness-to-everness/adler-guide-best-builds',raw:true,parser:parseIcyVeinsGuideImport}];
+    `).runInContext(f.context);
+    const webLookup = await f.m.handleGuideImportLookup(
+      new Request('https://example.com/api/guide-import/lookup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ query: 'Адлер' }),
+      }),
+      f.env,
+    );
+    expect(webLookup.ok).toBe(true);
+    const webResult = (await webLookup.json()).data;
+    const priority = JSON.parse(
+      webResult.suggestions.find(
+        (row: { field: string }) => row.field === 'guide.skillPriority',
+      ).value,
+    );
+    const nativeAdler = (
+      await f.m.buildLocalGameGuideSources(f.env, {
+        name: 'Адлер',
+        originalName: 'Adler',
+      })
+    )[0];
+    const nativeSkills = nativeAdler.recommendations.stages[0].skills;
+    expect(priority.map((row: GuideVisualItem) => row.equalPriority)).toEqual([
+      false,
+      true,
+      false,
+      false,
+    ]);
+    for (const row of priority) {
+      const skill = nativeSkills.find(
+        (item: { skillType: string }) => item.skillType === row.skillType,
+      )!;
+      expect(skill).toBeTruthy();
+      expect(row).toMatchObject({
+        name: skill.name,
+        imageUrl: skill.imageUrl,
+        description: '',
+      });
+    }
     const name = records.find(
       (row) => row.namespace === 'ST_Attribute' && row.gameId === 'Def',
     )!;

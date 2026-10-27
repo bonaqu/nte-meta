@@ -15,6 +15,18 @@ type Source = {
   resolveUrl?: WorkerContracts['resolveCatalogueImportSource'];
 };
 type WorkerContracts = {
+  parseIcyVeinsGuideImport: (
+    html: string,
+    source: Source,
+    character: object,
+  ) => CharacterImportSuggestion[];
+  enrichGuideSkillPriority: (
+    rows: unknown[],
+    icons?: object[],
+  ) => Array<Record<string, unknown>>;
+  dedupeGuideImportSuggestions: (
+    rows: CharacterImportSuggestion[],
+  ) => CharacterImportSuggestion[];
   nevernessAppCharacterCode: (character: object) => string;
   resolveCatalogueImportSource: (
     source: Source,
@@ -56,10 +68,118 @@ async function workerContracts(fetcher: typeof fetch) {
   });
   new vm.Script(
     source.replace('export default {', 'const worker = {') +
-      '\n globalThis.contracts = { findImportCharacter, fetchImportSource, resolveWotpackGuideSource, resolveCatalogueImportSource, nevernessAppCharacterCode };',
+      '\n globalThis.contracts = { findImportCharacter, fetchImportSource, resolveWotpackGuideSource, resolveCatalogueImportSource, nevernessAppCharacterCode, parseIcyVeinsGuideImport, enrichGuideSkillPriority, dedupeGuideImportSuggestions };',
   ).runInContext(context);
   return context.contracts as WorkerContracts;
 }
+
+test('импорт сохраняет защиту/ОЗ, равный приоритет и собственные имена навыков без служебного текста', async () => {
+  const m = await workerContracts(fetch);
+  const suggestions = m.parseIcyVeinsGuideImport(
+    '<h1>Adler Guide</h1><h2>Adler Stat Priority</h2><p>Cartridge Mainstat Priority: DEF &gt; HP &gt; Incantation DMG</p><p>Substat Priority: DEF% &gt; HP%</p><h2>Adler Skill Priority</h2><p>Skill = Ultimate &gt; Basic Attack &gt; Support Skill</p>',
+    {
+      id: 'icy-veins-build-guide',
+      url: 'https://www.icy-veins.com/neverness-to-everness/adler-guide-best-builds',
+    },
+    { slug: 'adler', originalName: 'Adler' },
+  );
+  const stats = JSON.parse(
+    suggestions.find((item) => item.field === 'guide.mainStats')!.value,
+  );
+  expect(stats.map((row: { title: string }) => row.title)).toEqual([
+    'Защита',
+    'ОЗ',
+    'Бонус урона чар',
+  ]);
+  expect(
+    stats.every((row: { description: string }) => row.description === ''),
+  ).toBe(true);
+  const priority = JSON.parse(
+    suggestions.find((item) => item.field === 'guide.skillPriority')!.value,
+  );
+  const icons = [
+    {
+      name: 'Истребление зла',
+      type: 'Навык перенаправления',
+      iconUrl: '/nte-meta/game-assets/skill.webp',
+      native: true,
+    },
+    {
+      name: 'Спокойствие',
+      type: 'Сверхспособность',
+      iconUrl: '/nte-meta/game-assets/ultimate.webp',
+      native: true,
+    },
+    {
+      name: "Evil's Bane",
+      type: 'Навык перенаправления',
+      iconUrl: 'https://example.com/skill.webp',
+    },
+  ];
+  const enriched = m.enrichGuideSkillPriority(priority, icons);
+  expect(enriched.map((row) => row.equalPriority)).toEqual([
+    false,
+    true,
+    false,
+    false,
+  ]);
+  expect(enriched[0]).toMatchObject({
+    name: 'Истребление зла',
+    skillType: 'Навык перенаправления',
+    imageUrl: '/nte-meta/game-assets/skill.webp',
+    description: '',
+  });
+  expect(enriched[1]).toMatchObject({
+    name: 'Спокойствие',
+    skillType: 'Сверхспособность',
+  });
+  const note = 'Урон навыка > 50% при достаточном запасе ОЗ.';
+  expect(
+    m.enrichGuideSkillPriority(
+      [{ name: 'Истребление зла', description: note }],
+      icons,
+    )[0].description,
+  ).toBe(note);
+  expect(
+    m.enrichGuideSkillPriority([{ name: "Evil's Bane" }], icons)[0].imageUrl,
+  ).toBe('/nte-meta/game-assets/skill.webp');
+  expect(m.enrichGuideSkillPriority(['3.8-Billion-Year Mirage'])[0].name).toBe(
+    '3.8-Billion-Year Mirage',
+  );
+});
+
+test('разные приоритеты и ротации остаются целыми вариантами источников', async () => {
+  const m = await workerContracts(fetch);
+  for (const field of ['guide.skillPriority', 'guide.rotations']) {
+    const sourceRows = [
+      [
+        { name: 'Навык перенаправления', description: '' },
+        { name: 'Сверхспособность', description: '', equalPriority: true },
+      ],
+      [
+        { name: 'Сверхспособность', description: '' },
+        { name: 'Базовая атака', description: '' },
+      ],
+    ];
+    const inputs = sourceRows.map((rows, index) => ({
+      id: `source-${index}`,
+      field,
+      label: 'Вариант',
+      value: JSON.stringify(rows),
+      sourceName: `Источник ${index}`,
+      sourceUrl: `https://example.com/${index}`,
+      confidence: 'high' as const,
+      note: '',
+    }));
+    const result = m.dedupeGuideImportSuggestions([...inputs, inputs[0]]);
+    expect(result).toHaveLength(2);
+    expect(result.map((item) => item.value).sort()).toEqual(
+      inputs.map((item) => item.value).sort(),
+    );
+    expect(result.every((item) => item.variantCount === 2)).toBe(true);
+    expect(result.some((item) => item.id.startsWith('merged:'))).toBe(false);
+  }
+});
 
 test('каталог источника находит akane_rin и даёт рабочую ссылку вместо отсутствующей страницы', async () => {
   const m = await workerContracts(

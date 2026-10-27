@@ -141,8 +141,8 @@ export function visualFromLegacy(
           : undefined;
       return {
         id: `${section.id}-visual-${index}`,
-        name,
-        description: '',
+        name: kind === 'rotation' ? '' : name,
+        description: kind === 'rotation' ? name : '',
         imageUrl: ability?.iconUrl || '',
         stats: [],
       };
@@ -184,9 +184,15 @@ export function visualFromImport(
           : { name: String(row) };
       return {
         id: crypto.randomUUID(),
-        name: String(item.name || item.title || item.label || ''),
+        name:
+          kind === 'rotation' && typeof row === 'string'
+            ? ''
+            : String(item.name || item.title || item.label || ''),
         imageUrl: String(item.imageUrl || item.iconUrl || ''),
-        description: String(item.description || item.value || ''),
+        description:
+          kind === 'rotation' && typeof row === 'string'
+            ? row
+            : String(item.description || item.value || ''),
         skillType:
           kind === 'skills' && typeof item.skillType === 'string'
             ? item.skillType.slice(0, 120)

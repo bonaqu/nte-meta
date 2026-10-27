@@ -106,11 +106,16 @@ test('гайд: навигация, экипировка и мобильная �
         const number = node
           .querySelector('.guide-rotation-index')!
           .getBoundingClientRect();
-        const body = node
-          .querySelector('.guide-rotation-action')!
+        const heading = node
+          .querySelector('.guide-rotation-heading')!
           .getBoundingClientRect();
+        const content = node
+          .querySelector('.guide-rotation-content')!
+          .getBoundingClientRect();
+        if (content.top < heading.bottom)
+          throw new Error('Текст перекрывает заголовок этапа');
         return Math.abs(
-          number.top + number.height / 2 - body.top - body.height / 2,
+          number.top + number.height / 2 - heading.top - heading.height / 2,
         );
       }),
     );
@@ -124,9 +129,27 @@ test('гайд: навигация, экипировка и мобильная �
             .every(
               (node) =>
                 !['none', 'normal'].includes(
-                  getComputedStyle(node, '::before').content,
+                  getComputedStyle(node, '::after').content,
                 ),
             ),
+        ),
+    ).toBe(true);
+    await expect(rotation.locator('.guide-rotation-index')).toHaveText([
+      '01',
+      '02',
+      '03',
+      '04',
+      '05',
+    ]);
+    expect(
+      await rotation
+        .locator(':scope > li')
+        .evaluateAll((nodes) =>
+          nodes.every((node) =>
+            ['none', 'normal'].includes(
+              getComputedStyle(node, '::before').content,
+            ),
+          ),
         ),
     ).toBe(true);
     if (width === 360 || width === 1440)

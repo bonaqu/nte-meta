@@ -134,34 +134,38 @@ export function GuideVisualView({ value }: { value: GuideVisual }) {
       <ol className="guide-basic-rotation" aria-label="Шаги базовой ротации">
         {value.items.map((item, index) => (
           <li key={item.id}>
-            <span className="guide-rotation-index" aria-hidden="true">
-              {index + 1}
-            </span>
             <div className="guide-rotation-action">
-              {item.imageUrl ? (
-                <img
-                  src={resolveAssetUrl(item.imageUrl)}
-                  alt=""
-                  width="40"
-                  height="40"
-                  loading="lazy"
-                />
-              ) : null}
-              <div>
+              <div className="guide-rotation-heading">
+                <span className="guide-rotation-index" aria-hidden="true">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
                 {!/^шаг\s*\d+\s*$/iu.test(item.name) && item.name ? (
                   <h3>{item.name}</h3>
                 ) : null}
-                {item.description ? <p>{item.description}</p> : null}
-                {item.stats.length ? (
-                  <dl className="guide-visual__stats">
-                    {item.stats.map((stat, i) => (
-                      <div key={i}>
-                        <dt>{stat.label}</dt>
-                        <dd>{stat.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
+              </div>
+              <div className="guide-rotation-content">
+                {item.imageUrl ? (
+                  <img
+                    src={resolveAssetUrl(item.imageUrl)}
+                    alt=""
+                    width="40"
+                    height="40"
+                    loading="lazy"
+                  />
                 ) : null}
+                <div>
+                  {item.description ? <p>{item.description}</p> : null}
+                  {item.stats.length ? (
+                    <dl className="guide-visual__stats">
+                      {item.stats.map((stat, i) => (
+                        <div key={i}>
+                          <dt>{stat.label}</dt>
+                          <dd>{stat.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
+                </div>
               </div>
             </div>
           </li>
@@ -506,9 +510,16 @@ export function GuideVisualEditor({
               </fieldset>
             ) : null}
             <label>
-              {value.kind === 'rotation' ? 'Действие' : 'Название'}
+              {value.kind === 'rotation'
+                ? 'Название этапа (необязательно)'
+                : 'Название'}
               <input
                 value={item.name}
+                placeholder={
+                  value.kind === 'rotation'
+                    ? 'Например: Подготовка усилений'
+                    : undefined
+                }
                 maxLength={600}
                 onChange={(e) => patch(item.id, { name: e.target.value })}
               />

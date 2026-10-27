@@ -3,6 +3,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest import TestCase
+from unittest import skipUnless
+import os
+import shutil
+import subprocess
 from unittest.mock import patch
 from updates import snapshot_folder, compare_archives, profile_migration, reuse_snapshot_files
 import sys
@@ -11,6 +15,28 @@ from media_cache import media_name
 
 
 class UpdateTests(TestCase):
+    @skipUnless(os.name == 'nt' and shutil.which('pwsh'), 'NTFS junction lifecycle is checked on Windows')
+    def test_incompatible_archives_mark_failed_and_unlink_only_mount(self):
+        with TemporaryDirectory() as directory:
+            root=Path(directory); content=root/'game/Client/WindowsNoEditor/HT/Content'
+            for name in ['Paks','PatchPaks','TagPatchPaks']:(content/name).mkdir(parents=True)
+            original=content/'Paks/fixture.pak';original.write_bytes(b'untouched game')
+            key=root/'key.txt';key.write_text('0'*64)
+            tool=root/'mock-extractor.cmd'
+            tool.write_text('@echo No valid files found. Archives may be encrypted with a different AES key.\n@exit /b 1\n')
+            mapping=root/'test.usmap';mapping.write_bytes(b'fixture')
+            output=root/'extracts'
+            result=subprocess.run(['pwsh','-NoProfile','-File',str(Path(__file__).resolve().parents[2]/'scripts/game-data/extract-local.ps1'),
+                '-GameDirectory',str(root/'game'),'-Tool',str(tool),'-Mapping',str(mapping),'-ArchiveKeyFile',str(key),'-Output',str(output)],
+                capture_output=True,encoding='utf-8',errors='replace',creationflags=subprocess.CREATE_NO_WINDOW,timeout=30)
+            self.assertNotEqual(result.returncode,0)
+            snapshot=next(output.iterdir())
+            status=json.loads((snapshot/'extraction-status.json').read_text('utf-8-sig'))
+            self.assertEqual(status['status'],'failed');self.assertTrue(status['compatibilityError'])
+            self.assertEqual(original.read_bytes(),b'untouched game')
+            self.assertFalse((snapshot/'mount/HT/Content/Paks').exists())
+            with self.assertRaises(ValueError):snapshot_folder(output)
+
     def test_incremental_export_reuses_identical_payloads_but_preserves_old_versions(self):
         with TemporaryDirectory() as directory:
             old,new=Path(directory)/'old',Path(directory)/'new'

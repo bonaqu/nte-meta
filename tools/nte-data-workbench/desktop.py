@@ -177,6 +177,12 @@ class Desktop(QMainWindow):
             try:
                 values = config(); result = check_update(Path(values['game']), Path(values['source']))
                 result['paths'] = values
+                latest = sorted(Path(values['output']).glob('*/extraction-status.json'), reverse=True)[:1]
+                if latest:
+                    try:
+                        status = json.loads(latest[0].read_text('utf-8-sig'))
+                        result['compatibilityError'] = status.get('status') == 'failed' and status.get('compatibilityError', False)
+                    except (OSError, ValueError): pass
             except Exception as error: result = {'error': str(error)}
             self.checker.finished.emit(result)
         threading.Thread(target=work, daemon=True).start()
@@ -188,6 +194,8 @@ class Desktop(QMainWindow):
         self.paths.setText('Игра: ' + result['paths']['game'] + '\nВыгрузка: ' + result['snapshot'] + '\nДанные приложения: ' + str(DATA))
         changes = len(result['added']) + len(result['changed']) + len(result['removed'])
         self.game_status.setText(f'Изменилось архивов: {changes}. Доступно обновление игровых данных.' if result['needsExtraction'] else 'Архивы не изменились. Рабочая выгрузка актуальна.')
+        if result.get('compatibilityError'):
+            self.game_status.setText('Обновление игры обнаружено, но последняя попытка чтения архивов не удалась. Проверьте совместимость инструмента и файла ключа через «Пути и все инструменты». Прежняя рабочая выгрузка сохранена.')
 
     def launch_tool(self, action=None):
         if self.tool and self.tool.poll() is None: return

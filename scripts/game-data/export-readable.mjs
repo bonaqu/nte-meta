@@ -64,7 +64,7 @@ new vm.Script(
     'export default {',
     'const worker={',
   ) +
-    '\nglobalThis.reader={buildLocalGameCharacterSource,normalizeCharacterProfile,findLocalGameEquipment,handleGameData};',
+    '\nglobalThis.reader={buildLocalGameCharacterSource,buildLocalGameGuideSources,normalizeCharacterProfile,findLocalGameEquipment,handleGameData};',
 ).runInContext(context);
 const select = (where) =>
   db
@@ -126,6 +126,13 @@ for (const appearance of select(
     values: identity.values,
     fields,
     profile,
+    recommendations: (
+      await context.reader.buildLocalGameGuideSources(env, {
+        name,
+        originalName: identity.values.en,
+        gameDataOwnerId: appearance.gameId,
+      })
+    )[0]?.recommendations,
   });
 }
 const equipment = [];

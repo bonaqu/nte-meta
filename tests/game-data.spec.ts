@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import vm from 'node:vm';
 import type { GameDataRecord } from '../src/lib/api';
+import type { GuideVisualItem } from '../src/types';
 import {
   calculateProgression,
   type ProgressionData,
@@ -89,15 +90,38 @@ async function contract(records: SourceRecord[]) {
       'export default {',
       'const worker={',
     ) +
-      '\ngetAuthUser=async()=>globalThis.testUser;logAudit=async()=>{};globalThis.contracts={handleGameData,gameTermReplacements,translateCandidate,buildLocalGameCharacterSource,localizeGameImportSuggestions,normalizeCharacterProfile,prepareCharacterImportProposal};',
+      '\ngetAuthUser=async()=>globalThis.testUser;logAudit=async()=>{};globalThis.contracts={handleGameData,handleGuideImportLookup,gameTermReplacements,translateCandidate,buildLocalGameCharacterSource,buildLocalGameGuideSources,localizeGameImportSuggestions,normalizeCharacterProfile,prepareCharacterImportProposal};',
   ).runInContext(context);
   const m = context.contracts as {
     handleGameData: (r: Request, e: object, p: string[]) => Promise<Response>;
+    handleGuideImportLookup: (r: Request, e: object) => Promise<Response>;
     gameTermReplacements: (
       e: object,
       text: string,
     ) => Promise<{ text: string; matches: unknown[] }>;
     translateCandidate: (c: object, e: object) => Promise<{ title: string }>;
+    buildLocalGameGuideSources: (
+      e: object,
+      c: object,
+    ) => Promise<
+      Array<{
+        ownerId: string;
+        suggestions: Array<{ field: string; value: string }>;
+        recommendations: {
+          arcs: GuideVisualItem[];
+          stats: GuideVisualItem[];
+          stages: Array<{
+            skills: Array<{
+              id: string;
+              name: string;
+              imageUrl: string;
+              level: number;
+            }>;
+          }>;
+          unresolved: string[];
+        };
+      }>
+    >;
     buildLocalGameCharacterSource: (
       e: object,
       c: object,
@@ -964,6 +988,159 @@ test('админка справочника: фильтры, JSON-валидац
     .selectOption('skill');
   await expect(page.locator('.game-data-list li')).toHaveCount(rows.length - 1);
   expect(errors).toEqual([]);
+});
+
+test('рекомендации клиента: 25 вариантов, русские дуги/статы/уровни навыков и ручные переопределения', async () => {
+  const namespaces = new Set([
+    'ST_Player',
+    'NTE_ReferenceCharacter',
+    'DT_DefaultAppearanceData',
+    'DT_CultivationGuideData',
+    'DT_GameplayAbilityTipsData',
+    'DT_AttributeStaticData',
+    'ST_Attribute',
+    'ST_Fork',
+    'NTE_ReferenceWeapon',
+  ]);
+  const records = gunzipSync(
+    await readFile('scripts/content/game-data/chunks.jsonl.gz'),
+  )
+    .toString('utf8')
+    .trim()
+    .split('\n')
+    .flatMap((line) =>
+      (JSON.parse(line).records as SourceRecord[]).filter(
+        (row) =>
+          namespaces.has(row.namespace) || /SkillDes$/i.test(row.namespace),
+      ),
+    );
+  const f = await contract(records);
+  try {
+    const active = new Set(
+      records
+        .filter((row) => row.namespace === 'DT_DefaultAppearanceData')
+        .map((row) => row.gameId),
+    );
+    const identities = records.filter(
+      (row) =>
+        row.namespace === 'NTE_ReferenceCharacter' && active.has(row.ownerId),
+    );
+    expect(identities).toHaveLength(25);
+    for (const identity of identities) {
+      const sources = await f.m.buildLocalGameGuideSources(f.env, {
+        name: identity.values.ru,
+        originalName: identity.values.en,
+        gameDataOwnerId: identity.ownerId,
+      });
+      expect(sources, identity.ownerId).toHaveLength(1);
+      const source = sources[0];
+      expect(source.ownerId).toBe(identity.ownerId);
+      expect(source.recommendations.unresolved, identity.ownerId).toEqual([]);
+      expect(source.recommendations.arcs).toHaveLength(2);
+      expect(source.recommendations.stats.length).toBeGreaterThan(0);
+      expect(source.suggestions.map((row) => row.field)).toEqual([
+        'guide.bestArcs',
+        'guide.mainStats',
+      ]);
+      expect(source.recommendations.stages).toHaveLength(8);
+      for (const stage of source.recommendations.stages) {
+        expect(stage.skills).toHaveLength(4);
+        for (const skill of stage.skills) {
+          expect(skill.name).toMatch(/[а-яё]/i);
+          expect(skill.imageUrl).toContain('game-assets/');
+          expect(skill.level).toBeGreaterThanOrEqual(1);
+          expect(skill.level).toBeLessThanOrEqual(10);
+          if (identity.ownerId === '1046') expect(skill.id).toContain('046');
+          if (identity.ownerId === '1051') expect(skill.id).toContain('051');
+        }
+      }
+      for (const row of [
+        ...source.recommendations.arcs,
+        ...source.recommendations.stats,
+      ]) {
+        expect(row.name).toMatch(/[а-яё]/i);
+        expect(row.imageUrl).toContain('game-assets/');
+      }
+    }
+    const zero = await f.m.buildLocalGameGuideSources(f.env, {
+      name: 'Зеро',
+      originalName: 'Esper Zero',
+    });
+    expect(zero.map((row) => row.ownerId)).toEqual(['1046', '1051']);
+    expect(
+      await f.m.buildLocalGameGuideSources(f.env, {
+        name: 'Незнакомый персонаж',
+        gameDataOwnerId: '1033',
+      }),
+    ).toEqual([]);
+    f.db.exec(
+      "ALTER TABLE characters ADD COLUMN slug TEXT; INSERT INTO characters(name,original_name,slug) VALUES('Адлер','Adler','adler')",
+    );
+    new vm.Script(
+      'rateLimit=async()=>{};guideImportSources=()=>[];',
+    ).runInContext(f.context);
+    const lookup = await f.m.handleGuideImportLookup(
+      new Request('https://example.com/api/guide-import/lookup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ query: 'Адлер' }),
+      }),
+      f.env,
+    );
+    expect(lookup.ok).toBe(true);
+    const imported = (await lookup.json()).data;
+    expect(imported.found).toBe(true);
+    expect(imported.sources).toHaveLength(1);
+    expect(imported.sources[0].id).toBe('local-game-guide-1033');
+    expect(
+      imported.suggestions.map((row: { field: string }) => row.field),
+    ).toEqual(['guide.bestArcs', 'guide.mainStats']);
+    expect(JSON.parse(imported.fields['guide.bestArcs'])).toHaveLength(2);
+    const name = records.find(
+      (row) => row.namespace === 'ST_Attribute' && row.gameId === 'Def',
+    )!;
+    const original = (
+      await (await f.api('record?id=' + encodeURIComponent(name.id))).json()
+    ).data;
+    const changed = await f.api('record', {
+      id: name.id,
+      revision: original.revision,
+      overrides: { values: { ru: 'Защита администратора' } },
+    });
+    expect(changed.ok).toBe(true);
+    const adler = {
+      name: 'Адлер',
+      originalName: 'Adler',
+      gameDataOwnerId: '1033',
+    };
+    const updated = (await f.m.buildLocalGameGuideSources(f.env, adler))[0];
+    expect(
+      updated.recommendations.stats.every((row) =>
+        row.name.startsWith('Защита администратора'),
+      ),
+    ).toBe(true);
+    const guide = records.find(
+      (row) =>
+        row.namespace === 'DT_CultivationGuideData' && row.ownerId === '1033',
+    )!;
+    f.insert([
+      {
+        ...guide,
+        sourceHash: guide.sourceHash + '-unknown',
+        details: {
+          ...guide.details,
+          RecommendForkList: [{ ForkItemId: 'missing' }],
+        },
+      },
+    ]);
+    const partial = (await f.m.buildLocalGameGuideSources(f.env, adler))[0];
+    expect(partial.recommendations.unresolved).toContain('arc:missing');
+    expect(
+      partial.suggestions.some((row) => row.field === 'guide.bestArcs'),
+    ).toBe(false);
+  } finally {
+    f.db.close();
+  }
 });
 
 test('игровой калькулятор: все 25 вариантов имеют один совместимый тип дуг и настоящие иконки опыта', async () => {

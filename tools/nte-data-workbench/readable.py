@@ -257,16 +257,20 @@ def _export_readable(repository, destination, owners, source_records, include_me
         sheets[sheet].append(cells)
         sheet_sizes[sheet][0] += 1
     character_links = []; covered_voices = set()
-    sections = [('Биография', 'biography'), ('Характеристики', 'baseStats'), ('Навыки', 'abilities'), ('Пробуждения и резонанс', 'awakenings'), ('Прокачка', 'materials'), ('Симпатия и подарки', 'friendship'), ('Гардероб', 'skins'), ('Озвучка', 'voiceLines')]
+    sections = [('Биография', 'biography'), ('Характеристики', 'baseStats'), ('Навыки', 'abilities'), ('Пробуждения и резонанс', 'awakenings'), ('Прокачка', 'materials'), ('Симпатия и подарки', 'friendship'), ('Гардероб', 'skins'), ('Озвучка', 'voiceLines'), ('Рекомендации игры', 'recommendations')]
     for character in data['characters']:
         owner, profile = character['ownerId'], character['profile']
         name = owners.get(owner, character['name'])
         folder = root / 'Персонажи' / safe(owner + ' — ' + name)
         folder.mkdir(parents=True, exist_ok=True)
+        (folder / 'Досье.json').write_text(json.dumps({
+            'ownerId': owner, 'name': name, 'values': character['values'],
+            'profile': profile, 'recommendations': character.get('recommendations') or {},
+        }, ensure_ascii=False, indent=2), encoding='utf-8')
         progress('Понятные разделы: ' + name)
         character_links.append(link(os.path.relpath(folder / 'Содержание.html', root), name))
         index = '<p>Выберите раздел. Картинки можно открыть целиком; реплики прослушиваются на странице или в обычном проигрывателе.</p><nav>'
-        index += ''.join(link(f'{i:02} — {title}.html', title) for i, (title, _) in enumerate(sections, 1)) + '</nav>'
+        index += ''.join(link(f'{i:02} — {title}.html', title) for i, (title, _) in enumerate(sections, 1)) + link('Досье.json', 'Данные JSON') + '</nav>'
         index += media.image(character.get('fields', {}).get('imageUrl', ''), folder, 'Портрет — ' + name)
         passport = [(label, profile.get(key)) for key, label in [('birthday', 'День рождения'), ('faction', 'Организация'), ('arcType', 'Тип дуги')] if profile.get(key)]
         if passport: index += table(['О персонаже', 'Значение'], passport)
@@ -281,6 +285,24 @@ def _export_readable(repository, destination, owners, source_records, include_me
             elif field == 'baseStats':
                 body = '<p>Начальные показатели персонажа. Бонусы экипировки и отряда сюда не включены.</p>' + table(['Показатель', 'Значение'], [(r['label'], r['value']) for r in profile.get(field, [])])
                 for r in profile.get(field, []): excel('Характеристики', ['Персонаж', 'Показатель', 'Начальное значение'], [name, r['label'], r['value']])
+            elif field == 'recommendations':
+                recommendations = character.get('recommendations') or {}
+                body = '<h2>Дуги</h2>'
+                for i, arc in enumerate(recommendations.get('arcs', [])):
+                    label = 'Основной вариант' if i == 0 else 'На замену'
+                    body += '<article>' + media.image(arc.get('imageUrl', ''), folder, 'Рекомендуемая дуга — ' + arc['name']) + '<h3>' + esc(label + ' · ' + arc['name']) + '</h3><p>' + esc(arc.get('description')) + '</p>' + table(['Характеристика', 'Значение'], [(s['label'], s['value']) for s in arc.get('stats', [])]) + '</article>'
+                    excel('Рекомендации дуг', ['Персонаж', 'Вариант', 'Дуга', 'Эффект'], [name, label, arc['name'], arc.get('description')])
+                body += '<h2>Основные характеристики</h2>'
+                for stat in recommendations.get('stats', []):
+                    body += '<article>' + media.image(stat.get('imageUrl', ''), folder, 'Рекомендуемая характеристика — ' + stat['name']) + '<h3>' + esc(stat['name']) + '</h3></article>'
+                    excel('Рекомендуемые статы', ['Персонаж', 'Характеристика'], [name, stat['name']])
+                body += '<h2>Рекомендуемые уровни навыков</h2><p>Рекомендации клиента для разных этапов развития. Числа обозначают целевые уровни навыков, а не их приоритет.</p>'
+                for stage in recommendations.get('stages', []):
+                    body += '<h3>Этап ' + esc(stage['stage']) + ' · персонаж ур. ' + esc(stage.get('characterLevel')) + ' · дуга ур. ' + esc(stage.get('arcLevel')) + '</h3>' + table(['Тип навыка', 'Навык', 'Рекомендуемый уровень'], [(r['skillType'], r['name'], r['level']) for r in stage.get('skills', [])])
+                    for skill in stage.get('skills', []):
+                        excel('Рекомендуемые навыки', ['Персонаж', 'Этап', 'Уровень персонажа', 'Уровень дуги', 'Тип навыка', 'Навык', 'Уровень навыка'], [name, stage['stage'], stage.get('characterLevel'), stage.get('arcLevel'), skill['skillType'], skill['name'], skill['level']])
+                if not recommendations:
+                    body += '<p>В этом снимке рекомендации персонажа отсутствуют.</p>'
             elif field == 'abilities':
                 groups = {}
                 for r in profile.get(field, []): groups.setdefault(r['type'], []).append(r)

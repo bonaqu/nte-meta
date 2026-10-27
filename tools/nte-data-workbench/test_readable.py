@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from urllib.parse import quote
 
 from readable import category, export_readable, safe, skill_cost_sections
 
@@ -53,6 +54,11 @@ class ReadableTests(unittest.TestCase):
             records.extend({'namespace': 'UI', 'kind': 'image', 'gameId': str(i), 'values': {}, 'details': {}, 'assets': [{'url': '/nte-meta/game-assets/icon.webp', 'path': 'HT/Content/UI/icon.uasset'}]} for i in range(101))
             data = {'characters': [{'ownerId': '1025', 'name': 'Хатор', 'values': {'ru': 'Хатор', 'en': 'Hathor', 'ja': 'ハソール', 'zh': '哈索尔'}, 'profile': profile}], 'equipment': [], 'progression': {'costs': [], 'characterExp': []}}
             data['progression']['items'] = {'gold': {'name': 'Жук-монета', 'iconUrl': '/nte-meta/game-assets/icon.webp'}}
+            data['characters'][0]['recommendations'] = {
+                'arcs': [{'name': 'Рекомендуемая дуга', 'imageUrl': '/nte-meta/game-assets/icon.webp', 'description': 'Усиливает атаку.', 'stats': []}],
+                'stats': [{'name': 'Атака %', 'imageUrl': '/nte-meta/game-assets/icon.webp'}],
+                'stages': [{'stage': 1, 'characterLevel': 60, 'arcLevel': 60, 'skills': [{'name': 'Быстрая доставка', 'skillType': 'Базовая атака', 'level': 8}]}],
+            }
             data['progression']['costs'] = [{'id': '1025', 'kind': 'character', 'stages': [], 'skills': [
                 {'id': 'basic', 'type': 'melee', 'kind': 'combat', 'stages': [
                     {'level': '2', 'fromLevel': 1, 'items_id': ['gold'], 'amount': [2000]},
@@ -62,10 +68,19 @@ class ReadableTests(unittest.TestCase):
             result = export_readable(repo, out, {'1025': 'Хатор'}, lambda: iter(records), True, lambda _: None, data=data)
             self.assertEqual(result, {'characters': 1, 'equipment': 0, 'items': 1, 'mp3': 1, 'png': 1})
             folder = out / 'Для игрока/Персонажи/1025 — Хатор'
+            dossier = json.loads((folder / 'Досье.json').read_text(encoding='utf-8'))
+            self.assertEqual(dossier['recommendations'], data['characters'][0]['recommendations'])
+            self.assertEqual(dossier['profile'], profile)
+            self.assertIn(quote('Досье.json'), (folder / 'Содержание.html').read_text(encoding='utf-8'))
             self.assertIn('Доставщица из Хетэро.', (folder / '01 — Биография.html').read_text(encoding='utf-8'))
             self.assertIn('Удвоенная вместимость', (folder / '04 — Пробуждения и резонанс.html').read_text(encoding='utf-8'))
             self.assertIn('Спасибо!', (folder / '08 — Озвучка.html').read_text(encoding='utf-8'))
             self.assertIn('Всего для этого навыка', (folder / '05 — Прокачка.html').read_text(encoding='utf-8'))
+            recommendations = (folder / '09 — Рекомендации игры.html').read_text(encoding='utf-8')
+            self.assertIn('Рекомендуемая дуга', recommendations)
+            self.assertIn('Атака %', recommendations)
+            self.assertIn('Быстрая доставка', recommendations)
+            self.assertIn('не их приоритет', recommendations)
             mp3 = next((folder / 'Медиа/Озвучка/Английский').glob('Подарок получен I*.mp3'))
             subprocess.run([ffmpeg, '-v', 'error', '-i', str(mp3), '-f', 'null', '-'], check=True, capture_output=True)
             png = next((folder / 'Медиа/Изображения').glob('Гардероб*.png'))
@@ -79,6 +94,8 @@ class ReadableTests(unittest.TestCase):
             self.assertIsNotNone(workbook['Реплики']['E2'].hyperlink)
             self.assertEqual(workbook['Итоги навыков']['F2'].value, '7000')
             self.assertEqual(workbook['Прокачка навыков']['E2'].value, '2')
+            self.assertEqual(workbook['Рекомендуемые навыки']['G2'].value, '8')
+            self.assertEqual(workbook['Рекомендации дуг']['C2'].value, 'Рекомендуемая дуга')
             workbook.close()
 
     def test_categories_follow_actual_item_types_and_material_ids(self):

@@ -1261,13 +1261,40 @@ function characterProfileSelect() {
 }
 
 async function listGuides(env, includeDrafts = false) {
-  const where = includeDrafts ? '1 = 1' : "status = 'published'";
-  const rows = await env.DB.prepare(
-    `SELECT * FROM guides WHERE ${where} ORDER BY updated_at DESC`,
-  ).all();
-  return Promise.all(
-    rows.results.map((row) => serializeGuideWithRelations(env, row)),
+  const where = includeDrafts ? '1 = 1' : "g.status = 'published'";
+  const [guides, sections, rotations] = await env.DB.batch([
+    env.DB.prepare(
+      `SELECT g.* FROM guides g WHERE ${where} ORDER BY g.updated_at DESC`,
+    ),
+    env.DB.prepare(
+      `SELECT s.* FROM guide_sections s JOIN guides g ON g.id = s.guide_id
+       WHERE ${where} ORDER BY s.position`,
+    ),
+    env.DB.prepare(
+      `SELECT r.*, g.id AS related_guide_id FROM guides g
+       JOIN rotations r ON r.guide_id = g.id OR r.character_id = g.character_id
+       WHERE ${where} ORDER BY r.created_at`,
+    ),
+  ]);
+  const sectionsByGuide = groupRows(sections.results, 'guide_id');
+  const rotationsByGuide = groupRows(rotations.results, 'related_guide_id');
+  return guides.results.map((row) =>
+    serializeGuide(
+      row,
+      sectionsByGuide.get(row.id) || [],
+      rotationsByGuide.get(row.id) || [],
+    ),
   );
+}
+
+function groupRows(rows, key) {
+  const groups = new Map();
+  for (const row of rows) {
+    const id = row[key];
+    if (!groups.has(id)) groups.set(id, []);
+    groups.get(id).push(row);
+  }
+  return groups;
 }
 
 async function getGuide(env, idOrSlug, includeDrafts = false) {
@@ -1309,6 +1336,10 @@ async function serializeGuideWithRelations(env, row) {
   )
     .bind(row.id, row.character_id)
     .all();
+  return serializeGuide(row, sections.results, rotations.results);
+}
+
+function serializeGuide(row, sections, rotations) {
   return {
     id: row.id,
     slug: row.slug,
@@ -1321,8 +1352,8 @@ async function serializeGuideWithRelations(env, row) {
     updatedAt: row.updated_at,
     videoUrl: row.video_url || undefined,
     transcript: row.transcript_markdown || undefined,
-    sections: sections.results.map(serializeSection),
-    rotations: rotations.results.map(serializeRotation),
+    sections: sections.map(serializeSection),
+    rotations: rotations.map(serializeRotation),
   };
 }
 
@@ -1370,12 +1401,19 @@ async function serializeTierlistWithItems(env, row) {
 }
 
 async function listTeams(env, includeDrafts = false) {
-  const where = includeDrafts ? '1 = 1' : "status = 'published'";
-  const rows = await env.DB.prepare(
-    `SELECT * FROM teams WHERE ${where} ORDER BY updated_at DESC, title`,
-  ).all();
-  return Promise.all(
-    rows.results.map((row) => serializeTeamWithMembers(env, row)),
+  const where = includeDrafts ? '1 = 1' : "t.status = 'published'";
+  const [teams, members] = await env.DB.batch([
+    env.DB.prepare(
+      `SELECT t.* FROM teams t WHERE ${where} ORDER BY t.updated_at DESC, t.title`,
+    ),
+    env.DB.prepare(
+      `SELECT m.* FROM team_members m JOIN teams t ON t.id = m.team_id
+       WHERE ${where} ORDER BY m.position`,
+    ),
+  ]);
+  const membersByTeam = groupRows(members.results, 'team_id');
+  return teams.results.map((row) =>
+    serializeTeam(row, membersByTeam.get(row.id) || []),
   );
 }
 
@@ -1395,6 +1433,10 @@ async function serializeTeamWithMembers(env, row) {
   )
     .bind(row.id)
     .all();
+  return serializeTeam(row, members.results);
+}
+
+function serializeTeam(row, members) {
   return {
     id: row.id,
     slug: row.slug,
@@ -1416,7 +1458,7 @@ async function serializeTeamWithMembers(env, row) {
           .filter(Boolean),
     status: row.status,
     updatedAt: row.updated_at,
-    members: members.results.map((member) => ({
+    members: members.map((member) => ({
       characterId: member.character_id,
       role: member.role,
     })),

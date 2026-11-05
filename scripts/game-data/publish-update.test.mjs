@@ -104,8 +104,16 @@ test('publishing can resume after PR failure and then publish a second snapshot'
 
 test('project update preserves prepared files and rejects unrelated edits', (t) => {
   const f = fixture(t);
+  f.git(['switch', '-c', 'upstream-update']);
+  writeFileSync(join(f.work, 'README.md'), 'updated program');
+  f.git(['add', '.']);
+  f.git(['commit', '-m', 'Upstream update']);
+  f.git(['push', 'origin', 'HEAD:bonaqu_projects']);
+  const upstreamHead = f.git(['rev-parse', 'HEAD']);
+  f.git(['switch', 'bonaqu_projects']);
   writeFileSync(join(f.work, 'src/data/native-test.json'), 'local snapshot');
   assert.match(updateProject(f.run), /обновлён/);
+  assert.equal(f.git(['rev-parse', 'HEAD']), upstreamHead);
   assert.equal(
     readFileSync(join(f.work, 'src/data/native-test.json'), 'utf8'),
     'local snapshot',
@@ -114,6 +122,22 @@ test('project update preserves prepared files and rejects unrelated edits', (t) 
   assert.throws(() => updateProject(f.run), /другие изменения/);
   assert.equal(readFileSync(join(f.work, 'README.md'), 'utf8'), 'user text');
   assert.equal(f.calls.length, 0);
+});
+
+test('an overlapping upstream update preserves the local generated file', (t) => {
+  const f = fixture(t);
+  f.git(['switch', '-c', 'upstream-data']);
+  const path = join(f.work, 'src/data/native-test.json');
+  writeFileSync(path, 'upstream data');
+  f.git(['add', '.']);
+  f.git(['commit', '-m', 'Upstream data']);
+  f.git(['push', 'origin', 'HEAD:bonaqu_projects']);
+  f.git(['switch', 'bonaqu_projects']);
+  const originalHead = f.git(['rev-parse', 'HEAD']);
+  writeFileSync(path, 'local snapshot');
+  assert.throws(() => updateProject(f.run));
+  assert.equal(readFileSync(path, 'utf8'), 'local snapshot');
+  assert.equal(f.git(['rev-parse', 'HEAD']), originalHead);
 });
 
 test('a clean pushed snapshot branch returns to main without deleting its commits', (t) => {

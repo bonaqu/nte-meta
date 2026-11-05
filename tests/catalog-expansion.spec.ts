@@ -220,6 +220,45 @@ test('полные гайды добавляются по слагу и сохр
   }
 });
 
+test('Хаос получает атрибут выпущенного персонажа, авторские сведения сохраняются', async () => {
+  const db = await database();
+  try {
+    const sql = await readFile(
+      'migrations/0052_chaos_released_identity.sql',
+      'utf8',
+    );
+    db.exec(sql);
+    expect(
+      db
+        .prepare(
+          "SELECT attribute, role, type FROM characters WHERE slug='chaos'",
+        )
+        .get(),
+    ).toEqual({
+      attribute: 'Лакшана',
+      role: 'Основной ДД',
+      type: 'Основной ДД',
+    });
+    db.exec(
+      "UPDATE characters SET attribute='Хаос',role='Авторская роль',summary='Текст редактора' WHERE slug='chaos'",
+    );
+    db.exec(sql);
+    expect(
+      db
+        .prepare(
+          "SELECT attribute, role, summary FROM characters WHERE slug='chaos'",
+        )
+        .get(),
+    ).toEqual({
+      attribute: 'Хаос',
+      role: 'Авторская роль',
+      summary: 'Текст редактора',
+    });
+  } finally {
+    db.close();
+  }
+});
+
 test('реестр источников сохраняет выключатели редактора и не создаёт дубликаты адресов', async () => {
   const db = await database();
   try {

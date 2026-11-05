@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (QApplication, QFileDialog, QFrame, QHBoxLayout, Q
 from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
-from app import DEFAULTS, REPOSITORY, SETTINGS
+from app import DEFAULTS, REPOSITORY, SETTINGS, HELP
 from updates import check_update
 
 SITE = 'https://bonaqu.github.io/nte-meta/'
@@ -24,7 +24,7 @@ SECTIONS = [('Новости и слухи', '/'), ('Гайды', '/guides'), ('
             ('Тир-листы', '/tierlists'), ('База игры', '/admin/game-data'), ('Мой профиль', '/profile')]
 ACTIONS = {'extract': 'Извлечь обновление', 'normalize': 'Подготовить снимок',
            'export_data': 'Экспорт Excel / JSON / медиа', 'prepare_characters': 'Подготовить персонажей',
-           'publish_data': 'Опубликовать игровые данные'}
+           'publish_data': 'Опубликовать игровые данные', 'update_project': 'Обновить программу / проект'}
 
 
 def config():
@@ -133,7 +133,7 @@ class Desktop(QMainWindow):
         guide = QLabel('После обновления: извлеките патч → подготовьте снимок → просмотрите экспорт → подготовьте персонажей и опубликуйте данные.\nСтарые версии сохраняются. Неизменившиеся файлы переиспользуются; новые версии не затирают прежние.'); guide.setWordWrap(True); box.addWidget(guide)
         self.tool_buttons = []
         for action, title in ACTIONS.items():
-            button = QPushButton(title); button.setToolTip('Открыть инструмент выгрузки с выбранным действием. Его окно показывает параметры, ход работы и ошибки.')
+            button = QPushButton(title); button.setToolTip(HELP['update_project'] if action == 'update_project' else 'Открыть инструмент выгрузки с выбранным действием. Его окно показывает параметры, ход работы и ошибки.')
             button.clicked.connect(lambda _, a=action: self.launch_tool(a)); box.addWidget(button); self.tool_buttons.append(button)
         controls = QHBoxLayout()
         settings = QPushButton('Пути и все инструменты'); settings.clicked.connect(lambda: self.launch_tool()); controls.addWidget(settings); self.tool_buttons.append(settings)

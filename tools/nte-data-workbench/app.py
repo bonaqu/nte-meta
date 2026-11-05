@@ -48,6 +48,7 @@ HELP = {
     'check': 'Сравнить размер и дату игровых архивов с выбранной рабочей выгрузкой. Проверяются Paks, PatchPaks и голосовые TagPatchPaks; игра и лаунчер не меняются. Если появились или изменились архивы, выполните шаг 1 и затем 3. Проверка также выполняется при запуске программы.',
     'prepare': 'Подготовить новых персонажей для сайта из проверенного снимка шага 3. Программа сверит имена с сайтом, создаст файл «Персонажи для сайта.json» и обновление существующих профилей с сохранением ручных правок. После публикации файлов шага 7 откройте Админка → Данные игры → Новые персонажи из локальной программы, выберите JSON, проверьте сведения и создайте черновик.',
     'publish': 'Создать GitHub Issue и pull request только с подготовленными игровыми данными, медиа и обновлением профилей. Нужна основная ветка проекта без посторонних изменений и действующий вход в GitHub CLI. Пароли на сайт не передаются. Проверьте PR и объедините его: Actions опубликует сайт и обновит D1. Кнопка не объединяет PR автоматически.',
+    'update_project': 'Получить обновления программы и сайта из GitHub перед подготовкой следующего снимка. Сначала сохраните постороннюю работу в проекте. Подготовленные игровые файлы сохраняются, а при конфликте программа остановится и покажет причину. После обновления заново откройте программу.',
 }
 
 
@@ -122,7 +123,8 @@ class Workbench(tk.Tk):
             button=ttk.Button(actions,text=title,command=command)
             button.grid(row=index//2,column=index%2,sticky='ew',padx=4,pady=4);self.buttons.append(button);explain(button,key)
         result=ttk.Button(actions,text='Открыть каталог игрока',command=self.open_output); result.grid(row=3,column=1,sticky='ew',padx=4,pady=4); explain(result,'open')
-        working=ttk.Button(actions,text='Открыть рабочую папку',command=self.open_working); working.grid(row=4,column=0,columnspan=2,sticky='ew',padx=4,pady=4); explain(working,'working')
+        update_project=ttk.Button(actions,text='Обновить программу / проект',command=self.update_project); update_project.grid(row=4,column=0,sticky='ew',padx=4,pady=4); self.buttons.append(update_project); explain(update_project,'update_project')
+        working=ttk.Button(actions,text='Открыть рабочую папку',command=self.open_working); working.grid(row=4,column=1,sticky='ew',padx=4,pady=4); explain(working,'working')
         self.media=tk.BooleanVar(value=True)
         media=ttk.Checkbutton(body,text='Добавить в каталог картинки PNG и озвучку MP3 с понятными названиями',variable=self.media); media.pack(anchor='w'); explain(media,'media')
         help_label=tk.Label(body,textvariable=self.help_text,wraplength=900,relief='groove',padx=8,pady=8,height=3,anchor='w',justify='left'); help_label.pack(fill='x',pady=8)
@@ -251,6 +253,9 @@ class Workbench(tk.Tk):
     def publish_data(self):
         self.run(lambda:self.command(['node',str(REPOSITORY/'scripts/game-data/publish-update.mjs')]),'PR подготовлен. Откройте ссылку из журнала, дождитесь проверок и объедините PR на GitHub.')
 
+    def update_project(self):
+        self.run(lambda:self.command(['node',str(REPOSITORY/'scripts/game-data/publish-update.mjs'),'--update-project']),'Проект обновлён. Заново откройте программу, чтобы загрузить её обновления.')
+
     def export_data(self):
         parent=filedialog.askdirectory(title='Куда сохранить новую папку экспорта')
         if not parent:return
@@ -295,7 +300,7 @@ class Workbench(tk.Tk):
 if __name__=='__main__':
     import argparse
     parser=argparse.ArgumentParser()
-    parser.add_argument('--action',choices=['extract','normalize','export_data','prepare_characters','publish_data'])
+    parser.add_argument('--action',choices=['extract','normalize','export_data','prepare_characters','publish_data','update_project'])
     arguments=parser.parse_args()
     window=Workbench()
     if arguments.action:window.after(250,lambda:getattr(window,arguments.action)())

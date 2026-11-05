@@ -117,6 +117,109 @@ test('миграция не заменяет существующего геро
   }
 });
 
+test('полные гайды добавляются по слагу и сохраняют авторские записи при повторном применении', async () => {
+  const db = await database();
+  try {
+    for (const file of (await readdir('migrations'))
+      .filter(
+        (file) => file.endsWith('.sql') && file >= '0031' && file < '0051',
+      )
+      .sort()) {
+      db.exec(await readFile(`migrations/${file}`, 'utf8'));
+    }
+    const sql = await readFile(
+      'migrations/0051_complete_character_guides.sql',
+      'utf8',
+    );
+    const seedGuides = db
+      .prepare(
+        "SELECT id, title FROM guides WHERE id IN ('guide-baicang','guide-sakiri') ORDER BY id",
+      )
+      .all();
+    db.exec(sql);
+    expect(
+      db
+        .prepare(
+          "SELECT id, title FROM guides WHERE id IN ('guide-baicang','guide-sakiri') ORDER BY id",
+        )
+        .all(),
+    ).toEqual(seedGuides);
+    expect(
+      db
+        .prepare(
+          "SELECT id FROM guides WHERE slug IN ('baicang-build-guide','sakiri-build-guide','shinku-build-guide')",
+        )
+        .all(),
+    ).toEqual([]);
+    // Mirror the production catalogue: Shinku was added through the editor
+    // and the two old seed guides are not public there.
+    db.exec(`
+      UPDATE guides SET status='archived' WHERE id IN ('guide-baicang','guide-sakiri');
+      INSERT INTO characters (id,slug,name,original_name,role,type,attribute,image_url,short_description,summary)
+      VALUES ('fixture-shinku','shinku','Шинку','Shinku','ДД','ДД','Космос','','','');
+    `);
+    db.exec(sql);
+    const incomplete = db
+      .prepare(
+        `
+      SELECT c.slug FROM characters c
+      WHERE c.status = 'published' AND NOT EXISTS (
+        SELECT 1 FROM guides g WHERE g.character_id = c.id AND g.status = 'published'
+      )`,
+      )
+      .all();
+    expect(incomplete).toEqual([]);
+    const newGuides = db
+      .prepare(
+        "SELECT id, character_id FROM guides WHERE id LIKE 'guide-%-0051'",
+      )
+      .all();
+    expect(newGuides).toHaveLength(18);
+    for (const guide of newGuides) {
+      const sections = db
+        .prepare(
+          'SELECT section_type, meta_json FROM guide_sections WHERE guide_id = ? ORDER BY position',
+        )
+        .all(guide.id as string);
+      expect(sections.map((s) => s.section_type)).toEqual([
+        'overview',
+        'skill-priority',
+        'best-arcs',
+        'cartridges',
+        'main-stats',
+        'rotations',
+        'tips',
+      ]);
+      const teams = db
+        .prepare('SELECT id, rotation_steps_json FROM teams WHERE guide_id = ?')
+        .all(guide.id as string);
+      expect(teams).toHaveLength(2);
+      for (const team of teams) {
+        const members = db
+          .prepare(
+            'SELECT character_id FROM team_members WHERE team_id = ? ORDER BY position',
+          )
+          .all(team.id as string)
+          .map((member) => member.character_id);
+        expect(new Set(members).size).toBe(4);
+        expect(members).toContain(guide.character_id);
+        expect(JSON.parse(team.rotation_steps_json as string)).toHaveLength(4);
+      }
+    }
+    db.exec(
+      "UPDATE guides SET title='Авторская сборка' WHERE id='guide-adler-0051'",
+    );
+    db.exec(sql);
+    expect(
+      db.prepare("SELECT title FROM guides WHERE id='guide-adler-0051'").get()
+        ?.title,
+    ).toBe('Авторская сборка');
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
+  } finally {
+    db.close();
+  }
+});
+
 test('реестр источников сохраняет выключатели редактора и не создаёт дубликаты адресов', async () => {
   const db = await database();
   try {

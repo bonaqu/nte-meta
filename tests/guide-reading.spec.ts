@@ -1,6 +1,74 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+test('весь каталог гайдов и отрядов доступен после расширения', async ({
+  request,
+  page,
+}) => {
+  const api = process.env.NTE_GUIDE_REVIEW_URL
+    ? 'https://nte-meta-api.bonaqu.workers.dev/api'
+    : 'http://127.0.0.1:8788/api';
+  const base = process.env.NTE_GUIDE_REVIEW_URL || '/';
+  const [guideResponse, teamResponse, characterResponse] = await Promise.all([
+    request.get(`${api}/guides`),
+    request.get(`${api}/teams`),
+    request.get(`${api}/characters`),
+  ]);
+  expect(guideResponse.ok()).toBe(true);
+  expect(teamResponse.ok()).toBe(true);
+  expect(characterResponse.ok()).toBe(true);
+  const { data: guides } = await guideResponse.json();
+  const { data: teams } = await teamResponse.json();
+  const { data: characters } = await characterResponse.json();
+  const covered = new Set(
+    guides.map((guide: { characterId: string }) => guide.characterId),
+  );
+  expect(
+    characters
+      .filter((character: { id: string }) => !covered.has(character.id))
+      .map((character: { id: string }) => character.id),
+  ).toEqual([]);
+  const added = guides.filter((guide: { id: string }) =>
+    guide.id.endsWith('-0051'),
+  );
+  if (process.env.NTE_GUIDE_REVIEW_URL) expect(added).toHaveLength(18);
+  expect(added.map((guide: { slug: string }) => guide.slug)).toContain(
+    'adler-build-guide',
+  );
+  for (const guide of added) {
+    expect(guide.sections).toHaveLength(7);
+    expect(
+      teams.filter((team: { guideId: string }) => team.guideId === guide.id),
+    ).toHaveLength(2);
+  }
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  for (const width of [360, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(base + '#/guides/adler-build-guide');
+    await expect(
+      page.getByRole('heading', { name: 'Адлер — сборка, отряды и ротация' }),
+    ).toBeVisible();
+    const navigation = page.getByLabel('Навигация по гайду', { exact: true });
+    await navigation
+      .getByRole('button', { name: 'Базовая ротация', exact: true })
+      .click();
+    await expect(
+      page.getByText('Наберите Карму', { exact: true }),
+    ).toBeInViewport();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width);
+    await navigation
+      .getByRole('button', { name: 'Отряды и ротации', exact: true })
+      .click();
+    await expect(
+      page.getByText('Ожог под щитом', { exact: true }),
+    ).toBeVisible();
+  }
+  expect(errors).toEqual([]);
+});
+
 test('гайд: навигация, экипировка и мобильная компоновка', async ({
   page,
 }, info) => {

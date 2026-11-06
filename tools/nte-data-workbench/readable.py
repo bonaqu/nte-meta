@@ -148,6 +148,7 @@ class Media:
         self.repository, self.root, self.enabled = repository, root, enabled
         self.images = {}
         self.audio_jobs = []
+        self.audio_urls = set()
         self.ffmpeg = shutil.which('ffmpeg')
         if enabled and not self.ffmpeg: raise RuntimeError('Для совместимых MP3 нужен установленный FFmpeg.')
 
@@ -184,6 +185,7 @@ class Media:
         if not original.is_file(): raise FileNotFoundError('Не найдена реплика: ' + str(original))
         target.parent.mkdir(parents=True, exist_ok=True)
         self.audio_jobs.append((original, target, row, character))
+        self.audio_urls.add(row['audioUrl'])
         relative = quote(os.path.relpath(target, folder).replace('\\', '/'))
         return '<audio controls preload="none" src="' + relative + '"></audio><p>' + link(os.path.relpath(target, folder), 'Открыть MP3 в проигрывателе') + '</p>'
 
@@ -256,7 +258,7 @@ def _export_readable(repository, destination, owners, source_records, include_me
             cells.append(cell)
         sheets[sheet].append(cells)
         sheet_sizes[sheet][0] += 1
-    character_links = []; covered_voices = set()
+    character_links = []; covered_voices = set(); profile_audio_urls = set()
     sections = [('Биография', 'biography'), ('Характеристики', 'baseStats'), ('Навыки', 'abilities'), ('Пробуждения и резонанс', 'awakenings'), ('Прокачка', 'materials'), ('Симпатия и подарки', 'friendship'), ('Гардероб', 'skins'), ('Озвучка', 'voiceLines'), ('Рекомендации игры', 'recommendations')]
     for character in data['characters']:
         owner, profile = character['ownerId'], character['profile']
@@ -364,6 +366,7 @@ def _export_readable(repository, destination, owners, source_records, include_me
                     if not rows: body += '<p>В этом снимке нет доступных звуковых файлов этого языка.</p>'
                     for r in rows:
                         covered_voices.add((owner, r.get('id')))
+                        profile_audio_urls.add((owner, r['audioUrl']))
                         body += '<article><h3>' + esc(r['title']) + '</h3><p>' + esc(r.get('description')) + '</p>' + media.voice(r, folder, name) + '</article>'
                         audio_path = media.audio_path(r, folder)
                         excel('Реплики', ['Персонаж', 'Язык', 'Ситуация', 'Текст реплики', 'MP3'], [name, language, r['title'], r.get('description'), os.path.relpath(audio_path, root) if audio_path else ''])
@@ -411,8 +414,11 @@ def _export_readable(repository, destination, owners, source_records, include_me
     # Keep all extracted voices, including old IDs and entries absent from a current profile.
     extra_voices = {}
     for r in audio_rows:
-        if (r.get('ownerId'), r['details'].get('locale', '') + '-' + r['gameId']) not in covered_voices:
-            extra_voices.setdefault(r.get('ownerId', ''), []).append(r)
+        event_covered = (r.get('ownerId'), (r['details'].get('locale', '') + '-' + r['gameId'])[:80]) in covered_voices
+        assets = list({asset['url']: asset for asset in r.get('assets', []) if asset.get('url')}.values())
+        for take, asset in enumerate(assets, 1):
+            if not event_covered or (r.get('ownerId'), asset['url']) not in profile_audio_urls:
+                extra_voices.setdefault(r.get('ownerId', ''), []).append((r, take, asset))
     archive_links = []
     for owner, rows in extra_voices.items():
         name = owners.get(owner, 'Персонаж без подтверждённого имени · ID ' + owner)
@@ -420,10 +426,11 @@ def _export_readable(repository, destination, owners, source_records, include_me
         body = '<p>Эти файлы связаны с игровым ID, но не вошли в досье действующего персонажа. Это могут быть старые или дополнительные записи клиента. Неизвестная ситуация явно остаётся неподписанной.</p>'
         for locale, language in LANGUAGES.items():
             body += '<h2>' + language + '</h2>'
-            for index, r in enumerate((r for r in rows if r['details'].get('locale') == locale), 1):
+            for index, (r, take, asset) in enumerate((entry for entry in rows if entry[0]['details'].get('locale') == locale), 1):
                 title, description = voice_labels.get(r['gameId'], ('', ''))
                 title = title or 'Реплика без игрового названия ' + str(index)
-                voice = {'title': title, 'description': description, 'language': language, 'audioUrl': r['assets'][0]['url']}
+                if take > 1: title += ' · Запись ' + str(take)
+                voice = {'title': title, 'description': description, 'language': language, 'audioUrl': asset['url']}
                 body += '<article><h3>' + esc(title) + '</h3><p>' + esc(description) + '</p>' + media.voice(voice, folder, name) + '<details><summary>Привязка в игре</summary><p>Игровой ID персонажа: ' + esc(owner) + '\nСобытие: ' + esc(r['gameId']) + '</p></details></article>'
                 audio_path = media.audio_path(voice, folder)
                 excel('Дополнительные реплики', ['Персонаж или ID', 'Язык', 'Ситуация', 'Текст реплики', 'Событие игры', 'MP3'], [name, language, title, description, r['gameId'], os.path.relpath(audio_path, root) if audio_path else ''])
@@ -448,6 +455,10 @@ def _export_readable(repository, destination, owners, source_records, include_me
                     body += '<article><h2>' + esc(name) + '</h2>' + ('<p>Персонаж: ' + esc(owner_name) + '</p>' if owner_name else '') + media.image(url, folder, name, True) + '<details><summary>Исходный путь в игре</summary><p>' + esc(r['assets'][0].get('path')) + '</p></details></article>'
                 page(folder / gallery_file(number), group, body + navigation, '../../Начать здесь.html')
             gallery_links.append(link(os.path.relpath(folder / 'Каталог.html', root), group + ' · ' + str(len(rows))))
+    if include_media:
+        expected_audio = {asset['url'] for row in audio_rows for asset in row.get('assets', []) if asset.get('url', '').startswith('/nte-meta/game-audio/')}
+        if expected_audio - media.audio_urls:
+            raise ValueError('Неполный экспорт озвучки: пропущено файлов ' + str(len(expected_audio - media.audio_urls)))
     # Write-only mode keeps the full technical dump and this concise workbook affordable.
     from openpyxl.utils import get_column_letter
     for title, sheet in sheets.items(): sheet.auto_filter.ref = f'A1:{get_column_letter(sheet_sizes[title][1])}{sheet_sizes[title][0]}'

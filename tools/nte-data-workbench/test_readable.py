@@ -35,6 +35,7 @@ class ReadableTests(unittest.TestCase):
             Image.new('RGB', (4, 4), 'red').save(repo / 'public/game-assets/icon.webp')
             audio = repo / 'public/game-audio/voice.ogg'
             subprocess.run([ffmpeg, '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.15', '-c:a', 'libopus', str(audio)], check=True)
+            shutil.copy2(audio, repo / 'public/game-audio/alternate.ogg')
             profile = {
                 'biography': 'Доставщица из Хетэро.',
                 'baseStats': [{'label': 'АТК', 'value': '81'}],
@@ -49,7 +50,8 @@ class ReadableTests(unittest.TestCase):
             records = [
                 {'namespace': 'NTE_ReferenceItem', 'gameId': 'CharacterUpMaterial_lv1', 'values': {'ru': 'Книга опыта', 'en': 'Experience Book'}, 'details': {'context': 'Grants experience'}, 'assets': [{'url': '/nte-meta/game-assets/icon.webp'}]},
                 {'namespace': 'ST_Item', 'gameId': 'book_context', 'values': {'ru': 'Даёт опыт персонажу.', 'en': 'Grants experience'}, 'details': {}, 'assets': []},
-                {'namespace': 'NTE_ProfileVoice', 'kind': 'audio', 'ownerId': '1025', 'gameId': 'voice_event', 'values': {}, 'details': {'locale': 'en'}, 'assets': [{'url': '/nte-meta/game-audio/voice.ogg'}]},
+                {'namespace': 'NTE_ProfileVoice', 'kind': 'audio', 'ownerId': '1025', 'gameId': 'voice_event', 'values': {}, 'details': {'locale': 'en'}, 'assets': [{'url': '/nte-meta/game-audio/voice.ogg'}, {'url': '/nte-meta/game-audio/alternate.ogg'}, {'url': '/nte-meta/game-audio/alternate.ogg'}]},
+                {'namespace': 'NTE_ProfileVoice', 'kind': 'audio', 'ownerId': '1025', 'gameId': 'other_event', 'values': {}, 'details': {'locale': 'en'}, 'assets': [{'url': '/nte-meta/game-audio/voice.ogg'}, {'url': '/nte-meta/game-audio/alternate.ogg'}]},
             ]
             records.extend({'namespace': 'UI', 'kind': 'image', 'gameId': str(i), 'values': {}, 'details': {}, 'assets': [{'url': '/nte-meta/game-assets/icon.webp', 'path': 'HT/Content/UI/icon.uasset'}]} for i in range(101))
             data = {'characters': [{'ownerId': '1025', 'name': 'Хатор', 'values': {'ru': 'Хатор', 'en': 'Hathor', 'ja': 'ハソール', 'zh': '哈索尔'}, 'profile': profile}], 'equipment': [], 'progression': {'costs': [], 'characterExp': []}}
@@ -66,7 +68,13 @@ class ReadableTests(unittest.TestCase):
                 ]},
             ]}]
             result = export_readable(repo, out, {'1025': 'Хатор'}, lambda: iter(records), True, lambda _: None, data=data)
-            self.assertEqual(result, {'characters': 1, 'equipment': 0, 'items': 1, 'mp3': 1, 'png': 1})
+            self.assertEqual(result, {'characters': 1, 'equipment': 0, 'items': 1, 'mp3': 4, 'png': 1})
+            archive = out / 'Для игрока/Архив озвучки/1025 — Хатор'
+            archive_text = (archive / 'Каталог.html').read_text(encoding='utf-8')
+            self.assertEqual(archive_text.count('<audio '), 3)
+            self.assertIn('Запись 2', archive_text)
+            self.assertIn('other_event', archive_text)
+            self.assertEqual(len(list(archive.rglob('*.mp3'))), 3)
             folder = out / 'Для игрока/Персонажи/1025 — Хатор'
             dossier = json.loads((folder / 'Досье.json').read_text(encoding='utf-8'))
             self.assertEqual(dossier['recommendations'], data['characters'][0]['recommendations'])
@@ -92,6 +100,7 @@ class ReadableTests(unittest.TestCase):
             self.assertEqual(workbook['Характеристики'].auto_filter.ref, 'A1:C2')
             self.assertEqual(workbook['Характеристики']['C2'].data_type, 's')
             self.assertIsNotNone(workbook['Реплики']['E2'].hyperlink)
+            self.assertEqual(workbook['Дополнительные реплики'].max_row, 4)
             self.assertEqual(workbook['Итоги навыков']['F2'].value, '7000')
             self.assertEqual(workbook['Прокачка навыков']['E2'].value, '2')
             self.assertEqual(workbook['Рекомендуемые навыки']['G2'].value, '8')

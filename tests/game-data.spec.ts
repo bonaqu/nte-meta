@@ -422,6 +422,15 @@ test('варианты Зеро доступны отдельно; общие д
         appearanceVariants.find((row: { id: string }) => row.id === id)
           .abilities,
       ).toEqual(expected);
+      expect(
+        appearanceVariants.find((row: { id: string }) => row.id === id)
+          .baseStats,
+      ).toEqual(
+        JSON.parse(
+          original.suggestions.find((row) => row.field === 'profile.baseStats')!
+            .value,
+        ),
+      );
     }
     const proposal = f.m.prepareCharacterImportProposal(
       [

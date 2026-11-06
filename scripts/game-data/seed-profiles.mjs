@@ -239,6 +239,7 @@ if (
           for (const [name, column] of [
             ['voiceLines', 'voice_lines_json'],
             ['abilities', 'abilities_json'],
+            ['baseStats', 'base_stats_json'],
             ['skins', 'skins_json'],
           ]) {
             const incoming = variant[name] || [];

@@ -1289,7 +1289,16 @@ export function AdminCharacterEditor({
       ) {
         next.profile.appearanceVariants = mergeRowsByKey(
           next.profile.appearanceVariants || [],
-          parsed as CharacterAppearanceVariant[],
+          (parsed as CharacterAppearanceVariant[]).map((variant) => ({
+            ...variant,
+            baseStats: mergeRowsByKey(
+              variant.baseStats || [],
+              next.profile.appearanceVariants?.find(
+                (row) => row.id === variant.id,
+              )?.baseStats || [],
+              statIdentity,
+            ),
+          })),
           (item) => item.id,
         );
       } else if (

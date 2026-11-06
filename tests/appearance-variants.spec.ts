@@ -8,6 +8,73 @@ import type {
   CharacterProfile,
 } from '../src/types';
 
+test('полные начальные показатели женского Зеро не затрагивают мужской вариант и ручные правки', async () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec(
+      "CREATE TABLE characters(id TEXT PRIMARY KEY, updated_at TEXT); INSERT INTO characters VALUES('esper-zero','2026-07-28 14:58:37')",
+    );
+    db.exec(
+      await readFile(
+        'migrations/0042_character_appearance_variants.sql',
+        'utf8',
+      ),
+    );
+    db.exec(
+      await readFile('migrations/0053_appearance_variant_stats.sql', 'utf8'),
+    );
+    db.exec(`INSERT INTO character_appearance_variants(character_id,variant_id,name,base_stats_json,updated_at) VALUES
+      ('esper-zero','1046','Мой мужской вариант','[{"id":"manual","label":"Мой показатель","value":"99"}]','2026-01-01'),
+      ('esper-zero','1051','Мой женский вариант','[]','2026-01-01')`);
+    const read = () =>
+      db
+        .prepare(
+          'SELECT variant_id,name,base_stats_json FROM character_appearance_variants ORDER BY variant_id',
+        )
+        .all();
+    const male = read()[0];
+    const seed = await readFile(
+      'migrations/0054_zero_female_initial_stats.sql',
+      'utf8',
+    );
+    db.exec(seed);
+    expect(read()[0]).toEqual(male);
+    const female = read()[1];
+    expect(female.name).toBe('Мой женский вариант');
+    const stats = JSON.parse(String(female.base_stats_json));
+    expect(stats).toHaveLength(23);
+    expect(new Set(stats.map((row: { id: string }) => row.id)).size).toBe(23);
+    expect(stats).toContainEqual(
+      expect.objectContaining({ id: 'ChargeGetEfficiencyBase', value: '100%' }),
+    );
+    // Female_base has no StrengthMax field. Never copy an assumed common value.
+    expect(stats.some((row: { id: string }) => row.id === 'StrengthMax')).toBe(
+      false,
+    );
+    const saved = read();
+    db.exec(seed);
+    expect(read()).toEqual(saved);
+    db.exec(
+      `UPDATE character_appearance_variants SET base_stats_json='[{"id":"manual","label":"Моя атака","value":"123"}]' WHERE variant_id='1051'`,
+    );
+    const manual = read();
+    db.exec(seed);
+    expect(read()).toEqual(manual);
+    db.exec(
+      "UPDATE character_appearance_variants SET base_stats_json='[]',updated_at='2099-01-01' WHERE variant_id='1051'",
+    );
+    db.exec(seed);
+    expect(read()[1].base_stats_json).toBe('[]');
+    db.exec(
+      "UPDATE character_appearance_variants SET updated_at='2026-01-01' WHERE variant_id='1051'; UPDATE characters SET updated_at='2099-01-01'",
+    );
+    db.exec(seed);
+    expect(read()[1].base_stats_json).toBe('[]');
+  } finally {
+    db.close();
+  }
+});
+
 test('добавление игровых вариантов Зеро не переписывает ручные поля и пропускает изменённую запись', async () => {
   const db = new DatabaseSync(':memory:');
   try {
@@ -104,6 +171,9 @@ test('варианты внешности читаются и сохраняют
       ),
     );
     db.exec(await readFile('migrations/0044_variant_abilities.sql', 'utf8'));
+    db.exec(
+      await readFile('migrations/0053_appearance_variant_stats.sql', 'utf8'),
+    );
     const context = vm.createContext({
       crypto: webcrypto,
       TextEncoder,
@@ -168,6 +238,7 @@ test('варианты внешности читаются и сохраняют
       {
         id: '1046',
         name: 'Мужской вариант',
+        baseStats: [{ id: 'AtkBase', label: 'Атака', value: '101' }],
         abilities: [
           {
             id: 'male-melee',
@@ -202,6 +273,7 @@ test('варианты внешности читаются и сохраняют
       {
         id: '1051',
         name: 'Женский вариант',
+        baseStats: [{ id: 'AtkBase', label: 'Атака', value: '202' }],
         abilities: [],
         skins: [
           {
@@ -261,6 +333,19 @@ test('варианты внешности читаются и сохраняют
     ).toThrow(/http/);
     expect(read('zero')).toEqual(variants);
     save('another', { appearanceVariants: variants });
+    expect(() =>
+      save('zero', {
+        appearanceVariants: [
+          {
+            ...variants[0],
+            baseStats: Array.from(
+              { length: 41 },
+              () => variants[0].baseStats![0],
+            ),
+          },
+        ],
+      }),
+    ).toThrow(/40/);
     save('zero', { appearanceVariants: [] });
     expect(read('zero')).toEqual([]);
     expect(read('another')).toEqual(variants);

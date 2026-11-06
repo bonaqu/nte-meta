@@ -42,6 +42,8 @@ test('варианты гардероба и озвучки переключаю
     await readFile('tests/fixtures/appearance-variants.json', 'utf8'),
   ) as CharacterAppearanceVariant[];
   const zero = characters.find((row) => row.id === 'esper-zero')!;
+  variants[0].baseStats = [{ id: 'AtkBase', label: 'Атака', value: '111' }];
+  variants[1].baseStats = [{ id: 'AtkBase', label: 'Атака', value: '222' }];
   zero.profile = {
     ...zero.profile!,
     skins: [],
@@ -67,7 +69,9 @@ test('варианты гардероба и озвучки переключаю
   await cpu.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   for (const width of [360, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto('/#/characters/esper-zero');
+    await page.goto(
+      (process.env.NTE_VARIANT_REVIEW_URL || '/') + '#/characters/esper-zero',
+    );
     await page.reload();
     await expect(
       page
@@ -104,6 +108,9 @@ test('варианты гардероба и озвучки переключаю
       ['Мужской вариант', '23 %'],
     ]) {
       await skillVariant.getByRole('button', { name, exact: true }).click();
+      await expect(page.locator('.character-initial-stats')).toContainText(
+        name === 'Женский вариант' ? '222' : '111',
+      );
       await skills
         .getByRole('group', { name: 'Выбор навыка' })
         .getByRole('button', { name: 'Базовая атака Оценка', exact: true })
@@ -196,7 +203,9 @@ test('варианты гардероба и озвучки переключаю
           document.documentElement.clientWidth + 1,
       ),
     ).toBeTruthy();
-    await page.goto('/#/characters');
+    await page.goto(
+      (process.env.NTE_VARIANT_REVIEW_URL || '/') + '#/characters',
+    );
     await expect(page.locator('.character-grid .character-card')).toHaveCount(
       characters.length,
     );
@@ -219,7 +228,7 @@ test('варианты гардероба и озвучки переключаю
 test('редактор сохраняет вариант, изображение и относительный адрес игрового аудио', async ({
   page,
   request,
-}) => {
+}, info) => {
   test.setTimeout(90000);
   await owner(page);
   const characters = (
@@ -260,7 +269,9 @@ test('редактор сохраняет вариант, изображение
     }),
   );
   await page.setViewportSize({ width: 360, height: 900 });
-  await page.goto('/#/characters/esper-zero');
+  await page.goto(
+    (process.env.NTE_VARIANT_REVIEW_URL || '/') + '#/characters/esper-zero',
+  );
   await page
     .getByRole('button', { name: 'Редактировать персонажа', exact: true })
     .click();
@@ -279,6 +290,15 @@ test('редактор сохраняет вариант, изображение
   await editor
     .getByLabel('Название варианта', { exact: true })
     .fill('Женский вариант — правка');
+  const stats = editor.getByRole('region', {
+    name: 'Начальные показатели варианта',
+  });
+  await stats
+    .getByRole('button', { name: 'Добавить показатель', exact: true })
+    .click();
+  await stats.getByLabel('Показатель 1', { exact: true }).fill('Атака');
+  await stats.getByLabel('Значение 1', { exact: true }).fill('123');
+  await stats.screenshot({ path: info.outputPath('variant-stats-editor.png') });
   const attributes = editor.getByLabel('Атрибуты способности варианта', {
     exact: true,
   });
@@ -345,6 +365,10 @@ test('редактор сохраняет вариант, изображение
   expect(saved!.profile!.appearanceVariants![1].skins[0].imageUrl).toBe(
     imageUrl,
   );
+  expect(saved!.profile!.appearanceVariants![1].baseStats?.[0]).toMatchObject({
+    label: 'Атака',
+    value: '123',
+  });
   expect(saved!.profile!.voiceLines[0].audioUrl).toBe(
     variants[0].voiceLines[0].audioUrl,
   );

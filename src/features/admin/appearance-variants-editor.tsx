@@ -9,6 +9,7 @@ import type {
 import { CharacterAppearanceSelector } from '../../components/character-appearance-selector';
 import { ImageField } from '../../components/image-field';
 import { PageStepper } from '../../components/page-stepper';
+import { VariantStatsEditor } from './variant-stats-editor';
 
 export function AppearanceVariantsEditor({
   value,
@@ -113,6 +114,11 @@ export function AppearanceVariantsEditor({
               Удалить вариант
             </button>
           </div>
+          <VariantStatsEditor
+            key={`stats-${active.id}`}
+            value={active.baseStats || []}
+            onChange={(baseStats) => patch({ baseStats })}
+          />
           <VariantAbilitiesEditor
             key={active.id}
             value={active.abilities || []}

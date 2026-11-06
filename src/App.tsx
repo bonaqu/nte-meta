@@ -3410,7 +3410,13 @@ function CharacterDetailPage({
           label="Вариант способностей"
           onChange={selectAppearance}
         />
-        <CharacterStats stats={profile.baseStats} />
+        <CharacterStats
+          stats={
+            activeAppearance?.baseStats?.length
+              ? activeAppearance.baseStats
+              : profile.baseStats
+          }
+        />
         {abilities.length ? (
           <CharacterAbilityBrowser key={character.id} abilities={abilities} />
         ) : (

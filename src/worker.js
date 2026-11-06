@@ -1251,7 +1251,8 @@ function characterProfileSelect() {
       character_profiles.awakenings_json AS profile_awakenings_json,
       (SELECT json_group_array(json_object(
         'id', variant_id, 'name', name, 'skins', json(skins_json),
-        'voiceLines', json(voice_lines_json), 'abilities', json(abilities_json)
+        'voiceLines', json(voice_lines_json), 'abilities', json(abilities_json),
+        'baseStats', json(base_stats_json)
       )) FROM (
         SELECT * FROM character_appearance_variants
         WHERE character_id = characters.id ORDER BY position, variant_id
@@ -12490,6 +12491,7 @@ function normalizeCharacterAppearanceVariants(value) {
       skins: item.skins,
       voiceLines: item.voiceLines,
       abilities: item.abilities,
+      baseStats: item.baseStats,
     });
     return {
       id,
@@ -12497,6 +12499,7 @@ function normalizeCharacterAppearanceVariants(value) {
       skins: profile.skins,
       voiceLines: profile.voiceLines,
       abilities: profile.abilities,
+      baseStats: profile.baseStats,
     };
   });
 }
@@ -12785,12 +12788,13 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
         statements.push(
           env.DB.prepare(
             `INSERT INTO character_appearance_variants
-              (character_id, variant_id, name, skins_json, voice_lines_json, position, abilities_json)
-             VALUES (?, ?, ?, ?, ?, ?, ?)
+              (character_id, variant_id, name, skins_json, voice_lines_json, position, abilities_json, base_stats_json)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(character_id, variant_id) DO UPDATE SET
                name=excluded.name, skins_json=excluded.skins_json, voice_lines_json=excluded.voice_lines_json,
                position=excluded.position,
                abilities_json=CASE WHEN ? THEN excluded.abilities_json ELSE character_appearance_variants.abilities_json END,
+               base_stats_json=CASE WHEN ? THEN excluded.base_stats_json ELSE character_appearance_variants.base_stats_json END,
                updated_at=CURRENT_TIMESTAMP`,
           ).bind(
             entityId,
@@ -12800,9 +12804,16 @@ function buildRelationStatements(env, entity, entityId, body, replace) {
             JSON.stringify(variant.voiceLines),
             position,
             JSON.stringify(variant.abilities),
+            JSON.stringify(variant.baseStats),
             Object.hasOwn(
               body.profile.appearanceVariants[position],
               'abilities',
+            )
+              ? 1
+              : 0,
+            Object.hasOwn(
+              body.profile.appearanceVariants[position],
+              'baseStats',
             )
               ? 1
               : 0,
@@ -14739,7 +14750,7 @@ async function buildLocalGameCharacterSource(env, character) {
     source.suggestions.push(
       makeImportSuggestion(
         'profile.appearanceVariants',
-        'Способности, гардероб и реплики по вариантам',
+        'Показатели, способности, гардероб и реплики по вариантам',
         variants
           .map((variant) => ({
             id: variant.id.replace('local-installed-game-', ''),
@@ -14750,6 +14761,11 @@ async function buildLocalGameCharacterSource(env, character) {
             skins: JSON.parse(
               variant.suggestions.find((row) => row.field === 'profile.skins')
                 ?.value || '[]',
+            ),
+            baseStats: JSON.parse(
+              variant.suggestions.find(
+                (row) => row.field === 'profile.baseStats',
+              )?.value || '[]',
             ),
             abilities: JSON.parse(
               variant.suggestions.find(

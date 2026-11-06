@@ -18,7 +18,7 @@ export function VariantStatsEditor({
     onChange(value.map((row, i) => (i === index ? { ...row, ...next } : row)));
   return (
     <section
-      className="appearance-variant-editor-part"
+      className="appearance-variant-editor-part variant-stats-editor"
       aria-label="Начальные показатели варианта"
     >
       <div className="panel-title-row">

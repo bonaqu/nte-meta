@@ -9619,6 +9619,9 @@
     padding-block: 16px;
     border-block-start: 1px solid var(--border);
   }
+  .variant-stats-editor :is(button, input, select) {
+    min-block-size: 44px;
+  }
 }
 
 @layer polish {

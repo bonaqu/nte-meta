@@ -298,6 +298,9 @@ test('редактор сохраняет вариант, изображение
     .click();
   await stats.getByLabel('Показатель 1', { exact: true }).fill('Атака');
   await stats.getByLabel('Значение 1', { exact: true }).fill('123');
+  for (const control of await stats.locator('button,input,select').all()) {
+    expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
   await stats.screenshot({ path: info.outputPath('variant-stats-editor.png') });
   const attributes = editor.getByLabel('Атрибуты способности варианта', {
     exact: true,

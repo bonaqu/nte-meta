@@ -16,6 +16,64 @@ import { validProposal } from '../src/lib/local-character-proposal';
 import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 
+test('альтернативные записи добавляются один раз, сохраняя ручные строки и поздние правки', async () => {
+  const sql = await readFile(
+    'migrations/0055_alternate_native_voice_takes.sql',
+    'utf8',
+  );
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec(
+      'CREATE TABLE characters(id TEXT, updated_at TEXT); CREATE TABLE character_profiles(character_id TEXT, updated_at TEXT, voice_lines_json TEXT);',
+    );
+    const original = [
+      {
+        id: 'manual',
+        title: 'Моя запись',
+        audioUrl: 'https://example.com/custom.mp3',
+      },
+    ];
+    for (const [id, updatedAt] of [
+      ['linko', '2026-10-21 03:56:00'],
+      ['sakiri', '2026-07-02 18:37:34'],
+    ]) {
+      db.prepare('INSERT INTO characters VALUES(?,?)').run(id, updatedAt);
+      db.prepare('INSERT INTO character_profiles VALUES(?,?,?)').run(
+        id,
+        '2026-01-01',
+        JSON.stringify(original),
+      );
+    }
+    const voices = (id: string) =>
+      JSON.parse(
+        db
+          .prepare(
+            'SELECT voice_lines_json FROM character_profiles WHERE character_id=?',
+          )
+          .get(id)!.voice_lines_json as string,
+      );
+    db.exec(sql);
+    expect(voices('linko')).toHaveLength(81);
+    expect(voices('sakiri')).toHaveLength(5);
+    expect(voices('linko')[0]).toEqual(original[0]);
+    const first = voices('linko');
+    db.exec(sql);
+    expect(voices('linko')).toEqual(first);
+    db.prepare(
+      'UPDATE character_profiles SET updated_at=?,voice_lines_json=?',
+    ).run('2099-01-01', JSON.stringify(original));
+    db.exec(sql);
+    expect(voices('linko')).toEqual(original);
+    db.exec(
+      "UPDATE character_profiles SET updated_at='2026-01-01'; UPDATE characters SET updated_at='2099-01-01';",
+    );
+    db.exec(sql);
+    expect(voices('sakiri')).toEqual(original);
+  } finally {
+    db.close();
+  }
+});
+
 test('озвучка женского Зеро: четыре пакета, повтор миграции и защита поздних правок', async () => {
   const sql = await readFile(
     'migrations/0048_native_voice_row_owners.sql',

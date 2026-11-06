@@ -15458,19 +15458,26 @@ async function buildLocalGameCharacterSource(env, character) {
         r.details.binding === 'character-voice-map' &&
         r.details.titleRu &&
         r.details.contentRu;
-      return (line || mapped) && r.assets[0]
-        ? [
-            {
-              id: `${r.details.locale}-${r.gameId}`.slice(0, 80),
-              title: line ? ru(line.Title) : plain(r.details.titleRu),
+      const assets = r.assets.filter(
+        (asset, index, all) =>
+          asset.url &&
+          all.findIndex((other) => other.url === asset.url) === index,
+      );
+      return line || mapped
+        ? assets.map((asset, index) => {
+            const suffix = index ? `-take-${index + 1}` : '';
+            const title = line ? ru(line.Title) : plain(r.details.titleRu);
+            return {
+              id: `${`${r.details.locale}-${r.gameId}`.slice(0, 80 - suffix.length)}${suffix}`,
+              title: index ? `${title} · Запись ${index + 1}` : title,
               description: (line
                 ? ru(line.Content)
                 : plain(r.details.contentRu)
               ).slice(0, 1000),
               language: languageNames[r.details.locale],
-              audioUrl: r.assets[0].url,
-            },
-          ]
+              audioUrl: asset.url,
+            };
+          })
         : [];
     });
   if (voiceLines.length)

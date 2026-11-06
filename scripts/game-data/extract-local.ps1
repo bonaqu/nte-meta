@@ -48,8 +48,10 @@ foreach($folder in 'Paks','PatchPaks','TagPatchPaks'){
  New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
  # Directory junctions work across local volumes without copying game archives.
  # Extractors only read Content; aes.txt and every output stay in the run folder.
- New-Item -ItemType Junction -Path $destination -Target $sourceFolder | Out-Null
- $links+=@{path=$destination;target=$sourceFolder}
+ $createdJunction=New-Item -ItemType Junction -Path $destination -Target $sourceFolder
+ # NTFS expands 8.3 aliases (ADMINI~1) in the junction target. Remember the
+ # actual target so guarded cleanup also works with Windows' short TEMP path.
+ $links+=@{path=$destination;target=$createdJunction.Target}
  foreach($file in Get-ChildItem -LiteralPath $sourceFolder -File | Where-Object Extension -in '.pak','.utoc','.ucas'){
   $archives+=@{folder=$folder;name=$file.Name;bytes=$file.Length;modifiedUtc=$file.LastWriteTimeUtc.ToString('o')}
  }

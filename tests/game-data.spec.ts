@@ -466,6 +466,59 @@ test('варианты Зеро доступны отдельно; общие д
   }
 });
 
+test('импорт озвучки сохраняет все записи события, стабильный ID и исходное название', async () => {
+  const records = JSON.parse(
+    await readFile('tests/fixtures/game-data-native-hathor.json', 'utf8'),
+  ) as SourceRecord[];
+  const audio = records.find((row) => row.kind === 'audio')!;
+  const original = { ...audio.assets[0] };
+  const alternate = {
+    ...original,
+    url: '/nte-meta/game-audio/12345678901234567890.ogg',
+  };
+  const base = await contract(records);
+  let previous: { id: string; title: string; audioUrl: string }[];
+  try {
+    const source = await base.m.buildLocalGameCharacterSource(base.env, {
+      originalName: 'Hathor',
+      name: 'Хатор',
+    });
+    previous = JSON.parse(
+      source.suggestions.find((row) => row.field === 'profile.voiceLines')!
+        .value,
+    );
+  } finally {
+    base.db.close();
+  }
+  audio.assets = [original, alternate, alternate];
+  const f = await contract(records);
+  try {
+    const source = await f.m.buildLocalGameCharacterSource(f.env, {
+      originalName: 'Hathor',
+      name: 'Хатор',
+    });
+    const voices = JSON.parse(
+      source.suggestions.find((row) => row.field === 'profile.voiceLines')!
+        .value,
+    );
+    expect(voices).toHaveLength(previous.length + 1);
+    for (const voice of previous) expect(voices).toContainEqual(voice);
+    const primary = previous.find((row) => row.audioUrl === original.url)!;
+    expect(voices).toContainEqual(
+      expect.objectContaining({
+        id: `${primary.id}-take-2`,
+        title: `${primary.title} · Запись 2`,
+        audioUrl: alternate.url,
+      }),
+    );
+    expect(new Set(voices.map((row: { id: string }) => row.id)).size).toBe(
+      voices.length,
+    );
+  } finally {
+    f.db.close();
+  }
+});
+
 test('нативный профиль Хатор: исходные статы, навыки без дублей, коэффициенты, 6 пробуждений и 2 резонанса, аудио', async () => {
   const records = JSON.parse(
     await readFile('tests/fixtures/game-data-native-hathor.json', 'utf8'),

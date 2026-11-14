@@ -5562,12 +5562,13 @@ async function fetchImportSource(source, character, deadline) {
         suggestions: [],
       };
     }
-    // Kaiden's server-rendered guide is ~620 KB including hydration scripts.
-    // Keep an explicit per-source cap instead of weakening all fetch limits.
+    // Kaiden embeds hydration data and the Game8 wardrobe includes all characters.
+    // Keep an explicit cap for these sources instead of raising the default.
     const maxBytes = [
       'kaiden-character-guide',
       'kaiden-tier-profile',
       'kaiden-character-images',
+      'game8-skins',
     ].includes(source.id)
       ? 1500000
       : IMPORT_MAX_HTML_BYTES;
@@ -6829,6 +6830,9 @@ const knownGiftLocalizations = new Map([
 ]);
 
 const knownOutfitLocalizations = new Map([
+  ['Fashion_1090_1', { name: 'Мистика Y2K', official: true }],
+  ['Fashion_1090_2', { name: 'Парящие лепестки', official: true }],
+  ['Fashion_1090_nighty', { name: 'Ветроцвет', official: true }],
   [
     'Game8_1033_0',
     {
@@ -6884,6 +6888,9 @@ const knownOutfitLocalizations = new Map([
 ]);
 
 const knownOutfitIdsBySourceName = new Map([
+  ['Y2K Mystique', 'Fashion_1090_1'],
+  ['Drifting Petals', 'Fashion_1090_2'],
+  ['Windflower', 'Fashion_1090_nighty'],
   ['Five Aggregates', 'Game8_1033_0'],
   ['CSU Prodigy', 'Game8_1019_0'],
   ['To Mary', 'Game8_1019_1'],
@@ -7299,9 +7306,9 @@ function parseGame8SkinsImport(text, source, character) {
     const sourceSkinName = cleanGame8Text(
       chunk.match(/<b class='a-bold'>([\s\S]*?)<\/b>/i)?.[1] || '',
     );
-    const skinName = knownOutfitLocalizations.get(
-      knownOutfitIdsBySourceName.get(sourceSkinName),
-    )?.name;
+    const outfitId = knownOutfitIdsBySourceName.get(sourceSkinName);
+    const localization = knownOutfitLocalizations.get(outfitId);
+    const skinName = localization?.name;
     const characterFromAlt = cleanGame8Text(
       chunk.match(/alt='([^']+)\s+Icon'/i)?.[1] || '',
     );
@@ -7326,14 +7333,16 @@ function parseGame8SkinsImport(text, source, character) {
         : cells[2] || '';
     const description = [
       translateGame8Obtain(obtainText, displayCharacterName),
-      'Название является рабочим переводом; перед публикацией проверьте его в русской версии игры.',
+      localization.official
+        ? ''
+        : 'Название является рабочим переводом; перед публикацией проверьте его в русской версии игры.',
     ]
       .filter(Boolean)
       .join('\n\n');
     const key = normalizeImportSearch(skinName);
     if (!seen.has(key)) {
       skins.push({
-        id: crypto.randomUUID(),
+        id: localization.official ? outfitId : crypto.randomUUID(),
         name: skinName,
         imageUrl,
         description,

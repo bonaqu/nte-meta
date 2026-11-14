@@ -15,6 +15,7 @@ type Source = {
   resolveUrl?: WorkerContracts['resolveCatalogueImportSource'];
 };
 type WorkerContracts = {
+  characterImportSources: (slug: string, character: object) => Source[];
   parseIcyVeinsGuideImport: (
     html: string,
     source: Source,
@@ -68,7 +69,7 @@ async function workerContracts(fetcher: typeof fetch) {
   });
   new vm.Script(
     source.replace('export default {', 'const worker = {') +
-      '\n globalThis.contracts = { findImportCharacter, fetchImportSource, resolveWotpackGuideSource, resolveCatalogueImportSource, nevernessAppCharacterCode, parseIcyVeinsGuideImport, enrichGuideSkillPriority, dedupeGuideImportSuggestions };',
+      '\n globalThis.contracts = { characterImportSources, findImportCharacter, fetchImportSource, resolveWotpackGuideSource, resolveCatalogueImportSource, nevernessAppCharacterCode, parseIcyVeinsGuideImport, enrichGuideSkillPriority, dedupeGuideImportSuggestions };',
   ).runInContext(context);
   return context.contracts as WorkerContracts;
 }
@@ -299,6 +300,35 @@ test('крупный гайд разбирается в своём лимите,
       )
     ).status,
   ).toBe('reference');
+});
+
+test('каталог Game8 принимает выросшую страницу и связывает облик Элимс с игровым ID', async () => {
+  const entry = `<td class="center"><div class='imageLink' data-image-url='https://img.game8.co/windflower'></div><b class='a-bold'>Windflower</b></td><td><img alt='Elyms Icon'>Elyms</td><td>Achieve Bond Level 10 with Elyms</td>`;
+  const m = await workerContracts(
+    async () => new Response(' '.repeat(659607) + entry),
+  );
+  const character = { slug: 'elyms', originalName: 'Elyms', name: 'Элимс' };
+  const source = m
+    .characterImportSources(character.slug, character)
+    .find((item) => item.id === 'game8-skins')!;
+  const result = await m.fetchImportSource(source, character, {
+    signal: new AbortController().signal,
+    remainingMs: () => 15000,
+  });
+  expect(result.status).toBe('ok');
+  const values = result.suggestions as CharacterImportSuggestion[];
+  expect(
+    JSON.parse(values.find((item) => item.field === 'profile.skins')!.value),
+  ).toEqual([
+    expect.objectContaining({ id: 'Fashion_1090_nighty', name: 'Ветроцвет' }),
+  ]);
+  expect(
+    JSON.parse(
+      values.find((item) => item.field === 'profile.friendship')!.value,
+    ),
+  ).toEqual([
+    expect.objectContaining({ level: 10, rewardName: 'Скин: Ветроцвет' }),
+  ]);
 });
 
 test('Wotpack ищет текущий адрес, известный URL используется как запасной', async () => {

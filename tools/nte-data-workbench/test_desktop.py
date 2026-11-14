@@ -41,7 +41,8 @@ class DesktopTests(TestCase):
                 window.checked(result)
                 application.processEvents()
                 self.assertTrue(window.patch_report.isEnabled())
-                self.assertGreater(window.local.verticalScrollBar().maximum(), 0)
+                position = window.patch_report.mapTo(window.local.viewport(), window.patch_report.rect().center())
+                self.assertTrue(window.local.viewport().rect().contains(position))
                 with patch.object(desktop, 'config', return_value={'source':str(snapshot)}), \
                         patch.object(desktop.QDesktopServices, 'openUrl', return_value=True) as open_url:
                     window.patch_report.click()

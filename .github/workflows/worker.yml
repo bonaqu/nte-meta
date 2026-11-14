@@ -2,27 +2,26 @@ name: Deploy Cloudflare Worker
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: [Deploy GitHub Pages]
-    types: [completed]
-    branches: [bonaqu_projects]
+  workflow_call:
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
 
 permissions:
   contents: read
 
-concurrency:
-  group: cloudflare-worker
-  cancel-in-progress: false
-
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'pull_request')
+    if: github.ref == 'refs/heads/bonaqu_projects'
     runs-on: ubuntu-latest
+    concurrency:
+      group: cloudflare-worker
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
       - name: Setup Node
         uses: actions/setup-node@v6
         with:

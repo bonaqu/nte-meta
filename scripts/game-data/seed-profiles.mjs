@@ -214,6 +214,7 @@ if (
     roleIcons: 'role_icons_json',
     voiceActors: 'voice_actors_json',
   };
+  const dossierFields = { birthday: 80, faction: 160 };
   const report = [];
   for (const character of current) {
     const source = native.characters.find(
@@ -228,8 +229,28 @@ if (
     }
     const guard = `character_id=${quote(character.id)} AND updated_at<=${quote(captured)} AND EXISTS(SELECT 1 FROM characters WHERE id=character_id AND updated_at=${quote(character.updatedAt)})`;
     let changed = 0;
+    let dossierFieldsFilled = 0;
     for (const suggestion of source.suggestions || []) {
       const field = suggestion.field.replace(/^profile\./, '');
+      if (Object.hasOwn(dossierFields, field)) {
+        const value =
+          typeof suggestion.value === 'string'
+            ? suggestion.value.trim().replaceAll('\u00a0', ' ')
+            : '';
+        const existing = character.profile[field];
+        if (
+          !existing?.trim() &&
+          value &&
+          !/^(?:[-—–/]+|нет|не указан[ао]?)$/iu.test(value) &&
+          value.length <= dossierFields[field]
+        ) {
+          lines.push(
+            `UPDATE character_profiles SET ${field}=${quote(value)} WHERE ${guard} AND trim(COALESCE(${field}, ''))='';`,
+          );
+          dossierFieldsFilled++;
+        }
+        continue;
+      }
       if (field === 'appearanceVariants') {
         for (const variant of JSON.parse(suggestion.value)) {
           const before = (character.profile.appearanceVariants || []).find(
@@ -283,7 +304,11 @@ if (
       lines.push(
         `UPDATE character_profiles SET updated_at=CURRENT_TIMESTAMP WHERE ${guard};`,
       );
-    report.push({ character: character.name, collections: changed });
+    report.push({
+      character: character.name,
+      collections: changed,
+      dossierFields: dossierFieldsFilled,
+    });
   }
   if (lines.some((line) => Buffer.byteLength(line, 'utf8') > 100000))
     throw new Error('Migration query exceeds D1 limit');

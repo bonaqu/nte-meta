@@ -1,7 +1,104 @@
 import { expect, test } from '@playwright/test';
-import { readFile, readdir } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { mergeNativeCollection } from '../scripts/game-data/seed-profiles.mjs';
+
+test('локальный импорт заполняет только пустые даты и организации из досье', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'nte-dossier-seed-'));
+  const db = new DatabaseSync(':memory:');
+  try {
+    const current = join(cwd, 'current.json');
+    const native = join(cwd, 'native.json');
+    const output = join(cwd, 'generated.sql');
+    const date = '2026-01-01';
+    const rows = [
+      { id: 'missing', birthday: '', faction: '' },
+      { id: 'authored', birthday: '5 мая', faction: '' },
+      { id: 'edited', birthday: '', faction: '' },
+    ];
+    await writeFile(
+      current,
+      JSON.stringify(
+        rows.map(({ id, birthday, faction }) => ({
+          id,
+          name: id,
+          originalName: id,
+          updatedAt: date,
+          profile: { birthday, faction },
+        })),
+      ),
+    );
+    await writeFile(
+      native,
+      JSON.stringify({
+        characters: rows.map(({ id }) => ({
+          name: id,
+          status: 'ok',
+          suggestions: [
+            { field: 'profile.birthday', value: '14\u00a0февраля' },
+            {
+              field: 'profile.faction',
+              value: id === 'authored' ? '/' : "Группа 'Эхо'",
+            },
+          ],
+        })),
+      }),
+    );
+    execFileSync(process.execPath, [
+      'scripts/game-data/seed-profiles.mjs',
+      '--current',
+      current,
+      '--native',
+      native,
+      '--output',
+      output,
+    ]);
+    const sql = await readFile(output, 'utf8');
+    db.exec(
+      'CREATE TABLE characters(id TEXT, updated_at TEXT); CREATE TABLE character_profiles(character_id TEXT, updated_at TEXT, birthday TEXT, faction TEXT);',
+    );
+    for (const { id, birthday, faction } of rows) {
+      db.prepare('INSERT INTO characters VALUES (?, ?)').run(id, date);
+      db.prepare('INSERT INTO character_profiles VALUES (?, ?, ?, ?)').run(
+        id,
+        id === 'edited' ? '2099-01-01' : date,
+        birthday,
+        faction,
+      );
+    }
+    // A newly filled value survives even if it shares the observed timestamp.
+    db.exec(
+      "UPDATE character_profiles SET faction='Ручная редакция' WHERE character_id='missing';",
+    );
+    db.exec(sql);
+    const actual = () =>
+      db
+        .prepare(
+          'SELECT character_id, birthday, faction FROM character_profiles ORDER BY character_id',
+        )
+        .all();
+    const first = actual();
+    expect(first).toEqual([
+      { character_id: 'authored', birthday: '5 мая', faction: '' },
+      { character_id: 'edited', birthday: '', faction: '' },
+      {
+        character_id: 'missing',
+        birthday: '14 февраля',
+        faction: 'Ручная редакция',
+      },
+    ]);
+    db.exec(sql);
+    expect(actual()).toEqual(first);
+  } finally {
+    db.close();
+    if (dirname(resolve(cwd)) === resolve(tmpdir())) {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  }
+});
 
 test('начальные характеристики сопоставляются по игровым синонимам и сохраняют ручные значения', () => {
   const current = [

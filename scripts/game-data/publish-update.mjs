@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { createReadStream, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -30,7 +31,7 @@ function workingChanges(run) {
 
 function checkPreparedChanges(changes) {
   const allowed = (file) =>
-    /^(?:scripts\/content\/game-data\/|public\/game-(?:assets|audio)\/|src\/data\/native-[\w-]+\.json$|migrations\/\d{4}_native_profile_update\.sql$)/.test(
+    /^(?:scripts\/content\/game-data\/(?:chunks\.jsonl\.gz|manifest\.json)$|public\/game-(?:assets|audio)\/|src\/data\/native-[\w-]+\.json$|migrations\/\d{4}_native_profile_update\.sql$)/.test(
       file,
     );
   if (
@@ -41,6 +42,36 @@ function checkPreparedChanges(changes) {
     throw Error(
       'В проекте есть другие изменения или удалённые файлы. Сохраните эту работу отдельно перед обновлением программы. Подготовленный снимок остаётся в рабочей папке.',
     );
+  }
+}
+
+async function verifyPreparedSnapshot(source, cwd) {
+  const message =
+    'Выбранный снимок не прошёл проверку или изменился. Выполните шаг 3 «Подготовить снимок» и повторите публикацию.';
+  if (!source) throw Error(message);
+  const content = resolve(cwd, 'scripts/content/game-data');
+  try {
+    const marker = JSON.parse(
+      readFileSync(resolve(source, 'prepared-snapshot.json'), 'utf8'),
+    );
+    const manifest = JSON.parse(
+      readFileSync(resolve(content, 'manifest.json'), 'utf8'),
+    );
+    if (
+      !/^[a-f0-9]{64}$/.test(marker.chunksSha256) ||
+      marker.chunksSha256 !== manifest.chunksSha256 ||
+      !statSync(marker.database).isFile()
+    ) {
+      throw Error(message);
+    }
+    const hash = createHash('sha256');
+    for await (const chunk of createReadStream(
+      resolve(content, 'chunks.jsonl.gz'),
+    ))
+      hash.update(chunk);
+    if (hash.digest('hex') !== marker.chunksSha256) throw Error(message);
+  } catch (error) {
+    throw Error(message, { cause: error });
   }
 }
 
@@ -107,7 +138,10 @@ function openPullRequest(run, branch, body) {
   );
 }
 
-export function publishUpdate(run = runCommand) {
+export async function publishUpdate(
+  run = runCommand,
+  { source, cwd = process.cwd() } = {},
+) {
   let branch = run('git', ['branch', '--show-current']);
   const changes = workingChanges(run);
   run(gh, ['auth', 'status']);
@@ -125,6 +159,7 @@ export function publishUpdate(run = runCommand) {
     if (!remainingChanges.length) {
       throw Error('Эти данные уже опубликованы. Проект обновлён.');
     }
+    await verifyPreparedSnapshot(source, cwd);
     const issue = JSON.parse(
       run(
         gh,
@@ -193,7 +228,11 @@ if (
     console.log(
       process.argv.includes('--update-project')
         ? updateProject()
-        : publishUpdate(),
+        : await publishUpdate(runCommand, {
+            source: process.argv.includes('--source')
+              ? process.argv[process.argv.indexOf('--source') + 1]
+              : undefined,
+          }),
     );
   } catch (error) {
     console.error(error.message);

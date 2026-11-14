@@ -289,20 +289,20 @@ def _export_readable(repository, destination, owners, source_records, include_me
                 for r in profile.get(field, []): excel('Характеристики', ['Персонаж', 'Показатель', 'Начальное значение'], [name, r['label'], r['value']])
             elif field == 'recommendations':
                 recommendations = character.get('recommendations') or {}
-                body = '<h2>Дуги</h2>'
+                body = ('<p><strong>Из предыдущего снимка клиента.</strong> В текущей выгрузке таблица рекомендаций пуста.</p>' if recommendations.get('historical') else '') + '<h2>Дуги</h2>'
                 for i, arc in enumerate(recommendations.get('arcs', [])):
                     label = 'Основной вариант' if i == 0 else 'На замену'
                     body += '<article>' + media.image(arc.get('imageUrl', ''), folder, 'Рекомендуемая дуга — ' + arc['name']) + '<h3>' + esc(label + ' · ' + arc['name']) + '</h3><p>' + esc(arc.get('description')) + '</p>' + table(['Характеристика', 'Значение'], [(s['label'], s['value']) for s in arc.get('stats', [])]) + '</article>'
-                    excel('Рекомендации дуг', ['Персонаж', 'Вариант', 'Дуга', 'Эффект'], [name, label, arc['name'], arc.get('description')])
+                    excel('Рекомендации дуг', ['Персонаж', 'Вариант', 'Дуга', 'Эффект', 'Источник'], [name, label, arc['name'], arc.get('description'), 'Предыдущий снимок' if recommendations.get('historical') else 'Текущий снимок'])
                 body += '<h2>Основные характеристики</h2>'
                 for stat in recommendations.get('stats', []):
                     body += '<article>' + media.image(stat.get('imageUrl', ''), folder, 'Рекомендуемая характеристика — ' + stat['name']) + '<h3>' + esc(stat['name']) + '</h3></article>'
-                    excel('Рекомендуемые статы', ['Персонаж', 'Характеристика'], [name, stat['name']])
+                    excel('Рекомендуемые статы', ['Персонаж', 'Характеристика', 'Источник'], [name, stat['name'], 'Предыдущий снимок' if recommendations.get('historical') else 'Текущий снимок'])
                 body += '<h2>Рекомендуемые уровни навыков</h2><p>Рекомендации клиента для разных этапов развития. Числа обозначают целевые уровни навыков, а не их приоритет.</p>'
                 for stage in recommendations.get('stages', []):
                     body += '<h3>Этап ' + esc(stage['stage']) + ' · персонаж ур. ' + esc(stage.get('characterLevel')) + ' · дуга ур. ' + esc(stage.get('arcLevel')) + '</h3>' + table(['Тип навыка', 'Навык', 'Рекомендуемый уровень'], [(r['skillType'], r['name'], r['level']) for r in stage.get('skills', [])])
                     for skill in stage.get('skills', []):
-                        excel('Рекомендуемые навыки', ['Персонаж', 'Этап', 'Уровень персонажа', 'Уровень дуги', 'Тип навыка', 'Навык', 'Уровень навыка'], [name, stage['stage'], stage.get('characterLevel'), stage.get('arcLevel'), skill['skillType'], skill['name'], skill['level']])
+                        excel('Рекомендуемые навыки', ['Персонаж', 'Этап', 'Уровень персонажа', 'Уровень дуги', 'Тип навыка', 'Навык', 'Уровень навыка', 'Источник'], [name, stage['stage'], stage.get('characterLevel'), stage.get('arcLevel'), skill['skillType'], skill['name'], skill['level'], 'Предыдущий снимок' if recommendations.get('historical') else 'Текущий снимок'])
                 if not recommendations:
                     body += '<p>В этом снимке рекомендации персонажа отсутствуют.</p>'
             elif field == 'abilities':

@@ -14335,11 +14335,11 @@ async function findLocalGameEquipment(env, query, kind, gameId = '') {
   const namespace = kind === 'arcs' ? 'ST_Fork' : 'ST_Equipment';
   const rows = await env.DB.prepare(
     GAME_RECORD_SELECT +
-      " WHERE c.kind=? AND (json_extract(e.value,'$.namespace')=? OR json_extract(e.value,'$.namespace')='DT_EquipmentSuitData') AND json_extract(e.value,'$.term')=1",
+      " WHERE c.kind=? AND (json_extract(e.value,'$.namespace')=? OR json_extract(e.value,'$.namespace') IN ('DT_EquipmentSuitData','NTE_ReferenceWeapon') OR (c.kind='arc' AND json_extract(e.value,'$.namespace')='' AND lower(json_extract(e.value,'$.gameId')) GLOB 'fork_*_name')) AND json_extract(e.value,'$.term')=1",
   )
     .bind(localKind, namespace)
     .all();
-  const names = (rows.results || [])
+  const matched = (rows.results || [])
     .map((r) => gameRecordView(r))
     .filter(
       (r) =>
@@ -14349,15 +14349,31 @@ async function findLocalGameEquipment(env, query, kind, gameId = '') {
           : Object.values(r.values).some((v) =>
               v.toLowerCase().includes(key),
             )) && !/^buff_/i.test(r.gameId),
-    )
-    .slice(0, 6);
+    );
+  const byStem = new Map();
+  const nameRank = (row) =>
+    (row.values.ru ? 2 : 0) + (row.namespace !== 'NTE_ReferenceWeapon' ? 1 : 0);
+  for (const row of matched) {
+    const stem = row.gameId.replace(/_name$/i, '').toLowerCase();
+    const previous = byStem.get(stem);
+    if (!previous || nameRank(row) > nameRank(previous)) byStem.set(stem, row);
+  }
+  const names = [...byStem.values()].slice(0, 6);
   for (const name of names) {
     const stem = name.gameId.replace(/_name$/i, '');
     const related = await env.DB.prepare(
       GAME_RECORD_SELECT +
-        " WHERE c.kind=? AND json_extract(e.value,'$.namespace')=? AND instr(lower(json_extract(e.value,'$.gameId')),?)>0 LIMIT 30",
+        " WHERE c.kind=? AND (json_extract(e.value,'$.namespace')=? OR (c.kind='arc' AND json_extract(e.value,'$.namespace')='' AND lower(json_extract(e.value,'$.gameId')) IN (?, ?, ?, ?))) AND instr(lower(json_extract(e.value,'$.gameId')),?)>0 LIMIT 30",
     )
-      .bind(localKind, namespace, stem.toLowerCase())
+      .bind(
+        localKind,
+        namespace,
+        `${stem.toLowerCase()}_des`,
+        `${stem.toLowerCase()}_desc`,
+        `${stem.toLowerCase()}_context`,
+        `buff_${stem.toLowerCase()}_effect`,
+        stem.toLowerCase(),
+      )
       .all();
     const records = (related.results || []).map((r) => gameRecordView(r));
     const effect = records
@@ -14369,9 +14385,9 @@ async function findLocalGameEquipment(env, query, kind, gameId = '') {
       kind === 'arcs'
         ? await env.DB.prepare(
             GAME_RECORD_SELECT +
-              " WHERE c.kind='arc' AND json_extract(e.value,'$.namespace')='NTE_ReferenceWeapon' AND json_extract(e.value,'$.gameId')=?",
+              " WHERE c.kind='arc' AND json_extract(e.value,'$.namespace')='NTE_ReferenceWeapon' AND lower(json_extract(e.value,'$.gameId'))=?",
           )
-            .bind(stem)
+            .bind(stem.toLowerCase())
             .first()
         : null;
     const gear = reference ? gameRecordView(reference) : null;
@@ -14512,11 +14528,17 @@ async function buildLocalGameGuideSources(env, character) {
       .bind(owner)
       .all();
     const records = (rows.results || []).map((row) => gameRecordView(row));
-    const guide = records.find(
+    const guideRecord = records.find(
       (row) =>
         row.namespace === 'DT_CultivationGuideData' && row.gameId === owner,
-    )?.details;
+    );
+    const guide = guideRecord?.details;
     if (!guide) continue;
+    const historical = Boolean(guide.reference?.historical);
+    if (historical) {
+      source.name = 'Рекомендации из предыдущего снимка клиента';
+      source.recommendations.historical = true;
+    }
     const attributes = (guide.RecommendAttrList || []).map((id) =>
       records.find(
         (row) =>
@@ -14673,15 +14695,19 @@ async function buildLocalGameGuideSources(env, character) {
         label,
         items,
         source,
-        'high',
-        'Рекомендация клиента игры; редактор выбирает, применять ли её к гайду.',
+        historical ? 'medium' : 'high',
+        historical
+          ? 'Рекомендация из предыдущего снимка клиента. Проверьте её для текущего патча.'
+          : 'Рекомендация клиента игры; редактор выбирает, применять ли её к гайду.',
       );
       if (suggestion) source.suggestions.push(suggestion);
     }
     source.status = source.suggestions.length ? 'ok' : 'reference';
-    source.message = recommendations.unresolved.length
-      ? 'Часть игровых ID не сопоставлена. Неполные разделы не предлагаются для импорта.'
-      : 'Дуги и основные характеристики из игровых рекомендаций.';
+    source.message = historical
+      ? 'В текущей выгрузке таблица рекомендаций пуста. Ниже — ранее прочитанные значения; они могут отличаться от текущего патча.'
+      : recommendations.unresolved.length
+        ? 'Часть игровых ID не сопоставлена. Неполные разделы не предлагаются для импорта.'
+        : 'Дуги и основные характеристики из игровых рекомендаций.';
     sources.push(source);
   }
   return sources;
@@ -15784,10 +15810,32 @@ async function handleGameData(request, env, parts) {
           ];
         }),
     );
+    // A signature arc explicitly bound to an owner also identifies the type
+    // when the new character has no cultivation recommendation row yet.
+    const exclusiveTypes = new Map();
+    for (const weapon of weapons.values()) {
+      const type = Number(weapon.details.type_id);
+      const owners = weapon.details.exclusive_character_ids;
+      if (!arcTypes[type] || !Array.isArray(owners)) continue;
+      for (const id of owners) {
+        const owner = String(id);
+        const set = exclusiveTypes.get(owner) || new Set();
+        set.add(type);
+        exclusiveTypes.set(owner, set);
+      }
+    }
+    const characterType = (owner) => {
+      const exclusive = exclusiveTypes.get(owner);
+      return characterArcTypes.has(owner)
+        ? characterArcTypes.get(owner)
+        : exclusive?.size === 1
+          ? [...exclusive][0]
+          : undefined;
+    };
     const typeFor = (row) =>
       row.namespace === 'NTE_ReferenceWeapon'
         ? Number(row.details.type_id)
-        : characterArcTypes.get(row.ownerId || row.gameId);
+        : characterType(row.ownerId || row.gameId);
     const costs = records
       .filter(
         (row) =>

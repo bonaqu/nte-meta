@@ -17,6 +17,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from exporter import export
 from updates import check_update, snapshot_folder, profile_migration, reuse_snapshot_files
+from patch_report import write_report
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 SETTINGS = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'NTEMetaWorkbench/settings.json'
@@ -146,7 +147,9 @@ class Workbench(tk.Tk):
 
     def save_settings(self):
         SETTINGS.parent.mkdir(parents=True,exist_ok=True)
-        SETTINGS.write_text(json.dumps({k:v.get() for k,v in self.values.items()},ensure_ascii=False,indent=2),encoding='utf-8')
+        temporary=SETTINGS.with_suffix('.tmp')
+        temporary.write_text(json.dumps({k:v.get() for k,v in self.values.items()},ensure_ascii=False,indent=2),encoding='utf-8')
+        temporary.replace(SETTINGS)
 
     def run(self,operation,done_text='Готово'):
         if self.busy:return
@@ -167,9 +170,13 @@ class Workbench(tk.Tk):
         environment.update(TEMP=str(temporary),TMP=str(temporary))
         self.process=subprocess.Popen(args,cwd=REPOSITORY,env=environment,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
             text=True,encoding='utf-8',errors='replace',creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
-        for line in self.process.stdout:self.messages.put(('log',line.rstrip()))
+        output=[]
+        for line in self.process.stdout:
+            output.append(line.rstrip())
+            self.messages.put(('log',line.rstrip()))
         code=self.process.wait();self.process=None
         if code:raise RuntimeError(f'Команда завершилась с кодом {code}. Проверьте журнал выбранной выгрузки.')
+        return output
 
     def extract(self):
         values={k:v.get() for k,v in self.values.items()}
@@ -182,10 +189,15 @@ class Workbench(tk.Tk):
             self.values['source'].set(str(previous));self.save_settings()
             self.status.set('Используется готовая выгрузка: '+str(previous));return
         def operation():
-            self.command(['pwsh','-NoProfile','-File',str(REPOSITORY/'scripts/game-data/extract-local.ps1'),
+            lines=self.command(['pwsh','-NoProfile','-File',str(REPOSITORY/'scripts/game-data/extract-local.ps1'),
                 '-GameDirectory',values['game'],'-Tool',values['tool'],'-Mapping',values['mapping'],
                 '-ArchiveKeyFile',values['key'],'-Output',values['output']])
-            latest=snapshot_folder(Path(values['output']))
+            run_paths=[Path(line.removeprefix('Local extraction: ')).resolve()
+                for line in lines if line.startswith('Local extraction: ')]
+            if (len(run_paths)!=1 or run_paths[0].parent!=Path(values['output']).resolve()
+                or snapshot_folder(run_paths[0])!=run_paths[0]):
+                raise ValueError('Не удалось подтвердить папку только что завершённой выгрузки.')
+            latest=run_paths[0]
             if latest:
                 if previous and latest != previous:
                     reused=reuse_snapshot_files(latest,previous)
@@ -202,14 +214,25 @@ class Workbench(tk.Tk):
         try:source=str(snapshot_folder(Path(self.values['source'].get())))
         except ValueError as error:messagebox.showerror('Рабочая выгрузка',str(error));return
         def operation():
-            self.command([sys.executable,str(REPOSITORY/'scripts/game-data/normalize.py'),'--source',source,'--repository',str(REPOSITORY),'--reuse-images'])
+            corpus=REPOSITORY/'scripts/content/game-data/chunks.jsonl.gz'
+            baseline=Path(source)/'previous-corpus.jsonl.gz'
+            manifest=REPOSITORY/'scripts/content/game-data/manifest.json'
+            prepared=Path(source)/'prepared-snapshot.json'
+            previous_hash=json.loads(manifest.read_text('utf-8'))['chunksSha256']
+            already_prepared=prepared.is_file() and json.loads(prepared.read_text('utf-8')).get('chunksSha256')==previous_hash
+            if not baseline.exists() and not already_prepared:
+                shutil.copy2(corpus, baseline)
+            self.command([sys.executable,str(REPOSITORY/'scripts/game-data/normalize.py'),'--source',source,'--repository',str(REPOSITORY),'--reuse-images',
+                *(['--previous-corpus',str(baseline)] if baseline.is_file() else [])])
             database=Path(source)/'verified-reference.sqlite'
             if database.exists():database=Path(source)/('verified-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite')
             self.command([sys.executable,str(REPOSITORY/'scripts/game-data/validate.py'),'--database',str(database)])
             self.command(['node',str(REPOSITORY/'scripts/game-data/build-asset-aliases.mjs'),'--output',str(REPOSITORY/'src/data/native-media-aliases.json')])
             self.command(['node',str(REPOSITORY/'scripts/game-data/build-ui-icons.mjs')])
-            manifest=REPOSITORY/'scripts/content/game-data/manifest.json'
-            (Path(source)/'prepared-snapshot.json').write_text(json.dumps({'chunksSha256':json.loads(manifest.read_text('utf-8'))['chunksSha256'],'database':str(database)},ensure_ascii=False,indent=2),encoding='utf-8')
+            if baseline.exists():
+                report=write_report(baseline,corpus,Path(source))
+                self.messages.put(('log',f"Сравнение снимков: добавлено {sum(report['added'].values())}, изменено {sum(report['changed'].values())}. Отчёт «Изменения патча.html» в рабочей папке."))
+            prepared.write_text(json.dumps({'chunksSha256':json.loads(manifest.read_text('utf-8'))['chunksSha256'],'database':str(database)},ensure_ascii=False,indent=2),encoding='utf-8')
         self.run(operation,'Снимок подготовлен. Нажмите 4, чтобы получить читаемый каталог, Excel, PNG и MP3.')
 
     def supplement(self):

@@ -11,6 +11,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--source', type=Path, required=True)
 parser.add_argument('--repository', type=Path, required=True)
 parser.add_argument('--reuse-images', action='store_true')
+parser.add_argument('--previous-corpus', type=Path)
 parser.add_argument('--vgmstream', default=r'D:\CODEX\Programs\vgmstream\vgmstream-cli.exe')
 parser.add_argument('--ffmpeg', default='ffmpeg')
 args = parser.parse_args()
@@ -102,7 +103,8 @@ def text(value):
     if not isinstance(value,dict): return {}
     namespace=value.get('Namespace') or value.get('TableId','').split('.')[-1]
     key=value.get('Key','')
-    return translations.get(namespace+'::'+key, {'zh':value.get('SourceString','')})
+    fallback=value.get('SourceString')
+    return translations.get(namespace+'::'+key, {'zh':fallback} if isinstance(fallback,str) and fallback else {})
 
 def category(key):
     key=key.lower()
@@ -289,6 +291,20 @@ if supplement:
     for row in supplement.get('communityProfiles',[]):
         records.append(external_record('character','NTE_ReferenceCommunityProfile',row['ownerId'],{'levels':row['levels'],'gifts':row['gifts'],'phases':row.get('phases',[])},row['url'],row['ownerId'],provider='Neverness.app'))
 
+# Patch 1.5 returned an empty cultivation table. Preserve the last readable
+# recommendations as explicitly historical, without restoring other old rows.
+historical_recommendations=0
+if args.previous_corpus and not any(r['namespace']=='DT_CultivationGuideData' for r in records):
+    active={r['gameId'] for r in records if r['namespace']=='DT_DefaultAppearanceData'}
+    with gzip.open(args.previous_corpus,'rt',encoding='utf-8') as stream:
+        for line in stream:
+            for row in json.loads(line)['records']:
+                if row['namespace']!='DT_CultivationGuideData' or row['ownerId'] not in active:continue
+                row['id']=row['originalId']
+                row['details']['reference']={'provider':'Предыдущий снимок клиента','historical':True}
+                records.append(row)
+                historical_recommendations+=1
+
 # Keep the StringTable key, its owning character and the exact referring field.
 # Shared headings remain shared; unique biography/wardrobe lines gain an owner.
 references={}
@@ -327,17 +343,22 @@ dataset_hash=hashlib.sha256()
 for record in records: dataset_hash.update((compact(record)+'\n').encode())
 chunks={}
 for record in records: chunks.setdefault(record['id'].split('|',1)[0],[]).append(record)
-with (content/'chunks.jsonl.gz').open('wb') as raw, gzip.GzipFile(filename='',mode='wb',fileobj=raw,mtime=0) as binary, io.TextIOWrapper(binary,encoding='utf-8',newline='\n') as stream:
+if image_errors or audio_errors:
+    (args.source/'normalization-errors.json').write_text(json.dumps({'imageErrors':image_errors,'audioErrors':audio_errors},ensure_ascii=False,indent=2),encoding='utf-8')
+    raise SystemExit('Некоторые медиа не обработаны. См. normalization-errors.json в рабочей выгрузке. Прежний снимок сохранён.')
+candidate=content/'chunks.jsonl.gz.part'
+with candidate.open('wb') as raw, gzip.GzipFile(filename='',mode='wb',fileobj=raw,mtime=0) as binary, io.TextIOWrapper(binary,encoding='utf-8',newline='\n') as stream:
     for chunk_id,rows in sorted(chunks.items()):
         payload=compact(rows)
         if len(payload.encode())>1700000: raise ValueError('Chunk exceeds D1 value limit: '+chunk_id)
         stream.write(compact({'id':chunk_id,'kind':rows[0]['kind'],'records':rows,'search':' '.join(r['search'] for r in rows),'hash':digest(payload),'count':len(rows)})+'\n')
 report={'formatVersion':2,'locales':['ru','en','ja','zh'],'localizationKeys':len(translations),'records':len(records),'kinds':dict(Counter(r['kind'] for r in records)),'textures':len(images),'extractionErrors':manifest['failures'],'imageErrors':image_errors,'audioErrors':audio_errors,'emptyTables':sorted(set(empty)),'source':'Local installed game archives including PatchPaks; original strings preserved','datasetSha256':dataset_hash.hexdigest()}
 report['chunks']=len(chunks)
+if historical_recommendations:report['historicalCultivationRows']=historical_recommendations
 report['repairedCsvRows']=dict(csv_repairs)
 if supplement:report['supplement']={'providers':['Nanoka','Kaiden','Neverness.app'],'version':supplement['version'],'checkedAt':supplement['checkedAt'],'characters':len(supplement['characters']),'items':len(supplement['items']),'weapons':len(supplement['weapons']),'affinity':len(supplement.get('affinity',[])),'gifts':len(supplement.get('giftCatalog',{})),'failures':supplement['failures']}
-report['chunksSha256']=hashlib.sha256((content/'chunks.jsonl.gz').read_bytes()).hexdigest()
+report['chunksSha256']=hashlib.sha256(candidate.read_bytes()).hexdigest()
+candidate.replace(content/'chunks.jsonl.gz')
 (content/'manifest.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 print(compact({k:report[k] for k in ['localizationKeys','records','kinds','textures']}))
-if image_errors or audio_errors:raise SystemExit('Некоторые медиа не обработаны. Подробности сохранены в manifest.json; исправьте ошибки перед публикацией.')
 cache_path.write_text(json.dumps(next_media_cache,separators=(',',':')),encoding='utf-8')

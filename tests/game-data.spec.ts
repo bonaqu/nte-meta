@@ -108,6 +108,7 @@ async function contract(records: SourceRecord[]) {
         ownerId: string;
         suggestions: Array<{ field: string; value: string }>;
         recommendations: {
+          historical?: boolean;
           arcs: GuideVisualItem[];
           stats: GuideVisualItem[];
           stages: Array<{
@@ -1087,8 +1088,20 @@ test('рекомендации клиента: 25 вариантов, русск
       (row) =>
         row.namespace === 'NTE_ReferenceCharacter' && active.has(row.ownerId),
     );
-    expect(identities).toHaveLength(25);
+    expect(identities).toHaveLength(27);
+    const withoutRecommendations = identities.filter(
+      (identity) =>
+        !records.some(
+          (row) =>
+            row.namespace === 'DT_CultivationGuideData' &&
+            row.gameId === identity.ownerId,
+        ),
+    );
+    expect(
+      withoutRecommendations.map((identity) => identity.ownerId).sort(),
+    ).toEqual(['1074', '1090']);
     for (const identity of identities) {
+      if (withoutRecommendations.includes(identity)) continue;
       const sources = await f.m.buildLocalGameGuideSources(f.env, {
         name: identity.values.ru,
         originalName: identity.values.en,
@@ -1097,6 +1110,7 @@ test('рекомендации клиента: 25 вариантов, русск
       expect(sources, identity.ownerId).toHaveLength(1);
       const source = sources[0];
       expect(source.ownerId).toBe(identity.ownerId);
+      expect(source.recommendations.historical, identity.ownerId).toBe(true);
       expect(source.recommendations.unresolved, identity.ownerId).toEqual([]);
       expect(source.recommendations.arcs).toHaveLength(2);
       expect(source.recommendations.stats.length).toBeGreaterThan(0);
@@ -1275,9 +1289,19 @@ test('игровой калькулятор: все 25 вариантов име
       .data as ProgressionData;
     const characters = data.costs.filter((row) => row.kind === 'character');
     const arcs = data.costs.filter((row) => row.kind === 'arc');
-    expect(characters).toHaveLength(25);
-    expect(arcs).toHaveLength(51);
+    expect(characters).toHaveLength(27);
+    expect(arcs).toHaveLength(53);
+    expect(characters.find((row) => row.id === '1090')).toMatchObject({
+      name: 'Элимс',
+      arcTypeId: 1,
+      arcType: 'Твёрдый',
+    });
+    expect(arcs.find((row) => row.id === 'fork_elyms')).toMatchObject({
+      name: 'Эхо в режиме ожидания',
+      arcTypeId: 1,
+    });
     for (const character of characters) {
+      if (character.id === '1074') continue; // Not announced as playable in 1.5.
       expect(character.arcTypeId, character.name).toBeGreaterThan(0);
       expect(
         arcs.some((arc) => arc.arcTypeId === character.arcTypeId),
@@ -1339,8 +1363,9 @@ test('все 25 вариантов передают полные стоимос�
     const data = (await (await f.api('progression')).json())
       .data as ProgressionData;
     const characters = data.costs.filter((row) => row.kind === 'character');
-    expect(characters).toHaveLength(25);
+    expect(characters).toHaveLength(27);
     for (const character of characters) {
+      if (character.id === '1074') continue; // Incomplete, unreleased client entry.
       expect(
         character.skills?.filter((skill) => skill.kind === 'combat'),
         character.name,

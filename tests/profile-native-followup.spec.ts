@@ -16,6 +16,82 @@ import { validProposal } from '../src/lib/local-character-proposal';
 import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 
+test('1.5: реплики об Элимс дополняют фонотеки без перезаписи и дублей', async () => {
+  const sql = await readFile(
+    'migrations/0057_patch_15_elyms_voice_reactions.sql',
+    'utf8',
+  );
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec(
+      'CREATE TABLE characters(id TEXT, updated_at TEXT); CREATE TABLE character_profiles(character_id TEXT, updated_at TEXT, voice_lines_json TEXT);',
+    );
+    const manual = {
+      id: 'manual',
+      audioUrl: 'https://example.com/voice.mp3',
+      title: 'Моя реплика',
+    };
+    for (const [id, date] of [
+      ['chaos', '2026-11-05 21:41:33'],
+      ['linko', '2026-10-21 03:56:00'],
+    ]) {
+      db.prepare('INSERT INTO characters VALUES (?, ?)').run(id, date);
+      db.prepare('INSERT INTO character_profiles VALUES (?, ?, ?)').run(
+        id,
+        date,
+        JSON.stringify([manual]),
+      );
+    }
+    const voices = (id: string) =>
+      JSON.parse(
+        String(
+          db
+            .prepare(
+              'SELECT voice_lines_json FROM character_profiles WHERE character_id=?',
+            )
+            .get(id)?.voice_lines_json,
+        ),
+      ) as Array<typeof manual & { language: string }>;
+    db.exec(sql);
+    const chaos = voices('chaos');
+    const linko = voices('linko');
+    for (const [records, count] of [
+      [chaos, 2],
+      [linko, 3],
+    ] as const) {
+      expect(records[0]).toEqual(manual);
+      expect(records.slice(1)).toHaveLength(count * 4);
+      for (const language of [
+        'Английский',
+        'Японский',
+        'Китайский',
+        'Корейский',
+      ]) {
+        expect(records.filter((row) => row.language === language)).toHaveLength(
+          count,
+        );
+      }
+      expect(records.slice(1).every((row) => /элимс/i.test(row.title))).toBe(
+        true,
+      );
+    }
+    const custom = { ...manual, audioUrl: chaos[1].audioUrl };
+    db.prepare(
+      "UPDATE character_profiles SET voice_lines_json=? WHERE character_id='chaos'",
+    ).run(JSON.stringify([custom]));
+    db.prepare(
+      "UPDATE character_profiles SET updated_at='2099-01-01',voice_lines_json=? WHERE character_id='linko'",
+    ).run(JSON.stringify([manual]));
+    db.exec(sql);
+    expect(voices('chaos')).toEqual([custom, ...chaos.slice(2)]);
+    expect(voices('linko')).toEqual([manual]);
+    db.exec(sql);
+    expect(voices('chaos')).toEqual([custom, ...chaos.slice(2)]);
+  } finally {
+    db.close();
+  }
+});
+
 test('альтернативные записи добавляются один раз, сохраняя ручные строки и поздние правки', async () => {
   const sql = await readFile(
     'migrations/0055_alternate_native_voice_takes.sql',

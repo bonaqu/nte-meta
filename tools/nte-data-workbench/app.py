@@ -274,7 +274,16 @@ class Workbench(tk.Tk):
         self.run(operation,'Файл персонажей подготовлен. Шаг 7 отправляет данные в PR. Затем выберите JSON в Админка → Данные игры.')
 
     def publish_data(self):
-        self.run(lambda:self.command(['node',str(REPOSITORY/'scripts/game-data/publish-update.mjs')]),'PR подготовлен. Откройте ссылку из журнала, дождитесь проверок и объедините PR на GitHub.')
+        selected = Path(self.values['source'].get())
+        try:
+            source = snapshot_folder(selected)
+        except (ValueError, OSError):
+            # Resume an existing publication even when the local archive was moved.
+            source = selected
+        self.run(
+            lambda: self.command(['node', str(REPOSITORY/'scripts/game-data/publish-update.mjs'), '--source', str(source)]),
+            'PR подготовлен. Откройте ссылку из журнала, дождитесь проверок и объедините PR на GitHub.',
+        )
 
     def update_project(self):
         self.run(lambda:self.command(['node',str(REPOSITORY/'scripts/game-data/publish-update.mjs'),'--update-project']),'Проект обновлён. Заново откройте программу, чтобы загрузить её обновления.')

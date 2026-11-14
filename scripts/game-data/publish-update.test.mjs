@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   mkdtempSync,
   mkdirSync,
@@ -64,6 +65,19 @@ function fixture(t) {
     pulls.push(pr);
     return JSON.stringify(pr);
   };
+  const source = join(root, 'prepared-extraction');
+  mkdirSync(source);
+  const corpus = join(work, 'scripts/content/game-data/chunks.jsonl.gz');
+  const manifest = join(work, 'scripts/content/game-data/manifest.json');
+  const prepared = join(source, 'prepared-snapshot.json');
+  const database = join(source, 'verified.sqlite');
+  writeFileSync(database, '');
+  function prepare(snapshot) {
+    const chunksSha256 = createHash('sha256').update(snapshot).digest('hex');
+    writeFileSync(corpus, snapshot);
+    writeFileSync(manifest, JSON.stringify({ chunksSha256 }));
+    writeFileSync(prepared, JSON.stringify({ chunksSha256, database }));
+  }
   return {
     root,
     work,
@@ -71,22 +85,29 @@ function fixture(t) {
     run,
     calls,
     pulls,
+    corpus,
+    prepare,
+    publish: (selected = source) =>
+      publishUpdate(run, { source: selected, cwd: work }),
     setFailPull: (value) => {
       failPull = value;
     },
   };
 }
 
-test('publishing can resume after PR failure and then publish a second snapshot', (t) => {
+test('publishing can resume after PR failure and then publish a second snapshot', async (t) => {
   const f = fixture(t);
-  writeFileSync(join(f.work, 'scripts/content/game-data/manifest.json'), 'one');
+  f.prepare('one');
   f.setFailPull(true);
-  assert.throws(() => publishUpdate(f.run), /network outage/);
+  await assert.rejects(f.publish(), /network outage/);
   const pending = f.git(['branch', '--show-current']);
   assert.match(pending, /^codex\/game-data-/);
   const savedHead = f.git(['rev-parse', 'HEAD']);
   f.setFailPull(false);
-  assert.match(publishUpdate(f.run), /https:\/\/example.invalid\/pull\/1/);
+  assert.match(
+    await f.publish(join(f.root, 'unavailable-source')),
+    /https:\/\/example.invalid\/pull\/1/,
+  );
   assert.equal(f.git(['branch', '--show-current']), 'bonaqu_projects');
   assert.equal(f.git(['rev-parse', pending]), savedHead);
   assert.equal(f.calls.filter((x) => x.args[1]?.endsWith('/issues')).length, 1);
@@ -95,11 +116,29 @@ test('publishing can resume after PR failure and then publish a second snapshot'
   f.git(['merge', '--ff-only', pending]);
   f.git(['push', 'origin', 'bonaqu_projects']);
   assert.match(updateProject(f.run), /обновлён/);
-  writeFileSync(join(f.work, 'scripts/content/game-data/manifest.json'), 'two');
+  f.prepare('two');
   f.pulls.length = 0;
-  publishUpdate(f.run);
+  await f.publish();
   assert.equal(f.git(['branch', '--show-current']), 'bonaqu_projects');
   assert.equal(f.calls.filter((x) => x.args[1]?.endsWith('/issues')).length, 2);
+});
+
+test('new PRs reject unverified or changed snapshots before creating an issue', async (t) => {
+  const f = fixture(t);
+  f.prepare('verified bytes');
+  await assert.rejects(
+    f.publish(join(f.root, 'unverified')),
+    /не прошёл проверку/,
+  );
+  writeFileSync(f.corpus, 'changed after verification');
+  await assert.rejects(f.publish(), /не прошёл проверку/);
+  assert.equal(f.git(['branch', '--show-current']), 'bonaqu_projects');
+  assert.equal(f.calls.filter((x) => x.args[1]?.endsWith('/issues')).length, 0);
+  assert.equal(readFileSync(f.corpus, 'utf8'), 'changed after verification');
+  f.prepare('verified bytes');
+  writeFileSync(f.corpus + '.part', 'incomplete next snapshot');
+  await assert.rejects(f.publish(), /другие изменения/);
+  assert.equal(f.calls.filter((x) => x.args[1]?.endsWith('/issues')).length, 0);
 });
 
 test('project update preserves prepared files and rejects unrelated edits', (t) => {

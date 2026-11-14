@@ -2,6 +2,133 @@ import { expect, test } from '@playwright/test';
 import { readFile, readdir } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 
+test('1.5: профиль, гайд и новость Элимс открываются с опубликованным медиа', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/#/characters/elyms');
+  const hero = page.locator('.character-lore-hero');
+  await expect(hero.getByRole('heading', { name: 'Элимс' })).toBeVisible();
+  await expect
+    .poll(() =>
+      hero
+        .getByRole('img', { name: 'Элимс' })
+        .evaluate((img) => (img as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  for (const width of [360, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width);
+  }
+  await page.getByRole('button', { name: 'Гардероб', exact: true }).click();
+  await expect(page.locator('#character-wardrobe')).toBeVisible();
+  await page.goto('/#/guides/elyms-build-guide');
+  const arcs = page.locator('.guide-section-card').filter({
+    has: page.getByRole('heading', { name: 'Лучшие дуги', exact: true }),
+  });
+  await page.getByRole('button', { name: 'Лучшие дуги', exact: true }).click();
+  await expect(
+    arcs.getByText('Эхо в режиме ожидания', { exact: true }),
+  ).toBeVisible();
+  await page.goto('/#/news/patch-1-5-elyms');
+  await expect(
+    page.getByRole('heading', { level: 1, name: /Элимс/ }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('1.5: опубликованы только выпущенная Элимс, её гайд и заметка о патче', async () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    for (const file of (await readdir('migrations'))
+      .filter((name) => name.endsWith('.sql') && name < '0056')
+      .sort())
+      db.exec(await readFile(`migrations/${file}`, 'utf8'));
+    const sql = await readFile('migrations/0056_patch_15_elyms.sql', 'utf8');
+    db.exec(sql);
+    expect(
+      db
+        .prepare(
+          "SELECT name, rarity, attribute, patch_version FROM characters WHERE slug='elyms' AND status='published'",
+        )
+        .get(),
+    ).toEqual({
+      name: 'Элимс',
+      rarity: 'S',
+      attribute: 'Космос',
+      patch_version: '1.5',
+    });
+    expect(
+      db.prepare("SELECT id FROM characters WHERE slug='exe'").get(),
+    ).toBeUndefined();
+    const profile = db
+      .prepare("SELECT * FROM character_profiles WHERE character_id='elyms'")
+      .get()!;
+    for (const [field, count] of Object.entries({
+      base_stats_json: 23,
+      abilities_json: 9,
+      skins_json: 4,
+      voice_lines_json: 392,
+      awakenings_json: 8,
+      friendship_json: 10,
+    })) {
+      const rows = JSON.parse(String(profile[field]));
+      expect(rows).toHaveLength(count);
+      expect(
+        new Set(
+          rows.map(
+            (row: { id?: string; level?: number; kind?: string }) =>
+              row.id || `${row.kind || ''}:${row.level}`,
+          ),
+        ).size,
+      ).toBe(count);
+    }
+    expect(
+      db
+        .prepare(
+          "SELECT count(*) AS n FROM guide_sections WHERE guide_id='guide-elyms-0056'",
+        )
+        .get()?.n,
+    ).toBe(7);
+    expect(
+      db
+        .prepare(
+          "SELECT count(*) AS n FROM team_members WHERE team_id IN ('elyms-hathor','elyms-hotori')",
+        )
+        .get()?.n,
+    ).toBe(8);
+    expect(
+      db
+        .prepare("SELECT character_id FROM tierlist_items WHERE character_id='elyms'")
+        .get(),
+    ).toBeUndefined();
+    expect(
+      db
+        .prepare(
+          "SELECT slug FROM news WHERE id='patch-1-5-20261111' AND status='published'",
+        )
+        .get()?.slug,
+    ).toBe('patch-1-5-elyms');
+    db.exec(
+      "UPDATE character_profiles SET biography_markdown='Ручная правка' WHERE character_id='elyms';",
+    );
+    db.exec(sql);
+    expect(
+      db
+        .prepare(
+          "SELECT biography_markdown FROM character_profiles WHERE character_id='elyms'",
+        )
+        .get()?.biography_markdown,
+    ).toBe('Ручная правка');
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
+  } finally {
+    db.close();
+  }
+});
+
 async function database() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');

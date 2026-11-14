@@ -10,8 +10,8 @@ import threading
 
 from PySide6.QtCore import QObject, QTimer, QUrl, Signal, QLockFile
 from PySide6.QtGui import QDesktopServices, QIcon
-from PySide6.QtWidgets import (QApplication, QFileDialog, QFrame, QHBoxLayout, QLabel,
-    QMainWindow, QMessageBox, QProgressBar, QPushButton, QStackedWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
+    QMainWindow, QMessageBox, QProgressBar, QPushButton, QScrollArea, QStackedWidget, QVBoxLayout, QWidget)
 from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
@@ -30,8 +30,9 @@ ACTIONS = {'extract': 'Извлечь обновление', 'normalize': 'По�
 def config():
     result = dict(DEFAULTS)
     if SETTINGS.is_file():
-        saved = json.loads(SETTINGS.read_text('utf-8'))
-        result.update({k: v for k, v in saved.items() if k in result and isinstance(v, str)})
+        saved = json.loads(SETTINGS.read_text('utf-8-sig'))
+        if isinstance(saved, dict):
+            result.update({k: v for k, v in saved.items() if k in result and isinstance(v, str)})
     return result
 
 
@@ -60,6 +61,7 @@ QFrame#sidebar {background:#111215;border-right:1px solid #44454c;}
 QLabel#brand {font-size:25px;font-weight:800;color:#ff4897;}
 QLabel#heading {font-size:25px;font-weight:750;}
 QLabel#muted {color:#b5b7c2;}
+QLabel#step {font-weight:700;color:#64d9e7;padding-top:6px;}
 QLabel#status {color:#64d9e7;padding:12px;background:#101216;border-radius:9px;}
 QPushButton {min-height:44px;padding:0 14px;border:1px solid #51525a;border-radius:12px;background:#292a30;text-align:left;}
 QPushButton:hover {border-color:#ff4897;background:#34313a;}
@@ -127,20 +129,38 @@ class Desktop(QMainWindow):
         self.show_local(); QTimer.singleShot(100, self.check_game)
 
     def make_local(self):
-        page = QWidget(); box = QVBoxLayout(page); box.setContentsMargins(0, 12, 0, 0); box.setSpacing(16)
+        page = QWidget(); box = QVBoxLayout(page); box.setContentsMargins(0, 12, 10, 0); box.setSpacing(10)
         self.game_status = QLabel('Проверяем установленную игру…'); self.game_status.setObjectName('status'); self.game_status.setWordWrap(True); box.addWidget(self.game_status)
+        results = QHBoxLayout()
+        self.patch_report = QPushButton('Что изменилось в патче')
+        self.patch_report.setEnabled(False); self.patch_report.clicked.connect(self.open_patch_report)
+        results.addWidget(self.patch_report)
+        export = QPushButton('Открыть каталог игрока'); export.setObjectName('primary'); export.clicked.connect(self.open_export)
+        results.addWidget(export)
+        box.addLayout(results)
         self.paths = QLabel(); self.paths.setWordWrap(True); self.paths.setObjectName('muted'); box.addWidget(self.paths)
-        guide = QLabel('После обновления: извлеките патч → подготовьте снимок → просмотрите экспорт → подготовьте персонажей и опубликуйте данные.\nСтарые версии сохраняются. Неизменившиеся файлы переиспользуются; новые версии не затирают прежние.'); guide.setWordWrap(True); box.addWidget(guide)
+        guide = QLabel('Прежние выгрузки сохраняются. Повторно используются только файлы, которые совпадают с предыдущей версией.'); guide.setWordWrap(True); box.addWidget(guide)
         self.tool_buttons = []
-        for action, title in ACTIONS.items():
+        actions = QGridLayout(); actions.setHorizontalSpacing(10); actions.setVerticalSpacing(8)
+        for column in range(2): actions.setColumnStretch(column, 1)
+        for column, title in enumerate(('ВЫГРУЗКА И КАТАЛОГ', 'ПУБЛИКАЦИЯ НА САЙТЕ')):
+            label = QLabel(title); label.setObjectName('step'); actions.addWidget(label, 0, column)
+        for row, column, action in [(1, 0, 'extract'), (2, 0, 'normalize'), (3, 0, 'export_data'),
+                                    (1, 1, 'prepare_characters'), (2, 1, 'publish_data'), (3, 1, 'update_project')]:
+            title = ACTIONS[action]
             button = QPushButton(title); button.setToolTip(HELP['update_project'] if action == 'update_project' else 'Открыть инструмент выгрузки с выбранным действием. Его окно показывает параметры, ход работы и ошибки.')
-            button.clicked.connect(lambda _, a=action: self.launch_tool(a)); box.addWidget(button); self.tool_buttons.append(button)
+            button.clicked.connect(lambda _, a=action: self.launch_tool(a)); actions.addWidget(button, row, column); self.tool_buttons.append(button)
+        box.addLayout(actions)
         controls = QHBoxLayout()
         settings = QPushButton('Пути и все инструменты'); settings.clicked.connect(lambda: self.launch_tool()); controls.addWidget(settings); self.tool_buttons.append(settings)
         check = QPushButton('Проверить обновление игры'); check.clicked.connect(self.check_game); controls.addWidget(check); box.addLayout(controls)
-        self.tool_status = QLabel(''); self.tool_status.setWordWrap(True); self.tool_status.setObjectName('muted'); box.addWidget(self.tool_status)
-        export = QPushButton('Открыть последний читаемый каталог'); export.setObjectName('primary'); export.clicked.connect(self.open_export); box.addWidget(export)
-        box.addStretch(); return page
+        self.tool_status = QLabel(''); self.tool_status.setWordWrap(True); self.tool_status.setObjectName('muted'); self.tool_status.hide(); box.addWidget(self.tool_status)
+        box.addStretch()
+        scroll = QScrollArea()
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(page)
+        return scroll
 
     def select(self, button):
         for item in self.nav: item.setChecked(item is button)
@@ -177,6 +197,15 @@ class Desktop(QMainWindow):
             try:
                 values = config(); result = check_update(Path(values['game']), Path(values['source']))
                 result['paths'] = values
+                result['prepared'] = False
+                prepared = Path(result['snapshot'])/'prepared-snapshot.json'
+                if prepared.is_file():
+                    try:
+                        marker = json.loads(prepared.read_text('utf-8'))
+                        manifest = json.loads((REPOSITORY/'scripts/content/game-data/manifest.json').read_text('utf-8'))
+                        result['prepared'] = (marker['chunksSha256'] == manifest['chunksSha256']
+                                              and Path(marker['database']).is_file())
+                    except (OSError, ValueError, KeyError, TypeError): pass
                 latest = sorted(Path(values['output']).glob('*/extraction-status.json'), reverse=True)[:1]
                 if latest:
                     try:
@@ -189,13 +218,30 @@ class Desktop(QMainWindow):
 
     def checked(self, result):
         self.checking = False
+        self.patch_report.setEnabled(False)
         if 'error' in result:
             self.game_status.setText(result['error'] + '\nОткройте «Пути и все инструменты» для выбора игры и выгрузки.'); return
         self.paths.setText('Игра: ' + result['paths']['game'] + '\nВыгрузка: ' + result['snapshot'] + '\nДанные приложения: ' + str(DATA))
+        self.patch_report.setEnabled((Path(result['snapshot'])/'Изменения патча.html').is_file())
         changes = len(result['added']) + len(result['changed']) + len(result['removed'])
-        self.game_status.setText(f'Изменилось архивов: {changes}. Доступно обновление игровых данных.' if result['needsExtraction'] else 'Архивы не изменились. Рабочая выгрузка актуальна.')
-        if result.get('compatibilityError'):
+        if result['needsExtraction']:
+            self.game_status.setText(f'Изменилось архивов: {changes}. Следующий шаг: «Извлечь обновление».')
+        elif result.get('prepared'):
+            self.game_status.setText('Архивы не изменились. Снимок проверен и готов к экспорту или подготовке публикации.')
+        else:
+            self.game_status.setText('Архивы не изменились. Чтобы использовать эту выгрузку, нажмите «Подготовить снимок».')
+        if result['needsExtraction'] and result.get('compatibilityError'):
             self.game_status.setText('Файлы игры изменились, но повторные попытки чтения архивов не удались. Дождитесь окончания загрузок в лаунчере и повторите выгрузку. Журнал доступен через «Пути и все инструменты». Прежняя рабочая выгрузка сохранена.')
+
+    def open_patch_report(self):
+        from updates import snapshot_folder
+        try:
+            report = snapshot_folder(Path(config()['source']))/'Изменения патча.html'
+            if not report.is_file(): raise ValueError('Подготовьте снимок после извлечения патча.')
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(report))):
+                raise ValueError('Проводник не смог открыть отчёт: ' + str(report))
+        except (ValueError, OSError) as error:
+            QMessageBox.information(self, 'Изменения патча', str(error))
 
     def launch_tool(self, action=None):
         if self.tool and self.tool.poll() is None: return
@@ -206,6 +252,7 @@ class Desktop(QMainWindow):
         try:
             self.tool = subprocess.Popen(command, cwd=REPOSITORY, env=environment, creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
             self.tool_status.setText('Инструмент выгрузки открыт в отдельном окне. Он продолжит работу, если закрыть редакцию.')
+            self.tool_status.show()
             for button in self.tool_buttons: button.setEnabled(False)
         except OSError as error: QMessageBox.warning(self, 'Не удалось открыть инструменты', str(error))
 

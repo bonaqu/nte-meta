@@ -6,25 +6,369 @@
     "ja",
     "zh"
   ],
-  "localizationKeys": 113100,
-  "records": 207389,
+  "localizationKeys": 122103,
+  "records": 217801,
   "kinds": {
-    "localization": 142752,
-    "skill": 3622,
-    "awakening": 210,
-    "wardrobe": 754,
-    "affinity": 14705,
-    "item": 7417,
-    "arc": 5497,
-    "stat": 8457,
-    "cartridge": 2340,
-    "biography": 3522,
-    "character": 1269,
-    "image": 7968,
-    "audio": 8876
+    "localization": 149793,
+    "character": 1321,
+    "arc": 5810,
+    "skill": 3946,
+    "awakening": 214,
+    "wardrobe": 817,
+    "affinity": 15390,
+    "item": 7764,
+    "stat": 8762,
+    "cartridge": 2367,
+    "biography": 3782,
+    "image": 8265,
+    "audio": 9570
   },
-  "textures": 7968,
+  "textures": 8265,
   "extractionErrors": [
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_about_001.bnk",
+      "error": "Profile voice media is missing: 5901129"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_about_002.bnk",
+      "error": "Profile voice media is missing: 461378862"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_about_003.bnk",
+      "error": "Profile voice media is missing: 801903611"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_about_004.bnk",
+      "error": "Profile voice media is missing: 451772232"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_about_005.bnk",
+      "error": "Profile voice media is missing: 832079252"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_about_006.bnk",
+      "error": "Profile voice media is missing: 646628950"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_about_007.bnk",
+      "error": "Profile voice media is missing: 600963007"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_anomaly_003.bnk",
+      "error": "Profile voice media is missing: 245244048"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_anomaly_004.bnk",
+      "error": "Profile voice media is missing: 1013976515"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_aoe_001.bnk",
+      "error": "Profile voice media is missing: 163123248"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_aoe_002.bnk",
+      "error": "Profile voice media is missing: 744616113"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_aoe_003.bnk",
+      "error": "Profile voice media is missing: 593243992"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_chat_001.bnk",
+      "error": "Profile voice media is missing: 140444563"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_chat_002.bnk",
+      "error": "Profile voice media is missing: 49011099"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_chat_003.bnk",
+      "error": "Profile voice media is missing: 31270713"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_containment_001.bnk",
+      "error": "Profile voice media is missing: 826913013"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_containment_002.bnk",
+      "error": "Profile voice media is missing: 137416567"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_dead_001.bnk",
+      "error": "Profile voice media is missing: 60148990"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_dead_002.bnk",
+      "error": "Profile voice media is missing: 112717533"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_dead_003.bnk",
+      "error": "Profile voice media is missing: 321565454"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_deploy_001.bnk",
+      "error": "Profile voice media is missing: 932560699"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_deploy_002.bnk",
+      "error": "Profile voice media is missing: 57040839"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_DodgeCombo_001.bnk",
+      "error": "Profile voice media is missing: 531236612"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_DodgeCombo_002.bnk",
+      "error": "Profile voice media is missing: 526870768"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_fh_001.bnk",
+      "error": "Profile voice media is missing: 139890679"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_fh_002.bnk",
+      "error": "Profile voice media is missing: 672996218"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_Fly_001.bnk",
+      "error": "Profile voice media is missing: 850214684"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_Fly_002.bnk",
+      "error": "Profile voice media is missing: 193508615"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_gift_001.bnk",
+      "error": "Profile voice media is missing: 349975610"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_gift_002.bnk",
+      "error": "Profile voice media is missing: 611839819"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_gift_003.bnk",
+      "error": "Profile voice media is missing: 740428475"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_gift_004.bnk",
+      "error": "Profile voice media is missing: 865848407"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_greet_001.bnk",
+      "error": "Profile voice media is missing: 815555831"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_greet_002.bnk",
+      "error": "Profile voice media is missing: 286957711"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_greet_003.bnk",
+      "error": "Profile voice media is missing: 824142792"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_greet_004.bnk",
+      "error": "Profile voice media is missing: 1052968154"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_hobby_001.bnk",
+      "error": "Profile voice media is missing: 654293327"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_hp_001.bnk",
+      "error": "Profile voice media is missing: 107960916"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_hp_002.bnk",
+      "error": "Profile voice media is missing: 984002929"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_hp_003.bnk",
+      "error": "Profile voice media is missing: 228596484"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_hstruck_001.bnk",
+      "error": "Profile voice media is missing: 1068693789"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_hstruck_002.bnk",
+      "error": "Profile voice media is missing: 235942851"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_kill_001.bnk",
+      "error": "Profile voice media is missing: 457152254"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_kill_002.bnk",
+      "error": "Profile voice media is missing: 637710164"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_meet_001.bnk",
+      "error": "Profile voice media is missing: 426012986"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_Parry_001.bnk",
+      "error": "Profile voice media is missing: 1039486532"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_Parry_002.bnk",
+      "error": "Profile voice media is missing: 966316973"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_QTE_001.bnk",
+      "error": "Profile voice media is missing: 438211548"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_QTE_002.bnk",
+      "error": "Profile voice media is missing: 438922751"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_QTE_003.bnk",
+      "error": "Profile voice media is missing: 511783906"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_self_001.bnk",
+      "error": "Profile voice media is missing: 734835561"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_self_002.bnk",
+      "error": "Profile voice media is missing: 224308616"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_self_003.bnk",
+      "error": "Profile voice media is missing: 162776537"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_skill_001.bnk",
+      "error": "Profile voice media is missing: 606282836"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_skill_002.bnk",
+      "error": "Profile voice media is missing: 933333266"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_skill_003.bnk",
+      "error": "Profile voice media is missing: 253111792"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_SSC_ELYMS_001.bnk",
+      "error": "Profile voice media is missing: 818700626"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_SSC_KES_001.bnk",
+      "error": "Profile voice media is missing: 107289663"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_SSC_LK_001.bnk",
+      "error": "Profile voice media is missing: 984511199"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_SSC_ZERO_001.bnk",
+      "error": "Profile voice media is missing: 277259466"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_struck_001.bnk",
+      "error": "Profile voice media is missing: 328945235"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_struck_002.bnk",
+      "error": "Profile voice media is missing: 696172771"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_Switch_001.bnk",
+      "error": "Profile voice media is missing: 364890508"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_Switch_002.bnk",
+      "error": "Profile voice media is missing: 479792033"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_Switch_003.bnk",
+      "error": "Profile voice media is missing: 783217248"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_talk_001.bnk",
+      "error": "Profile voice media is missing: 711468927"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_talk_002.bnk",
+      "error": "Profile voice media is missing: 1060405263"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_talk_003.bnk",
+      "error": "Profile voice media is missing: 527436126"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_TeammateDown_001.bnk",
+      "error": "Profile voice media is missing: 625393526"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_TeammateDown_002.bnk",
+      "error": "Profile voice media is missing: 228574289"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_TeammateDown_003.bnk",
+      "error": "Profile voice media is missing: 80283595"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_TeammateDown_005.bnk",
+      "error": "Profile voice media is missing: 979358985"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_ug_001.bnk",
+      "error": "Profile voice media is missing: 949036998"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_ug_002.bnk",
+      "error": "Profile voice media is missing: 389799266"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_ug_003.bnk",
+      "error": "Profile voice media is missing: 309998087"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_vexation_001.bnk",
+      "error": "Profile voice media is missing: 980199965"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_weather_001.bnk",
+      "error": "Profile voice media is missing: 406195898"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_weather_002.bnk",
+      "error": "Profile voice media is missing: 989846699"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_weather_003.bnk",
+      "error": "Profile voice media is missing: 151946469"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_weather_004.bnk",
+      "error": "Profile voice media is missing: 189665226"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_windfall_001.bnk",
+      "error": "Profile voice media is missing: 93485253"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_windfall_002.bnk",
+      "error": "Profile voice media is missing: 636676590"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_windfall_003.bnk",
+      "error": "Profile voice media is missing: 1043670822"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_windfall_004.bnk",
+      "error": "Profile voice media is missing: 797555220"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_windfall_005.bnk",
+      "error": "Profile voice media is missing: 113135916"
+    },
+    {
+      "path": "HT/Content/WwiseAudio/Event/Chinese/Play_Vo_Char_NPC029_windfall_006.bnk",
+      "error": "Profile voice media is missing: 9618493"
+    },
     {
       "path": "HT/Content/WwiseAudio/Event/English/Play_Vo_Char_NPC020_about_001.bnk",
       "error": "Profile voice media is missing: 0"
@@ -703,6 +1047,7 @@
   "emptyTables": [
     "HT/Content/DataTable/Character/Appearance/DT_DecorationCameraData.uasset",
     "HT/Content/DataTable/Character/Appearance/DT_DecorationData.uasset",
+    "HT/Content/DataTable/Character/CultivationGuide/DT_CultivationGuideData.uasset",
     "HT/Content/DataTable/Character/DT_Character.uasset",
     "HT/Content/DataTable/Character/DT_CharacterAbilityConfig.uasset",
     "HT/Content/DataTable/Character/DT_CharacterAbilityConfig_Old.uasset",
@@ -710,6 +1055,7 @@
     "HT/Content/DataTable/Character/DT_CharacterBreakthroughDataTable.uasset",
     "HT/Content/DataTable/Character/DT_RoomAppearanceRequirement.uasset",
     "HT/Content/DataTable/Character/Trial/DT_CustomizeCharacterDataTable.uasset",
+    "HT/Content/DataTable/Character/Trial/DT_TrialCharacterCloneMonsterConfig.uasset",
     "HT/Content/DataTable/Character/Trial/DT_TrialCharacterDataTable.uasset",
     "HT/Content/DataTable/Drop/DropGroupModifyWeightDataTable.uasset",
     "HT/Content/DataTable/Drop/DropModifySequenceDataTable.uasset",
@@ -732,18 +1078,20 @@
     "HT/Content/DataTable/Skill/DT_ForkWeaponDataTable.uasset",
     "HT/Content/DataTable/Skill/DT_MediaFFmpegInfo.uasset",
     "HT/Content/DataTable/Skill/DT_MediaFFmpegInfo_Quest.uasset",
+    "HT/Content/DataTable/Skill/DT_MonsterSkillDamageData.uasset",
     "HT/Content/DataTable/Skill/DT_SkillDamageGameplayModifyData.uasset",
     "HT/Content/DataTable/Skill/GlobalCharacterData/DT_GlobalValueChiichanData.uasset",
     "HT/Content/DataTable/Skill/GlobalCharacterData/DT_GlobalValueLinkoData.uasset"
   ],
   "source": "Local installed game archives including PatchPaks; original strings preserved",
-  "datasetSha256": "82d44de238103eff86b8d7294d3d78cb547d80647fd0eab3d5d0b0494b26f5eb",
+  "datasetSha256": "c1a7eca97fbf152921aae0fa4522683f22c55818d2596df37422f211b0fef940",
   "chunks": 1088,
+  "historicalCultivationRows": 25,
   "repairedCsvRows": {
-    "ru": 425,
-    "en": 598,
-    "ja": 213,
-    "zh": 237
+    "ru": 458,
+    "en": 634,
+    "ja": 231,
+    "zh": 247
   },
   "supplement": {
     "providers": [
@@ -751,14 +1099,14 @@
       "Kaiden",
       "Neverness.app"
     ],
-    "version": "1.4.13",
-    "checkedAt": "2026-10-23T04:19:41.391Z",
-    "characters": 25,
-    "items": 2071,
-    "weapons": 51,
-    "affinity": 25,
-    "gifts": 138,
+    "version": "1.5.4",
+    "checkedAt": "2026-11-14T10:43:17.852Z",
+    "characters": 27,
+    "items": 2191,
+    "weapons": 53,
+    "affinity": 26,
+    "gifts": 143,
     "failures": []
   },
-  "chunksSha256": "dcdf1f8861b9e24f7735875f9dbeca5a71206793fdb483f929a835b774b039e1"
+  "chunksSha256": "a59e42ab724671a66cd4cc767d63cb724c2cea18cd9bf2c13cbfa1b5c7e1fca4"
 }

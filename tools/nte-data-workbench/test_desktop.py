@@ -14,7 +14,8 @@ class DesktopTests(TestCase):
         from PySide6.QtCore import QUrl, QCoreApplication, QEvent, QEventLoop, QTimer
         from PySide6.QtWebEngineCore import QWebEnginePage
         application = QApplication.instance() or QApplication([])
-        with TemporaryDirectory() as directory, patch.object(desktop, 'DATA', Path(directory)):
+        with TemporaryDirectory() as directory, patch.object(desktop, 'DATA', Path(directory)), \
+                patch.object(desktop.Desktop, 'check_game'):
             window = desktop.Desktop()
             try:
                 window.hide()
@@ -26,6 +27,26 @@ class DesktopTests(TestCase):
                 self.assertTrue(window.page.acceptNavigationRequest(QUrl(desktop.site_url('/guides')), kind, True))
                 with self.assertRaises(ValueError): desktop.site_url('javascript:alert(1)')
                 self.assertEqual(len(window.nav), 7)
+                snapshot = Path(directory)/'snapshot'
+                (snapshot/'export').mkdir(parents=True)
+                (snapshot/'export/extraction.json').write_text('{}', 'utf-8')
+                report = snapshot/'Изменения патча.html'
+                result = dict(snapshot=str(snapshot), paths={'game': 'NTE'}, added=[], changed=[],
+                              removed=[], needsExtraction=False)
+                window.checked(result)
+                self.assertFalse(window.patch_report.isEnabled())
+                report.write_text('<h1>Изменения патча</h1>', 'utf-8')
+                window.resize(920, 650)
+                window.show()
+                window.checked(result)
+                application.processEvents()
+                self.assertTrue(window.patch_report.isEnabled())
+                position = window.patch_report.mapTo(window.local.viewport(), window.patch_report.rect().center())
+                self.assertTrue(window.local.viewport().rect().contains(position))
+                with patch.object(desktop, 'config', return_value={'source':str(snapshot)}), \
+                        patch.object(desktop.QDesktopServices, 'openUrl', return_value=True) as open_url:
+                    window.patch_report.click()
+                    open_url.assert_called_once_with(QUrl.fromLocalFile(str(report)))
             finally:
                 window.close(); application.processEvents()
                 QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)

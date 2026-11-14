@@ -1,6 +1,19 @@
 // Compact Russian equipment sheets from the same normalized native snapshot.
 export function equipmentDescriptions(rows) {
   const key = (value) => String(value || '').toLowerCase();
+  const arcNames = new Map(
+    rows
+      .filter(
+        (row) =>
+          (!row.namespace || row.namespace === 'ST_Fork') &&
+          /^fork_.+_name$/i.test(row.gameId) &&
+          row.values.ru,
+      )
+      .sort(
+        (a, b) => Number(Boolean(b.namespace)) - Number(Boolean(a.namespace)),
+      )
+      .map((row) => [key(row.gameId).slice(0, -5), row.values]),
+  );
   const text = new Map(
     rows
       .filter((row) => row.values.ru)
@@ -44,14 +57,24 @@ export function equipmentDescriptions(rows) {
       (row) =>
         ['NTE_ReferenceWeapon', 'DT_EquipmentSuitData'].includes(
           row.namespace,
-        ) && row.values.ru,
+        ) &&
+        (row.values.ru || arcNames.has(key(row.gameId))),
     )
     .map((row) => {
       const arc = row.namespace === 'NTE_ReferenceWeapon';
       const stem = key(row.gameId);
+      const names = arc ? { ...row.values, ...arcNames.get(stem) } : row.values;
       const fields = rows.filter(
         (record) =>
-          record.namespace === 'ST_Fork' && key(record.gameId).includes(stem),
+          (record.namespace === 'ST_Fork' ||
+            (!record.namespace &&
+              [
+                `${stem}_des`,
+                `${stem}_desc`,
+                `${stem}_context`,
+                `buff_${stem}_effect`,
+              ].includes(key(record.gameId)))) &&
+          key(record.gameId).includes(stem),
       );
       const resolveEffect = (value) =>
         clean(value).replace(
@@ -65,7 +88,12 @@ export function equipmentDescriptions(rows) {
         ? fields
             .filter((record) => /_effect$/i.test(record.gameId))
             .map((record) => resolveEffect(record.values.ru))
-            .filter((value) => value && !/\{\d+\}/.test(value))
+            .filter(
+              (value, index, array) =>
+                value &&
+                !/\{\d+\}/.test(value) &&
+                array.indexOf(value) === index,
+            )
             .join('\n')
         : '';
       const description = arc
@@ -91,9 +119,15 @@ export function equipmentDescriptions(rows) {
             .filter((stat) => stat.value);
       return {
         id: stem,
-        names: Object.values(row.values).filter(Boolean),
+        names: [
+          ...new Set(
+            [...Object.values(row.values), ...Object.values(names)].filter(
+              Boolean,
+            ),
+          ),
+        ],
         detail: {
-          name: row.values.ru,
+          name: names.ru,
           type: arc ? 'Дуга' : 'Картридж',
           rarity: row.details.rarity,
           iconUrl:
